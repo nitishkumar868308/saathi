@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/.claude/skills/ui-ux-pro-max/**)",
+      "Bash(ls scripts *)",
+      "Bash(ls scripts/scripts/)",
+      "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/**)",
+      "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/**)",
+      "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/src/ui-ux-pro-max/**)",
+      "Bash(python scripts/search.py \"AI personal companion warm cozy premium service consumer\" --design-system -f markdown)"
+    ]
+  }
+}
