@@ -48,10 +48,15 @@ const config: Config = {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-12px)" },
         },
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.7s ease-out both",
         float: "float 6s ease-in-out infinite",
+        marquee: "marquee 32s linear infinite",
       },
     },
   },

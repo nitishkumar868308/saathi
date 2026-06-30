@@ -9,7 +9,14 @@
       "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/**)",
       "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/**)",
       "Read(//c/Users/Pratiek A Jain/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.5.0/src/ui-ux-pro-max/**)",
-      "Bash(python scripts/search.py \"AI personal companion warm cozy premium service consumer\" --design-system -f markdown)"
+      "Bash(python scripts/search.py \"AI personal companion warm cozy premium service consumer\" --design-system -f markdown)",
+      "Bash(seq 1 30)",
+      "Bash(grep -qi \"ready\\\\|started\\\\|localhost:3000\" \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/6c47a3af-596c-443c-8d36-3eab9508e2ff/tasks/bg61meggs.output\")",
+      "Bash(echo \"SERVER_READY\")",
+      "Bash(cat \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/6c47a3af-596c-443c-8d36-3eab9508e2ff/tasks/bg61meggs.output\")",
+      "Bash(break)",
+      "mcp__plugin_superpowers-chrome_chrome__use_browser",
+      "Read(//c/Users/Pratiek A Jain/AppData/Local/superpowers/browser/2026-06-30/session-1782795863092/**)"
     ]
   }
 }
