@@ -14,7 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 import WaitlistForm from "@/components/WaitlistForm";
-import PhoneDemo from "@/components/PhoneDemo";
+import HeroVisual from "@/components/HeroVisual";
 import Marquee from "@/components/Marquee";
 import Faq from "@/components/Faq";
 import Reveal from "@/components/Reveal";
@@ -191,9 +191,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Hero visual: animated phone */}
+          {/* Hero visual: premium animated phone + floating cards */}
           <div className="order-first animate-fade-up [animation-delay:200ms] lg:order-none">
-            <PhoneDemo />
+            <HeroVisual />
           </div>
         </section>
 
