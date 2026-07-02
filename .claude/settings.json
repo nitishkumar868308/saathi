@@ -16,7 +16,13 @@
       "Bash(cat \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/6c47a3af-596c-443c-8d36-3eab9508e2ff/tasks/bg61meggs.output\")",
       "Bash(break)",
       "mcp__plugin_superpowers-chrome_chrome__use_browser",
-      "Read(//c/Users/Pratiek A Jain/AppData/Local/superpowers/browser/2026-06-30/session-1782795863092/**)"
+      "Read(//c/Users/Pratiek A Jain/AppData/Local/superpowers/browser/2026-06-30/session-1782795863092/**)",
+      "Bash(rm -f src/components/app-tabs.tsx src/components/app-tabs.web.tsx src/components/animated-icon.tsx src/components/animated-icon.web.tsx src/components/animated-icon.module.css src/components/hint-row.tsx src/components/themed-text.tsx src/components/themed-view.tsx src/components/web-badge.tsx src/components/external-link.tsx src/components/ui/collapsible.tsx src/constants/theme.ts src/hooks/use-color-scheme.ts src/hooks/use-color-scheme.web.ts src/hooks/use-theme.ts)",
+      "Bash(rmdir src/components/ui src/constants src/hooks)",
+      "Bash(rm -f src/data/mock.ts)",
+      "Bash(rmdir src/data)",
+      "Bash(rm -rf .expo/types)",
+      "Bash(ls .expo)"
     ]
   }
 }

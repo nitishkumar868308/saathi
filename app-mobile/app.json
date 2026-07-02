@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "Saathi",
+    "slug": "saathi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "saathi",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.saathi.app"
+    },
+    "android": {
+      "package": "com.saathi.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#C25A37",
+        "foregroundImage": "./assets/images/adaptive-foreground.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F2E9",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 130
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Saathi ko documents ki photo access chahiye.",
+          "cameraPermission": "Saathi ko document scan karne ke liye camera chahiye."
+        }
+      ],
+      "expo-speech-recognition",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f42a2d18-8e2b-4a46-baa4-58415723c437"
+      }
+    },
+    "owner": "nitish8683"
+  }
+}
