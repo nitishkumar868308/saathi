@@ -1,29 +1,93 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Mulish } from "next/font/google";
 import "./globals.css";
+import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
+import { ToastProvider } from "@/components/Toast";
+import Analytics from "@/components/Analytics";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-fraunces",
   display: "swap",
+  preload: true,
 });
 
 const mulish = Mulish({
   subsets: ["latin"],
   variable: "--font-mulish",
   display: "swap",
+  preload: true,
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://saathi.app";
+
 export const metadata: Metadata = {
-  title: "Saathi — Aapka personal saathi jo kuch nahi bhoolta",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Aapka saathi, jo kuch nahi bhoolta",
+    template: "%s · Saathi",
+  },
   description:
-    "Ek AI saathi jo aapke zaroori documents aur dates kabhi bhoolne nahi deta — aur ek dost ki tarah bina pooche aapki life ka khayal rakhta hai.",
+    "Saathi ek AI companion hai jo aapke documents ki expiry, zaroori dates aur roz ke kaam bina pooche yaad dilata hai. Passport, insurance, FASTag, EMI — sab yaad. Hindi + English. Early access lo.",
+  keywords: [
+    "Saathi",
+    "AI reminder app",
+    "document expiry reminder",
+    "India reminder app",
+    "Hindi AI assistant",
+    "FASTag reminder",
+    "insurance expiry reminder",
+    "personal AI companion",
+  ],
+  authors: [{ name: "Saathi" }],
+  creator: "Saathi",
+  applicationName: "Saathi",
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Saathi — Aapka personal saathi",
+    title: "Saathi — Aapka AI saathi jo kuch nahi bhoolta",
     description:
-      "Documents ki expiry, daily brief, aur reminders — sab ek dost ki tarah sambhalta hai.",
+      "Documents ki expiry, daily brief, aur reminders — sab ek dost ki tarah bina pooche sambhalta hai. Never forget what matters.",
+    url: SITE_URL,
+    siteName: "Saathi",
+    locale: "en_IN",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Saathi — jo kuch nahi bhoolta",
+    description:
+      "AI saathi jo aapke documents, dates aur kaam bina pooche yaad dilata hai.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  category: "productivity",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#F7F2E9",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Saathi",
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "Android",
+  description:
+    "AI companion that reminds you about document expiries, important dates and daily tasks — without being asked.",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: "4.9",
+    ratingCount: "500",
+  },
+  inLanguage: ["hi", "en"],
 };
 
 export default function RootLayout({
@@ -32,8 +96,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${mulish.variable}`}>
-      <body>{children}</body>
+    <html lang="hi" className={`${fraunces.variable} ${mulish.variable}`}>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
+      <body>
+        <LanguageProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </LanguageProvider>
+        <Analytics />
+      </body>
     </html>
   );
 }

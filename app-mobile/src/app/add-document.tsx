@@ -16,7 +16,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
 import { colors } from "@/theme/colors";
-import { addDocument } from "@/lib/documents";
+import { addDocument, DocLimitError } from "@/lib/documents";
 import { ocrImage } from "@/lib/ocr";
 import { dateAfterMonths, isValidDate } from "@/utils/expiry";
 import { extractExpiry } from "@/utils/extract-expiry";
@@ -102,8 +102,13 @@ export default function AddDocument() {
       await addDocument({ name: name.trim(), type, expiry: expiry || null });
       toast.show("Document add ho gaya 🎉", "success");
       router.back();
-    } catch {
-      toast.show("Save nahi ho paya", "error");
+    } catch (e) {
+      if (e instanceof DocLimitError) {
+        toast.show("Free limit poori — Saathi Plus lo unlimited ke liye", "info");
+        router.push("/upgrade" as never);
+      } else {
+        toast.show("Save nahi ho paya", "error");
+      }
     } finally {
       setSaving(false);
     }

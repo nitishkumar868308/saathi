@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.saathi.app"
+      "bundleIdentifier": "com.saathi.app",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+      }
     },
     "android": {
       "package": "com.saathi.app",
@@ -17,7 +21,10 @@
         "backgroundColor": "#C25A37",
         "foregroundImage": "./assets/images/adaptive-foreground.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -51,9 +58,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f42a2d18-8e2b-4a46-baa4-58415723c437"
+        "projectId": "e033d02c-b1a4-40c8-b932-bcdb3183f0c3"
       }
     },
-    "owner": "nitish8683"
+    "owner": "saathi8683"
   }
 }

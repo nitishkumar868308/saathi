@@ -3,36 +3,15 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
-
-const faqs = [
-  {
-    q: "Saathi free hai?",
-    a: "Shuruaat mein free. Early access wale logon ko launch pe sabse pehle aur best deal milegi. Aage chal ke kuch premium features aa sakte hain, par core kaam free rahega.",
-  },
-  {
-    q: "Mera data safe hai? Documents kahan jaate hain?",
-    a: "Aapke documents aapke apne private storage mein, encrypted. Hum unhe kisi AI ke memory server pe save nahi karte. Aap chaho toh ek tap mein sab kuch delete kar sakte ho.",
-  },
-  {
-    q: "Kya ye ChatGPT se alag hai?",
-    a: "Haan. ChatGPT aapke poochne ka wait karta hai. Saathi khud aage aata hai — bina pooche expiry, dates aur kaam yaad dilata hai. Aur ye India ke documents (FASTag, RC, insurance) ke liye bana hai.",
-  },
-  {
-    q: "Hindi mein baat kar sakte hain?",
-    a: "Bilkul. Hindi, English ya Hinglish — jaise aap bolte ho waise baat karo. Type karo ya mic dabake bol do.",
-  },
-  {
-    q: "Kab launch ho raha hai? Android ya iPhone?",
-    a: "Pehle Android pe early access aayega, phir iPhone. Waitlist mein judo — launch hote hi aapko sabse pehle khabar denge.",
-  },
-];
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function Faq() {
+  const { faq } = useT();
   const [open, setOpen] = useState<number | null>(0);
 
   return (
     <div className="mx-auto max-w-3xl divide-y divide-line overflow-hidden rounded-4xl border border-line bg-surface">
-      {faqs.map((f, i) => {
+      {faq.items.map((f, i) => {
         const isOpen = open === i;
         return (
           <div key={i}>

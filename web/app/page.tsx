@@ -1,3 +1,5 @@
+"use client";
+
 import {
   FileClock,
   Sunrise,
@@ -7,98 +9,52 @@ import {
   Bell,
   ScanLine,
   Heart,
-  MapPin,
+  Globe,
   Lock,
   MessageCircleHeart,
   Sun,
   Clock,
+  Plane,
+  BadgeCheck,
+  Cake,
+  IndianRupee,
 } from "lucide-react";
 import WaitlistForm from "@/components/WaitlistForm";
+import WaitlistCount from "@/components/WaitlistCount";
 import HeroVisual from "@/components/HeroVisual";
 import Marquee from "@/components/Marquee";
 import Faq from "@/components/Faq";
 import Reveal from "@/components/Reveal";
+import LiveDemo from "@/components/LiveDemo";
+import TrustSection from "@/components/TrustSection";
+import SupportedDocs from "@/components/SupportedDocs";
+import Testimonials from "@/components/Testimonials";
+import Pricing from "@/components/Pricing";
+import Footer from "@/components/Footer";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
-const features = [
-  {
-    icon: FileClock,
-    title: "Document Expiry Guardian",
-    body: "Passport, license, car insurance, FASTag, warranty — ek photo daalo. Saathi expiry yaad rakhta hai aur 1 mahina, 1 hafta pehle, aur expire hone pe khud yaad dilata hai.",
-    accent: "bg-terracotta/10 text-terracotta",
-  },
-  {
-    icon: Sunrise,
-    title: "Morning Daily Brief",
-    body: "Har subah ek chhota, pyaara message — aaj ke kaam, is hafte kya expire ho raha hai, aur aaj ka gym/reminder. Poora din ek nazar mein.",
-    accent: "bg-amber-warm/15 text-amber-warm",
-  },
-  {
-    icon: Mic,
-    title: "Bol ya likh ke baat",
-    body: "Dost jaise baat karo — type karo ya mic dabake bolo. “Kal 8 baje uthana”, “mummy ko call karna yaad dilana” — bas keh do, ho gaya.",
-    accent: "bg-sage/15 text-sage",
-  },
-  {
-    icon: MessageCircleHeart,
-    title: "Aapko yaad rakhta hai",
-    body: "Jo aap ek baar batate ho woh yaad rehta hai — har baar dohrana nahi padta. Sach mein ek saathi jo aapko jaanta hai.",
-    accent: "bg-terracotta/10 text-terracotta",
-  },
-  {
-    icon: Lock,
-    title: "Pura private, aapke control mein",
-    body: "Documents aapke apne encrypted storage mein. Kisi AI ke memory server pe kuch nahi. Aap chaho toh ek tap mein sab delete.",
-    accent: "bg-sage/15 text-sage",
-  },
+const featureIcons = [FileClock, Sunrise, Mic, MessageCircleHeart, Lock];
+const featureAccents = [
+  "bg-terracotta/10 text-terracotta",
+  "bg-amber-warm/15 text-amber-warm",
+  "bg-sage/15 text-sage",
+  "bg-terracotta/10 text-terracotta",
+  "bg-sage/15 text-sage",
 ];
-
-const steps = [
-  {
-    icon: ScanLine,
-    title: "Batao ya dikhao",
-    body: "Document ki photo daalo, ya bas Saathi se bol do ki kya yaad rakhna hai.",
-  },
-  {
-    icon: Sparkles,
-    title: "Saathi samajh leta hai",
-    body: "AI document padhke expiry aur zaroori dates apne aap nikal leta hai.",
-  },
-  {
-    icon: Bell,
-    title: "Woh khud yaad dilata hai",
-    body: "Sahi time pe notification — bina aapke pooche. Aap tension-free.",
-  },
+const stepIcons = [ScanLine, Sparkles, Bell];
+const dayIcons = [Sun, FileClock, Mic];
+const dayColors = [
+  "bg-amber-warm/15 text-amber-warm",
+  "bg-terracotta/10 text-terracotta",
+  "bg-sage/15 text-sage",
 ];
-
-const day = [
-  {
-    time: "Subah 8:00",
-    icon: Sun,
-    color: "bg-amber-warm/15 text-amber-warm",
-    text: "“Good morning! Aaj 2 kaam hain. Car insurance is hafte (12 ko) expire ho raha hai — renew kara doon?”",
-  },
-  {
-    time: "Dopahar 2:30",
-    icon: FileClock,
-    color: "bg-terracotta/10 text-terracotta",
-    text: "“FASTag recharge khatam hone wala hai. Abhi karwa lo, warna kal toll pe dikkat ho sakti hai.”",
-  },
-  {
-    time: "Raat 10:00",
-    icon: Mic,
-    color: "bg-sage/15 text-sage",
-    text: "Aapne bola: “Kal subah 7 baje gym yaad dilana” — Saathi: “Set! 💪 Subah milte hain.”",
-  },
-];
-
-const trust = [
-  { icon: ShieldCheck, label: "100% private" },
-  { icon: MapPin, label: "Made in India" },
-  { icon: MessageCircleHeart, label: "Hindi + English" },
-  { icon: Bell, label: "Android first" },
-];
+const exampleIcons = [Plane, ShieldCheck, Cake, IndianRupee];
+const trustIcons = [ShieldCheck, Mic, MessageCircleHeart, Bell];
 
 export default function Home() {
+  const t = useT();
+
   return (
     <div className="relative overflow-hidden">
       {/* Soft background blobs */}
@@ -110,42 +66,59 @@ export default function Home() {
 
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-line/0 bg-cream/80 backdrop-blur-md">
-        <div className="container-page flex items-center justify-between py-4">
-          <div className="flex items-center gap-2.5">
+        <div className="container-page flex items-center justify-between gap-2 py-3 sm:py-4">
+          <a href="/" className="flex shrink-0 items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm sm:h-10 sm:w-10">
               <Heart size={18} strokeWidth={2.4} className="fill-white" />
             </span>
-            <span className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
+            <span className="font-display text-lg font-semibold tracking-tight sm:text-2xl">
               Saathi
             </span>
-          </div>
-          <a
-            href="#waitlist"
-            className="rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-cream transition hover:bg-ink/90 sm:px-5"
-          >
-            Early access
           </a>
+          <div className="flex items-center gap-1 sm:gap-2.5">
+            <nav className="flex items-center">
+              <a
+                href="/"
+                className="rounded-full bg-terracotta/10 px-2.5 py-2 text-[13px] font-semibold text-terracotta transition sm:px-3 sm:text-sm"
+              >
+                {t.nav.home}
+              </a>
+              <a
+                href="/about"
+                className="rounded-full px-2.5 py-2 text-[13px] font-semibold text-ink-soft transition hover:bg-cream-deep/50 hover:text-ink sm:px-3 sm:text-sm"
+              >
+                {t.nav.about}
+              </a>
+              <a
+                href="/contact"
+                className="rounded-full px-2.5 py-2 text-[13px] font-semibold text-ink-soft transition hover:bg-cream-deep/50 hover:text-ink sm:px-3 sm:text-sm"
+              >
+                {t.nav.contact}
+              </a>
+            </nav>
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
 
       <main>
         {/* Hero */}
-        <section className="container-page grid items-center gap-10 pb-12 pt-8 sm:pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:pb-24">
+        <section className="container-page grid items-center gap-8 pb-12 pt-6 sm:gap-10 sm:pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:pb-24">
           <div>
             <div className="animate-fade-up">
               <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-terracotta" />
-                Aapka AI saathi · India ke liye
+                {t.hero.badge}
               </span>
             </div>
 
             <div className="animate-fade-up [animation-delay:80ms]">
-              <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:mt-6 sm:text-6xl lg:text-[4.25rem]">
-                Aapka saathi,
+              <h1 className="mt-4 font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:mt-6 sm:text-6xl lg:text-[4.25rem]">
+                {t.hero.titleA}
                 <br />
-                jo kuch nahi{" "}
+                {t.hero.titleB}{" "}
                 <span className="relative inline-block text-terracotta">
-                  bhoolta.
+                  {t.hero.titleAccent}
                   <svg
                     aria-hidden
                     viewBox="0 0 200 12"
@@ -162,14 +135,18 @@ export default function Home() {
                   </svg>
                 </span>
               </h1>
+              <p className="mt-3 font-display text-sm font-semibold uppercase tracking-[0.2em] text-terracotta/80">
+                {t.hero.tagline}
+              </p>
             </div>
 
             <div className="animate-fade-up [animation-delay:160ms]">
               <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-soft sm:mt-6 sm:text-xl">
-                Documents ki expiry, roz ke kaam, zaroori dates — Saathi sab yaad
-                rakhta hai aur ek dost ki tarah{" "}
-                <span className="font-semibold text-ink">bina pooche</span>{" "}
-                khayal rakhta hai. Bas baat karo, ya bol do.
+                {t.hero.desc.pre}
+                <span className="font-semibold text-ink">
+                  {t.hero.desc.strong}
+                </span>
+                {t.hero.desc.post}
               </p>
             </div>
 
@@ -179,14 +156,22 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="animate-fade-up [animation-delay:320ms]">
-              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2.5 text-sm text-ink-soft">
-                {trust.map((t) => (
-                  <span key={t.label} className="inline-flex items-center gap-2">
-                    <t.icon size={15} className="text-sage" />
-                    {t.label}
-                  </span>
-                ))}
+            {/* Waitlist count */}
+            <div className="animate-fade-up mt-6 [animation-delay:300ms]">
+              <WaitlistCount />
+            </div>
+
+            <div className="animate-fade-up [animation-delay:360ms]">
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2.5 text-sm text-ink-soft">
+                {t.hero.trust.map((label, i) => {
+                  const Icon = trustIcons[i] ?? ShieldCheck;
+                  return (
+                    <span key={label} className="inline-flex items-center gap-2">
+                      <Icon size={15} className="text-sage" />
+                      {label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -197,92 +182,149 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Real-life examples strip */}
+        <section className="container-page pb-10 sm:pb-14">
+          <Reveal>
+            <p className="mb-4 text-center text-sm font-semibold uppercase tracking-widest text-ink-soft">
+              {t.hero.examplesLabel}
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+              {t.hero.examples.map((ex, i) => {
+                const Icon = exampleIcons[i] ?? BadgeCheck;
+                return (
+                  <div
+                    key={ex.label}
+                    className="group flex items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-warm"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta transition group-hover:scale-110">
+                      <Icon size={20} />
+                    </span>
+                    <div className="min-w-0 leading-tight">
+                      <p className="truncate font-display text-base font-semibold">
+                        {ex.label}
+                      </p>
+                      <p className="truncate text-xs text-ink-soft">{ex.sub}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Reveal>
+        </section>
+
         {/* Marquee */}
         <Marquee />
 
-        {/* Insight strip */}
+        {/* Insight strip — Saathi bina pooche yaad dilata hai */}
         <section className="container-page py-14 sm:py-20">
           <Reveal>
             <p className="mx-auto max-w-3xl text-center font-display text-2xl font-medium leading-snug text-ink sm:text-4xl">
-              ChatGPT aapke poochne ka wait karta hai.{" "}
-              <span className="text-terracotta">Saathi khud aage aata hai.</span>
+              {t.insight.pre}{" "}
+              <span className="text-terracotta">{t.insight.accent}</span>
             </p>
           </Reveal>
         </section>
 
         {/* Features */}
-        <section className="container-page pb-16 sm:pb-24">
+        <section id="features" className="container-page scroll-mt-24 pb-16 sm:pb-24">
           <Reveal>
             <div className="mx-auto max-w-2xl text-center">
               <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-5xl">
-                Ek dost jo sach mein khayal rakhe
+                {t.features.heading}
               </h2>
               <p className="mt-3 text-base text-ink-soft sm:mt-4 sm:text-lg">
-                Yaad rakhne ki tension khatam. Saathi sambhal leta hai.
+                {t.features.sub}
               </p>
             </div>
           </Reveal>
 
           <div className="mt-12 grid gap-4 sm:mt-14 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((f, i) => (
-              <Reveal key={f.title} delay={i * 0.06}>
-                <div className="group h-full rounded-4xl border border-line bg-surface p-6 shadow-soft transition duration-300 hover:-translate-y-1 hover:shadow-warm sm:p-7">
-                  <span
-                    className={`flex h-14 w-14 items-center justify-center rounded-2xl ${f.accent}`}
-                  >
-                    <f.icon size={24} strokeWidth={2} />
-                  </span>
-                  <h3 className="mt-5 font-display text-xl font-semibold">
-                    {f.title}
-                  </h3>
-                  <p className="mt-2.5 leading-relaxed text-ink-soft">
-                    {f.body}
-                  </p>
-                </div>
-              </Reveal>
-            ))}
+            {t.features.items.map((f, i) => {
+              const Icon = featureIcons[i] ?? Sparkles;
+              return (
+                <Reveal key={f.title} delay={i * 0.06}>
+                  <div className="group h-full rounded-4xl border border-line bg-surface p-6 shadow-soft transition duration-300 hover:-translate-y-1.5 hover:border-terracotta/25 hover:shadow-warm sm:p-7">
+                    <span
+                      className={`flex h-14 w-14 items-center justify-center rounded-2xl transition duration-300 group-hover:scale-110 group-hover:-rotate-3 ${featureAccents[i]}`}
+                    >
+                      <Icon size={24} strokeWidth={2} />
+                    </span>
+                    <h3 className="mt-5 font-display text-xl font-semibold">
+                      {f.title}
+                    </h3>
+                    <p className="mt-2.5 leading-relaxed text-ink-soft">
+                      {f.body}
+                    </p>
+                  </div>
+                </Reveal>
+              );
+            })}
 
             <Reveal delay={0.3}>
               <div className="flex h-full flex-col justify-center rounded-4xl bg-ink p-7 text-cream shadow-soft">
                 <h3 className="font-display text-2xl font-semibold leading-snug">
-                  Aur dheere-dheere,
-                  <br />
-                  poori life ka saathi.
+                  {t.features.cta.title}
                 </h3>
                 <p className="mt-3 leading-relaxed text-cream/70">
-                  Gym, goals, aur bahut kuch — sab isi mein add hota jayega.
+                  {t.features.cta.body}
                 </p>
                 <a
                   href="#waitlist"
-                  className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark"
+                  className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark active:scale-95"
                 >
-                  Mujhe chahiye
+                  {t.features.cta.button}
                 </a>
               </div>
             </Reveal>
           </div>
         </section>
 
-        {/* How it works */}
-        <section className="bg-cream-deep/40 py-16 sm:py-28">
+        {/* Live product demo */}
+        <section id="demo" className="scroll-mt-24 bg-cream-deep/40 py-16 sm:py-28">
           <div className="container-page">
             <Reveal>
               <div className="mx-auto max-w-2xl text-center">
-                <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-5xl">
-                  Kaise kaam karta hai
+                <span className="inline-flex items-center gap-2 rounded-full bg-terracotta/10 px-4 py-1.5 text-sm font-semibold text-terracotta">
+                  <Sparkles size={15} />
+                  {t.demo.badge}
+                </span>
+                <h2 className="mt-5 font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+                  {t.demo.heading}
                 </h2>
                 <p className="mt-3 text-base text-ink-soft sm:mt-4 sm:text-lg">
-                  Teen aasan kadam. Form bharne ki zaroorat nahi.
+                  {t.demo.sub}
                 </p>
               </div>
             </Reveal>
+            <Reveal delay={0.1}>
+              <div className="mt-12 sm:mt-14">
+                <LiveDemo />
+              </div>
+            </Reveal>
+          </div>
+        </section>
 
-            <div className="mt-12 grid gap-8 sm:mt-14 md:grid-cols-3 md:gap-6">
-              {steps.map((s, i) => (
+        {/* How it works */}
+        <section className="container-page py-16 sm:py-28">
+          <Reveal>
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-5xl">
+                {t.how.heading}
+              </h2>
+              <p className="mt-3 text-base text-ink-soft sm:mt-4 sm:text-lg">
+                {t.how.sub}
+              </p>
+            </div>
+          </Reveal>
+
+          <div className="mt-12 grid gap-8 sm:mt-14 md:grid-cols-3 md:gap-6">
+            {t.how.steps.map((s, i) => {
+              const Icon = stepIcons[i] ?? Sparkles;
+              return (
                 <Reveal key={s.title} delay={i * 0.1}>
-                  <div className="text-center">
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-line bg-surface text-terracotta shadow-soft">
-                      <s.icon size={26} strokeWidth={2} />
+                  <div className="group text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-line bg-surface text-terracotta shadow-soft transition duration-300 group-hover:-translate-y-1 group-hover:shadow-warm">
+                      <Icon size={26} strokeWidth={2} />
                     </div>
                     <span className="mt-5 inline-block font-display text-xs font-bold uppercase tracking-widest text-ink-soft">
                       Step {i + 1}
@@ -295,26 +337,25 @@ export default function Home() {
                     </p>
                   </div>
                 </Reveal>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </section>
 
         {/* A day with Saathi */}
-        <section className="container-page py-16 sm:py-28">
+        <section className="container-page pb-16 sm:pb-28">
           <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
             <Reveal>
               <div className="lg:sticky lg:top-28">
                 <span className="inline-flex items-center gap-2 rounded-full bg-terracotta/10 px-4 py-1.5 text-sm font-semibold text-terracotta">
                   <Clock size={15} />
-                  Ek din Saathi ke saath
+                  {t.day.badge}
                 </span>
                 <h2 className="mt-5 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-                  Subah se raat tak, bina pooche.
+                  {t.day.heading}
                 </h2>
                 <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
-                  Aapko kuch yaad rakhne ki zaroorat nahi. Saathi sahi time pe,
-                  sahi cheez, khud bata deta hai — jaise ek samajhdaar dost.
+                  {t.day.sub}
                 </p>
               </div>
             </Reveal>
@@ -324,65 +365,77 @@ export default function Home() {
                 aria-hidden
                 className="absolute left-[26px] top-4 bottom-4 w-px bg-line sm:left-[30px]"
               />
-              {day.map((d, i) => (
-                <Reveal key={d.time} delay={i * 0.1}>
-                  <div className="relative flex gap-4 sm:gap-5">
-                    <span
-                      className={`relative z-10 flex shrink-0 items-center justify-center rounded-2xl border-4 border-cream ${d.color}`}
-                      style={{ height: 52, width: 52 }}
-                    >
-                      <d.icon size={22} />
-                    </span>
-                    <div className="flex-1 rounded-3xl border border-line bg-surface p-5 shadow-soft">
-                      <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">
-                        {d.time}
-                      </p>
-                      <p className="mt-2 leading-relaxed text-ink">{d.text}</p>
+              {t.day.items.map((d, i) => {
+                const Icon = dayIcons[i] ?? Sun;
+                return (
+                  <Reveal key={d.time} delay={i * 0.1}>
+                    <div className="relative flex gap-4 sm:gap-5">
+                      <span
+                        className={`relative z-10 flex shrink-0 items-center justify-center rounded-2xl border-4 border-cream ${dayColors[i]}`}
+                        style={{ height: 52, width: 52 }}
+                      >
+                        <Icon size={22} />
+                      </span>
+                      <div className="flex-1 rounded-3xl border border-line bg-surface p-5 shadow-soft transition duration-300 hover:shadow-warm">
+                        <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+                          {d.time}
+                        </p>
+                        <p className="mt-2 leading-relaxed text-ink">{d.text}</p>
+                      </div>
                     </div>
-                  </div>
-                </Reveal>
-              ))}
+                  </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>
 
-        {/* India-first */}
+        {/* Trust / Your Data Your Control */}
         <section className="container-page pb-16 sm:pb-28">
+          <Reveal>
+            <TrustSection />
+          </Reveal>
+        </section>
+
+        {/* Supported documents */}
+        <section className="bg-cream-deep/40 py-16 sm:py-28">
+          <div className="container-page">
+            <Reveal>
+              <SupportedDocs />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* India-first */}
+        <section className="container-page py-16 sm:py-28">
           <Reveal>
             <div className="overflow-hidden rounded-[2rem] border border-line bg-surface shadow-soft sm:rounded-[2.5rem]">
               <div className="grid items-center gap-8 p-7 sm:p-12 lg:grid-cols-2 lg:p-16">
                 <div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-terracotta/10 px-4 py-1.5 text-sm font-semibold text-terracotta">
-                    <MapPin size={15} />
-                    India ke liye bana
+                    <Globe size={15} />
+                    {t.india.badge}
                   </span>
                   <h2 className="mt-5 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-                    Aapki bhasha, aapke documents.
+                    {t.india.heading}
                   </h2>
                   <p className="mt-4 text-base leading-relaxed text-ink-soft sm:text-lg">
-                    FASTag, RC, insurance, driving license, gas connection,
-                    warranty — wahi cheezein jo India mein matter karti hain.
-                    Hindi mein bhi baat karo. Bilkul apne dost jaisa.
+                    {t.india.body}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  {[
-                    "Passport",
-                    "Driving License",
-                    "Car Insurance",
-                    "FASTag",
-                    "RC / PUC",
-                    "Warranty / AMC",
-                  ].map((doc) => (
+                  {t.india.items.map((doc) => (
                     <div
                       key={doc}
-                      className="flex items-center gap-3 rounded-2xl border border-line bg-cream-deep/30 px-4 py-3.5"
+                      className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-line bg-cream-deep/30 px-3 py-3.5 transition hover:border-terracotta/30 hover:bg-surface sm:gap-3 sm:px-4"
                     >
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta">
                         <FileClock size={17} />
                       </span>
-                      <span className="text-sm font-semibold">{doc}</span>
+                      <span className="min-w-0 break-words text-sm font-semibold">
+                        {doc}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -391,12 +444,28 @@ export default function Home() {
           </Reveal>
         </section>
 
+        {/* Testimonials */}
+        <section className="bg-cream-deep/40 py-16 sm:py-28">
+          <div className="container-page">
+            <Reveal>
+              <Testimonials />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Pricing */}
+        <section id="pricing" className="container-page scroll-mt-24 py-16 sm:py-28">
+          <Reveal>
+            <Pricing />
+          </Reveal>
+        </section>
+
         {/* FAQ */}
-        <section className="container-page pb-16 sm:pb-28">
+        <section id="faq" className="container-page scroll-mt-24 pb-16 sm:pb-28">
           <Reveal>
             <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-12">
               <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-5xl">
-                Sawaal hain? Bilkul natural hai.
+                {t.faq.heading}
               </h2>
             </div>
           </Reveal>
@@ -415,14 +484,16 @@ export default function Home() {
               </div>
               <div className="relative mx-auto max-w-2xl">
                 <h2 className="font-display text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-                  Sabse pehle Saathi try karo
+                  {t.finalCta.heading}
                 </h2>
                 <p className="mt-4 text-base text-cream/75 sm:text-lg">
-                  Early access list mein jud jao. Launch hote hi aapko batayenge
-                  — koi spam nahi, bas khabar.
+                  {t.finalCta.sub}
                 </p>
                 <div className="mx-auto mt-8 max-w-lg text-left">
-                  <WaitlistForm id="footer" />
+                  <WaitlistForm id="footer" dark />
+                </div>
+                <div className="mt-6 flex justify-center">
+                  <WaitlistCount dark />
                 </div>
               </div>
             </div>
@@ -430,25 +501,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-line">
-        <div className="container-page flex flex-col items-center justify-between gap-4 py-8 sm:flex-row">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta text-white">
-              <Heart size={16} className="fill-white" strokeWidth={2.4} />
-            </span>
-            <span className="font-display text-lg font-semibold">Saathi</span>
-          </div>
-          <p className="text-sm text-ink-soft">
-            Made with{" "}
-            <Heart
-              size={13}
-              className="inline fill-terracotta text-terracotta"
-            />{" "}
-            in India · {new Date().getFullYear()}
-          </p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

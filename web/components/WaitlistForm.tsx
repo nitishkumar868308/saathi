@@ -1,14 +1,36 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
+import { ArrowRight, Check, Copy, Share2, PartyPopper, UserCheck } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { useToast } from "@/components/Toast";
+import DotsLoader from "@/components/DotsLoader";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 type Status = "idle" | "loading" | "success" | "error";
 
-export default function WaitlistForm({ id }: { id?: string }) {
+export default function WaitlistForm({
+  id,
+  dark = false,
+}: {
+  id?: string;
+  dark?: boolean;
+}) {
+  const { waitlist: tw } = useT();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<Status>("idle");
-  const [message, setMessage] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [already, setAlready] = useState(false);
+  const [shareUrl, setShareUrl] = useState("https://saathi.app");
+
+  useEffect(() => {
+    // Personal referral link once we know the origin
+    if (typeof window !== "undefined") {
+      setShareUrl(`${window.location.origin}/?ref=early`);
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -16,8 +38,7 @@ export default function WaitlistForm({ id }: { id?: string }) {
 
     const trimmed = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setStatus("error");
-      setMessage("Sahi email daalo 🙂");
+      toast("error", tw.invalidEmail);
       return;
     }
 
@@ -29,68 +50,158 @@ export default function WaitlistForm({ id }: { id?: string }) {
         body: JSON.stringify({ email: trimmed }),
       });
       if (!res.ok) throw new Error("failed");
+      const data = await res.json().catch(() => ({}));
+      const isAlready = Boolean(data?.already);
+      setAlready(isAlready);
       setStatus("success");
-      setMessage("Aap list mein ho! Launch pe sabse pehle batayenge. 🎉");
       setEmail("");
+      toast(isAlready ? "info" : "success", isAlready ? tw.already : tw.thankTitle);
     } catch {
-      setStatus("error");
-      setMessage("Kuch gadbad ho gayi. Thodi der baad try karo.");
+      setStatus("idle");
+      toast("error", tw.error);
     }
   }
 
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  async function shareLink() {
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try {
+        await navigator.share({
+          title: "Saathi — jo kuch nahi bhoolta",
+          text: "Main Saathi ki early access list mein hoon. Tum bhi jud jao 👇",
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        /* user cancelled — fall through to copy */
+      }
+    }
+    copyLink();
+  }
+
+  // ---- Thank You screen (success) ----
   if (status === "success") {
     return (
       <div
-        className="flex items-center gap-3 rounded-2xl border border-sage/40 bg-sage/10 px-5 py-4 text-ink"
+        className={`rounded-3xl border p-5 sm:p-6 ${
+          dark
+            ? "border-white/15 bg-white/10 text-cream"
+            : "border-sage/40 bg-sage/10 text-ink"
+        }`}
         role="status"
         aria-live="polite"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sage text-white">
-          <Check size={18} strokeWidth={2.5} />
-        </span>
-        <p className="text-sm font-medium sm:text-base">{message}</p>
+        <div className="flex items-center gap-3">
+          <span
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white ${
+              already ? "bg-amber-warm" : "bg-sage"
+            }`}
+          >
+            {already ? (
+              <UserCheck size={20} strokeWidth={2.2} />
+            ) : (
+              <PartyPopper size={20} strokeWidth={2.2} />
+            )}
+          </span>
+          <div>
+            <p className="font-display text-lg font-semibold leading-tight">
+              {already ? tw.already : tw.thankTitle}
+            </p>
+            <p
+              className={`text-sm ${dark ? "text-cream/75" : "text-ink-soft"}`}
+            >
+              {already ? tw.alreadySub : tw.thankSub}
+            </p>
+          </div>
+        </div>
+
+        <div
+          className={`mt-5 rounded-2xl border p-4 ${
+            dark ? "border-white/15 bg-black/20" : "border-line bg-surface"
+          }`}
+        >
+          <p className="text-sm font-semibold">{tw.referTitle}</p>
+          <p className={`mt-1 text-xs ${dark ? "text-cream/70" : "text-ink-soft"}`}>
+            {tw.referSub}
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={copyLink}
+              className={`inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition ${
+                dark
+                  ? "border-white/20 bg-white/10 text-cream hover:bg-white/20"
+                  : "border-line bg-cream-deep/40 text-ink hover:bg-cream-deep/70"
+              }`}
+            >
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              <span className="truncate">
+                {copied ? tw.copied : tw.copy}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={shareLink}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-terracotta px-5 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
+            >
+              <Share2 size={16} />
+              {tw.share}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ---- Form ----
+  const inputBase = dark
+    ? "border-white/20 bg-white/95 text-ink placeholder:text-ink-soft/60 focus:border-white focus:ring-white/25"
+    : "border-line bg-surface text-ink placeholder:text-ink-soft/60 focus:border-terracotta focus:ring-terracotta/15";
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="w-full"
-      noValidate
-      aria-describedby={message ? `${id}-msg` : undefined}
-    >
-      <div className="flex flex-col gap-3 sm:flex-row">
+    <>
+      <AnimatePresence>
+        {status === "loading" && <LoadingOverlay label={tw.sending} />}
+      </AnimatePresence>
+      <form onSubmit={handleSubmit} className="w-full" noValidate>
+      <div className="flex w-full flex-col gap-3 sm:flex-row">
         <label htmlFor={`${id}-email`} className="sr-only">
           Email address
         </label>
         <input
           id={`${id}-email`}
+          name="email"
           type="email"
           inputMode="email"
           autoComplete="email"
-          placeholder="aapka@email.com"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder={tw.emailPlaceholder}
           value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (status === "error") setStatus("idle");
-          }}
-          className="h-14 flex-1 rounded-2xl border border-line bg-surface px-5 text-base text-ink placeholder:text-ink-soft/60 outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
+          onChange={(e) => setEmail(e.target.value)}
+          className={`h-16 w-full min-w-0 flex-1 rounded-2xl border px-5 text-base shadow-soft outline-none transition focus:ring-4 sm:h-14 ${inputBase}`}
           required
         />
         <button
           type="submit"
           disabled={status === "loading"}
-          className="group inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-terracotta px-7 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:cursor-not-allowed disabled:opacity-70"
+          className="group inline-flex h-16 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-terracotta px-7 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-80 sm:h-14 sm:w-auto"
         >
           {status === "loading" ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Ruko...
-            </>
+            <DotsLoader variant="white" />
           ) : (
             <>
-              Early access lo
+              {tw.button}
               <ArrowRight
                 size={18}
                 className="transition-transform group-hover:translate-x-0.5"
@@ -99,18 +210,12 @@ export default function WaitlistForm({ id }: { id?: string }) {
           )}
         </button>
       </div>
-      {message && status === "error" && (
-        <p
-          id={`${id}-msg`}
-          role="alert"
-          className="mt-2 pl-1 text-sm text-terracotta-dark"
-        >
-          {message}
-        </p>
-      )}
-      <p className="mt-3 pl-1 text-xs text-ink-soft">
-        Koi spam nahi. Sirf launch ki khabar. Kabhi bhi unsubscribe.
+      <p
+        className={`mt-3 pl-1 text-xs ${dark ? "text-cream/60" : "text-ink-soft"}`}
+      >
+        {tw.noSpam}
       </p>
-    </form>
+      </form>
+    </>
   );
 }

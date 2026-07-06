@@ -52,11 +52,16 @@ const config: Config = {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        "loader-bounce": {
+          "0%, 80%, 100%": { transform: "scale(0.5)", opacity: "0.4" },
+          "40%": { transform: "scale(1)", opacity: "1" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.7s ease-out both",
         float: "float 6s ease-in-out infinite",
         marquee: "marquee 32s linear infinite",
+        "loader-bounce": "loader-bounce 1.4s ease-in-out infinite both",
       },
     },
   },

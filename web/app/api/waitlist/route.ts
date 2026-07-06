@@ -1,27 +1,23 @@
 import { NextResponse } from "next/server";
+import { addToWaitlist, getWaitlistCount } from "@/lib/store";
+import { sendWaitlistWelcome } from "@/lib/email";
+
+export const runtime = "nodejs";
 
 /**
- * Waitlist signup endpoint.
- *
- * Abhi ke liye: email validate karke success return karta hai aur server log mein print.
- *
- * 👉 Supabase se jodne ke liye (jab ready ho):
- *   1. Supabase mein ek table banao:  waitlist (id, email unique, created_at)
- *   2. Env vars set karo (Vercel + .env.local):
- *        SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   (service key sirf server pe!)
- *   3. Neeche TODO wali jagah par insert karo:
- *
- *      const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/waitlist`, {
- *        method: "POST",
- *        headers: {
- *          apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
- *          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
- *          "Content-Type": "application/json",
- *          Prefer: "resolution=ignore-duplicates",
- *        },
- *        body: JSON.stringify({ email }),
- *      });
+ * Waitlist signup.
+ * - Email validate karta hai
+ * - Store mein dedup ke saath add karta hai (dubara add nahi hota)
+ * - Naye signup pe Gmail se welcome email bhejta hai (agar configured ho)
  */
+
+const BASE_COUNT = Number(process.env.WAITLIST_BASE_COUNT ?? 500);
+
+export async function GET() {
+  const stored = await getWaitlistCount();
+  return NextResponse.json({ count: BASE_COUNT + stored });
+}
+
 export async function POST(request: Request) {
   let email = "";
   try {
@@ -35,8 +31,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid email" }, { status: 400 });
   }
 
-  // TODO: Supabase `waitlist` table mein insert karo (upar comment dekho).
-  console.log(`[waitlist] new signup: ${email}`);
+  let added = false;
+  let count = 0;
+  try {
+    const r = await addToWaitlist(email, new Date().toISOString());
+    added = r.added;
+    count = r.count;
+  } catch (err) {
+    console.error("[waitlist] store error:", err);
+    return NextResponse.json({ error: "server error" }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true });
+  if (!added) {
+    // Pehle se list mein hai — dubara add nahi kiya, email bhi nahi bheja.
+    console.log(`[waitlist] duplicate ignored: ${email}`);
+    return NextResponse.json({
+      ok: true,
+      already: true,
+      count: BASE_COUNT + count,
+    });
+  }
+
+  console.log(`[waitlist] new signup: ${email}`);
+  try {
+    await sendWaitlistWelcome(email);
+  } catch (err) {
+    // Email fail ho to bhi signup succeed rehta hai.
+    console.error("[waitlist] welcome email failed:", err);
+  }
+
+  return NextResponse.json({ ok: true, already: false, count: BASE_COUNT + count });
 }

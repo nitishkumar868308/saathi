@@ -22,7 +22,29 @@
       "Bash(rm -f src/data/mock.ts)",
       "Bash(rmdir src/data)",
       "Bash(rm -rf .expo/types)",
-      "Bash(ls .expo)"
+      "Bash(ls .expo)",
+      "PowerShell(Get-Process -Name node -ErrorAction SilentlyContinue)",
+      "PowerShell(cd d:\\\\my-app\\\\web; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 5; \"STATUS: $\\($r.StatusCode\\)\"; if \\($r.Content -match \"Join Early Access|bhoolta|Saathi\"\\) { \"CONTENT OK - found landing markers\" } } catch { \"No dev server on :3000 -> $\\($_.Exception.Message\\)\" })",
+      "PowerShell(cd d:\\\\my-app\\\\web; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 15 } catch { $resp = $_.Exception.Response; if \\($resp\\) { $sr = New-Object System.IO.StreamReader\\($resp.GetResponseStream\\(\\)\\); $body = $sr.ReadToEnd\\(\\); $body.Substring\\(0, [Math]::Min\\(3000, $body.Length\\)\\) } })",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c | Select-Object LocalPort, OwningProcess; $c.OwningProcess | ForEach-Object { \\(Get-Process -Id $_\\).Path } } else { \"nothing listening on 3000\" })",
+      "PowerShell(Stop-Process -Id 43516 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)",
+      "PowerShell(\"stopped\")",
+      "PowerShell(Start-Sleep -Seconds 6; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 30; \"STATUS: $\\($r.StatusCode\\)\"; if \\($r.Content -match \"bhoolta\"\\) { \"FOUND: bhoolta \\(hero\\)\" }; if \\($r.Content -match \"Join Early Access|Early Access\"\\) { \"FOUND: CTA\" }; if \\($r.Content -match \"Live demo|Upload\"\\) { \"FOUND: demo\" } } catch { \"ERR: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(Start-Sleep -Seconds 3; try { $og = Invoke-WebRequest -Uri \"http://localhost:3000/opengraph-image\" -UseBasicParsing -TimeoutSec 60; \"og -> $\\($og.StatusCode\\) type=$\\($og.Headers['Content-Type']\\) bytes=$\\($og.RawContentLength\\)\" } catch { \"og -> ERR $\\($_.Exception.Message\\)\" })",
+      "PowerShell(Start-Sleep -Seconds 4; try { $og = Invoke-WebRequest -Uri \"http://localhost:3000/opengraph-image\" -UseBasicParsing -TimeoutSec 90; \"og -> $\\($og.StatusCode\\) type=$\\($og.Headers['Content-Type']\\) bytes=$\\($og.RawContentLength\\)\" } catch { \"og -> ERR $\\($_.Exception.Message\\)\" })",
+      "PowerShell(curl.exe -s -o NUL -w \"HTTP %{http_code} size=%{size_download}\\\\n\" http://localhost:3000/opengraph-image --max-time 90)",
+      "PowerShell(curl.exe -s -o NUL -w \"HTTP %{http_code} size=%{size_download} type=%{content_type}\\\\n\" http://localhost:3000/opengraph-image --max-time 90)",
+      "PowerShell(cd d:\\\\my-app\\\\web; npx tsc --noEmit 2>&1 | Select-Object -First 40; \"---- tsc done \\(empty above = pass\\) ----\"; Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 30; \"HOME: $\\($r.StatusCode\\)\"; if \\($r.Content -match 'name=\"viewport\"'\\) { \"viewport meta: present\" }; if \\($r.Content -match 'width=device-width'\\) { \"responsive viewport: OK\" } } catch { \"HOME ERR: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(cd d:\\\\my-app\\\\web; npx tsc --noEmit 2>&1 | Select-Object -First 30; \"---- tsc pass if empty ----\"; Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 30; \"HOME: $\\($r.StatusCode\\)\" } catch { \"ERR: $\\($_.Exception.Message\\)\" })",
+      "Bash(ls node_modules/nodemailer)",
+      "Bash(ls -la /d/my-app/supabase)",
+      "Bash(tail -30 /tmp/saathi-dev.log)",
+      "Read(//tmp/**)",
+      "Bash(curl.exe -s -o /dev/null -w \"home HTTP %{http_code} time=%{time_total}s\\\\n\" http://localhost:3000/ --max-time 120)",
+      "Bash(ls -la app.json app.config.js app.config.ts eas.json)",
+      "Bash(cat app.json)",
+      "Bash(cat eas.json)"
     ]
   }
 }

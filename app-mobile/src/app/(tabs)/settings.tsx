@@ -1,12 +1,15 @@
+import { useEffect, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
+import { getPlan } from "@/lib/plan";
 
 type Row = { icon: string; label: string; tint?: string };
 
@@ -41,6 +44,14 @@ export default function Settings() {
   const toast = useToast();
   const meta = session?.user?.user_metadata;
   const name = meta?.full_name || meta?.name || "Aapka account";
+  const [isPlus, setIsPlus] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    getPlan()
+      .then((p) => setIsPlus(p.isPlus))
+      .catch(() => {});
+  }, []);
 
   async function logout() {
     try {
@@ -85,6 +96,31 @@ export default function Settings() {
             </Text>
           </View>
         </View>
+
+        {/* Plan / Saathi Plus */}
+        <Pressable
+          onPress={() => router.push("/upgrade" as never)}
+          style={({ pressed }) => [styles.planCard, pressed && { opacity: 0.92 }]}
+        >
+          <View style={styles.planIcon}>
+            <Ionicons
+              name={isPlus ? "star" : "sparkles"}
+              size={22}
+              color={colors.white}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.planTitle}>
+              {isPlus ? "Saathi Plus — active" : "Saathi Plus lo"}
+            </Text>
+            <Text style={styles.planSub}>
+              {isPlus
+                ? "Unlimited docs, family sharing, daily brief"
+                : "Unlimited docs, family sharing + aur bahut kuch"}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="rgba(247,242,233,0.7)" />
+        </Pressable>
 
         {groups.map((g) => (
           <View key={g.title} style={{ marginTop: 22 }}>
@@ -153,6 +189,25 @@ const styles = StyleSheet.create({
   },
   statusDot: { height: 7, width: 7, borderRadius: 4 },
   statusText: { fontSize: 12.5, fontWeight: "600" },
+  planCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginTop: 22,
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: colors.ink,
+  },
+  planIcon: {
+    height: 44,
+    width: 44,
+    borderRadius: 15,
+    backgroundColor: colors.terracotta,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  planTitle: { fontSize: 15.5, fontWeight: "700", color: colors.white },
+  planSub: { marginTop: 2, fontSize: 12.5, color: "rgba(247,242,233,0.65)" },
   groupTitle: {
     fontSize: 13,
     fontWeight: "700",

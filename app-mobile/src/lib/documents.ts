@@ -1,4 +1,15 @@
 import { supabase } from "./supabase";
+import { canAddDocument, FREE_DOC_LIMIT } from "./plan";
+
+/** Free-plan document limit cross hone par throw hota hai. */
+export class DocLimitError extends Error {
+  constructor() {
+    super(
+      `Free plan mein sirf ${FREE_DOC_LIMIT} documents rakh sakte ho. Unlimited ke liye Saathi Plus lo.`,
+    );
+    this.name = "DocLimitError";
+  }
+}
 
 export type Document = {
   id: string;
@@ -27,6 +38,9 @@ export async function addDocument(input: {
   type: string;
   expiry: string | null;
 }): Promise<Document> {
+  // Free plan limit check
+  if (!(await canAddDocument())) throw new DocLimitError();
+
   const { data, error } = await client()
     .from("documents")
     .insert(input)

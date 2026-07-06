@@ -23,6 +23,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# local file-based store (waitlist/contacts)
+/data
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
