@@ -4,16 +4,18 @@ import { useState } from "react";
 import { Check, Sparkles, Gift } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
-function gstTotal(price: string): string {
-  const n = Number(price.replace(/[^0-9.]/g, ""));
-  if (!n) return price;
-  const total = Math.round(n * 1.18);
-  return `₹${total.toLocaleString("en-IN")}`;
-}
+// GST abhi comment out — humare paas GST registration nahi, isliye user se nahi lenge.
+// function gstTotal(price: string): string {
+//   const n = Number(price.replace(/[^0-9.]/g, ""));
+//   if (!n) return price;
+//   const total = Math.round(n * 1.18);
+//   return `₹${total.toLocaleString("en-IN")}`;
+// }
 
 export default function Pricing() {
   const { pricing: t } = useT();
   const [yearly, setYearly] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
 
   return (
     <div>
@@ -74,7 +76,8 @@ export default function Pricing() {
           const price = yearly && plan.priceYearly ? plan.priceYearly : plan.price;
           const period =
             yearly && plan.periodYearly ? plan.periodYearly : plan.period;
-          const showGst = plan.gst && price !== "₹0";
+          // GST abhi off:
+          // const showGst = plan.gst && price !== "₹0";
 
           return (
             <div
@@ -104,6 +107,7 @@ export default function Pricing() {
                   {period}
                 </span>
               </div>
+              {/* GST abhi off — registration nahi, base price hi dikhega:
               {showGst && (
                 <p
                   className={`mt-1 text-xs font-medium ${
@@ -113,7 +117,7 @@ export default function Pricing() {
                   {t.gstNote} · Total {gstTotal(price)}
                   {period}
                 </p>
-              )}
+              )} */}
               <p
                 className={`mt-2 text-sm ${
                   highlight ? "text-cream/70" : "text-ink-soft"
@@ -141,8 +145,9 @@ export default function Pricing() {
                 ))}
               </ul>
 
-              <a
-                href="#waitlist"
+              <button
+                type="button"
+                onClick={() => setShowDownload(true)}
                 className={`mt-7 inline-flex h-12 items-center justify-center rounded-2xl px-6 text-sm font-semibold transition active:scale-[0.98] ${
                   highlight
                     ? "bg-terracotta text-white shadow-warm hover:bg-terracotta-dark"
@@ -150,7 +155,7 @@ export default function Pricing() {
                 }`}
               >
                 {plan.cta}
-              </a>
+              </button>
             </div>
           );
         })}
@@ -159,6 +164,45 @@ export default function Pricing() {
       <p className="mx-auto mt-6 max-w-xl text-center text-sm text-ink-soft">
         {t.note}
       </p>
+
+      {showDownload && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-5 backdrop-blur-sm"
+          onClick={() => setShowDownload(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-4xl border border-line bg-surface p-7 text-center shadow-warm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-terracotta/10 text-terracotta">
+              <Sparkles size={30} />
+            </div>
+            <h3 className="mt-5 font-display text-2xl font-semibold">
+              Saathi ab app pe hai 📱
+            </h3>
+            <p className="mt-2.5 text-ink-soft">
+              Plus subscription aur saare features Saathi app ke andar milte hain.
+              Play Store se app download karo aur seedhe app se hi upgrade karo — bilkul
+              secure, Google Play ke through.
+            </p>
+            <a
+              href="https://play.google.com/store/apps/details?id=app.saathi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
+            >
+              Play Store se download karo
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowDownload(false)}
+              className="mt-3 text-sm font-semibold text-ink-soft hover:text-ink"
+            >
+              Abhi nahi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
