@@ -1,74 +1,73 @@
-# Checkout Billing + Local Documents Implementation Plan
+# In-App Payment (GPB) + Profile Details + Local Documents — Implementation Plan (v2)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Web plans button ko checkout se jodo, checkout pe country-wise-validated billing details collect kar ke DB me save karo, aur app me document ki actual file local folder me save + full-screen view karo.
+**Goal:** Web pe plan button "App download karo" modal khole (koi web payment nahi), GST 18% comment out, billing/details form app me aaye (Supabase me save), aur payment app ke andar Google Play Billing (RevenueCat) se ho. Saath me document ki actual file local folder me save + full-screen view.
 
-**Architecture:** Web (Next.js 14 app router) Supabase ko REST API (`fetch` + service-role key) se use karta hai — `supabase-js` nahi. Isi pattern ko location + billing ke liye reuse karenge. App (Expo v57 / expo-router) documents ki file `expo-file-system` se local `documentDirectory/documents/` me copy karta hai; sirf local path DB me store hota hai. Payment app me nahi — web checkout hi.
+**Architecture:** Web (Next.js) sirf marketing — plan CTA modal, checkout page commented out. Payment app me RevenueCat (`react-native-purchases`, GPB wrapper), profile details Supabase `user_details` (per-user upsert, own-row RLS). Location cascade app se direct Supabase (public-read tables). Phone validation `libphonenumber-js` (pure JS). Documents `expo-file-system` se local copy.
 
-**Tech Stack:** Next.js 14, Supabase (PostgREST via fetch), Razorpay (fetch-based), `react-phone-number-input` (+ bundled `libphonenumber-js`), Expo v57, expo-file-system, expo-router.
+**Tech Stack:** Next.js 14, Supabase (web REST fetch / app supabase-js), RevenueCat `react-native-purchases`, `libphonenumber-js`, Expo v57, expo-file-system, expo-router.
 
-**Testing note:** Is repo me koi test runner (jest/vitest) setup NAHI hai — na web me, na app me. Isliye plan "TDD unit test" ke bajaye **real verification** use karta hai: web ke liye `npm run lint` + `npm run build` + `curl` API check, app ke liye manual run (Expo). Yeh codebase ke existing pattern ke consistent hai. Naya test framework add mat karo.
+**Testing note:** Repo me koi test runner nahi (na web na app). Verification = `npm run lint`/`npm run build` (web) + `npx tsc --noEmit` + manual Expo run. Naya test framework add mat karo.
 
-**Env vars (already used by codebase):** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (web `.env.local`). App me `EXPO_PUBLIC_WEB_URL`.
+**⚠️ USER prerequisites (code se bahar — inke bina payment ship/test nahi hoga):**
+1. Google Play Console: app internal-testing track pe; `plus_monthly` + `plus_yearly` subscription products.
+2. Merchant/payments profile.
+3. **EAS development build** (`eas build --profile development`) — Expo Go se GPB nahi chalega.
+4. RevenueCat: project + Play link + Android API key → `.env` me `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`; entitlement id `plus`; offering with the two packages.
+
+Code aisa likha hai ki RevenueCat/native module na mile (Expo Go) to app crash na ho — upgrade button gracefully "abhi available nahi" dikhaye.
 
 ---
 
 ## File Structure
 
 **Create:**
-- `supabase/locations-billing.sql` — countries/states/cities + billing_details tables + RLS
-- `web/lib/locations.ts` — countries/states/cities REST fetch helpers
-- `web/lib/billing-server.ts` — billing_details insert helper
-- `web/app/api/locations/countries/route.ts` — GET countries
-- `web/app/api/locations/states/route.ts` — GET states?country=<id>
-- `web/app/api/locations/cities/route.ts` — GET cities?state=<id>
-- `app-mobile/src/app/document-view.tsx` — full-screen document image viewer
+- `supabase/locations-billing.sql` — countries/states/cities + user_details
+- `app-mobile/src/lib/user-details.ts` — location cascade + user_details CRUD
+- `app-mobile/src/lib/purchases.ts` — RevenueCat wrapper (safe)
+- `app-mobile/src/components/phone-field.tsx` — country-code + phone input (libphonenumber-js)
+- `app-mobile/src/app/profile-details.tsx` — details form screen
+- `app-mobile/src/app/document-view.tsx` — full-screen document viewer
 
 **Modify:**
-- `supabase/schema.sql` — `documents.file_uri` column add
-- `web/app/api/razorpay/order/route.ts` — billing accept + save
-- `web/components/Pricing.tsx` — CTA → `/checkout?plan=...`
-- `web/components/CheckoutClient.tsx` — billing form + phone input + cascade selects
-- `web/package.json` — `react-phone-number-input` dep
-- `app-mobile/package.json` — `expo-file-system` dep
-- `app-mobile/src/lib/documents.ts` — `file_uri` field
-- `app-mobile/src/app/add-document.tsx` — image ko local folder me copy
-- `app-mobile/src/components/doc-card.tsx` — `onPress` prop
-- `app-mobile/src/app/(tabs)/documents.tsx` — card tap → view
-- `app-mobile/src/app/(tabs)/index.tsx` — attention card tap → view
+- `supabase/schema.sql` — `documents.file_uri`
+- `web/components/Pricing.tsx` — GST comment-out + "Download app" modal
+- `web/app/checkout/page.tsx` — CheckoutClient comment-out + redirect
+- `app-mobile/src/app/(tabs)/settings.tsx` — "Meri details" row
+- `app-mobile/src/app/upgrade.tsx` — GST comment-out + details-check + RevenueCat purchase
+- `app-mobile/src/lib/plan.ts` — `markProfilePlus()`
+- `app-mobile/src/lib/documents.ts` — `file_uri`
+- `app-mobile/src/app/add-document.tsx` — local copy
+- `app-mobile/src/components/doc-card.tsx` — `onPress`
+- `app-mobile/src/app/(tabs)/documents.tsx` + `index.tsx` — card tap → view
+- `web/components/CheckoutClient.tsx` — (rehne do, unused; koi edit nahi)
 
 ---
 
 ## Phase A — Database
 
-### Task 1: Location + billing tables SQL
+### Task 1: Locations + user_details SQL
 
-**Files:**
-- Create: `supabase/locations-billing.sql`
+**Files:** Create `supabase/locations-billing.sql`
 
-- [ ] **Step 1: Create the SQL file**
+- [ ] **Step 1: Create the file**
 
 ```sql
--- Saathi — Locations (country/state/city cascade) + checkout billing details
+-- Saathi — Locations (country/state/city cascade) + per-user details
 -- Supabase SQL Editor mein Run karo. (Dobara run safe hai.)
 
--- 1. Countries
 create table if not exists public.countries (
   id serial primary key,
   name text not null,
   code text unique
 );
-
--- 2. States (country se linked)
 create table if not exists public.states (
   id serial primary key,
   country_id int not null references public.countries(id) on delete cascade,
   name text not null
 );
 create index if not exists states_country_idx on public.states(country_id);
-
--- 3. Cities (state se linked)
 create table if not exists public.cities (
   id serial primary key,
   state_id int not null references public.states(id) on delete cascade,
@@ -76,417 +75,121 @@ create table if not exists public.cities (
 );
 create index if not exists cities_state_idx on public.cities(state_id);
 
--- 4. Billing details (checkout pe save)
-create table if not exists public.billing_details (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete set null,
-  full_name text not null,
-  email text not null,
-  phone text not null,              -- poora E.164, jaise +919876543210
-  phone_dial_code text,             -- country calling code, jaise +91
-  phone_country text,               -- ISO country, jaise IN
-  address text not null,
-  gender text not null,
+-- Per-user details (checkout/profile) — ek row per user, upsert.
+create table if not exists public.user_details (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  email text,
+  phone text,                 -- E.164, jaise +919876543210
+  phone_dial_code text,       -- +91
+  phone_country text,         -- IN
+  address text,
+  gender text,
   country_id int references public.countries(id),
   state_id int references public.states(id),
   city_id int references public.cities(id),
-  order_id text,                    -- razorpay order id se link
-  created_at timestamptz not null default now()
+  updated_at timestamptz not null default now()
 );
 
--- RLS: location tables public-read (dropdown ke liye), billing sirf server.
+-- RLS: location tables public-read (dropdown), user_details own-row.
 alter table public.countries enable row level security;
 alter table public.states enable row level security;
 alter table public.cities enable row level security;
-alter table public.billing_details enable row level security;
+alter table public.user_details enable row level security;
 
 drop policy if exists "read countries" on public.countries;
 drop policy if exists "read states" on public.states;
 drop policy if exists "read cities" on public.cities;
+drop policy if exists "own user_details" on public.user_details;
 
 create policy "read countries" on public.countries for select using (true);
 create policy "read states" on public.states for select using (true);
 create policy "read cities" on public.cities for select using (true);
--- billing_details: koi public policy nahi — sirf service_role (server) access.
+create policy "own user_details" on public.user_details for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
-- [ ] **Step 2: Verify SQL syntax by running in Supabase SQL Editor**
-
-User (ya aap) Supabase dashboard → SQL Editor me paste kar ke Run karo.
-Expected: "Success. No rows returned." Dobara run karo → phir bhi success (idempotent).
+- [ ] **Step 2: Run in Supabase SQL Editor.** Expected: Success; dobara run bhi success.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add supabase/locations-billing.sql
-git commit -m "feat(db): countries/states/cities + billing_details tables"
+git commit -m "feat(db): countries/states/cities + per-user user_details"
 ```
-
----
 
 ### Task 2: documents.file_uri column
 
-**Files:**
-- Modify: `supabase/schema.sql`
+**Files:** Modify `supabase/schema.sql`
 
-- [ ] **Step 1: Add file_uri column after the documents table block**
-
-`supabase/schema.sql` me, documents `create table` block ke turant baad (line 11 ke baad, `-- 2. Reminders` se pehle) yeh line add karo:
+- [ ] **Step 1:** documents `create table` block ke baad (line 11 ke baad) add karo:
 
 ```sql
 -- Document ki local file ka path (app device pe). Abhi cloud pe nahi.
 alter table public.documents add column if not exists file_uri text;
 ```
 
-- [ ] **Step 2: Run in Supabase SQL Editor**
-
-Poora `schema.sql` (ya sirf yeh alter line) Supabase me Run karo.
-Expected: Success. `documents` table me `file_uri` column dikhe (Table editor me confirm).
+- [ ] **Step 2:** Supabase me Run karo. Expected: Success, column dikhe.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add supabase/schema.sql
-git commit -m "feat(db): documents.file_uri column for local file path"
+git commit -m "feat(db): documents.file_uri column"
 ```
 
 ---
 
-## Phase B — Web backend (locations + billing)
+## Phase B — Web (GST comment-out + download modal + checkout off)
 
-### Task 3: Location REST helpers
+### Task 3: Pricing — GST comment-out + "Download app" modal
 
-**Files:**
-- Create: `web/lib/locations.ts`
+**Files:** Modify `web/components/Pricing.tsx`
 
-- [ ] **Step 1: Create the helper file**
+- [ ] **Step 1: Comment out the gstTotal helper**
 
-```ts
-/**
- * Location lookups (country/state/city) — Supabase REST (service_role).
- * web/lib/store.ts jaisa hi fetch pattern.
- */
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-export type LocationItem = { id: number; name: string };
-
-export function locationsConfigured(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_KEY);
-}
-
-function headers() {
-  return {
-    apikey: SUPABASE_KEY as string,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
-    "Content-Type": "application/json",
-  };
-}
-
-async function sbSelect<T>(query: string): Promise<T[]> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {
-    headers: headers(),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`supabase select failed: ${res.status}`);
-  return (await res.json()) as T[];
-}
-
-export async function getCountries(): Promise<LocationItem[]> {
-  if (!locationsConfigured()) return [];
-  return sbSelect<LocationItem>("countries?select=id,name&order=name.asc");
-}
-
-export async function getStates(countryId: number): Promise<LocationItem[]> {
-  if (!locationsConfigured()) return [];
-  return sbSelect<LocationItem>(
-    `states?select=id,name&country_id=eq.${countryId}&order=name.asc`,
-  );
-}
-
-export async function getCities(stateId: number): Promise<LocationItem[]> {
-  if (!locationsConfigured()) return [];
-  return sbSelect<LocationItem>(
-    `cities?select=id,name&state_id=eq.${stateId}&order=name.asc`,
-  );
-}
-```
-
-- [ ] **Step 2: Typecheck**
-
-Run: `cd web && npx tsc --noEmit`
-Expected: No errors from `lib/locations.ts`.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add web/lib/locations.ts
-git commit -m "feat(web): location REST helpers (countries/states/cities)"
-```
-
----
-
-### Task 4: Location API routes
-
-**Files:**
-- Create: `web/app/api/locations/countries/route.ts`
-- Create: `web/app/api/locations/states/route.ts`
-- Create: `web/app/api/locations/cities/route.ts`
-
-- [ ] **Step 1: Create countries route**
-
-`web/app/api/locations/countries/route.ts`:
-
-```ts
-import { NextResponse } from "next/server";
-import { getCountries } from "@/lib/locations";
-
-export const runtime = "nodejs";
-
-export async function GET() {
-  try {
-    const data = await getCountries();
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("[locations/countries]", err);
-    return NextResponse.json({ error: "load failed" }, { status: 500 });
-  }
-}
-```
-
-- [ ] **Step 2: Create states route**
-
-`web/app/api/locations/states/route.ts`:
-
-```ts
-import { NextResponse } from "next/server";
-import { getStates } from "@/lib/locations";
-
-export const runtime = "nodejs";
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const countryId = Number(searchParams.get("country"));
-  if (!countryId) {
-    return NextResponse.json({ error: "country required" }, { status: 400 });
-  }
-  try {
-    const data = await getStates(countryId);
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("[locations/states]", err);
-    return NextResponse.json({ error: "load failed" }, { status: 500 });
-  }
-}
-```
-
-- [ ] **Step 3: Create cities route**
-
-`web/app/api/locations/cities/route.ts`:
-
-```ts
-import { NextResponse } from "next/server";
-import { getCities } from "@/lib/locations";
-
-export const runtime = "nodejs";
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const stateId = Number(searchParams.get("state"));
-  if (!stateId) {
-    return NextResponse.json({ error: "state required" }, { status: 400 });
-  }
-  try {
-    const data = await getCities(stateId);
-    return NextResponse.json(data);
-  } catch (err) {
-    console.error("[locations/cities]", err);
-    return NextResponse.json({ error: "load failed" }, { status: 500 });
-  }
-}
-```
-
-- [ ] **Step 4: Verify routes respond**
-
-Run: `cd web && npm run dev` (background), phir:
-```bash
-curl -s http://localhost:3000/api/locations/countries
-```
-Expected: JSON array (`[]` agar abhi data import nahi kiya; `[{"id":..,"name":".."}]` agar hai). Koi 500 nahi. `states?country=1` bina data ke `[]` deta hai. Dev server band kar do.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add web/app/api/locations
-git commit -m "feat(web): location API routes (countries/states/cities)"
-```
-
----
-
-### Task 5: Billing save helper
-
-**Files:**
-- Create: `web/lib/billing-server.ts`
-
-- [ ] **Step 1: Create the helper**
-
-```ts
-/**
- * Checkout billing details ko Supabase me save karo (service_role).
- * Razorpay order banne ke saath call hota hai.
- */
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-export type BillingInput = {
-  userId?: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  phoneDialCode?: string;
-  phoneCountry?: string;
-  address: string;
-  gender: string;
-  countryId?: number;
-  stateId?: number;
-  cityId?: number;
-  orderId: string;
-};
-
-export function billingDbConfigured(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_KEY);
-}
-
-function headers(extra?: Record<string, string>) {
-  return {
-    apikey: SUPABASE_KEY as string,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
-    "Content-Type": "application/json",
-    ...extra,
-  };
-}
-
-export async function saveBillingDetails(b: BillingInput): Promise<void> {
-  if (!billingDbConfigured()) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/billing_details`, {
-    method: "POST",
-    headers: headers({ Prefer: "return=minimal" }),
-    body: JSON.stringify([
-      {
-        user_id: b.userId ?? null,
-        full_name: b.fullName,
-        email: b.email,
-        phone: b.phone,
-        phone_dial_code: b.phoneDialCode ?? null,
-        phone_country: b.phoneCountry ?? null,
-        address: b.address,
-        gender: b.gender,
-        country_id: b.countryId ?? null,
-        state_id: b.stateId ?? null,
-        city_id: b.cityId ?? null,
-        order_id: b.orderId,
-      },
-    ]),
-    cache: "no-store",
-  });
-}
-```
-
-- [ ] **Step 2: Typecheck**
-
-Run: `cd web && npx tsc --noEmit`
-Expected: No errors.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add web/lib/billing-server.ts
-git commit -m "feat(web): billing_details save helper"
-```
-
----
-
-### Task 6: Order route saves billing
-
-**Files:**
-- Modify: `web/app/api/razorpay/order/route.ts`
-
-- [ ] **Step 1: Add billing type + import at top**
-
-Existing imports ke baad add karo:
-
-```ts
-import { saveBillingDetails, type BillingInput } from "@/lib/billing-server";
-```
-
-- [ ] **Step 2: Parse billing from body**
-
-Body parse block me (jahan `plan` aur `userId` nikaalte hain), ek aur variable add karo. Poora try-block ise se replace karo:
-
-```ts
-  let plan: PlanId;
-  let userId: string | undefined;
-  let billing: Omit<BillingInput, "orderId"> | undefined;
-  try {
-    const body = await request.json();
-    plan = body?.plan;
-    userId = body?.userId ? String(body.userId) : undefined;
-    billing = body?.billing ?? undefined;
-  } catch {
-    return NextResponse.json({ error: "invalid body" }, { status: 400 });
-  }
-```
-
-- [ ] **Step 3: Save billing after order create**
-
-`recordPayment(...)` ke `await` ke turant baad (return se pehle) yeh add karo:
-
-```ts
-    if (billing) {
-      await saveBillingDetails({ ...billing, userId, orderId: order.id });
-    }
-```
-
-- [ ] **Step 4: Typecheck + build**
-
-Run: `cd web && npx tsc --noEmit && npm run build`
-Expected: Build success, koi type error nahi.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add web/app/api/razorpay/order/route.ts
-git commit -m "feat(web): save billing_details when order is created"
-```
-
----
-
-## Phase C — Web frontend
-
-### Task 7: Pricing button → checkout
-
-**Files:**
-- Modify: `web/components/Pricing.tsx:144-153`
-
-- [ ] **Step 1: Compute planId + destination inside the plans.map**
-
-`web/components/Pricing.tsx` me, `.map((plan) => {` ke andar, `const showGst = ...` line ke baad yeh add karo:
+Top pe `function gstTotal(...) {...}` block ko comment karo (delete nahi):
 
 ```tsx
-          const isPaid = plan.price !== "₹0";
-          const planId = yearly ? "plus_yearly" : "plus_monthly";
-          const href = isPaid ? `/checkout?plan=${planId}` : "#waitlist";
+// GST abhi comment out — humare paas GST registration nahi, isliye user se nahi lenge.
+// function gstTotal(price: string): string {
+//   const n = Number(price.replace(/[^0-9.]/g, ""));
+//   if (!n) return price;
+//   const total = Math.round(n * 1.18);
+//   return `₹${total.toLocaleString("en-IN")}`;
+// }
 ```
 
-- [ ] **Step 2: Use the href in the CTA anchor**
+- [ ] **Step 2: Add modal state + import**
 
-Usi CTA `<a>` me `href="#waitlist"` ko `href={href}` se badlo:
+`import { useState } from "react";` pehle se hai. `useT` line ke baad, component ke andar top pe add karo:
 
 ```tsx
-              <a
-                href={href}
+  const [showDownload, setShowDownload] = useState(false);
+```
+
+- [ ] **Step 3: Comment out the GST note block**
+
+`{showGst && (...)}` waale poore block ko comment karo. `const showGst = ...` line bhi comment:
+
+```tsx
+              {/* GST abhi off:
+              const showGst = plan.gst && price !== "₹0";
+              {showGst && (
+                <p className={...}>{t.gstNote} · Total {gstTotal(price)}{period}</p>
+              )} */}
+```
+
+(Practically: `const showGst` line ko `// const showGst = ...` karo, aur JSX block ko `{/* ... */}` me wrap karo.)
+
+- [ ] **Step 4: CTA button — modal kholo (checkout/waitlist ke bajaye)**
+
+CTA ko `<a href=...>` se `<button>` me badlo:
+
+```tsx
+              <button
+                type="button"
+                onClick={() => setShowDownload(true)}
                 className={`mt-7 inline-flex h-12 items-center justify-center rounded-2xl px-6 text-sm font-semibold transition active:scale-[0.98] ${
                   highlight
                     ? "bg-terracotta text-white shadow-warm hover:bg-terracotta-dark"
@@ -494,397 +197,927 @@ Usi CTA `<a>` me `href="#waitlist"` ko `href={href}` se badlo:
                 }`}
               >
                 {plan.cta}
-              </a>
+              </button>
 ```
 
-- [ ] **Step 3: Verify in browser**
+- [ ] **Step 5: Add the download modal at end of the component**
 
-Run: `cd web && npm run dev`. `http://localhost:3000` → Pricing section → Plus plan ka button dabao.
-Expected: `/checkout?plan=plus_yearly` (yearly toggle on) ya `plus_monthly` khule. Free plan button page ke `#waitlist` pe jaaye.
+Outer `<div>` ke closing se pehle (return ke andar, `<p className="... mt-6 ...">{t.note}</p>` ke baad) add karo:
 
-- [ ] **Step 4: Commit**
+```tsx
+      {showDownload && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 px-5 backdrop-blur-sm"
+          onClick={() => setShowDownload(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-4xl border border-line bg-surface p-7 text-center shadow-warm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-terracotta/10 text-terracotta">
+              <Sparkles size={30} />
+            </div>
+            <h3 className="mt-5 font-display text-2xl font-semibold">
+              Saathi ab app pe hai 📱
+            </h3>
+            <p className="mt-2.5 text-ink-soft">
+              Plus subscription aur saare features Saathi app ke andar milte hain.
+              Play Store se app download karo aur seedhe app se hi upgrade karo — bilkul
+              secure, Google Play ke through.
+            </p>
+            <a
+              href="https://play.google.com/store/apps/details?id=app.saathi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
+            >
+              Play Store se download karo
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowDownload(false)}
+              className="mt-3 text-sm font-semibold text-ink-soft hover:text-ink"
+            >
+              Abhi nahi
+            </button>
+          </div>
+        </div>
+      )}
+```
+
+(`Sparkles` pehle se `lucide-react` se imported hai is file me.)
+
+- [ ] **Step 6: Build + manual verify**
+
+Run: `cd web && npx tsc --noEmit && npm run build` → success.
+Run: `npm run dev` → Pricing me price sirf base (`₹99`/`₹999`), koi "+18% GST/Total" nahi. Plan button dabao → download modal khule. Play Store link naye tab me khule; backdrop/"Abhi nahi" se band ho.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add web/components/Pricing.tsx
-git commit -m "fix(web): plans CTA routes to checkout, not waitlist"
+git commit -m "feat(web): plans open download-app modal; comment out GST"
 ```
 
----
+### Task 4: Checkout page comment-out
 
-### Task 8: Add phone-input dependency
+**Files:** Modify `web/app/checkout/page.tsx`
 
-**Files:**
-- Modify: `web/package.json`
-
-- [ ] **Step 1: Install the library**
-
-Run: `cd web && npm install react-phone-number-input`
-Expected: `react-phone-number-input` (aur bundled `libphonenumber-js`) `dependencies` me aa jaaye, `package-lock.json` update ho.
-
-- [ ] **Step 2: Commit**
-
-```bash
-git add web/package.json web/package-lock.json
-git commit -m "chore(web): add react-phone-number-input"
-```
-
----
-
-### Task 9: Checkout billing form
-
-**Files:**
-- Modify: `web/components/CheckoutClient.tsx` (poora rewrite)
-
-- [ ] **Step 1: Replace the whole file with the form version**
-
-`web/components/CheckoutClient.tsx` ka poora content is se replace karo:
+- [ ] **Step 1: Replace page body — comment out CheckoutClient, redirect home**
 
 ```tsx
-"use client";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+// import { Suspense } from "react";
+// import CheckoutClient from "@/components/CheckoutClient";
 
-import { useEffect, useState } from "react";
-import Script from "next/script";
-import { useSearchParams } from "next/navigation";
-import { ShieldCheck, Loader2, CheckCircle2, Lock } from "lucide-react";
-import PhoneInput, {
-  isValidPhoneNumber,
-  parsePhoneNumber,
-} from "react-phone-number-input";
-import "react-phone-number-input/style.css";
-import SaathiMark from "@/components/SaathiMark";
-
-type PlanId = "plus_monthly" | "plus_yearly";
-type LocationItem = { id: number; name: string };
-
-const PLAN_UI: Record<PlanId, { title: string; base: string; total: string; period: string }> = {
-  plus_monthly: { title: "Saathi Plus · Monthly", base: "₹99", total: "₹117", period: "/month" },
-  plus_yearly: { title: "Saathi Plus · Yearly", base: "₹999", total: "₹1,179", period: "/year" },
+export const metadata: Metadata = {
+  title: "Checkout",
+  robots: { index: false, follow: false },
 };
 
-declare global {
-  interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
-  }
+// NOTE: Web checkout abhi OFF hai — payment app ke andar (Google Play Billing) hota hai.
+// CheckoutClient code delete nahi kiya, baad me kaam aa sakta hai.
+export default function CheckoutPage() {
+  redirect("/");
+
+  // return (
+  //   <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-cream" />}>
+  //     <CheckoutClient />
+  //   </Suspense>
+  // );
+}
+```
+
+- [ ] **Step 2: Build.** Run: `cd web && npm run build` → success. `/checkout` kholte hi `/` pe redirect ho.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add web/app/checkout/page.tsx
+git commit -m "feat(web): comment out web checkout, redirect to home"
+```
+
+---
+
+## Phase C — App: Profile details form
+
+### Task 5: libphonenumber-js + user-details lib
+
+**Files:** Modify `app-mobile/package.json`; Create `app-mobile/src/lib/user-details.ts`
+
+- [ ] **Step 1: Install libphonenumber-js**
+
+Run: `cd app-mobile && npx expo install libphonenumber-js`
+Expected: `libphonenumber-js` `dependencies` me.
+
+- [ ] **Step 2: Create the lib**
+
+`app-mobile/src/lib/user-details.ts`:
+
+```ts
+import { supabase } from "./supabase";
+
+export type LocationItem = { id: number; name: string };
+
+export type UserDetails = {
+  full_name: string;
+  email: string;
+  phone: string;
+  phone_dial_code: string | null;
+  phone_country: string | null;
+  address: string;
+  gender: string;
+  country_id: number | null;
+  state_id: number | null;
+  city_id: number | null;
+};
+
+function client() {
+  if (!supabase) throw new Error("Supabase set nahi hai (.env check karo)");
+  return supabase;
 }
 
-export default function CheckoutClient() {
-  const params = useSearchParams();
-  const plan = (params.get("plan") as PlanId) || "plus_yearly";
-  const uid = params.get("uid") ?? undefined;
-  const returnTo = params.get("return") ?? undefined;
+export async function getCountries(): Promise<LocationItem[]> {
+  const { data, error } = await client()
+    .from("countries").select("id,name").order("name");
+  if (error) throw error;
+  return (data ?? []) as LocationItem[];
+}
+export async function getStates(countryId: number): Promise<LocationItem[]> {
+  const { data, error } = await client()
+    .from("states").select("id,name").eq("country_id", countryId).order("name");
+  if (error) throw error;
+  return (data ?? []) as LocationItem[];
+}
+export async function getCities(stateId: number): Promise<LocationItem[]> {
+  const { data, error } = await client()
+    .from("cities").select("id,name").eq("state_id", stateId).order("name");
+  if (error) throw error;
+  return (data ?? []) as LocationItem[];
+}
 
-  const ui = PLAN_UI[plan] ?? PLAN_UI.plus_yearly;
-  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [error, setError] = useState("");
+export async function getUserDetails(): Promise<UserDetails | null> {
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return null;
+  const { data } = await sb
+    .from("user_details").select("*").eq("user_id", uid).maybeSingle();
+  return (data as UserDetails) ?? null;
+}
 
-  // Form state
-  const [fullName, setFullName] = useState(params.get("name") ?? "");
-  const [email, setEmail] = useState(params.get("email") ?? "");
-  const [phone, setPhone] = useState<string | undefined>(undefined);
-  const [address, setAddress] = useState("");
-  const [gender, setGender] = useState("");
+export async function saveUserDetails(d: UserDetails): Promise<void> {
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) throw new Error("Login zaroori hai");
+  const { error } = await sb.from("user_details").upsert(
+    { user_id: uid, ...d, updated_at: new Date().toISOString() },
+    { onConflict: "user_id" },
+  );
+  if (error) throw error;
+}
 
-  // Cascade selects
-  const [countries, setCountries] = useState<LocationItem[]>([]);
-  const [states, setStates] = useState<LocationItem[]>([]);
-  const [cities, setCities] = useState<LocationItem[]>([]);
-  const [countryId, setCountryId] = useState("");
-  const [stateId, setStateId] = useState("");
-  const [cityId, setCityId] = useState("");
-
-  // Load countries on mount
-  useEffect(() => {
-    fetch("/api/locations/countries")
-      .then((r) => r.json())
-      .then((d) => setCountries(Array.isArray(d) ? d : []))
-      .catch(() => setCountries([]));
-  }, []);
-
-  // Country change → load states, reset state+city
-  useEffect(() => {
-    setStates([]);
-    setStateId("");
-    setCities([]);
-    setCityId("");
-    if (!countryId) return;
-    fetch(`/api/locations/states?country=${countryId}`)
-      .then((r) => r.json())
-      .then((d) => setStates(Array.isArray(d) ? d : []))
-      .catch(() => setStates([]));
-  }, [countryId]);
-
-  // State change → load cities, reset city
-  useEffect(() => {
-    setCities([]);
-    setCityId("");
-    if (!stateId) return;
-    fetch(`/api/locations/cities?state=${stateId}`)
-      .then((r) => r.json())
-      .then((d) => setCities(Array.isArray(d) ? d : []))
-      .catch(() => setCities([]));
-  }, [stateId]);
-
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const phoneOk = !!phone && isValidPhoneNumber(phone);
-  const formValid =
-    fullName.trim().length > 1 &&
-    emailOk &&
-    phoneOk &&
-    address.trim().length > 3 &&
-    !!gender &&
-    !!countryId &&
-    !!stateId &&
-    !!cityId;
-
-  async function pay() {
-    if (status === "loading" || !formValid || !phone) return;
-    setStatus("loading");
-    setError("");
-    try {
-      const parsed = parsePhoneNumber(phone);
-      const billing = {
-        fullName: fullName.trim(),
-        email: email.trim(),
-        phone,
-        phoneDialCode: parsed ? `+${parsed.countryCallingCode}` : undefined,
-        phoneCountry: parsed?.country ?? undefined,
-        address: address.trim(),
-        gender,
-        countryId: Number(countryId),
-        stateId: Number(stateId),
-        cityId: Number(cityId),
-      };
-
-      const orderRes = await fetch("/api/razorpay/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, userId: uid, billing }),
-      });
-      if (!orderRes.ok) {
-        const j = await orderRes.json().catch(() => ({}));
-        throw new Error(j?.error || "order failed");
-      }
-      const order = await orderRes.json();
-
-      if (!window.Razorpay) throw new Error("Razorpay load nahi hua");
-
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        order_id: order.orderId,
-        amount: order.amount,
-        currency: order.currency,
-        name: "Saathi",
-        description: order.label,
-        prefill: { email: email.trim(), name: fullName.trim(), contact: phone },
-        theme: { color: "#C25A37" },
-        handler: async (resp: Record<string, string>) => {
-          const verifyRes = await fetch("/api/razorpay/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...resp, plan, userId: uid }),
-          });
-          if (verifyRes.ok) {
-            setStatus("done");
-            if (returnTo) setTimeout(() => (window.location.href = returnTo), 1500);
-          } else {
-            setStatus("error");
-            setError("Payment verify nahi hua. Support se baat karo.");
-          }
-        },
-        modal: { ondismiss: () => setStatus("idle") },
-      });
-      rzp.open();
-    } catch (e) {
-      setStatus("error");
-      setError(e instanceof Error ? e.message : "Kuch gadbad ho gayi");
-    }
-  }
-
-  const inputCls =
-    "mt-1.5 w-full rounded-2xl border border-line bg-cream-deep/20 px-4 py-3 text-sm outline-none focus:border-terracotta";
-
+export function isDetailsComplete(d: UserDetails | null): boolean {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cream px-5 py-10">
-      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
-      <div className="w-full max-w-md rounded-4xl border border-line bg-surface p-7 shadow-warm sm:p-8">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-            <SaathiMark size={22} className="text-white" />
-          </span>
-          <span className="font-display text-xl font-semibold">Saathi</span>
-        </div>
-
-        {status === "done" ? (
-          <div className="mt-8 text-center">
-            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sage text-white">
-              <CheckCircle2 size={32} />
-            </span>
-            <h1 className="mt-5 font-display text-2xl font-semibold">Payment ho gaya! 🎉</h1>
-            <p className="mt-2 text-ink-soft">Saathi Plus activate ho gaya. Ab app mein wapas jao.</p>
-          </div>
-        ) : (
-          <>
-            <h1 className="mt-6 font-display text-2xl font-semibold">{ui.title}</h1>
-            <div className="mt-4 rounded-2xl border border-line bg-cream-deep/30 p-5">
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-sm text-ink-soft">{ui.base} + 18% GST</p>
-                  <p className="font-display text-3xl font-semibold">
-                    {ui.total}
-                    <span className="text-base font-normal text-ink-soft">{ui.period}</span>
-                  </p>
-                </div>
-                <ShieldCheck size={26} className="text-sage" />
-              </div>
-            </div>
-
-            {/* Billing form */}
-            <div className="mt-5 space-y-3.5">
-              <div>
-                <label className="text-sm font-semibold">Poora naam</label>
-                <input className={inputCls} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Aapka naam" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Email</label>
-                <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Phone number</label>
-                <div className="mt-1.5 rounded-2xl border border-line bg-cream-deep/20 px-3 py-2.5 focus-within:border-terracotta">
-                  <PhoneInput
-                    international
-                    defaultCountry="IN"
-                    value={phone}
-                    onChange={setPhone}
-                    placeholder="Phone number"
-                  />
-                </div>
-                {phone && !phoneOk && (
-                  <p className="mt-1 text-xs text-terracotta-dark">Sahi phone number daalo</p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Address</label>
-                <textarea className={inputCls} rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ghar / office ka pata" />
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Gender</label>
-                <select className={inputCls} value={gender} onChange={(e) => setGender(e.target.value)}>
-                  <option value="">Choose…</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-semibold">Country</label>
-                <select className={inputCls} value={countryId} onChange={(e) => setCountryId(e.target.value)}>
-                  <option value="">{countries.length ? "Choose country…" : "Koi country nahi (data import karo)"}</option>
-                  {countries.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-semibold">State</label>
-                <select className={inputCls} value={stateId} onChange={(e) => setStateId(e.target.value)} disabled={!countryId}>
-                  <option value="">{states.length ? "Choose state…" : "Pehle country chuno"}</option>
-                  {states.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-semibold">City</label>
-                <select className={inputCls} value={cityId} onChange={(e) => setCityId(e.target.value)} disabled={!stateId}>
-                  <option value="">{cities.length ? "Choose city…" : "Pehle state chuno"}</option>
-                  {cities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {error && <p className="mt-3 text-sm font-medium text-terracotta-dark">{error}</p>}
-
-            <button
-              onClick={pay}
-              disabled={status === "loading" || !formValid}
-              className="mt-6 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-50"
-            >
-              {status === "loading" ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <Lock size={16} />
-                  Securely pay {ui.total}
-                </>
-              )}
-            </button>
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-ink-soft">
-              <Lock size={12} />
-              Razorpay se secure payment · UPI, card, netbanking
-            </p>
-          </>
-        )}
-      </div>
-    </div>
+    !!d && !!d.full_name && !!d.phone && !!d.address && !!d.gender && !!d.city_id
   );
 }
 ```
 
-- [ ] **Step 2: Typecheck + build**
-
-Run: `cd web && npx tsc --noEmit && npm run build`
-Expected: Build success. (Agar `parsePhoneNumber` type import error de, to `parsePhoneNumber` `react-phone-number-input` se export hota hai — confirm import spelling.)
-
-- [ ] **Step 3: Manual verify**
-
-Run: `cd web && npm run dev`. `http://localhost:3000/checkout?plan=plus_yearly` kholo.
-Expected:
-- Saare fields dikhein; phone input me country flag + `+91` default.
-- Jab tak sab fields valid nahi, "Securely pay" button faded/disabled.
-- Galat phone (jaise `+91 123`) pe error text aur button disabled.
-- Country data import na ho to country dropdown me "Koi country nahi" message.
+- [ ] **Step 3: Typecheck.** Run: `cd app-mobile && npx tsc --noEmit` → no errors.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add web/components/CheckoutClient.tsx
-git commit -m "feat(web): checkout billing form with phone + cascade location"
+git add app-mobile/package.json app-mobile/package-lock.json app-mobile/src/lib/user-details.ts
+git commit -m "feat(app): libphonenumber-js + user-details lib (locations + CRUD)"
+```
+
+### Task 6: PhoneField component
+
+**Files:** Create `app-mobile/src/components/phone-field.tsx`
+
+- [ ] **Step 1: Create the component**
+
+```tsx
+import { useMemo, useState } from "react";
+import {
+  View, Text, TextInput, Pressable, Modal, FlatList, StyleSheet,
+} from "react-native";
+import { getCountries, getCountryCallingCode, type CountryCode } from "libphonenumber-js";
+import { colors } from "@/theme/colors";
+
+function flag(cc: string) {
+  return cc
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
+export function PhoneField({
+  country, onCountry, national, onNational,
+}: {
+  country: CountryCode;
+  onCountry: (c: CountryCode) => void;
+  national: string;
+  onNational: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const list = useMemo(() => {
+    const all = getCountries().map((c) => ({
+      cc: c,
+      code: getCountryCallingCode(c),
+    }));
+    if (!q) return all;
+    const s = q.toLowerCase();
+    return all.filter(
+      (x) => x.cc.toLowerCase().includes(s) || x.code.includes(s),
+    );
+  }, [q]);
+
+  return (
+    <View style={styles.row}>
+      <Pressable style={styles.codeBtn} onPress={() => setOpen(true)}>
+        <Text style={styles.codeText}>
+          {flag(country)} +{getCountryCallingCode(country)}
+        </Text>
+      </Pressable>
+      <TextInput
+        style={styles.input}
+        value={national}
+        onChangeText={onNational}
+        placeholder="Phone number"
+        placeholderTextColor={colors.inkSoft}
+        keyboardType="phone-pad"
+      />
+
+      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+        <View style={styles.modal}>
+          <TextInput
+            style={styles.search}
+            value={q}
+            onChangeText={setQ}
+            placeholder="Country ya code search karo"
+            placeholderTextColor={colors.inkSoft}
+            autoFocus
+          />
+          <FlatList
+            data={list}
+            keyExtractor={(i) => i.cc}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.item}
+                onPress={() => {
+                  onCountry(item.cc as CountryCode);
+                  setOpen(false);
+                  setQ("");
+                }}
+              >
+                <Text style={styles.itemText}>
+                  {flag(item.cc)}  {item.cc}  +{item.code}
+                </Text>
+              </Pressable>
+            )}
+          />
+          <Pressable style={styles.close} onPress={() => setOpen(false)}>
+            <Text style={styles.closeText}>Band karo</Text>
+          </Pressable>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: { flexDirection: "row", gap: 8 },
+  codeBtn: {
+    justifyContent: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+  },
+  codeText: { fontSize: 15, fontWeight: "600", color: colors.ink },
+  input: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: colors.ink,
+    fontSize: 15,
+  },
+  modal: { flex: 1, backgroundColor: colors.cream, paddingTop: 60, paddingHorizontal: 16 },
+  search: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    color: colors.ink,
+    fontSize: 15,
+    marginBottom: 10,
+  },
+  item: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.line },
+  itemText: { fontSize: 15, color: colors.ink },
+  close: { alignItems: "center", paddingVertical: 16 },
+  closeText: { fontSize: 15, fontWeight: "700", color: colors.terracotta },
+});
+```
+
+- [ ] **Step 2: Typecheck.** `cd app-mobile && npx tsc --noEmit` → no errors.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app-mobile/src/components/phone-field.tsx
+git commit -m "feat(app): country-code phone field (libphonenumber-js)"
+```
+
+### Task 7: profile-details screen
+
+**Files:** Create `app-mobile/src/app/profile-details.tsx`
+
+- [ ] **Step 1: Create the screen**
+
+```tsx
+import { useEffect, useState } from "react";
+import {
+  View, Text, TextInput, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import {
+  isValidPhoneNumber, parsePhoneNumberFromString,
+  getCountryCallingCode, type CountryCode,
+} from "libphonenumber-js";
+
+import { colors } from "@/theme/colors";
+import { useToast } from "@/components/toast";
+import { useAuth } from "@/components/auth-provider";
+import { PhoneField } from "@/components/phone-field";
+import {
+  getCountries, getStates, getCities, getUserDetails, saveUserDetails,
+  type LocationItem,
+} from "@/lib/user-details";
+
+const GENDERS = [
+  { key: "male", label: "Male" },
+  { key: "female", label: "Female" },
+  { key: "other", label: "Other" },
+];
+
+export default function ProfileDetails() {
+  const toast = useToast();
+  const { session } = useAuth();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState(session?.user?.email ?? "");
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>("IN");
+  const [phoneNational, setPhoneNational] = useState("");
+  const [address, setAddress] = useState("");
+  const [gender, setGender] = useState("");
+
+  const [countries, setCountries] = useState<LocationItem[]>([]);
+  const [states, setStates] = useState<LocationItem[]>([]);
+  const [cities, setCities] = useState<LocationItem[]>([]);
+  const [countryId, setCountryId] = useState<number | null>(null);
+  const [stateId, setStateId] = useState<number | null>(null);
+  const [cityId, setCityId] = useState<number | null>(null);
+
+  // Initial load: countries + existing details
+  useEffect(() => {
+    (async () => {
+      try {
+        const [cs, existing] = await Promise.all([getCountries(), getUserDetails()]);
+        setCountries(cs);
+        if (existing) {
+          setFullName(existing.full_name ?? "");
+          setEmail(existing.email ?? email);
+          setAddress(existing.address ?? "");
+          setGender(existing.gender ?? "");
+          if (existing.phone_country) setPhoneCountry(existing.phone_country as CountryCode);
+          if (existing.phone && existing.phone_dial_code) {
+            setPhoneNational(existing.phone.replace(existing.phone_dial_code, ""));
+          }
+          if (existing.country_id) {
+            setCountryId(existing.country_id);
+            const st = await getStates(existing.country_id);
+            setStates(st);
+          }
+          if (existing.state_id) {
+            setStateId(existing.state_id);
+            const ct = await getCities(existing.state_id);
+            setCities(ct);
+          }
+          if (existing.city_id) setCityId(existing.city_id);
+        }
+      } catch {
+        toast.show("Details load nahi hui", "error");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function pickCountry(id: number) {
+    setCountryId(id); setStateId(null); setCityId(null); setStates([]); setCities([]);
+    try { setStates(await getStates(id)); } catch { /* ignore */ }
+  }
+  async function pickState(id: number) {
+    setStateId(id); setCityId(null); setCities([]);
+    try { setCities(await getCities(id)); } catch { /* ignore */ }
+  }
+
+  const dial = `+${getCountryCallingCode(phoneCountry)}`;
+  const fullPhone = `${dial}${phoneNational.replace(/\D/g, "")}`;
+  const phoneOk = phoneNational.length > 0 && isValidPhoneNumber(fullPhone, phoneCountry);
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const valid =
+    fullName.trim().length > 1 && emailOk && phoneOk &&
+    address.trim().length > 3 && !!gender && !!countryId && !!stateId && !!cityId;
+
+  async function onSave() {
+    if (saving) return;
+    if (!valid) { toast.show("Saare fields sahi se bharo", "info"); return; }
+    setSaving(true);
+    try {
+      const parsed = parsePhoneNumberFromString(fullPhone, phoneCountry);
+      await saveUserDetails({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        phone: parsed?.number ?? fullPhone,
+        phone_dial_code: dial,
+        phone_country: phoneCountry,
+        address: address.trim(),
+        gender,
+        country_id: countryId,
+        state_id: stateId,
+        city_id: cityId,
+      });
+      toast.show("Details save ho gayi ✅", "success");
+      if (returnTo) router.replace(returnTo as never);
+      else router.back();
+    } catch {
+      toast.show("Save nahi hua", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle = styles.input;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
+          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+        </Pressable>
+        <Text style={styles.title}>Meri details</Text>
+        <View style={{ width: 22 }} />
+      </View>
+
+      {loading ? (
+        <ActivityIndicator color={colors.terracotta} style={{ marginTop: 40 }} />
+      ) : (
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <Text style={styles.label}>Poora naam</Text>
+            <TextInput style={inputStyle} value={fullName} onChangeText={setFullName} placeholder="Aapka naam" placeholderTextColor={colors.inkSoft} />
+
+            <Text style={styles.label}>Email</Text>
+            <TextInput style={inputStyle} value={email} onChangeText={setEmail} placeholder="you@email.com" placeholderTextColor={colors.inkSoft} keyboardType="email-address" autoCapitalize="none" />
+
+            <Text style={styles.label}>Phone number</Text>
+            <PhoneField country={phoneCountry} onCountry={setPhoneCountry} national={phoneNational} onNational={setPhoneNational} />
+            {phoneNational.length > 0 && !phoneOk && (
+              <Text style={styles.err}>Sahi phone number daalo</Text>
+            )}
+
+            <Text style={styles.label}>Address</Text>
+            <TextInput style={[inputStyle, { height: 72 }]} value={address} onChangeText={setAddress} placeholder="Ghar / office ka pata" placeholderTextColor={colors.inkSoft} multiline />
+
+            <Text style={styles.label}>Gender</Text>
+            <View style={styles.chips}>
+              {GENDERS.map((g) => (
+                <Pressable key={g.key} onPress={() => setGender(g.key)} style={[styles.chip, gender === g.key && styles.chipActive]}>
+                  <Text style={[styles.chipText, gender === g.key && styles.chipTextActive]}>{g.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Country</Text>
+            <SelectRow items={countries} value={countryId} placeholder={countries.length ? "Country chuno" : "Data import karo"} onSelect={pickCountry} />
+
+            <Text style={styles.label}>State</Text>
+            <SelectRow items={states} value={stateId} placeholder={countryId ? "State chuno" : "Pehle country"} onSelect={pickState} disabled={!countryId} />
+
+            <Text style={styles.label}>City</Text>
+            <SelectRow items={cities} value={cityId} placeholder={stateId ? "City chuno" : "Pehle state"} onSelect={setCityId} disabled={!stateId} />
+
+            <View style={{ height: 20 }} />
+          </ScrollView>
+
+          <Pressable onPress={onSave} disabled={saving || !valid} style={({ pressed }) => [styles.save, (pressed || saving || !valid) && { opacity: 0.6 }]}>
+            {saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveText}>Save karo</Text>}
+          </Pressable>
+        </KeyboardAvoidingView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+// Simple inline select (chips-wrap). Small lists ke liye theek.
+function SelectRow({
+  items, value, placeholder, onSelect, disabled,
+}: {
+  items: LocationItem[];
+  value: number | null;
+  placeholder: string;
+  onSelect: (id: number) => void;
+  disabled?: boolean;
+}) {
+  if (disabled || items.length === 0) {
+    return <Text style={styles.selectEmpty}>{placeholder}</Text>;
+  }
+  return (
+    <View style={styles.chips}>
+      {items.map((it) => (
+        <Pressable key={it.id} onPress={() => onSelect(it.id)} style={[styles.chip, value === it.id && styles.chipActive]}>
+          <Text style={[styles.chipText, value === it.id && styles.chipTextActive]}>{it.name}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.cream },
+  header: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  back: { padding: 4 },
+  title: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  content: { padding: 20, paddingBottom: 20 },
+  label: { marginTop: 18, marginBottom: 8, fontSize: 15, fontWeight: "700", color: colors.ink },
+  input: {
+    borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+    paddingHorizontal: 16, paddingVertical: 14, color: colors.ink, fontSize: 15,
+  },
+  err: { marginTop: 6, fontSize: 13, color: colors.terracotta, fontWeight: "600" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    borderRadius: 999, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface,
+    paddingHorizontal: 16, paddingVertical: 9,
+  },
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipText: { fontSize: 13.5, fontWeight: "600", color: colors.inkSoft },
+  chipTextActive: { color: colors.cream },
+  selectEmpty: { fontSize: 14, color: colors.inkSoft, fontStyle: "italic" },
+  save: {
+    margin: 20, marginTop: 8, alignItems: "center", justifyContent: "center",
+    height: 54, borderRadius: 18, backgroundColor: colors.terracotta,
+  },
+  saveText: { color: colors.white, fontWeight: "700", fontSize: 16 },
+});
+```
+
+- [ ] **Step 2: Typecheck.** `cd app-mobile && npx tsc --noEmit` → no errors.
+
+- [ ] **Step 3: Manual verify (Expo Go OK).** `npx expo start`. `profile-details` par jaake (Task 7 ke baad settings se): fields dikhein, phone country picker khule, galat phone pe error, cascade country→state→city (data import hone par). Save → toast.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app-mobile/src/app/profile-details.tsx
+git commit -m "feat(app): profile details form (phone + cascade) saved to user_details"
+```
+
+### Task 8: Settings "Meri details" row
+
+**Files:** Modify `app-mobile/src/app/(tabs)/settings.tsx`
+
+- [ ] **Step 1: Add a details row above the plan card**
+
+`settings.tsx` me plan `<Pressable>` (`onPress={() => router.push("/upgrade" ...)}`) ke turant pehle add karo:
+
+```tsx
+        <Pressable
+          onPress={() => router.push("/profile-details" as never)}
+          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
+        >
+          <Ionicons name="person-outline" size={20} color={colors.terracotta} />
+          <Text style={styles.detailsText}>Meri details (name, phone, address…)</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.line} />
+        </Pressable>
+```
+
+- [ ] **Step 2: Add styles**
+
+`StyleSheet.create({...})` me add karo:
+
+```tsx
+  detailsRow: {
+    flexDirection: "row", alignItems: "center", gap: 12, marginTop: 22,
+    borderRadius: 16, borderWidth: 1, borderColor: colors.line,
+    backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 15,
+  },
+  detailsText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
+```
+
+- [ ] **Step 3: Typecheck + verify.** `npx tsc --noEmit` → ok. App: Settings me "Meri details" row dikhe, tap → form khule.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add "app-mobile/src/app/(tabs)/settings.tsx"
+git commit -m "feat(app): settings 'Meri details' entry"
 ```
 
 ---
 
-## Phase D — App: local documents
+## Phase D — App: Payment (RevenueCat / GPB)
 
-### Task 10: expo-file-system dep + documents lib field
+### Task 9: RevenueCat dep + purchases wrapper + plan.markProfilePlus
 
-**Files:**
-- Modify: `app-mobile/package.json`
-- Modify: `app-mobile/src/lib/documents.ts`
+**Files:** Modify `app-mobile/package.json`, `app-mobile/src/lib/plan.ts`; Create `app-mobile/src/lib/purchases.ts`
 
-- [ ] **Step 1: Install expo-file-system**
+- [ ] **Step 1: Install react-native-purchases**
 
-Run: `cd app-mobile && npx expo install expo-file-system`
-Expected: `expo-file-system` `dependencies` me aaye (Expo v57 compatible version).
+Run: `cd app-mobile && npx expo install react-native-purchases`
+Expected: dep added. (Autolinked in a dev build; Expo Go me native calls no-op honge — wrapper handle karta hai. Alag Expo config plugin ki zaroorat nahi.)
+
+- [ ] **Step 2: Create the safe wrapper**
+
+`app-mobile/src/lib/purchases.ts`:
+
+```ts
+/**
+ * RevenueCat (Google Play Billing) wrapper — safe.
+ * Native module na mile (Expo Go) ya API key na ho to sab no-op.
+ * Prereq: EXPO_PUBLIC_REVENUECAT_ANDROID_KEY, entitlement "plus", offering with packages.
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let Purchases: any = null;
+try {
+  // Expo Go me ye throw kar sakta hai — catch me handle.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  Purchases = require("react-native-purchases").default;
+} catch {
+  Purchases = null;
+}
+
+const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "";
+const ENTITLEMENT = "plus";
+let configured = false;
+
+export function purchasesAvailable(): boolean {
+  return Boolean(Purchases && API_KEY);
+}
+
+export async function initPurchases(appUserId?: string): Promise<void> {
+  if (!purchasesAvailable() || configured) return;
+  try {
+    await Purchases.configure({ apiKey: API_KEY, appUserID: appUserId });
+    configured = true;
+  } catch {
+    /* ignore */
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getPlusPackages(): Promise<any[]> {
+  if (!purchasesAvailable()) return [];
+  try {
+    const offerings = await Purchases.getOfferings();
+    return offerings.current?.availablePackages ?? [];
+  } catch {
+    return [];
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function purchasePlus(pkg: any): Promise<boolean> {
+  if (!purchasesAvailable()) throw new Error("purchases unavailable");
+  const { customerInfo } = await Purchases.purchasePackage(pkg);
+  return Boolean(customerInfo.entitlements.active[ENTITLEMENT]);
+}
+
+export async function isPlusActive(): Promise<boolean> {
+  if (!purchasesAvailable()) return false;
+  try {
+    const info = await Purchases.getCustomerInfo();
+    return Boolean(info.entitlements.active[ENTITLEMENT]);
+  } catch {
+    return false;
+  }
+}
+```
+
+- [ ] **Step 3: Add markProfilePlus to plan.ts**
+
+`app-mobile/src/lib/plan.ts` ke end me add karo:
+
+```ts
+/** Purchase success ke baad profiles.plan = plus set karo (webhook aane tak bridge). */
+export async function markProfilePlus(): Promise<void> {
+  const sb = client();
+  const { data: userData } = await sb.auth.getUser();
+  const uid = userData.user?.id;
+  if (!uid) return;
+  await sb
+    .from("profiles")
+    .update({ plan: "plus", plan_source: "google_play" })
+    .eq("id", uid);
+}
+```
+
+- [ ] **Step 4: Typecheck.** `npx tsc --noEmit` → no errors.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add app-mobile/package.json app-mobile/package-lock.json app-mobile/src/lib/purchases.ts app-mobile/src/lib/plan.ts
+git commit -m "feat(app): RevenueCat wrapper + markProfilePlus bridge"
+```
+
+### Task 10: Rewire upgrade.tsx (GST off + details-check + purchase)
+
+**Files:** Modify `app-mobile/src/app/upgrade.tsx`
+
+- [ ] **Step 1: Swap imports**
+
+`upgrade.tsx` top imports me — web-checkout waale hatao, naye jodo. In lines ko:
+
+```ts
+import * as WebBrowser from "expo-web-browser";
+import * as Linking from "expo-linking";
+import { buildCheckoutUrl, getPlan, type PlanId } from "@/lib/plan";
+```
+
+is se replace karo:
+
+```ts
+import { getPlan, markProfilePlus } from "@/lib/plan";
+import {
+  purchasesAvailable, initPurchases, getPlusPackages, purchasePlus,
+} from "@/lib/purchases";
+import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
+```
+
+- [ ] **Step 2: Init RevenueCat on mount**
+
+`useEffect(() => { refresh(); }, []);` ko is se replace karo:
+
+```ts
+  useEffect(() => {
+    refresh();
+    initPurchases(session?.user?.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+```
+
+- [ ] **Step 3: Comment out GST math + display**
+
+Line `const total = Math.round(base * 1.18);` ko comment karo:
+
+```ts
+  // GST abhi off (registration nahi) — base price hi lenge.
+  // const total = Math.round(base * 1.18);
+```
+
+Gst `<Text style={styles.gst}>...</Text>` line ko comment karo:
+
+```tsx
+              {/* <Text style={styles.gst}>+ 18% GST · Total ₹{total}{period}</Text> */}
+```
+
+Pay button ka text `₹{total} — Securely pay` ko `₹{base} — Securely pay` karo:
+
+```tsx
+                    <Text style={styles.payText}>₹{base} — Securely pay</Text>
+```
+
+- [ ] **Step 4: Replace startCheckout with GPB flow**
+
+Poora `startCheckout` function is se replace karo:
+
+```ts
+  async function startCheckout() {
+    if (paying) return;
+    const user = session?.user;
+    if (!user) {
+      toast.show("Pehle login karo", "error");
+      return;
+    }
+
+    // 1. Details complete? nahi to form bharwao.
+    let details = null;
+    try {
+      details = await getUserDetails();
+    } catch {
+      /* ignore, treat as incomplete */
+    }
+    if (!isDetailsComplete(details)) {
+      toast.show("Pehle apni details bharo", "info");
+      router.push({ pathname: "/profile-details", params: { returnTo: "/upgrade" } } as never);
+      return;
+    }
+
+    // 2. RevenueCat available? (dev build + key chahiye)
+    if (!purchasesAvailable()) {
+      toast.show("Payment abhi is build me available nahi (dev build chahiye)", "info");
+      return;
+    }
+
+    setPaying(true);
+    try {
+      const pkgs = await getPlusPackages();
+      const wanted: PlanId = yearly ? "plus_yearly" : "plus_monthly";
+      const pkg =
+        pkgs.find((p) => String(p.product?.identifier ?? "").includes(wanted)) ?? pkgs[0];
+      if (!pkg) {
+        toast.show("Koi plan available nahi", "error");
+        return;
+      }
+      const ok = await purchasePlus(pkg);
+      if (ok) {
+        await markProfilePlus();
+        await refresh();
+        toast.show("Saathi Plus active ho gaya! 🎉", "success");
+      } else {
+        toast.show("Purchase complete nahi hua", "error");
+      }
+    } catch {
+      toast.show("Payment shuru nahi hua", "error");
+    } finally {
+      setPaying(false);
+    }
+  }
+```
+
+- [ ] **Step 5: Add PlanId type import**
+
+`type PlanId` ab `@/lib/plan` se import nahi ho raha (Step 1 me hata diya). Step 1 ke import ko update karo:
+
+```ts
+import { getPlan, markProfilePlus, type PlanId } from "@/lib/plan";
+```
+
+- [ ] **Step 6: Typecheck.** `cd app-mobile && npx tsc --noEmit` → no errors. (Agar `styles.gst`/`Linking`/`WebBrowser`/`buildCheckoutUrl` unused warning aaye to unke references hata do — `styles.gst` style definition rehne do, koi harm nahi.)
+
+- [ ] **Step 7: Manual verify (Expo Go).** `npx expo start`. Upgrade screen: price sirf base (no GST line). "Securely pay" dabao bina details ke → "Pehle details bharo" + form khule. Details bhar ke wapas → dabao → Expo Go me "Payment abhi is build me available nahi" toast (kyunki native module nahi). Crash nahi.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add app-mobile/src/app/upgrade.tsx
+git commit -m "feat(app): upgrade uses GPB (RevenueCat) + details gate; GST off"
+```
+
+---
+
+## Phase E — App: Local documents
+
+### Task 11: expo-file-system dep + documents.file_uri
+
+**Files:** Modify `app-mobile/package.json`, `app-mobile/src/lib/documents.ts`
+
+- [ ] **Step 1: Install.** Run: `cd app-mobile && npx expo install expo-file-system`.
 
 - [ ] **Step 2: Add file_uri to Document type + addDocument**
 
-`app-mobile/src/lib/documents.ts` me `Document` type me field add karo:
+`documents.ts` me `Document` type:
 
 ```ts
 export type Document = {
   id: string;
   name: string;
   type: string;
-  expiry: string | null; // 'YYYY-MM-DD'
+  expiry: string | null;
   file_uri: string | null;
   created_at: string;
 };
 ```
 
-Aur `addDocument` ka input + insert update karo:
+`addDocument`:
 
 ```ts
 export async function addDocument(input: {
@@ -893,9 +1126,7 @@ export async function addDocument(input: {
   expiry: string | null;
   file_uri?: string | null;
 }): Promise<Document> {
-  // Free plan limit check
   if (!(await canAddDocument())) throw new DocLimitError();
-
   const { data, error } = await client()
     .from("documents")
     .insert({
@@ -911,36 +1142,27 @@ export async function addDocument(input: {
 }
 ```
 
-- [ ] **Step 3: Typecheck**
-
-Run: `cd app-mobile && npx tsc --noEmit`
-Expected: No errors from `documents.ts`. (Doosri files me `file_uri` add karne se pehle koi error nahi aana chahiye kyunki field optional read hai.)
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Typecheck + commit**
 
 ```bash
+cd app-mobile && npx tsc --noEmit
 git add app-mobile/package.json app-mobile/package-lock.json app-mobile/src/lib/documents.ts
-git commit -m "feat(app): expo-file-system dep + documents.file_uri"
+git commit -m "feat(app): expo-file-system + documents.file_uri"
 ```
 
----
+### Task 12: Copy picked image to local folder
 
-### Task 11: Save picked image to local folder
+**Files:** Modify `app-mobile/src/app/add-document.tsx`
 
-**Files:**
-- Modify: `app-mobile/src/app/add-document.tsx`
+> **NOTE (Expo v57):** `app-mobile/AGENTS.md` — code se pehle https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/ padho. Neeche `expo-file-system/legacy` API (v57 me stable: `documentDirectory`, `makeDirectoryAsync`, `copyAsync`). Naya `File`/`Directory` API prefer karo to same behaviour (permanent copy) me adapt karo.
 
-> **NOTE (Expo v57):** `app-mobile/AGENTS.md` kehta hai — code likhne se pehle https://docs.expo.dev/versions/v57.0.0/sdk/filesystem/ padho. Neeche legacy API (`expo-file-system/legacy`) use ho raha hai jo v57 me stable hai aur `documentDirectory`/`copyAsync`/`makeDirectoryAsync` deta hai. Agar naya `File`/`Directory` API prefer karo to docs se signature confirm kar ke adapt karo — behaviour same rahe (image ko permanent folder me copy karke uska path return karna).
-
-- [ ] **Step 1: Add import + helper**
-
-`add-document.tsx` ke imports me add karo:
+- [ ] **Step 1: Import + helper.** Imports me:
 
 ```ts
 import * as FileSystem from "expo-file-system/legacy";
 ```
 
-Component ke bahar (imports ke neeche, `const quick = [...]` ke paas) yeh helper add karo:
+`const quick = [...]` ke paas (component ke bahar):
 
 ```ts
 async function persistImage(cacheUri: string): Promise<string> {
@@ -957,30 +1179,23 @@ async function persistImage(cacheUri: string): Promise<string> {
 }
 ```
 
-- [ ] **Step 2: Track a saved local uri in state**
-
-`const [imageUri, setImageUri] = useState<string | null>(null);` ke neeche add karo:
+- [ ] **Step 2: savedUri state.** `const [imageUri, setImageUri] = useState<string | null>(null);` ke neeche:
 
 ```ts
   const [savedUri, setSavedUri] = useState<string | null>(null);
 ```
 
-- [ ] **Step 3: Persist image right after pick**
-
-`pickImage` ke andar, `setImageUri(asset.uri);` ke turant baad add karo:
+- [ ] **Step 3: Persist after pick.** `setImageUri(asset.uri);` ke turant baad:
 
 ```ts
       try {
-        const local = await persistImage(asset.uri);
-        setSavedUri(local);
+        setSavedUri(await persistImage(asset.uri));
       } catch {
-        setSavedUri(asset.uri); // fallback: cache uri (best effort)
+        setSavedUri(asset.uri);
       }
 ```
 
-- [ ] **Step 4: Pass file_uri when saving**
-
-`save()` me `addDocument({ ... })` call ko update karo:
+- [ ] **Step 4: Pass file_uri on save.** `addDocument({...})` ko:
 
 ```ts
       await addDocument({
@@ -991,76 +1206,46 @@ async function persistImage(cacheUri: string): Promise<string> {
       });
 ```
 
-- [ ] **Step 5: Typecheck**
-
-Run: `cd app-mobile && npx tsc --noEmit`
-Expected: No errors.
-
-- [ ] **Step 6: Manual verify (Expo)**
-
-Run: `cd app-mobile && npx expo start`. App me document add karo (camera/gallery se photo), Save karo.
-Expected: Save ho jaaye, koi crash nahi. (Actual file open next task me verify hoga.)
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Typecheck + commit**
 
 ```bash
+cd app-mobile && npx tsc --noEmit
 git add app-mobile/src/app/add-document.tsx
 git commit -m "feat(app): copy picked document image to local folder"
 ```
 
----
+### Task 13: Document view screen
 
-### Task 12: Document view screen
+**Files:** Create `app-mobile/src/app/document-view.tsx`
 
-**Files:**
-- Create: `app-mobile/src/app/document-view.tsx`
-
-- [ ] **Step 1: Create the viewer screen**
+- [ ] **Step 1: Create**
 
 ```tsx
-import {
-  View,
-  Text,
-  Image,
-  Pressable,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
+import { View, Text, Image, Pressable, StyleSheet, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-
 import { colors } from "@/theme/colors";
 
 export default function DocumentView() {
   const { uri, name } = useLocalSearchParams<{ uri?: string; name?: string }>();
   const { width, height } = Dimensions.get("window");
-
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
           <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={styles.title} numberOfLines={1}>
-          {name || "Document"}
-        </Text>
+        <Text style={styles.title} numberOfLines={1}>{name || "Document"}</Text>
         <View style={{ width: 22 }} />
       </View>
-
       <View style={styles.body}>
         {uri ? (
-          <Image
-            source={{ uri }}
-            style={{ width: width - 32, height: height * 0.72 }}
-            resizeMode="contain"
-          />
+          <Image source={{ uri }} style={{ width: width - 32, height: height * 0.72 }} resizeMode="contain" />
         ) : (
           <View style={styles.empty}>
             <Ionicons name="document-outline" size={40} color={colors.inkSoft} />
-            <Text style={styles.emptyText}>
-              Is document ki file save nahi hai.
-            </Text>
+            <Text style={styles.emptyText}>Is document ki file save nahi hai.</Text>
           </View>
         )}
       </View>
@@ -1071,11 +1256,8 @@ export default function DocumentView() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.cream },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingVertical: 12,
   },
   back: { padding: 4 },
   title: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: colors.ink },
@@ -1085,36 +1267,25 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 2: Typecheck**
-
-Run: `cd app-mobile && npx tsc --noEmit`
-Expected: No errors.
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Typecheck + commit**
 
 ```bash
+cd app-mobile && npx tsc --noEmit
 git add app-mobile/src/app/document-view.tsx
 git commit -m "feat(app): full-screen document view screen"
 ```
 
----
+### Task 14: Wire card tap → view
 
-### Task 13: Wire card tap → view
+**Files:** Modify `doc-card.tsx`, `(tabs)/documents.tsx`, `(tabs)/index.tsx`
 
-**Files:**
-- Modify: `app-mobile/src/components/doc-card.tsx`
-- Modify: `app-mobile/src/app/(tabs)/documents.tsx`
-- Modify: `app-mobile/src/app/(tabs)/index.tsx`
+- [ ] **Step 1: DocCard onPress prop**
 
-- [ ] **Step 1: Add onPress prop to DocCard**
-
-`doc-card.tsx` me props aur Pressable update karo:
+`doc-card.tsx`:
 
 ```tsx
 export function DocCard({
-  doc,
-  onPress,
-  onLongPress,
+  doc, onPress, onLongPress,
 }: {
   doc: Document;
   onPress?: () => void;
@@ -1122,23 +1293,18 @@ export function DocCard({
 }) {
 ```
 
-Aur `<Pressable>` me `onPress` add karo + pressed style dono ke liye:
+`<Pressable>`:
 
 ```tsx
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
-      style={({ pressed }) => [
-        styles.card,
-        pressed && (onPress || onLongPress) && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.card, pressed && (onPress || onLongPress) && styles.pressed]}
     >
 ```
 
-- [ ] **Step 2: Navigate from documents list**
-
-`documents.tsx` me DocCard render ko update karo (list.map wala):
+- [ ] **Step 2: documents.tsx list.map**
 
 ```tsx
             list.map((doc) => (
@@ -1156,9 +1322,7 @@ Aur `<Pressable>` me `onPress` add karo + pressed style dono ke liye:
             ))
 ```
 
-- [ ] **Step 3: Navigate from home attention cards**
-
-`index.tsx` me attention DocCard render update karo:
+- [ ] **Step 3: index.tsx attention.map**
 
 ```tsx
             {attention.map((doc) => (
@@ -1175,18 +1339,9 @@ Aur `<Pressable>` me `onPress` add karo + pressed style dono ke liye:
             ))}
 ```
 
-- [ ] **Step 4: Typecheck**
+- [ ] **Step 4: Typecheck.** `npx tsc --noEmit` → no errors.
 
-Run: `cd app-mobile && npx tsc --noEmit`
-Expected: No errors.
-
-- [ ] **Step 5: Manual verify (end-to-end)**
-
-Run: `cd app-mobile && npx expo start`.
-- Naya document photo ke saath add karo.
-- Documents tab me us card ko **tap** karo → full-screen photo khule.
-- Card ko **long-press** karo → delete confirm aaye (purana behaviour intact).
-- App fully band kar ke dobara kholo → wahi document tap karo → photo abhi bhi dikhe (cache clear se na gayi).
+- [ ] **Step 5: Manual verify (end-to-end, Expo Go).** Photo ke saath document add → documents tab me card **tap** → full-screen photo. **Long-press** → delete confirm (intact). App band kar ke dobara kholo → tap → photo abhi bhi dikhe.
 
 - [ ] **Step 6: Commit**
 
@@ -1197,29 +1352,57 @@ git commit -m "feat(app): tap document card to view full image"
 
 ---
 
-## Phase E — App checkout flow verify (no code change expected)
+## Phase F — Prerequisites doc + final verify
 
-### Task 14: Verify app → web checkout still works
+### Task 15: Write payment setup guide
 
-**Files:** none (verification only)
+**Files:** Create `docs/payment-setup.md`
 
-- [ ] **Step 1: Confirm upgrade flow**
+- [ ] **Step 1: Create the guide**
 
-`app-mobile/src/app/upgrade.tsx` review karo — `startCheckout` `buildCheckoutUrl(...)` se web `/checkout?...` banata hai aur `WebBrowser.openAuthSessionAsync` se kholta hai. Koi native payment nahi.
+```md
+# Saathi — In-App Payment (Google Play Billing) Setup
 
-- [ ] **Step 2: Manual verify**
+App me payment RevenueCat + Google Play Billing se hota hai. Ye steps USER karega
+(code taiyaar hai, par inke bina payment test/ship nahi hoga):
 
-App me Settings → upgrade, ya document limit hit kar ke upgrade screen pe jaao → "Securely pay" dabao.
-Expected: In-app browser me web `/checkout` khule (naya billing form ke saath). App me koi Razorpay native nahi. Yeh Play-Store-safe hai.
+1. **Google Play Console**
+   - App ko internal testing track pe publish karo (signed AAB).
+   - Subscriptions banao: product id `plus_monthly`, `plus_yearly` (base plans set karo).
+   - Merchant/payments profile complete karo.
+   - License testers add karo (test purchase bina charge ke).
+2. **EAS Development Build** (Expo Go se GPB nahi chalta)
+   - `eas build --profile development --platform android`
+   - Isi dev build me `react-native-purchases` native module chalega.
+3. **RevenueCat**
+   - Project banao, Google Play se link (service account JSON).
+   - Entitlement id: `plus`. Offering me `plus_monthly` + `plus_yearly` packages jodo.
+   - Android API key lo → app `.env` me: `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY=...`
+4. **GST**: abhi off (registration nahi). Google India me GST khud handle karta hai;
+   Console me tax-inclusive price set karna. Baad me apna GST invoice chahiye to alag.
+5. **Webhook (baad me)**: RevenueCat → Supabase webhook se `profiles.plan` sync karo
+   (refund/cancel handle). Abhi purchase success pe app khud plan set karta hai.
+```
 
-- [ ] **Step 3: (agar zaroori ho) commit koi note**
+- [ ] **Step 2: Commit**
 
-Koi code change nahi to commit nahi. Bas confirm.
+```bash
+git add docs/payment-setup.md
+git commit -m "docs: Google Play Billing / RevenueCat setup guide"
+```
+
+### Task 16: Final web + app sanity
+
+- [ ] **Step 1: Web build.** `cd web && npm run build` → success.
+- [ ] **Step 2: App typecheck.** `cd app-mobile && npx tsc --noEmit` → no errors.
+- [ ] **Step 3: App boots in Expo Go** (`npx expo start`) → koi crash nahi; upgrade + profile-details + document view sab chalein (payment ko chhod, jo dev-build maangega).
 
 ---
 
-## Self-Review (author checklist — reference only)
+## Self-Review (author checklist)
 
-- **Spec coverage:** Plans button fix (T7) ✓, checkout form all-required + phone country validation (T8,T9) ✓, phone saves E.164 + dial code + country (T9→T5→T1) ✓, country/state/city cascade tables + import-ready (T1,T3,T4,T9) ✓, billing saved to DB (T5,T6) ✓, app payment stays web-only (T14) ✓, document local folder save (T10,T11) ✓, document full view (T12,T13) ✓, documents.file_uri (T2,T10) ✓.
-- **Types:** `LocationItem`, `BillingInput`, `Document.file_uri`, `persistImage` return string — consistent across tasks.
-- **No test framework:** verification via lint/build/curl/manual — intentional, matches repo.
+- **Spec coverage:** Web download modal + GST off (T3) ✓; web checkout commented (T4) ✓; DB locations + user_details own-row (T1) + documents.file_uri (T2) ✓; app details form phone-country-validated + cascade, saved to user_details (T5,T6,T7) ✓; settings entry (T8) ✓; in-app GPB via RevenueCat + details-gate + profiles bridge, graceful when unavailable (T9,T10) ✓; GST off in app (T10) ✓; local document save + full view + tap (T11–T14) ✓; prerequisites documented (T15) ✓.
+- **Types:** `UserDetails`, `LocationItem`, `PlanId` (from plan.ts), `CountryCode` (libphonenumber-js), `Document.file_uri`, `purchasesAvailable/getPlusPackages/purchasePlus`, `markProfilePlus`, `isDetailsComplete` — consistent across tasks.
+- **Reversibility:** GST + web checkout sirf comment-out (delete nahi). ✓
+- **No test framework:** verification lint/build/tsc/manual — intentional.
+```

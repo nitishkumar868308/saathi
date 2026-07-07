@@ -1,172 +1,126 @@
-# Checkout Billing + Local Documents — Design
+# In-App Payment (Google Play Billing) + Profile Details + Local Documents — Design (v2)
 
 Date: 2026-07-07
-Status: Approved (design), pending implementation plan
+Status: Approved (design v2). **v1 (web Razorpay checkout) superseded — reasons below.**
 
-## Goal
+## Kyun badla (v1 → v2)
 
-Do char alag kaam ek saath:
+v1 me plan tha: app se web pe le jaakar Razorpay se pay. **Ye Google Play policy ke against hai** — app ke andar consume hone waale digital subscription ke liye Google **Google Play Billing (GPB)** force karta hai; Razorpay allowed nahi. Isliye:
 
-1. **Web plans button bug** — plan CTA checkout pe nahi jaata; fix karo.
-2. **Web checkout form** — payment se pehle billing details collect karo aur DB me save karo.
-3. **Database** — India-first cascade location tables (country → state → city) + billing details table.
-4. **App documents** — uploaded document ki actual file local folder me save karo aur app ke andar full view karo. Plus payment app me nahi (Play-Store-safe), web pe hi.
+- **Payment ab app ke andar** GPB se hoga (via **RevenueCat / `react-native-purchases`**).
+- **Web pe koi checkout nahi** — plan button ek "App download karo (Play Store)" **modal** kholega.
+- Web ka Razorpay checkout page **delete nahi, comment out** (baad me kaam aa sakta hai).
+- Billing/details **form app me** aa gaya (Supabase me save), payment se decoupled.
+- **GST 18% abhi comment out** (GST registration nahi hai) — sirf base price dikhega.
+
+## R&D summary (verify kiya)
+
+- `expo-in-app-purchases` **deprecated/removed**. Aaj ke options: **RevenueCat (`react-native-purchases`)** ✅ recommended, ya `expo-iap` (archive ho raha), ya `react-native-iap` (DIY).
+- IAP **Expo Go me nahi chalta** — **EAS development build** zaroori (native module).
+- Play Console pe: subscription products + base plans, merchant/payments profile, kam se kam internal/closed testing track, license-testers.
+- Fee 15%/30%. India me **GST Google khud collect/remit** karta hai — hamara manual GST math waise bhi hata rahe hain.
+
+## Prerequisites (USER ko karne honge — code se bahar)
+
+Ye main nahi kar sakta; code taiyaar rahega par ship/test tabhi:
+1. Google Play Console: app ko internal testing track pe daalo, `plus_monthly` & `plus_yearly` subscription products banao.
+2. Merchant/payments profile set karo.
+3. **EAS development build** banao (`eas build --profile development`) — Expo Go se hatna hoga.
+4. RevenueCat account: project banao, Play Console se link, Android API key lo → `.env` me `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+5. Entitlement `plus` + offerings RevenueCat me configure karo.
+
+Code ko aise likhenge ki **RevenueCat na mile (jaise Expo Go me) to app crash na ho** — upgrade button "abhi available nahi / dev build chahiye" jaisa gracefully handle kare.
 
 ## Non-goals (abhi nahi)
 
-- Documents ko Supabase Storage / cloud pe rakhna (abhi sirf local device). Cross-device file sync isliye nahi milega — sirf naam/type/expiry sync hoga.
-- App me apna payment gateway. App sirf feature-limits enforce karta hai; upgrade web pe.
-- PDF viewer. Abhi documents image (photo) hote hain (ImagePicker se), to full-screen image view kaafi hai.
+- Documents cloud pe (abhi local device hi).
+- RevenueCat → Supabase webhook (abhi purchase success pe app khud `profiles.plan` update karega; webhook baad me).
+- iOS / App Store billing (abhi Android focus).
 
 ---
 
-## Workstream 1 — Web: Plans button → Checkout
+## Workstream 1 — Web
 
-**File:** `web/components/Pricing.tsx`
+### 1a. Plans button → "Download app" modal
+`web/components/Pricing.tsx`:
+- Plan CTA ab `/checkout` ya `#waitlist` nahi — ek **modal** kholega: "Saathi abhi app pe hai — Play Store se download karo". Nice copy + Play Store button/link. Pricing already client component hai, `useState` se modal.
 
-- Abhi paid plan ka CTA `href="#waitlist"` hai — kabhi checkout pe nahi jaata.
-- Fix: paid ("Plus") plan ke CTA ko `/checkout?plan=<planId>` pe le jaao, jahan `planId` = billing toggle ke hisaab se `plus_yearly` (jab `yearly` true) ya `plus_monthly`.
-- Free plan ka CTA `#waitlist` par hi rahega (koi payment nahi).
-- Plan ko paid vs free identify karne ke liye: `plan.highlight` (Plus card) = paid. Agar i18n data me reliable flag na ho to `plan.price !== "₹0"` se detect karo.
+### 1b. GST comment out
+`web/components/Pricing.tsx`:
+- `gstTotal()` function, `showGst` block, aur "+ GST · Total ..." note ko **comment out** (delete nahi). Sirf base price (`plan.price`) dikhe.
 
-**Acceptance:** Landing pe Plus plan ka button dabao → `/checkout?plan=plus_yearly` (ya monthly) khule.
-
----
-
-## Workstream 2 — Web: Checkout form
-
-**File:** `web/components/CheckoutClient.tsx`
-
-Pay button se pehle ek details form. Saare fields **required**; jab tak sab valid na hon, Pay disabled.
-
-Fields:
-- Full name (query `name` se prefill agar mile)
-- Email (query `email` se prefill)
-- Phone (**country-wise validation, zaroori**) — dekho "Phone input" section neeche
-- Address (multi-line)
-- Gender (select: Male / Female / Other)
-- Country (select) → State (select) → City (select) — cascade
-
-### Phone input (country-wise validation)
-
-- Library: **`react-phone-number-input`** (country dropdown + flag + per-country validation via `libphonenumber-js`). Dependency web me add hogi.
-- User country select karta hai (default `IN`), number type karta hai. Number E.164 format me aata hai: `+919876543210`.
-- Validation: `isValidPhoneNumber(value)` — har country ke apne length/format rules. Invalid ho to Pay disabled + error dikhe.
-- Save karne ke liye number ko break karo:
-  - `phone` = poora E.164 number (`+919876543210`)
-  - `phone_dial_code` = country calling code (`+91`)
-  - `phone_country` = ISO country (`IN`)
-  - `libphonenumber-js` ke `parsePhoneNumber(value)` se `.countryCallingCode` (`91`) aur `.country` (`IN`) nikalo.
-
-### Cascade behaviour:
-- Mount pe countries load (`GET /api/locations/countries`).
-- Country choose → us country ke states load (`GET /api/locations/states?country=<id>`), state+city reset.
-- State choose → us state ki cities load (`GET /api/locations/cities?state=<id>`), city reset.
-
-Submit / Pay flow:
-1. Form valid → `POST /api/razorpay/order` body me `{ plan, userId, billing: { fullName, email, phone, phoneDialCode, phoneCountry, address, gender, countryId, stateId, cityId } }`.
-2. Order route order banata hai **aur** billing details `billing_details` table me save karta hai (order_id ke saath linked).
-3. Razorpay modal khulta hai (jaisa abhi hai). Prefill name/email/phone billing se.
-4. Verify unchanged.
-
-**Acceptance:** Checkout pe saare fields bharo → Pay enable ho → Razorpay khule → `billing_details` me ek row aaye order_id ke saath.
+### 1c. Web checkout comment out
+- `web/app/checkout/page.tsx`: `CheckoutClient` render **comment out**, page bas `/` pe redirect kare (ya khaali). `web/components/CheckoutClient.tsx` file rahegi (unused, delete nahi).
+- Web location API routes / web billing save: **v2 me nahi bante** (form app me hai). Razorpay web order/verify routes jaise hain waise rahenge (unused).
 
 ---
 
-## Workstream 3 — Database
+## Workstream 2 — Database
 
-**Nayi file:** `supabase/locations-billing.sql` (idempotent, dobara run safe).
+**Nayi file:** `supabase/locations-billing.sql` (idempotent).
 
-```sql
-create table if not exists public.countries (
-  id serial primary key,
-  name text not null,
-  code text unique
-);
+Tables:
+- `countries(id, name, code)`, `states(id, country_id→countries, name)`, `cities(id, state_id→states, name)` — cascade. **Public read** RLS. User data import karega.
+- `user_details` — **per-user, upsert** (v1 ke per-order `billing_details` ki jagah):
+  ```
+  user_id uuid unique → auth.users,
+  full_name, email, phone (E.164), phone_dial_code, phone_country,
+  address, gender, country_id, state_id, city_id, updated_at
+  ```
+  RLS: **own row** (`auth.uid() = user_id`) — app authed user seedha likhta/padhta hai.
 
-create table if not exists public.states (
-  id serial primary key,
-  country_id int not null references public.countries(id) on delete cascade,
-  name text not null
-);
+**Modify:** `supabase/schema.sql` — `documents.file_uri text` column.
 
-create table if not exists public.cities (
-  id serial primary key,
-  state_id int not null references public.states(id) on delete cascade,
-  name text not null
-);
-
-create table if not exists public.billing_details (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users(id) on delete set null,
-  full_name text not null,
-  email text not null,
-  phone text not null,              -- poora E.164, jaise +919876543210
-  phone_dial_code text,             -- country calling code, jaise +91
-  phone_country text,               -- ISO country, jaise IN
-  address text not null,
-  gender text not null,
-  country_id int references public.countries(id),
-  state_id int references public.states(id),
-  city_id int references public.cities(id),
-  order_id text,                 -- razorpay order id se link
-  created_at timestamptz not null default now()
-);
-```
-
-RLS:
-- `countries`, `states`, `cities`: RLS on, **public read** allowed (dropdown ke liye) — `for select using (true)`. Write sirf service_role.
-- `billing_details`: RLS on, koi public policy nahi (sirf server/service_role likhta-padhta hai).
-
-Indexes: `states(country_id)`, `cities(state_id)` (cascade lookups fast).
-
-Data import: user khud CSV/SQL se countries/states/cities bharega.
-
-**API routes (service-role backed, Next.js):**
-- `GET /api/locations/countries` → `[{ id, name }]`
-- `GET /api/locations/states?country=<id>` → `[{ id, name }]`
-- `GET /api/locations/cities?state=<id>` → `[{ id, name }]`
-
-Yeh routes existing server supabase helper (jaisa `web/lib/plan-server.ts` use karta hai) reuse karenge. Anon key browser me expose nahi hoga.
-
-**Acceptance:** Location API routes sahi cascade data lautaayein; billing insert order route se ho.
+"Details complete?" ka matlab: `full_name, phone, address, gender, city_id` sab present.
 
 ---
 
-## Workstream 4 — App: Payment + Documents
+## Workstream 3 — App: Profile details form
 
-### 4a. Payment (Play-Store-safe) — verify only
-- `app-mobile/src/app/upgrade.tsx` jaisa hai waisa rahega; pay button pehle se `WebBrowser.openAuthSessionAsync(url, returnUrl)` se web checkout kholta hai.
-- App me koi Razorpay/native payment nahi. Sirf verify karo ki checkout URL sahi banta hai aur wapas aane pe plan refresh hota hai.
+**Nayi screen:** `app-mobile/src/app/profile-details.tsx`
+- Fields (sab required): Full name, Email, Phone (country-wise validation), Address, Gender, Country → State → City cascade.
+- **Phone validation:** `libphonenumber-js` (pure JS, RN-safe) — default country IN, calling-code picker, `isValidPhoneNumber`. Save: `phone` (E.164 `+9198...`), `phone_dial_code` (`+91`), `phone_country` (`IN`).
+- Cascade: Supabase se direct (`countries`/`states`/`cities`, public read).
+- Load existing `user_details` → prefill/edit. Save → upsert.
+- Entry: Settings me "Meri details" row se; aur upgrade flow se (details adhoori ho to).
 
-### 4b. Document local save
-- Dependency add: `expo-file-system` (Expo v57 versioned docs ke hisaab se).
-- `add-document.tsx`: photo pick hone ke baad ImagePicker ka cache URI ko permanent folder me copy karo — `FileSystem.documentDirectory + "documents/"` (folder ensure/create karo), unique filename.
-- Copied local URI ko `addDocument()` me `file_uri` ke roop me pass karo.
-- `supabase/schema.sql`: `documents` table me `file_uri text` column add (`alter table ... add column if not exists`).
-- `app-mobile/src/lib/documents.ts`: `Document` type me `file_uri: string | null`; `addDocument` input me `file_uri` accept + insert.
-
-### 4c. Document view
-- Nayi screen: `app-mobile/src/app/document-view.tsx` — params se `file_uri` (ya doc id) le kar poori photo full-screen dikhaye (pinch-zoom nice-to-have; basic full-screen `Image` + close button minimum).
-- `doc-card` / documents list: card **tap** (short press) pe `router.push` view screen (long-press abhi delete ke liye hai — woh rahega).
-- File missing ho (purana doc bina file_uri) to friendly message: "Is document ki file save nahi hai."
-
-**Acceptance:** Naya document add karo photo ke saath → documents list me tap karo → poori photo full-screen khule. App restart ke baad bhi file rahe (cache clear se na jaaye).
+**Settings:** `settings.tsx` me ek "Meri details" row add (profile-details kholta hai).
 
 ---
 
-## Rollout / order of work
+## Workstream 4 — App: Payment (RevenueCat / GPB)
 
-1. DB: `locations-billing.sql` + `documents.file_uri` column.
-2. Web: location API routes.
-3. Web: Pricing button fix.
-4. Web: Checkout form + order route billing save.
-5. App: `expo-file-system` + local save + `file_uri`.
-6. App: document-view screen + card tap.
-7. App: upgrade/web-checkout flow verify.
+- Dep: `react-native-purchases` + Expo config plugin (`app.json`). Env: `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+- **Wrapper:** `app-mobile/src/lib/purchases.ts` — safe init (module na mile to no-op), `getOfferings()`, `purchasePlus(pkg)`, `isPlusActive()` (entitlement `plus`). Expo Go / missing-key me graceful.
+- **upgrade.tsx:**
+  - GST comment out (base price only).
+  - "Securely pay" → ab: (1) `user_details` complete? nahi → `profile-details` kholo (returnTo upgrade). (2) haan → RevenueCat purchase (`purchasePlus`).
+  - Purchase success → app khud `profiles.plan='plus', plan_source='google_play'` update kare (RLS own-profile), taaki `getPlan()`/doc-limit turant unlock ho. (Webhook baad me.)
+  - RevenueCat available na ho → toast: "Payment abhi is build me available nahi (dev build chahiye)".
+- **plan.ts:** `getPlan()` waisa hi (Supabase). Purchase success pe profiles update hone se isPlus reflect hoga.
+
+---
+
+## Workstream 5 — App: Local documents (v1 se unchanged)
+
+- `expo-file-system` add. Picked image ko `documentDirectory/documents/` me copy → local path.
+- `documents.file_uri` column + `documents.ts` field + `add-document.tsx` copy.
+- Nayi `document-view.tsx` — full-screen image. `doc-card` tap → view. Home + documents list wired.
+
+---
+
+## Rollout order
+
+1. DB: `locations-billing.sql` (+ user_details) + `documents.file_uri`.
+2. Web: GST comment-out + plans "download app" modal + checkout comment-out.
+3. App: `libphonenumber-js` + `profile-details.tsx` + settings row.
+4. App: `react-native-purchases` + `purchases.ts` + upgrade.tsx rewire + GST comment-out.
+5. App: local documents (file_uri, copy, view, tap).
+6. Verify (dev build note for payment).
 
 ## Open risks
 
-- Local-only files: user doosre device pe file nahi dekh payega (accepted for now).
-- Play Store: web-checkout link bhi kabhi-kabhi policy pe review me aa sakta hai; abhi user ne yeh flow choose kiya hai.
-- Location data import user pe depend karta hai — jab tak import nahi, dropdown khaali dikhega (empty-state message dikhana chahiye).
+- **GPB ship/test user ke Play Console + dev-build setup pe rukega** — code taiyaar, par "done" iske bina nahi.
+- Location data import na ho to dropdown khaali (empty-state message).
+- Local-only files: doosre device pe file nahi (accepted).
+- No RevenueCat webhook: agar user refund/cancel kare to app-side `profiles.plan` stale reh sakta hai jab tak webhook add na ho (baad me).
