@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import { colors } from "@/theme/colors";
+import SaathiMark from "@/components/saathi-mark";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
@@ -70,7 +71,7 @@ export default function Settings() {
         {/* Profile card */}
         <View style={styles.profile}>
           <View style={styles.pAvatar}>
-            <Ionicons name="heart" size={26} color={colors.white} />
+            <SaathiMark size={32} color={colors.white} />
           </View>
           <Text style={styles.pName}>{name}</Text>
           <Text style={styles.pSub}>{session?.user?.email ?? ""}</Text>
@@ -96,6 +97,16 @@ export default function Settings() {
             </Text>
           </View>
         </View>
+
+        {/* Meri details */}
+        <Pressable
+          onPress={() => router.push("/profile-details" as never)}
+          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
+        >
+          <Ionicons name="person-outline" size={20} color={colors.terracotta} />
+          <Text style={styles.detailsText}>Meri details (name, phone, address…)</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.line} />
+        </Pressable>
 
         {/* Plan / Saathi Plus */}
         <Pressable
@@ -189,6 +200,19 @@ const styles = StyleSheet.create({
   },
   statusDot: { height: 7, width: 7, borderRadius: 4 },
   statusText: { fontSize: 12.5, fontWeight: "600" },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 22,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+  },
+  detailsText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
   planCard: {
     flexDirection: "row",
     alignItems: "center",
