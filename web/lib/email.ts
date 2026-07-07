@@ -98,7 +98,7 @@ export function renderEmail(title: string, inner: string): string {
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;border-radius:13px;background:${BRAND};color:#fff;font-size:22px;">🙂</span>
+                      <img src="${SITE_URL}/logo.png" width="40" height="40" alt="Apka Saathi" style="display:block;width:40px;height:40px;border-radius:13px;background:${BRAND};"/>
                     </td>
                     <td style="vertical-align:middle;padding-left:10px;font-size:22px;font-weight:700;color:${INK};letter-spacing:-0.5px;">Apka Saathi</td>
                   </tr>
