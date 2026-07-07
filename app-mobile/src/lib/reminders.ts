@@ -7,6 +7,7 @@ export type Reminder = {
   remind_at: string | null; // ISO timestamp
   is_on: boolean;
   bucket: string; // 'today' | 'upcoming'
+  user_id: string | null;
   created_at: string;
 };
 
@@ -30,9 +31,12 @@ export async function addReminder(input: {
   remind_at: string | null;
   bucket: string;
 }): Promise<Reminder> {
-  const { data, error } = await client()
+  const sb = client();
+  // WhatsApp/email reminder ke liye backend ko user chahiye.
+  const { data: u } = await sb.auth.getUser();
+  const { data, error } = await sb
     .from("reminders")
-    .insert(input)
+    .insert({ ...input, user_id: u.user?.id ?? null })
     .select()
     .single();
   if (error) throw error;

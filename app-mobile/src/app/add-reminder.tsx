@@ -8,10 +8,14 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 
 import { colors } from "@/theme/colors";
 import { addReminder } from "@/lib/reminders";
@@ -19,25 +23,6 @@ import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { parseReminderTime } from "@/utils/parse-time";
 import { VoiceButton } from "@/components/voice-button";
 import { useToast } from "@/components/toast";
-
-type Opt = { key: string; label: string; make: () => Date };
-
-const options: Opt[] = [
-  { key: "1h", label: "1 ghante baad", make: () => new Date(Date.now() + 60 * 60 * 1000) },
-  { key: "3h", label: "3 ghante baad", make: () => new Date(Date.now() + 3 * 60 * 60 * 1000) },
-  { key: "tonight", label: "Aaj raat 9 baje", make: () => atTime(0, 21) },
-  { key: "tmrw_morning", label: "Kal subah 8 baje", make: () => atTime(1, 8) },
-  { key: "tmrw_evening", label: "Kal shaam 6 baje", make: () => atTime(1, 18) },
-  { key: "week", label: "1 hafte baad", make: () => atTime(7, 9) },
-];
-
-function atTime(addDays: number, hour: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + addDays);
-  d.setHours(hour, 0, 0, 0);
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
-  return d;
-}
 
 function isSameDay(a: Date, b: Date) {
   return (
@@ -47,27 +32,75 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
+/** "Aaj 9:30 PM" / "Kal 8:00 AM" / "12 Jul, 3:00 PM" */
+function formatWhen(d: Date): string {
+  const now = new Date();
+  const tmrw = new Date(now);
+  tmrw.setDate(now.getDate() + 1);
+  const time = d.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  if (isSameDay(d, now)) return `Aaj ${time}`;
+  if (isSameDay(d, tmrw)) return `Kal ${time}`;
+  const date = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return `${date}, ${time}`;
+}
+
 export default function AddReminder() {
   const router = useRouter();
   const toast = useToast();
   const [title, setTitle] = useState("");
-  const [chip, setChip] = useState<string | null>(null);
+  const [picked, setPicked] = useState<Date | null>(null);
+  const [showIosPicker, setShowIosPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const parsed = useMemo(() => parseReminderTime(title), [title]);
-  const usingParsed = chip === null && parsed !== null;
+
+  // Effective time: user ne khud chuna ho to wahi, warna text se samjha hua.
+  const when = picked ?? parsed?.date ?? null;
+
+  function openPicker() {
+    const base =
+      when ?? new Date(Date.now() + 60 * 60 * 1000); // default: 1 ghanta baad
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: base,
+        mode: "date",
+        minimumDate: new Date(),
+        onChange: (_e, d) => {
+          if (!d) return;
+          DateTimePickerAndroid.open({
+            value: d,
+            mode: "time",
+            is24Hour: false,
+            onChange: (_e2, t) => {
+              if (!t) return;
+              const combined = new Date(d);
+              combined.setHours(t.getHours(), t.getMinutes(), 0, 0);
+              setPicked(combined);
+            },
+          });
+        },
+      });
+    } else {
+      setShowIosPicker(true);
+    }
+  }
 
   async function save() {
     if (saving) return;
     const rawTitle = title.trim();
     if (!rawTitle) return toast.show("Kya yaad dilana hai?", "info");
+    if (!when) {
+      toast.show("Kab yaad dilaun? Date & time chuno", "info");
+      openPicker();
+      return;
+    }
 
-    const chipOpt = chip ? options.find((o) => o.key === chip) : null;
-    const when = chipOpt ? chipOpt.make() : parsed?.date ?? null;
-    if (!when) return toast.show("Kab yaad dilaun? Bolo ya chuno.", "info");
-
-    const finalTitle = chipOpt ? rawTitle : parsed?.title || rawTitle;
-    const finalLabel = chipOpt ? chipOpt.label : parsed?.label ?? null;
+    const finalTitle = picked ? rawTitle : parsed?.title || rawTitle;
+    const finalLabel = picked ? formatWhen(picked) : parsed?.label ?? formatWhen(when);
 
     try {
       setSaving(true);
@@ -81,7 +114,9 @@ export default function AddReminder() {
       const allowed = await ensureNotifPermission();
       if (allowed) await scheduleReminder(r.id, r.title, when);
       toast.show(
-        allowed ? "Reminder set ✓ Time pe yaad dila dunga" : "Saved (notification permission do)",
+        allowed
+          ? "Reminder set ✓ Time pe yaad dila dunga"
+          : "Saved (notification permission do)",
         "success",
       );
       router.back();
@@ -102,73 +137,99 @@ export default function AddReminder() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.label}>Kya yaad dilaun?</Text>
           <View style={styles.inputRow}>
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="Jaise: 1 minute baad mummy ko call karna"
+              placeholder="Jaise: kal subah 8 baje mummy ko call karna"
               placeholderTextColor={colors.inkSoft}
               style={styles.input}
               multiline
             />
             <VoiceButton onText={(t) => setTitle((p) => (p ? p + " " + t : t))} />
           </View>
-          <Text style={styles.hint}>🎤 Mic dabake bolo — time bhi bol do, main samajh lunga</Text>
+          <Text style={styles.hint}>
+            🎤 Mic dabake bolo — time bhi bol do, main samajh lunga
+          </Text>
 
-          {/* auto-detected time */}
-          {parsed && (
-            <Pressable
-              onPress={() => setChip(null)}
-              style={[styles.detected, usingParsed && styles.detectedActive]}
-            >
-              <Ionicons
-                name="sparkles"
-                size={18}
-                color={usingParsed ? colors.white : colors.terracotta}
-              />
+          {/* Auto-detected time (text se) */}
+          {parsed && !picked && (
+            <View style={[styles.detected, styles.detectedActive]}>
+              <Ionicons name="sparkles" size={18} color={colors.white} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.detLabel, usingParsed && { color: "rgba(255,255,255,0.8)" }]}>
+                <Text style={[styles.detLabel, { color: "rgba(255,255,255,0.8)" }]}>
                   Samajh gaya ✨
                 </Text>
-                <Text style={[styles.detTime, usingParsed && { color: colors.white }]}>
+                <Text style={[styles.detTime, { color: colors.white }]}>
                   {parsed.label}
                 </Text>
               </View>
-              {usingParsed && <Ionicons name="checkmark-circle" size={20} color={colors.white} />}
+              <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+            </View>
+          )}
+
+          {/* Kab? — time na mile to yahan se chuno */}
+          <Text style={styles.label}>Kab yaad dilaun?</Text>
+
+          {when ? (
+            <View style={styles.whenRow}>
+              <View style={styles.whenChip}>
+                <Ionicons name="alarm" size={18} color={colors.terracotta} />
+                <Text style={styles.whenText}>{formatWhen(when)}</Text>
+              </View>
+              <Pressable onPress={openPicker} style={styles.changeBtn}>
+                <Ionicons name="create-outline" size={16} color={colors.terracotta} />
+                <Text style={styles.changeText}>Badlo</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={openPicker} style={styles.pickBtn}>
+              <Ionicons name="calendar-outline" size={18} color={colors.white} />
+              <Text style={styles.pickText}>Date & time chuno</Text>
             </Pressable>
           )}
 
-          <Text style={styles.label}>{parsed ? "Ya time chuno" : "Kab?"}</Text>
-          <View style={styles.optGrid}>
-            {options.map((o) => {
-              const active = chip === o.key;
-              return (
-                <Pressable
-                  key={o.key}
-                  onPress={() => setChip(o.key)}
-                  style={[styles.opt, active && styles.optActive]}
-                >
-                  <Ionicons
-                    name="time-outline"
-                    size={16}
-                    color={active ? colors.white : colors.terracotta}
-                  />
-                  <Text style={[styles.optText, active && { color: colors.white }]}>
-                    {o.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {!when && (
+            <Text style={styles.hint}>
+              Time text me nahi mila — upar button se date aur time chuno.
+            </Text>
+          )}
+
+          {/* iOS inline picker */}
+          {showIosPicker && Platform.OS === "ios" && (
+            <View style={styles.iosPicker}>
+              <DateTimePicker
+                value={when ?? new Date(Date.now() + 60 * 60 * 1000)}
+                mode="datetime"
+                display="spinner"
+                minimumDate={new Date()}
+                onChange={(_e, d) => {
+                  if (d) setPicked(d);
+                }}
+              />
+              <Pressable
+                onPress={() => setShowIosPicker(false)}
+                style={styles.iosDone}
+              >
+                <Text style={styles.iosDoneText}>Ho gaya</Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
       <Pressable
         onPress={save}
         disabled={saving}
-        style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
+        style={({ pressed }) => [
+          styles.save,
+          (pressed || saving) && { opacity: 0.85 },
+        ]}
       >
         {saving ? (
           <ActivityIndicator color={colors.white} />
@@ -234,26 +295,61 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.terracotta,
-    backgroundColor: "rgba(194,90,55,0.08)",
     padding: 14,
   },
   detectedActive: { backgroundColor: colors.terracotta },
   detLabel: { fontSize: 12, fontWeight: "600", color: colors.inkSoft },
   detTime: { fontSize: 16, fontWeight: "700", color: colors.ink, marginTop: 1 },
-  optGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  opt: {
+  whenRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  whenChip: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.sage,
+    backgroundColor: "rgba(124,138,107,0.08)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  whenText: { fontSize: 16, fontWeight: "700", color: colors.ink },
+  changeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.terracotta,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  changeText: { fontSize: 14, fontWeight: "700", color: colors.terracotta },
+  pickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 16,
+    backgroundColor: colors.terracotta,
+    paddingVertical: 15,
+  },
+  pickText: { fontSize: 15, fontWeight: "700", color: colors.white },
+  iosPicker: {
+    marginTop: 12,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    padding: 8,
   },
-  optActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
-  optText: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  iosDone: {
+    alignItems: "center",
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  iosDoneText: { fontSize: 15, fontWeight: "700", color: colors.terracotta },
   save: {
     margin: 20,
     marginTop: 8,
