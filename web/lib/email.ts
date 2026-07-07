@@ -98,9 +98,9 @@ export function renderEmail(title: string, inner: string): string {
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;border-radius:13px;background:${BRAND};color:#fff;font-size:22px;font-weight:700;font-family:Georgia,serif;">S</span>
+                      <span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;border-radius:13px;background:${BRAND};color:#fff;font-size:22px;">🙂</span>
                     </td>
-                    <td style="vertical-align:middle;padding-left:10px;font-size:22px;font-weight:700;color:${INK};letter-spacing:-0.5px;">Saathi</td>
+                    <td style="vertical-align:middle;padding-left:10px;font-size:22px;font-weight:700;color:${INK};letter-spacing:-0.5px;">Apka Saathi</td>
                   </tr>
                 </table>
               </td>
@@ -117,7 +117,7 @@ export function renderEmail(title: string, inner: string): string {
             <!-- Footer -->
             <tr>
               <td align="center" style="padding:22px 10px 0;color:${SOFT};font-size:12px;line-height:1.7;">
-                <strong style="color:${INK};">Saathi</strong> — jo kuch nahi bhoolta.<br/>
+                <strong style="color:${INK};">Apka Saathi</strong> — jo kuch nahi bhoolta.<br/>
                 Koi spam nahi. Sirf zaroori baat. 🤍
               </td>
             </tr>
@@ -147,6 +147,27 @@ export function escapeHtml(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/** Reminder email — due reminder pe user ko (branded). */
+export async function sendReminderEmail(
+  to: string,
+  title: string,
+  whenLabel: string,
+): Promise<{ sent: boolean; skipped?: boolean }> {
+  const inner =
+    emailParagraph("Bas yaad dila raha hoon 🙂 — aapne ye set kiya tha:") +
+    `<div style="margin:6px 0 18px;padding:18px 20px;border:1px solid ${LINE};border-radius:16px;background:${CREAM};">
+       <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(title)}</div>
+       <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${escapeHtml(whenLabel)}</div>
+     </div>` +
+    emailParagraph("Ho gaya to badhiya — warna abhi kar lo. Main yahin hoon. 🤍");
+  return sendMail({
+    to,
+    subject: `🔔 Reminder: ${title}`,
+    html: renderEmail("Aapka reminder ⏰", inner),
+    fromName: "Apka Saathi",
+  });
 }
 
 /* ------------------------------------------------------------------ */
