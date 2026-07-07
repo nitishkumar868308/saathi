@@ -10,6 +10,9 @@ create table if not exists public.documents (
   created_at timestamptz not null default now()
 );
 
+-- Document ki local file ka path (app device pe). Abhi cloud pe nahi.
+alter table public.documents add column if not exists file_uri text;
+
 -- 2. Reminders
 create table if not exists public.reminders (
   id uuid primary key default gen_random_uuid(),
