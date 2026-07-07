@@ -8,9 +8,11 @@ import { colors } from "@/theme/colors";
 
 export function DocCard({
   doc,
+  onPress,
   onLongPress,
 }: {
   doc: Document;
+  onPress?: () => void;
   onLongPress?: () => void;
 }) {
   const hasExpiry = !!doc.expiry;
@@ -19,9 +21,13 @@ export function DocCard({
 
   return (
     <Pressable
+      onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
-      style={({ pressed }) => [styles.card, pressed && onLongPress && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        pressed && (onPress || onLongPress) && styles.pressed,
+      ]}
     >
       <View style={[styles.icon, { backgroundColor: s.bg }]}>
         <Ionicons name={iconForType(doc.type) as any} size={20} color={s.fg} />

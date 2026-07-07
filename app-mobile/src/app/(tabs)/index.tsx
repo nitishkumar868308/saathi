@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
+import SaathiMark from "@/components/saathi-mark";
 import { listDocuments, type Document } from "@/lib/documents";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
@@ -57,7 +58,7 @@ export default function Home() {
             <Text style={styles.sub}>Aaj ka aapka Saathi brief</Text>
           </View>
           <View style={styles.avatar}>
-            <Ionicons name="heart" size={20} color={colors.white} />
+            <SaathiMark size={24} color={colors.white} />
           </View>
         </View>
 
@@ -121,7 +122,16 @@ export default function Home() {
         ) : (
           <View style={{ gap: 10 }}>
             {attention.map((doc) => (
-              <DocCard key={doc.id} doc={doc} />
+              <DocCard
+                key={doc.id}
+                doc={doc}
+                onPress={() =>
+                  router.push({
+                    pathname: "/document-view",
+                    params: { uri: doc.file_uri ?? "", name: doc.name },
+                  } as never)
+                }
+              />
             ))}
           </View>
         )}

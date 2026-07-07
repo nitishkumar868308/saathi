@@ -143,7 +143,17 @@ export default function Documents() {
             </View>
           ) : (
             list.map((doc) => (
-              <DocCard key={doc.id} doc={doc} onLongPress={() => confirmDelete(doc)} />
+              <DocCard
+                key={doc.id}
+                doc={doc}
+                onPress={() =>
+                  router.push({
+                    pathname: "/document-view",
+                    params: { uri: doc.file_uri ?? "", name: doc.name },
+                  } as never)
+                }
+                onLongPress={() => confirmDelete(doc)}
+              />
             ))
           )}
           <Text style={styles.hint}>Delete karne ke liye card ko dabaye rakho</Text>

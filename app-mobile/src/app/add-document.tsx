@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
 import { addDocument, DocLimitError } from "@/lib/documents";
@@ -31,10 +32,24 @@ const quick = [
   { label: "+3 saal", months: 36 },
 ];
 
+async function persistImage(cacheUri: string): Promise<string> {
+  const dir = FileSystem.documentDirectory + "documents/";
+  try {
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+  } catch {
+    /* already exists */
+  }
+  const ext = (cacheUri.split(".").pop() || "jpg").split("?")[0].slice(0, 5);
+  const dest = `${dir}${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
+  await FileSystem.copyAsync({ from: cacheUri, to: dest });
+  return dest;
+}
+
 export default function AddDocument() {
   const router = useRouter();
   const toast = useToast();
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [savedUri, setSavedUri] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [type, setType] = useState("other");
@@ -60,6 +75,11 @@ export default function AddDocument() {
       if (result.canceled) return;
       const asset = result.assets[0];
       setImageUri(asset.uri);
+      try {
+        setSavedUri(await persistImage(asset.uri));
+      } catch {
+        setSavedUri(asset.uri);
+      }
       if (!asset.base64) return;
 
       setScanning(true);
@@ -99,7 +119,12 @@ export default function AddDocument() {
     }
     try {
       setSaving(true);
-      await addDocument({ name: name.trim(), type, expiry: expiry || null });
+      await addDocument({
+        name: name.trim(),
+        type,
+        expiry: expiry || null,
+        file_uri: savedUri,
+      });
       toast.show("Document add ho gaya 🎉", "success");
       router.back();
     } catch (e) {

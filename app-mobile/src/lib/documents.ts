@@ -16,6 +16,7 @@ export type Document = {
   name: string;
   type: string;
   expiry: string | null; // 'YYYY-MM-DD'
+  file_uri: string | null;
   created_at: string;
 };
 
@@ -37,13 +38,19 @@ export async function addDocument(input: {
   name: string;
   type: string;
   expiry: string | null;
+  file_uri?: string | null;
 }): Promise<Document> {
   // Free plan limit check
   if (!(await canAddDocument())) throw new DocLimitError();
 
   const { data, error } = await client()
     .from("documents")
-    .insert(input)
+    .insert({
+      name: input.name,
+      type: input.type,
+      expiry: input.expiry,
+      file_uri: input.file_uri ?? null,
+    })
     .select()
     .single();
   if (error) throw error;
