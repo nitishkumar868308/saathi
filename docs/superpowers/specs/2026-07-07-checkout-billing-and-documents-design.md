@@ -42,18 +42,29 @@ Pay button se pehle ek details form. Saare fields **required**; jab tak sab vali
 Fields:
 - Full name (query `name` se prefill agar mile)
 - Email (query `email` se prefill)
-- Phone (10-digit India validation)
+- Phone (**country-wise validation, zaroori**) — dekho "Phone input" section neeche
 - Address (multi-line)
 - Gender (select: Male / Female / Other)
 - Country (select) → State (select) → City (select) — cascade
 
-Cascade behaviour:
+### Phone input (country-wise validation)
+
+- Library: **`react-phone-number-input`** (country dropdown + flag + per-country validation via `libphonenumber-js`). Dependency web me add hogi.
+- User country select karta hai (default `IN`), number type karta hai. Number E.164 format me aata hai: `+919876543210`.
+- Validation: `isValidPhoneNumber(value)` — har country ke apne length/format rules. Invalid ho to Pay disabled + error dikhe.
+- Save karne ke liye number ko break karo:
+  - `phone` = poora E.164 number (`+919876543210`)
+  - `phone_dial_code` = country calling code (`+91`)
+  - `phone_country` = ISO country (`IN`)
+  - `libphonenumber-js` ke `parsePhoneNumber(value)` se `.countryCallingCode` (`91`) aur `.country` (`IN`) nikalo.
+
+### Cascade behaviour:
 - Mount pe countries load (`GET /api/locations/countries`).
 - Country choose → us country ke states load (`GET /api/locations/states?country=<id>`), state+city reset.
 - State choose → us state ki cities load (`GET /api/locations/cities?state=<id>`), city reset.
 
 Submit / Pay flow:
-1. Form valid → `POST /api/razorpay/order` body me `{ plan, userId, billing: { fullName, email, phone, address, gender, countryId, stateId, cityId } }`.
+1. Form valid → `POST /api/razorpay/order` body me `{ plan, userId, billing: { fullName, email, phone, phoneDialCode, phoneCountry, address, gender, countryId, stateId, cityId } }`.
 2. Order route order banata hai **aur** billing details `billing_details` table me save karta hai (order_id ke saath linked).
 3. Razorpay modal khulta hai (jaisa abhi hai). Prefill name/email/phone billing se.
 4. Verify unchanged.
@@ -90,7 +101,9 @@ create table if not exists public.billing_details (
   user_id uuid references auth.users(id) on delete set null,
   full_name text not null,
   email text not null,
-  phone text not null,
+  phone text not null,              -- poora E.164, jaise +919876543210
+  phone_dial_code text,             -- country calling code, jaise +91
+  phone_country text,               -- ISO country, jaise IN
   address text not null,
   gender text not null,
   country_id int references public.countries(id),
