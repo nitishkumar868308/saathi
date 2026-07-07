@@ -19,18 +19,18 @@ const mulish = Mulish({
   preload: true,
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://saathi.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Aapka saathi, jo kuch nahi bhoolta",
-    template: "%s · Saathi",
+    default: "Apka Saathi — jo kuch nahi bhoolta",
+    template: "%s · Apka Saathi",
   },
   description:
-    "Saathi ek AI companion hai jo aapke documents ki expiry, zaroori dates aur roz ke kaam bina pooche yaad dilata hai. Passport, insurance, FASTag, EMI — sab yaad. Hindi + English. Early access lo.",
+    "Apka Saathi ek AI companion hai jo aapke documents ki expiry, zaroori dates aur roz ke kaam bina pooche yaad dilata hai. Passport, insurance, FASTag, EMI — sab yaad. Hindi + English. Early access lo.",
   keywords: [
-    "Saathi",
+    "Apka Saathi",
     "AI reminder app",
     "document expiry reminder",
     "India reminder app",
@@ -39,22 +39,22 @@ export const metadata: Metadata = {
     "insurance expiry reminder",
     "personal AI companion",
   ],
-  authors: [{ name: "Saathi" }],
-  creator: "Saathi",
-  applicationName: "Saathi",
+  authors: [{ name: "Apka Saathi" }],
+  creator: "Apka Saathi",
+  applicationName: "Apka Saathi",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Saathi — Aapka AI saathi jo kuch nahi bhoolta",
+    title: "Apka Saathi — jo kuch nahi bhoolta",
     description:
       "Documents ki expiry, daily brief, aur reminders — sab ek dost ki tarah bina pooche sambhalta hai. Never forget what matters.",
     url: SITE_URL,
-    siteName: "Saathi",
+    siteName: "Apka Saathi",
     locale: "en_IN",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Saathi — jo kuch nahi bhoolta",
+    title: "Apka Saathi — jo kuch nahi bhoolta",
     description:
       "AI saathi jo aapke documents, dates aur kaam bina pooche yaad dilata hai.",
   },
@@ -76,7 +76,7 @@ export const viewport: Viewport = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Saathi",
+  name: "Apka Saathi",
   applicationCategory: "ProductivityApplication",
   operatingSystem: "Android",
   description:

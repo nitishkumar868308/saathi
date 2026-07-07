@@ -23,7 +23,7 @@ export default function WaitlistForm({
   const [status, setStatus] = useState<Status>("idle");
   const [copied, setCopied] = useState(false);
   const [already, setAlready] = useState(false);
-  const [shareUrl, setShareUrl] = useState("https://saathi.app");
+  const [shareUrl, setShareUrl] = useState("https://apkasaathi.com");
 
   useEffect(() => {
     // Personal referral link once we know the origin

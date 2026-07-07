@@ -186,7 +186,7 @@ export default function Pricing() {
               secure, Google Play ke through.
             </p>
             <a
-              href="https://play.google.com/store/apps/details?id=app.saathi"
+              href="https://play.google.com/store/apps/details?id=com.saathi.app"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"

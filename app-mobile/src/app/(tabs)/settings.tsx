@@ -35,7 +35,7 @@ const groups: { title: string; rows: Row[] }[] = [
     title: "Aur",
     rows: [
       { icon: "help-circle-outline", label: "Help & support" },
-      { icon: "information-circle-outline", label: "About Saathi" },
+      { icon: "information-circle-outline", label: "About Apka Saathi" },
     ],
   },
 ];
@@ -169,7 +169,7 @@ export default function Settings() {
           <Text style={styles.logoutText}>Logout</Text>
         </Pressable>
 
-        <Text style={styles.version}>Saathi · v0.1.0 · Made in India ❤️</Text>
+        <Text style={styles.version}>Apka Saathi · v0.1.0 · Made in India ❤️</Text>
       </ScrollView>
     </SafeAreaView>
   );

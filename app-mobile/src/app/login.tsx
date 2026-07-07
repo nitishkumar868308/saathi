@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
+import SaathiMark from "@/components/saathi-mark";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 
@@ -44,7 +45,7 @@ export default function Login() {
         if (needsConfirm) {
           toast.show("Email pe confirmation link bheja — check karo", "success");
         } else {
-          toast.show("Welcome to Saathi! 🎉", "success");
+          toast.show("Welcome to Apka Saathi! 🎉", "success");
         }
       } else {
         await signInEmail(email.trim(), password);
@@ -83,7 +84,7 @@ export default function Login() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logo}>
-            <Ionicons name="heart" size={30} color={colors.white} />
+            <SaathiMark size={36} color={colors.white} />
           </View>
           <Text style={styles.title}>
             {mode === "login" ? "Wapas aa gaye 🙂" : "Milo apne Saathi se"}

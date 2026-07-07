@@ -1,15 +1,16 @@
 "use client";
 
-import { Heart, Instagram, Twitter, Linkedin, Mail, Play } from "lucide-react";
+import { Instagram, Twitter, Linkedin, Mail, Play } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import SaathiMark from "@/components/SaathiMark";
 
 // 👉 Apne asli social handles yahan daal dena jab pages ban jaayein.
 const SOCIALS = [
   { icon: Instagram, label: "Instagram", href: "https://instagram.com/" },
   { icon: Twitter, label: "X (Twitter)", href: "https://x.com/" },
   { icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/" },
-  { icon: Mail, label: "Email", href: "mailto:hello@saathi.app" },
+  { icon: Mail, label: "Email", href: "mailto:hello@apkasaathi.com" },
 ];
 
 export default function Footer() {
@@ -32,9 +33,9 @@ export default function Footer() {
           <div>
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-                <Heart size={16} className="fill-white" strokeWidth={2.4} />
+                <SaathiMark size={20} className="text-white" />
               </span>
-              <span className="font-display text-xl font-semibold">Saathi</span>
+              <span className="font-display text-xl font-semibold">Apka Saathi</span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-soft">
               {t.tagline}
@@ -120,7 +121,7 @@ export default function Footer() {
 
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-line pt-6 text-sm text-ink-soft sm:flex-row">
           <p>
-            © {year} Saathi. {t.rights}
+            © {year} Apka Saathi. {t.rights}
           </p>
           <p className="flex items-center gap-1.5">
             {t.madeIn}

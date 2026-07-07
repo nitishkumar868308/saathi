@@ -162,11 +162,11 @@ export default function ContactForm() {
           <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
             {c.orEmail}{" "}
             <a
-              href="mailto:hello@saathi.app"
+              href="mailto:hello@apkasaathi.com"
               className="inline-flex items-center gap-1.5 font-semibold text-terracotta hover:underline"
             >
               <Mail size={14} />
-              hello@saathi.app
+              hello@apkasaathi.com
             </a>
           </p>
         </div>

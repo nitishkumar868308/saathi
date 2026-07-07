@@ -12,7 +12,7 @@ import { supabase } from "./supabase";
 
 export const FREE_DOC_LIMIT = 10;
 
-export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://saathi.app";
+export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://apkasaathi.com";
 
 export type PlanId = "plus_monthly" | "plus_yearly";
 

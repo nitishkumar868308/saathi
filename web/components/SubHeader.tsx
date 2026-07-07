@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import SaathiMark from "@/components/SaathiMark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function SubHeader() {
@@ -22,10 +22,10 @@ export default function SubHeader() {
       <div className="container-page flex items-center justify-between gap-2 py-3 sm:py-4">
         <Link href="/" className="flex shrink-0 items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm sm:h-10 sm:w-10">
-            <Heart size={18} strokeWidth={2.4} className="fill-white" />
+            <SaathiMark size={22} className="text-white" />
           </span>
           <span className="font-display text-lg font-semibold tracking-tight sm:text-2xl">
-            Saathi
+            Apka Saathi
           </span>
         </Link>
         <div className="flex items-center gap-1 sm:gap-2.5">

@@ -20,7 +20,7 @@ const GMAIL_USER = process.env.GMAIL_USER;
 // App passwords Gmail spaces ke saath dikhata hai — spaces hata do.
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, "");
 const CONTACT_TO = process.env.CONTACT_TO ?? GMAIL_USER;
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://saathi.app";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 
 export function emailConfigured(): boolean {
   return Boolean(GMAIL_USER && GMAIL_APP_PASSWORD);
@@ -98,7 +98,7 @@ export function renderEmail(title: string, inner: string): string {
                 <table role="presentation" cellpadding="0" cellspacing="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;border-radius:13px;background:${BRAND};color:#fff;font-size:20px;font-weight:700;">♥</span>
+                      <span style="display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;border-radius:13px;background:${BRAND};color:#fff;font-size:22px;font-weight:700;font-family:Georgia,serif;">S</span>
                     </td>
                     <td style="vertical-align:middle;padding-left:10px;font-size:22px;font-weight:700;color:${INK};letter-spacing:-0.5px;">Saathi</td>
                   </tr>
