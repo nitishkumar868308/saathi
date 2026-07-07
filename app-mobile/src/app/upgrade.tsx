@@ -10,13 +10,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
-
 import { colors } from "@/theme/colors";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
-import { buildCheckoutUrl, getPlan, type PlanId } from "@/lib/plan";
+import { getPlan, markProfilePlus, type PlanId } from "@/lib/plan";
+import {
+  purchasesAvailable,
+  initPurchases,
+  getPlusPackages,
+  purchasePlus,
+} from "@/lib/purchases";
+import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 
 const FREE_FEATURES = [
   "10 documents tak",
@@ -54,10 +58,13 @@ export default function Upgrade() {
 
   useEffect(() => {
     refresh();
+    initPurchases(session?.user?.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const base = yearly ? 999 : 99;
-  const total = Math.round(base * 1.18);
+  // GST abhi off (registration nahi) — base price hi lenge.
+  // const total = Math.round(base * 1.18);
   const period = yearly ? "/saal" : "/mahina";
 
   async function startCheckout() {
@@ -67,24 +74,49 @@ export default function Upgrade() {
       toast.show("Pehle login karo", "error");
       return;
     }
+
+    // 1. Details complete? nahi to form bharwao.
+    let details = null;
+    try {
+      details = await getUserDetails();
+    } catch {
+      /* ignore, treat as incomplete */
+    }
+    if (!isDetailsComplete(details)) {
+      toast.show("Pehle apni details bharo", "info");
+      router.push({
+        pathname: "/profile-details",
+        params: { returnTo: "/upgrade" },
+      } as never);
+      return;
+    }
+
+    // 2. RevenueCat available? (dev build + key chahiye)
+    if (!purchasesAvailable()) {
+      toast.show("Payment abhi is build me available nahi (dev build chahiye)", "info");
+      return;
+    }
+
     setPaying(true);
     try {
-      const returnUrl = Linking.createURL("upgrade");
-      const plan: PlanId = yearly ? "plus_yearly" : "plus_monthly";
-      const url = buildCheckoutUrl(plan, {
-        uid: user.id,
-        email: user.email ?? undefined,
-        name:
-          (user.user_metadata?.full_name as string) ||
-          (user.user_metadata?.name as string) ||
-          undefined,
-        returnUrl,
-      });
-      await WebBrowser.openAuthSessionAsync(url, returnUrl);
-      // Wapas aane par plan refresh
-      await refresh();
-      const p = await getPlan();
-      if (p.isPlus) toast.show("Saathi Plus active ho gaya! 🎉", "success");
+      const pkgs = await getPlusPackages();
+      const wanted: PlanId = yearly ? "plus_yearly" : "plus_monthly";
+      const pkg =
+        pkgs.find((p) =>
+          String(p.product?.identifier ?? "").includes(wanted),
+        ) ?? pkgs[0];
+      if (!pkg) {
+        toast.show("Koi plan available nahi", "error");
+        return;
+      }
+      const ok = await purchasePlus(pkg);
+      if (ok) {
+        await markProfilePlus();
+        await refresh();
+        toast.show("Saathi Plus active ho gaya! 🎉", "success");
+      } else {
+        toast.show("Purchase complete nahi hua", "error");
+      }
     } catch {
       toast.show("Payment shuru nahi hua", "error");
     } finally {
@@ -155,7 +187,7 @@ export default function Upgrade() {
                 <Text style={styles.price}>₹{base}</Text>
                 <Text style={styles.period}>{period}</Text>
               </View>
-              <Text style={styles.gst}>+ 18% GST · Total ₹{total}{period}</Text>
+              {/* GST abhi off: <Text style={styles.gst}>+ 18% GST · Total ₹{total}{period}</Text> */}
 
               <View style={{ marginTop: 16, gap: 12 }}>
                 {PLUS_FEATURES.map((f) => (
@@ -182,7 +214,7 @@ export default function Upgrade() {
                 ) : (
                   <>
                     <Ionicons name="lock-closed" size={16} color={colors.white} />
-                    <Text style={styles.payText}>₹{total} — Securely pay</Text>
+                    <Text style={styles.payText}>₹{base} — Securely pay</Text>
                   </>
                 )}
               </Pressable>

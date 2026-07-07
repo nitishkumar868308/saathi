@@ -81,6 +81,18 @@ export async function claimWaitlistReward(): Promise<string> {
   }
 }
 
+/** Purchase success ke baad profiles.plan = plus set karo (webhook aane tak bridge). */
+export async function markProfilePlus(): Promise<void> {
+  const sb = client();
+  const { data: userData } = await sb.auth.getUser();
+  const uid = userData.user?.id;
+  if (!uid) return;
+  await sb
+    .from("profiles")
+    .update({ plan: "plus", plan_source: "google_play" })
+    .eq("id", uid);
+}
+
 /** Web Razorpay checkout URL (app in-app browser mein kholega). */
 export function buildCheckoutUrl(
   plan: PlanId,
