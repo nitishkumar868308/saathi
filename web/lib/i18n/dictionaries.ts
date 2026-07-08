@@ -110,7 +110,10 @@ type Dict = {
     billYearly: string;
     saveBadge: string;
     gstNote: string;
+    /** Template — {n} = users, {m} = mahine. `tpl()` se bharo. */
     reward: string;
+    /** Template — {d} = din, {cap} = cap mahine. */
+    referralHow: string;
     plans: {
       name: string;
       price: string;
@@ -399,7 +402,8 @@ const hinglish: Dict = {
     billYearly: "Saal",
     saveBadge: "2 mahine free",
     gstNote: "+ 18% GST",
-    reward: "🎁 Pehle 1000 users ko Saathi Plus — poore 3 mahine bilkul FREE!",
+    reward: "🎁 Pehle {n} users ko Saathi Plus — poore {m} mahine bilkul FREE!",
+    referralHow: "Dost bulao: woh aapke code se join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din Plus free (max {cap} mahine).",
     plans: [
       {
         name: "Free",
@@ -435,7 +439,7 @@ const hinglish: Dict = {
         gst: true,
       },
     ],
-    note: "Pehle 1000 users ko 3 mahine Saathi Plus free. Dost bulao — dono ko 15 din extra Plus.",
+    note: "Pehle {n} users ko {m} mahine Saathi Plus free. Dost bulao — dono ko {d} din extra Plus.",
   },
   faq: {
     heading: "Sawaal hain? Bilkul natural hai.",
@@ -742,7 +746,8 @@ const hi: Dict = {
     billYearly: "साल",
     saveBadge: "2 महीने फ्री",
     gstNote: "+ 18% GST",
-    reward: "🎁 पहले 1000 यूज़र्स को साथी प्लस — पूरे 3 महीने बिल्कुल फ्री!",
+    reward: "🎁 पहले {n} यूज़र्स को साथी प्लस — पूरे {m} महीने बिल्कुल फ्री!",
+    referralHow: "दोस्त बुलाइए: वो आपके कोड से जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन प्लस फ्री (अधिकतम {cap} महीने)।",
     plans: [
       {
         name: "फ्री",
@@ -778,7 +783,7 @@ const hi: Dict = {
         gst: true,
       },
     ],
-    note: "पहले 1000 यूज़र्स को 3 महीने साथी प्लस फ्री। दोस्त बुलाइए — दोनों को 15 दिन एक्स्ट्रा प्लस।",
+    note: "पहले {n} यूज़र्स को {m} महीने साथी प्लस फ्री। दोस्त बुलाइए — दोनों को {d} दिन एक्स्ट्रा प्लस।",
   },
   faq: {
     heading: "सवाल हैं? बिल्कुल स्वाभाविक है।",
@@ -1085,7 +1090,8 @@ const en: Dict = {
     billYearly: "Yearly",
     saveBadge: "2 months free",
     gstNote: "+ 18% GST",
-    reward: "🎁 First 1000 users get Saathi Plus — 3 full months absolutely FREE!",
+    reward: "🎁 First {n} users get Saathi Plus — {m} full months absolutely FREE!",
+    referralHow: "Refer a friend: they join with your code, add their first document and chat with Saathi once — you both get {d} days of Plus free (up to {cap} months).",
     plans: [
       {
         name: "Free",
@@ -1121,7 +1127,7 @@ const en: Dict = {
         gst: true,
       },
     ],
-    note: "First 1000 users get 3 months of Saathi Plus free. Refer a friend — both get 15 extra days.",
+    note: "First {n} users get {m} months of Saathi Plus free. Refer a friend — both get {d} extra days.",
   },
   faq: {
     heading: "Got questions? Totally natural.",

@@ -21,6 +21,7 @@ import {
   purchasePlus,
 } from "@/lib/purchases";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
+import { useOffers } from "@/lib/use-offers";
 
 const FREE_FEATURES = [
   "10 documents tak",
@@ -40,6 +41,7 @@ const PLUS_FEATURES = [
 export default function Upgrade() {
   const { session } = useAuth();
   const toast = useToast();
+  const offers = useOffers();
   const [yearly, setYearly] = useState(true);
   const [isPlus, setIsPlus] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -152,13 +154,16 @@ export default function Upgrade() {
           </View>
         ) : (
           <>
-            {/* Waitlist reward */}
-            <View style={styles.reward}>
-              <Ionicons name="gift" size={18} color={colors.terracotta} />
-              <Text style={styles.rewardText}>
-                Pehle 1000 users ko Saathi Plus 3 mahine FREE!
-              </Text>
-            </View>
+            {/* Offer — numbers admin se aate hain; band ho to dikhta bhi nahi */}
+            {offers.firstNEnabled && (
+              <View style={styles.reward}>
+                <Ionicons name="gift" size={18} color={colors.terracotta} />
+                <Text style={styles.rewardText}>
+                  Pehle {offers.firstNUsers.toLocaleString("en-IN")} users ko Saathi
+                  Plus {offers.firstNFreeMonths} mahine FREE!
+                </Text>
+              </View>
+            )}
 
             {/* Billing toggle */}
             <View style={styles.toggle}>

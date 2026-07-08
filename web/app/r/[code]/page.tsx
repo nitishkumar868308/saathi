@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Gift, Smartphone } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import { PLAY_STORE_URL } from "@/lib/links";
+import { getOffers } from "@/lib/offers";
 
 export const metadata: Metadata = {
   title: "Aapko invite mila 🎁",
@@ -13,8 +14,10 @@ export const metadata: Metadata = {
  * App install hone ke baad ye link app kholta hai aur code apne aap bhar jaata hai.
  * Yahan bas invite dikhate hain + Play Store bhejte hain.
  */
-export default function ReferralInvite({ params }: { params: { code: string } }) {
+export default async function ReferralInvite({ params }: { params: { code: string } }) {
   const code = params.code.toUpperCase().slice(0, 10);
+  const offers = await getOffers();
+  const days = offers.referralDays;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream px-5 py-10">
@@ -31,8 +34,8 @@ export default function ReferralInvite({ params }: { params: { code: string } })
           Aapko Apka Saathi ka invite mila 🎉
         </h1>
         <p className="mt-2.5 text-ink-soft">
-          Is code se join karo — aapko aur aapke dost, <strong className="text-ink">dono ko
-          15 din Saathi Plus free</strong> milega.
+          Is code se join karo — aapko aur aapke dost, <strong className="text-ink">dono ko{" "}
+          {days} din Saathi Plus free</strong> milega.
         </p>
 
         <div className="mt-6 rounded-2xl border-2 border-dashed border-terracotta bg-terracotta/[0.07] py-5">
@@ -52,10 +55,30 @@ export default function ReferralInvite({ params }: { params: { code: string } })
           App download karo
         </a>
 
-        <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-          App khulte hi code apne aap bhar jaayega. Signup ke baad pehla document daalo
-          aur Saathi se ek baar baat karo — bas, dono ko 15 din Plus mil jaayega.
-        </p>
+        {/* Condition saaf-saaf — kya karna hai reward ke liye */}
+        <div className="mt-6 rounded-2xl border border-line bg-cream-deep/25 p-4 text-left">
+          <p className="text-xs font-bold uppercase tracking-wide text-ink-soft">
+            {days} din kaise milenge
+          </p>
+          <ol className="mt-2.5 space-y-2 text-sm text-ink">
+            {[
+              "App download karo — code apne aap bhar jaayega",
+              "Account banao",
+              "Apna pehla document add karo",
+              "Saathi se ek baar baat karo",
+            ].map((step, i) => (
+              <li key={step} className="flex gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-terracotta text-[11px] font-bold text-white">
+                  {i + 1}
+                </span>
+                <span className="leading-snug">{step}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-xs text-ink-soft">
+            Chaaron ho gaye — dono ko {days} din Saathi Plus. 🎉
+          </p>
+        </div>
       </div>
     </div>
   );

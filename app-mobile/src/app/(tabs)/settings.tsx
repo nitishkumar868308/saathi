@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 import { getPlan } from "@/lib/plan";
+import { useOffers } from "@/lib/use-offers";
 
 type Row = { icon: string; label: string; tint?: string };
 
@@ -43,6 +44,7 @@ const groups: { title: string; rows: Row[] }[] = [
 export default function Settings() {
   const { session } = useAuth();
   const toast = useToast();
+  const offers = useOffers();
   const meta = session?.user?.user_metadata;
   const name = meta?.full_name || meta?.name || "Aapka account";
   const [isPlus, setIsPlus] = useState(false);
@@ -108,15 +110,19 @@ export default function Settings() {
           <Ionicons name="chevron-forward" size={18} color={colors.line} />
         </Pressable>
 
-        {/* Dost bulao — referral */}
-        <Pressable
-          onPress={() => router.push("/referral" as never)}
-          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
-        >
-          <Ionicons name="gift-outline" size={20} color={colors.terracotta} />
-          <Text style={styles.detailsText}>Dost bulao — dono ko 15 din Plus free</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.line} />
-        </Pressable>
+        {/* Dost bulao — referral (band ho to row hi nahi) */}
+        {offers.referralsEnabled && (
+          <Pressable
+            onPress={() => router.push("/referral" as never)}
+            style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
+          >
+            <Ionicons name="gift-outline" size={20} color={colors.terracotta} />
+            <Text style={styles.detailsText}>
+              Dost bulao — dono ko {offers.referralDays} din Plus free
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.line} />
+          </Pressable>
+        )}
 
         {/* Plan / Saathi Plus */}
         <Pressable

@@ -19,6 +19,7 @@ import SaathiMark from "@/components/saathi-mark";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 import { savePendingReferral } from "@/lib/referral-pending";
+import { useOffers } from "@/lib/use-offers";
 
 /** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
 function referralFromUrl(url: string | null): string | null {
@@ -36,6 +37,7 @@ function referralFromUrl(url: string | null): string | null {
 
 export default function Login() {
   const toast = useToast();
+  const offers = useOffers();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -165,8 +167,8 @@ export default function Login() {
             style={styles.input}
           />
 
-          {/* referral code (signup only, optional) */}
-          {mode === "signup" && (
+          {/* referral code (signup only, optional; referrals band ho to nahi) */}
+          {mode === "signup" && offers.referralsEnabled && (
             <>
               <Text style={styles.label}>
                 Referral code <Text style={styles.optional}>(optional)</Text>
@@ -174,13 +176,17 @@ export default function Login() {
               <TextInput
                 value={refCode}
                 onChangeText={(t) => setRefCode(t.toUpperCase())}
-                placeholder="Dost ka code — dono ko 15 din Plus free"
+                placeholder={`Dost ka code — dono ko ${offers.referralDays} din Plus free`}
                 placeholderTextColor={colors.inkSoft}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={10}
                 style={styles.input}
               />
+              <Text style={styles.refHint}>
+                Reward tab milega jab aap apna pehla document add karo aur Saathi se ek
+                baar baat karo.
+              </Text>
             </>
           )}
 
@@ -261,6 +267,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   optional: { fontWeight: "500", color: colors.inkSoft },
+  refHint: { marginTop: 8, fontSize: 12.5, lineHeight: 18, color: colors.inkSoft },
   input: {
     borderRadius: 16,
     borderWidth: 1,

@@ -1,11 +1,18 @@
+"use client";
+
 import { Smartphone, Gift } from "lucide-react";
 import { PLAY_STORE_URL } from "@/lib/links";
+import { useOffers } from "@/lib/useOffers";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 /**
- * Landing ka main CTA — waitlist ki jagah.
- * App live hai, isliye seedha Play Store bhejo.
+ * Landing ka main CTA.
+ * Offer ka text `app_config` se aata hai — admin numbers badle to yahan bhi badlega.
  */
 export default function DownloadApp({ dark = false }: { dark?: boolean }) {
+  const offers = useOffers();
+  const t = useT();
+
   return (
     <div>
       <a
@@ -15,17 +22,24 @@ export default function DownloadApp({ dark = false }: { dark?: boolean }) {
         className="inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-terracotta px-7 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark active:scale-[0.98] sm:w-auto"
       >
         <Smartphone size={20} />
-        Play Store se download karo
+        {t.download.button}
       </a>
 
-      <p
-        className={`mt-3.5 flex items-center gap-2 text-sm font-medium ${
-          dark ? "text-cream/75" : "text-ink-soft"
-        }`}
-      >
-        <Gift size={15} className="shrink-0 text-terracotta" />
-        Pehle 1000 users ko Saathi Plus <strong className="font-semibold">3 mahine free</strong>
-      </p>
+      {offers.firstNEnabled && (
+        <p
+          className={`mt-3.5 flex items-start gap-2 text-sm font-medium ${
+            dark ? "text-cream/75" : "text-ink-soft"
+          }`}
+        >
+          <Gift size={15} className="mt-0.5 shrink-0 text-terracotta" />
+          <span>
+            Pehle {offers.firstNUsers.toLocaleString("en-IN")} users ko Saathi Plus{" "}
+            <strong className="font-semibold">
+              {offers.firstNFreeMonths} mahine free
+            </strong>
+          </span>
+        </p>
+      )}
     </div>
   );
 }

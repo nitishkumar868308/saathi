@@ -112,6 +112,58 @@ export async function checkReferralQualification(): Promise<string> {
   }
 }
 
+export type Offers = {
+  firstNEnabled: boolean;
+  firstNUsers: number;
+  firstNFreeMonths: number;
+  referralsEnabled: boolean;
+  referralDays: number;
+  referralCapMonths: number;
+};
+
+export const DEFAULT_OFFERS: Offers = {
+  firstNEnabled: true,
+  firstNUsers: 1000,
+  firstNFreeMonths: 3,
+  referralsEnabled: true,
+  referralDays: 15,
+  referralCapMonths: 6,
+};
+
+/**
+ * Live offer numbers (`app_config`, public read).
+ * Admin se badalne pe app ka text bhi khud badal jaata hai.
+ * Kabhi throw nahi karta — fail ho to defaults.
+ */
+export async function getOffers(): Promise<Offers> {
+  if (!supabase) return DEFAULT_OFFERS;
+  try {
+    const { data, error } = await supabase.from("app_config").select("key, value");
+    if (error || !data) return DEFAULT_OFFERS;
+
+    const m = new Map(data.map((r) => [r.key as string, r.value]));
+    const num = (k: string, d: number) => {
+      const n = Number(m.get(k));
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : d;
+    };
+    const bool = (k: string, d: boolean) => {
+      const v = m.get(k);
+      return typeof v === "boolean" ? v : d;
+    };
+
+    return {
+      firstNEnabled: bool("first_n_enabled", DEFAULT_OFFERS.firstNEnabled),
+      firstNUsers: num("first_n_users", DEFAULT_OFFERS.firstNUsers),
+      firstNFreeMonths: num("first_n_free_months", DEFAULT_OFFERS.firstNFreeMonths),
+      referralsEnabled: bool("referrals_enabled", DEFAULT_OFFERS.referralsEnabled),
+      referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
+      referralCapMonths: num("referral_cap_months", DEFAULT_OFFERS.referralCapMonths),
+    };
+  } catch {
+    return DEFAULT_OFFERS;
+  }
+}
+
 export type ReferralInfo = {
   code: string | null;
   daysEarned: number;
