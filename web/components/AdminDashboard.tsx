@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Heart,
   Lock,
   LogOut,
   Users,
@@ -15,6 +14,8 @@ import {
   TrendingUp,
   Inbox,
 } from "lucide-react";
+import SaathiMark from "@/components/SaathiMark";
+import AdminRewards from "@/components/AdminRewards";
 
 type WaitlistEntry = { email: string; createdAt: string };
 type ContactEntry = {
@@ -29,7 +30,7 @@ type Data = {
   stats: { waitlist: number; contacts: number };
 };
 
-type Tab = "waitlist" | "contacts";
+type Tab = "rewards" | "waitlist" | "contacts";
 
 function fmt(iso: string): string {
   try {
@@ -228,7 +229,7 @@ function Dashboard({
   onRefresh: () => void;
   onLogout: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("waitlist");
+  const [tab, setTab] = useState<Tab>("rewards");
   const [query, setQuery] = useState("");
 
   const waitlist = data?.waitlist ?? [];
@@ -290,7 +291,7 @@ function Dashboard({
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-8 sm:py-3.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-              <Heart size={16} className="fill-white" strokeWidth={2.4} />
+              <SaathiMark size={20} className="text-white" />
             </span>
             <span className="truncate font-display text-lg font-semibold">
               Saathi Admin
@@ -342,6 +343,9 @@ function Dashboard({
         {/* Controls */}
         <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex rounded-2xl border border-line bg-surface p-1">
+            <TabButton active={tab === "rewards"} onClick={() => setTab("rewards")}>
+              Rewards
+            </TabButton>
             <TabButton active={tab === "waitlist"} onClick={() => setTab("waitlist")}>
               Waitlist · {waitlist.length}
             </TabButton>
@@ -350,7 +354,7 @@ function Dashboard({
             </TabButton>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${tab === "rewards" ? "hidden" : ""}`}>
             <div className="relative flex-1 sm:w-64">
               <Search
                 size={16}
@@ -375,7 +379,9 @@ function Dashboard({
 
         {/* Content */}
         <div className="mt-5">
-          {tab === "waitlist" ? (
+          {tab === "rewards" ? (
+            <AdminRewards />
+          ) : tab === "waitlist" ? (
             <WaitlistView rows={filteredWaitlist} />
           ) : (
             <ContactsView rows={filteredContacts} />
