@@ -11,8 +11,10 @@ import {
   LogOut,
   Smartphone,
   MessageCircle,
+  Info,
 } from "lucide-react";
-import SaathiMark from "@/components/SaathiMark";
+import SubHeader from "@/components/SubHeader";
+import Footer from "@/components/Footer";
 import { supabaseBrowser, supabaseConfigured } from "@/lib/supabase-browser";
 import { useOffers } from "@/lib/useOffers";
 import { tpl } from "@/lib/offers";
@@ -22,6 +24,90 @@ import { PLAY_STORE_URL } from "@/lib/links";
 type Info = { code: string | null; daysEarned: number; total: number; rewarded: number };
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+
+/* ------------------------------- Page shell ------------------------------- */
+
+/**
+ * Poora page = SubHeader + content + Footer. Andar ka content state ke hisaab
+ * se badalta hai, par header/footer hamesha rehte hain — warna user phans jaata
+ * hai (na nav, na wapas jaane ka raasta).
+ */
+function Page({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col bg-cream">
+      <SubHeader />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
+/** Hero band — har state me same, taki page kabhi khaali na lage. */
+function Hero({ badge, heading, sub }: { badge: string; heading: string; sub: string }) {
+  return (
+    <section className="relative overflow-hidden border-b border-line">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-32 -top-32 h-72 w-72 rounded-full bg-amber-warm/20 blur-3xl" />
+        <div className="absolute -right-24 top-10 h-72 w-72 rounded-full bg-terracotta/12 blur-3xl" />
+      </div>
+      <div className="container-page relative py-12 text-center sm:py-16">
+        <span className="inline-flex items-center gap-2 rounded-full border border-terracotta/25 bg-terracotta/8 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-terracotta">
+          <Gift size={13} />
+          {badge}
+        </span>
+        <h1 className="mx-auto mt-5 max-w-2xl text-balance font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl md:text-5xl">
+          {heading}
+        </h1>
+        <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-relaxed text-ink-soft sm:text-lg">
+          {sub}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/** Content ke liye ek narrow, centered container. */
+function Body({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className="container-page py-10 sm:py-14">
+      <div className={wide ? "mx-auto max-w-5xl" : "mx-auto max-w-md"}>{children}</div>
+    </div>
+  );
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-4xl border border-line bg-surface p-6 shadow-warm sm:p-8 ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** "Kaise kaam karta hai" — login se pehle bhi, baad me bhi dikhta hai. */
+function Steps({ steps, capNote }: { steps: string[]; capNote: string }) {
+  return (
+    <div>
+      <ol className="space-y-4">
+        {steps.map((s, i) => (
+          <li key={i} className="flex gap-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-terracotta/10 font-display text-base font-bold text-terracotta">
+              {i + 1}
+            </span>
+            <p className="pt-1.5 text-sm leading-relaxed text-ink-soft">{s}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-6 flex items-start gap-2.5 rounded-2xl border border-line bg-cream-deep/25 p-4 text-xs leading-relaxed text-ink-soft">
+        <Info size={15} className="mt-px shrink-0 text-terracotta" />
+        {capNote}
+      </p>
+    </div>
+  );
+}
+
+/* -------------------------------- Root -------------------------------- */
 
 export default function ReferralClient() {
   const { referral: t } = useT();
@@ -42,58 +128,66 @@ export default function ReferralClient() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (!supabaseConfigured) {
+  const days = offers.referralDays;
+  const cap = offers.referralCapMonths;
+  const hero = (
+    <Hero badge={t.badge} heading={t.heading} sub={tpl(t.sub, { d: days })} />
+  );
+
+  if (!supabaseConfigured || !offers.referralsEnabled) {
     return (
-      <Shell>
-        <p className="text-center text-ink-soft">{t.notConfigured}</p>
-      </Shell>
+      <Page>
+        {hero}
+        <Body>
+          <Card className="text-center">
+            <p className="text-sm leading-relaxed text-ink-soft">
+              {supabaseConfigured ? t.disabled : t.notConfigured}
+            </p>
+            <a
+              href={PLAY_STORE_URL}
+              className="mt-6 inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
+            >
+              <Smartphone size={16} />
+              {t.downloadApp}
+            </a>
+          </Card>
+        </Body>
+      </Page>
     );
   }
 
   if (booting) {
     return (
-      <Shell>
-        <div className="flex justify-center py-6">
-          <Loader2 className="animate-spin text-terracotta" size={26} />
-        </div>
-      </Shell>
+      <Page>
+        {hero}
+        <Body>
+          <div className="flex justify-center py-10">
+            <Loader2 className="animate-spin text-terracotta" size={28} />
+          </div>
+        </Body>
+      </Page>
     );
   }
 
-  if (!offers.referralsEnabled) {
-    return (
-      <Shell>
-        <p className="text-center text-ink-soft">{t.disabled}</p>
-      </Shell>
-    );
-  }
-
-  return session ? (
-    <ReferralCard
-      session={session}
-      days={offers.referralDays}
-      cap={offers.referralCapMonths}
-    />
-  ) : (
-    <LoginCard />
-  );
-}
-
-/* ------------------------------- Shell ------------------------------- */
-
-function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cream px-4 py-10 sm:px-5">
-      <div className="w-full max-w-md rounded-4xl border border-line bg-surface p-6 shadow-warm sm:p-8">
-        <a href="/" className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-            <SaathiMark size={21} className="text-white" />
-          </span>
-          <span className="font-display text-xl font-semibold">Apka Saathi</span>
-        </a>
-        <div className="mt-6">{children}</div>
-      </div>
-    </div>
+    <Page>
+      {hero}
+      <Body wide>
+        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-10">
+          {/* Mobile pe pehle asli kaam (code / login), steps neeche */}
+          <div className="order-1">
+            {session ? <ReferralCard session={session} days={days} cap={cap} /> : <LoginCard />}
+          </div>
+          <Card className="order-2 lg:sticky lg:top-24">
+            <h2 className="font-display text-xl font-semibold">{t.heading}</h2>
+            <p className="mt-1.5 text-sm text-ink-soft">{tpl(t.sub, { d: days })}</p>
+            <div className="mt-6">
+              <Steps steps={t.steps} capNote={tpl(t.capNote, { d: days, cap })} />
+            </div>
+          </Card>
+        </div>
+      </Body>
+    </Page>
   );
 }
 
@@ -131,18 +225,16 @@ function LoginCard() {
     "mt-1.5 h-12 w-full rounded-2xl border border-line bg-cream-deep/20 px-4 text-base outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15";
 
   return (
-    <Shell>
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-terracotta/10 text-terracotta">
-        <Gift size={26} />
-      </div>
-      <h1 className="mt-5 text-center font-display text-2xl font-semibold">
-        {t.loginTitle}
-      </h1>
-      <p className="mt-2 text-center text-sm leading-relaxed text-ink-soft">{t.loginSub}</p>
+    <Card>
+      <h2 className="font-display text-2xl font-semibold">{t.loginTitle}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-ink-soft">{t.loginSub}</p>
 
       <form onSubmit={login} className="mt-6">
-        <label className="text-sm font-semibold">{t.email}</label>
+        <label className="text-sm font-semibold" htmlFor="ref-email">
+          {t.email}
+        </label>
         <input
+          id="ref-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -151,8 +243,11 @@ function LoginCard() {
           autoComplete="email"
           required
         />
-        <label className="mt-4 block text-sm font-semibold">{t.password}</label>
+        <label className="mt-4 block text-sm font-semibold" htmlFor="ref-pass">
+          {t.password}
+        </label>
         <input
+          id="ref-pass"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -190,21 +285,13 @@ function LoginCard() {
           {t.downloadApp}
         </a>
       </p>
-    </Shell>
+    </Card>
   );
 }
 
 /* ------------------------------ Referral ----------------------------- */
 
-function ReferralCard({
-  session,
-  days,
-  cap,
-}: {
-  session: Session;
-  days: number;
-  cap: number;
-}) {
+function ReferralCard({ session, days, cap }: { session: Session; days: number; cap: number }) {
   const { referral: t } = useT();
   const [info, setInfo] = useState<Info | null>(null);
   const [loading, setLoading] = useState(true);
@@ -266,112 +353,120 @@ function ReferralCard({
   const earned = info?.daysEarned ?? 0;
   const pct = Math.min(100, Math.round((earned / capDays) * 100));
 
-  return (
-    <Shell>
-      {loading ? (
-        <div className="flex justify-center py-6">
+  if (loading) {
+    return (
+      <Card>
+        <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-terracotta" size={26} />
         </div>
-      ) : error ? (
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
         <p className="text-center text-sm text-terracotta-dark">{error}</p>
-      ) : (
-        <>
-          <div className="text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-terracotta/10 text-terracotta">
-              <Gift size={26} />
-            </div>
-            <h1 className="mt-4 font-display text-2xl font-semibold">
-              {tpl(t.cardTitle, { d: days })}
-            </h1>
-            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              {tpl(t.cardSub, { d: days })}
-            </p>
-          </div>
+      </Card>
+    );
+  }
 
-          <div className="mt-6 rounded-2xl border-2 border-dashed border-terracotta bg-terracotta/[0.07] py-5 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-ink-soft">
-              {t.yourCode}
-            </p>
-            <p className="mt-1.5 font-display text-3xl font-bold tracking-[0.28em] text-terracotta">
-              {info?.code ?? "—"}
-            </p>
-          </div>
+  return (
+    <Card>
+      <h2 className="font-display text-2xl font-semibold">{tpl(t.cardTitle, { d: days })}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-ink-soft">{tpl(t.cardSub, { d: days })}</p>
 
-          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-line bg-cream-deep/20 px-3 py-2.5">
-            <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">{link || "—"}</p>
-            <button
-              onClick={copy}
-              disabled={!link}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3 py-2 text-xs font-semibold text-cream transition hover:opacity-90 disabled:opacity-50"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? t.copied : t.copy}
-            </button>
-          </div>
+      <div className="mt-6 rounded-3xl border-2 border-dashed border-terracotta bg-terracotta/[0.07] px-4 py-6 text-center">
+        <p className="text-xs font-semibold uppercase tracking-widest text-ink-soft">
+          {t.yourCode}
+        </p>
+        <p className="mt-2 break-all font-display text-3xl font-bold tracking-[0.28em] text-terracotta sm:text-4xl">
+          {info?.code ?? "—"}
+        </p>
+      </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2.5">
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(message)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-sage px-4 text-sm font-semibold text-white transition hover:opacity-90"
-            >
-              <MessageCircle size={16} />
-              {t.whatsapp}
-            </a>
-            <button
-              onClick={nativeShare}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-terracotta px-4 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
-            >
-              <Share2 size={16} />
-              {t.share}
-            </button>
-          </div>
+      <div className="mt-4 flex items-center gap-2 rounded-2xl border border-line bg-cream-deep/20 px-3 py-2.5">
+        <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">{link || "—"}</p>
+        <button
+          onClick={copy}
+          disabled={!link}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3 py-2 text-xs font-semibold text-cream transition hover:opacity-90 disabled:opacity-50"
+        >
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? t.copied : t.copy}
+        </button>
+      </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-2.5">
-            <Stat label={t.statReferrals} value={info?.rewarded ?? 0} />
-            <Stat label={t.statDays} value={earned} />
-          </div>
+      <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(message)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-sage px-4 text-sm font-semibold text-white transition hover:opacity-90"
+        >
+          <MessageCircle size={16} />
+          {t.whatsapp}
+        </a>
+        <button
+          onClick={nativeShare}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-terracotta px-4 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
+        >
+          <Share2 size={16} />
+          {t.share}
+        </button>
+      </div>
 
-          <p className="mt-4 text-xs font-medium text-ink-soft">
-            {tpl(t.capLine, { earned, capDays, cap })}
-          </p>
-          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-line">
-            <div className="h-full rounded-full bg-sage" style={{ width: `${pct}%` }} />
-          </div>
+      <div className="mt-7 grid grid-cols-2 gap-2.5">
+        <Stat label={t.statReferrals} value={info?.rewarded ?? 0} />
+        <Stat label={t.statDays} value={earned} />
+      </div>
 
-          {(info?.total ?? 0) > (info?.rewarded ?? 0) && (
-            <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-              {tpl(t.pending, { x: (info?.total ?? 0) - (info?.rewarded ?? 0) })}
-            </p>
-          )}
+      <p className="mt-4 text-xs font-medium text-ink-soft">
+        {tpl(t.capLine, { earned, capDays, cap })}
+      </p>
+      <div
+        className="mt-2 h-2.5 overflow-hidden rounded-full bg-line"
+        role="progressbar"
+        aria-valuenow={earned}
+        aria-valuemin={0}
+        aria-valuemax={capDays}
+      >
+        <div
+          className="h-full rounded-full bg-sage transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
 
-          <div className="mt-7 flex items-center justify-between border-t border-line pt-5">
-            <a
-              href={PLAY_STORE_URL}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:underline"
-            >
-              <Smartphone size={15} />
-              {t.openApp}
-            </a>
-            <button
-              onClick={() => supabaseBrowser?.auth.signOut()}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink"
-            >
-              <LogOut size={15} />
-              {t.logout}
-            </button>
-          </div>
-        </>
+      {(info?.total ?? 0) > (info?.rewarded ?? 0) && (
+        <p className="mt-4 rounded-2xl bg-amber-warm/12 p-3.5 text-sm leading-relaxed text-ink-soft">
+          {tpl(t.pending, { x: (info?.total ?? 0) - (info?.rewarded ?? 0) })}
+        </p>
       )}
-    </Shell>
+
+      <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
+        <a
+          href={PLAY_STORE_URL}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:underline"
+        >
+          <Smartphone size={15} />
+          {t.openApp}
+        </a>
+        <button
+          onClick={() => supabaseBrowser?.auth.signOut()}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft transition hover:text-ink"
+        >
+          <LogOut size={15} />
+          {t.logout}
+        </button>
+      </div>
+    </Card>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 text-center">
-      <p className="text-2xl font-bold text-ink">{value}</p>
+    <div className="rounded-2xl border border-line bg-cream-deep/20 p-4 text-center">
+      <p className="font-display text-3xl font-bold text-ink">{value}</p>
       <p className="mt-0.5 text-xs text-ink-soft">{label}</p>
     </div>
   );

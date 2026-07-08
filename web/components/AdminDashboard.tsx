@@ -14,9 +14,11 @@ import {
   Gift,
   Menu,
   X,
+  Users,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import AdminRewards from "@/components/AdminRewards";
+import AdminUsers from "@/components/AdminUsers";
 
 type ContactEntry = {
   name: string;
@@ -26,12 +28,25 @@ type ContactEntry = {
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section = "rewards" | "contacts";
+type Section = "rewards" | "users" | "contacts";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   { key: "rewards", label: "Rewards", icon: Gift },
+  { key: "users", label: "Users", icon: Users },
   { key: "contacts", label: "Contacts", icon: MessageSquare },
 ];
+
+const HEADING: Record<Section, { title: string; sub: string }> = {
+  rewards: {
+    title: "Rewards & Referrals",
+    sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain.",
+  },
+  users: {
+    title: "Users",
+    sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai.",
+  },
+  contacts: { title: "Contact messages", sub: "" },
+};
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -322,12 +337,12 @@ function Dashboard({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {section === "rewards" ? "Rewards & Referrals" : "Contact messages"}
+                  {HEADING[section].title}
                 </h1>
                 <p className="mt-1 text-sm text-ink-soft">
-                  {section === "rewards"
-                    ? "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain."
-                    : `${contacts.length} message`}
+                  {section === "contacts"
+                    ? `${contacts.length} message`
+                    : HEADING[section].sub}
                 </p>
               </div>
 
@@ -368,11 +383,9 @@ function Dashboard({
             )}
 
             <div className="mt-6">
-              {section === "rewards" ? (
-                <AdminRewards />
-              ) : (
-                <ContactsView rows={filteredContacts} />
-              )}
+              {section === "rewards" && <AdminRewards />}
+              {section === "users" && <AdminUsers />}
+              {section === "contacts" && <ContactsView rows={filteredContacts} />}
             </div>
           </div>
         </main>

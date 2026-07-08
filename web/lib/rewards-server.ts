@@ -108,6 +108,45 @@ export async function adminGrantDays(email: string, days: number): Promise<strin
   return (await res.json()) as string; // 'granted' | 'user_not_found'
 }
 
+export type AdminUser = {
+  id: string;
+  email: string | null;
+  fullName: string | null;
+  plan: "free" | "plus";
+  planExpiresAt: string | null;
+  planSource: string | null;
+  firstNGranted: boolean;
+  referralDaysEarned: number;
+  referralCode: string | null;
+  createdAt: string;
+};
+
+/** Sab users, naye pehle. Admin dashboard ke Users tab ke liye. */
+export async function getUsers(limit = 500): Promise<AdminUser[]> {
+  assertConfigured();
+  const cols =
+    "id,email,full_name,plan,plan_expires_at,plan_source,first_n_granted,referral_days_earned,referral_code,created_at";
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?select=${cols}&order=created_at.desc&limit=${limit}`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) await fail("users read", res);
+
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    email: (r.email as string) ?? null,
+    fullName: (r.full_name as string) ?? null,
+    plan: (r.plan as "free" | "plus") ?? "free",
+    planExpiresAt: (r.plan_expires_at as string) ?? null,
+    planSource: (r.plan_source as string) ?? null,
+    firstNGranted: Boolean(r.first_n_granted),
+    referralDaysEarned: Number(r.referral_days_earned ?? 0),
+    referralCode: (r.referral_code as string) ?? null,
+    createdAt: String(r.created_at),
+  }));
+}
+
 export type RewardStats = {
   totalUsers: number;
   firstNGranted: number;
