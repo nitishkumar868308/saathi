@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,27 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 
 import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
+import { savePendingReferral } from "@/lib/referral-pending";
+
+/** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
+function referralFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const { path, queryParams } = Linking.parse(url);
+    const q = queryParams?.ref;
+    if (typeof q === "string" && q.trim()) return q.trim().toUpperCase();
+    const m = path?.match(/^r\/([A-Za-z0-9]+)$/);
+    return m ? m[1].toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function Login() {
   const toast = useToast();
@@ -24,8 +40,19 @@ export default function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [refCode, setRefCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Share-link (apkasaathi.com/r/CODE) se app khule to code apne aap bhar do.
+  const url = Linking.useURL();
+  useEffect(() => {
+    const code = referralFromUrl(url);
+    if (code) {
+      setRefCode(code);
+      setMode("signup");
+    }
+  }, [url]);
 
   async function submit() {
     if (loading) return;
@@ -41,6 +68,8 @@ export default function Login() {
     try {
       setLoading(true);
       if (mode === "signup") {
+        // Login hone ke baad auth-provider isko apply karega.
+        await savePendingReferral(refCode);
         const { needsConfirm } = await signUpEmail(email.trim(), password, name.trim());
         if (needsConfirm) {
           toast.show("Email pe confirmation link bheja — check karo", "success");
@@ -62,6 +91,7 @@ export default function Login() {
     if (googleLoading) return;
     try {
       setGoogleLoading(true);
+      if (mode === "signup") await savePendingReferral(refCode);
       await signInGoogle();
     } catch (e: any) {
       if (e?.message !== "cancelled") {
@@ -134,6 +164,25 @@ export default function Login() {
             autoCapitalize="none"
             style={styles.input}
           />
+
+          {/* referral code (signup only, optional) */}
+          {mode === "signup" && (
+            <>
+              <Text style={styles.label}>
+                Referral code <Text style={styles.optional}>(optional)</Text>
+              </Text>
+              <TextInput
+                value={refCode}
+                onChangeText={(t) => setRefCode(t.toUpperCase())}
+                placeholder="Dost ka code — dono ko 15 din Plus free"
+                placeholderTextColor={colors.inkSoft}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={10}
+                style={styles.input}
+              />
+            </>
+          )}
 
           <Pressable
             onPress={submit}
@@ -211,6 +260,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.ink,
   },
+  optional: { fontWeight: "500", color: colors.inkSoft },
   input: {
     borderRadius: 16,
     borderWidth: 1,

@@ -2,7 +2,12 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
-import { claimFirstNReward, checkReferralQualification } from "@/lib/plan";
+import {
+  claimFirstNReward,
+  checkReferralQualification,
+  applyReferralCode,
+} from "@/lib/plan";
+import { takePendingReferral } from "@/lib/referral-pending";
 
 const AuthContext = createContext<{ session: Session | null; loading: boolean }>({
   session: null,
@@ -35,10 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       if (event === "SIGNED_IN" && s?.user) {
-        // Pehle N signups → X mahine Plus free. Idempotent.
-        claimFirstNReward().catch(() => {});
-        // Referral reward — document + chat dono ho chuke hon to grant ho jaye.
-        checkReferralQualification().catch(() => {});
+        (async () => {
+          // Signup pe diya gaya referral code ab apply karo (ek hi baar).
+          const pending = await takePendingReferral();
+          if (pending) await applyReferralCode(pending).catch(() => "error");
+          // Pehle N signups → X mahine Plus free. Idempotent.
+          await claimFirstNReward().catch(() => "error");
+          // Referral reward — document + chat dono ho chuke hon to grant ho jaye.
+          await checkReferralQualification().catch(() => "error");
+        })().catch(() => {});
       }
     });
     return () => sub.subscription.unsubscribe();
