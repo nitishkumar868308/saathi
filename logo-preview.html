@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Saathi — Mascot</title>
+<style>
+  :root {
+    --bg: #efe7d6; --panel: #fffcf6; --tile-a: #c8613e; --tile-b: #a8492b;
+    --text: #2e2823; --muted: #6b5f54; --hair: #e5dbc9; --accent: #c25a37;
+    --mark: #fbf5ea; --ink: #2e2823;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) { --bg:#1e1a16; --panel:#29231e; --tile-a:#c86440; --tile-b:#9c4227; --text:#f2ebdd; --muted:#b3a491; --hair:#392f28; --accent:#d8734d; --mark:#fbf5ea; }
+  }
+  :root[data-theme="dark"] { --bg:#1e1a16; --panel:#29231e; --tile-a:#c86440; --tile-b:#9c4227; --text:#f2ebdd; --muted:#b3a491; --hair:#392f28; --accent:#d8734d; --mark:#fbf5ea; }
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing:antialiased; line-height:1.5; }
+  .serif { font-family:"Fraunces", Georgia, serif; }
+  .wrap { max-width: 960px; margin:0 auto; padding:44px 22px 70px; }
+  .toggle { position:fixed; top:16px; right:16px; z-index:10; border:1px solid var(--hair); background:var(--panel); color:var(--text); border-radius:999px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+  .eyebrow { font-size:12px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-family:"Fraunces", Georgia, serif; font-weight:600; letter-spacing:-.02em; font-size:clamp(30px,6vw,46px); margin:10px 0 12px; }
+  .lede { max-width:60ch; color:var(--muted); font-size:17px; margin:0; }
+
+  /* Hero */
+  .hero { display:flex; gap:26px; align-items:center; flex-wrap:wrap; margin-top:38px; }
+  .bigtile { width:150px; height:150px; border-radius:40px; background:linear-gradient(150deg,var(--tile-a),var(--tile-b)); display:grid; place-items:center; color:var(--mark); box-shadow:0 24px 50px -20px rgba(168,73,43,.6); }
+  .bigtile svg { width:96px; height:96px; }
+  .bigtile.dark { background:#2a231e; }
+  .herocopy { flex:1; min-width:240px; }
+  .heroname { font-family:"Fraunces",Georgia,serif; font-size:32px; font-weight:600; }
+  .herosub { color:var(--muted); margin-top:6px; max-width:44ch; }
+
+  .section { margin-top:40px; }
+  .label { font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:16px; }
+
+  .contexts { display:flex; align-items:center; gap:26px; flex-wrap:wrap; background:var(--panel); border:1px solid var(--hair); border-radius:22px; padding:22px 24px; }
+  .favset { display:flex; align-items:flex-end; gap:12px; }
+  .f { border-radius:7px; background:linear-gradient(150deg,var(--tile-a),var(--tile-b)); display:grid; place-items:center; color:var(--mark); }
+  .f.s32{width:32px;height:32px;border-radius:9px}.f.s32 svg{width:21px;height:21px}
+  .f.s24{width:24px;height:24px}.f.s24 svg{width:16px;height:16px}
+  .f.s16{width:16px;height:16px;border-radius:5px}.f.s16 svg{width:11px;height:11px}
+  .cap { font-size:12px; color:var(--muted); margin-top:6px; }
+  .wordmark { display:flex; align-items:center; gap:10px; }
+  .wordmark .chip { width:34px;height:34px;border-radius:10px;background:linear-gradient(150deg,var(--tile-a),var(--tile-b));display:grid;place-items:center;color:var(--mark); }
+  .wordmark .chip svg { width:22px;height:22px }
+  .wordmark .txt { font-family:"Fraunces",Georgia,serif; font-size:26px; font-weight:600; }
+  .ondark { width:52px;height:52px;border-radius:16px;background:#2a231e;display:grid;place-items:center;color:var(--mark) }
+  .ondark svg{width:32px;height:32px}
+  .linev { color:var(--accent); display:grid; place-items:center }
+  .linev svg { width:44px;height:44px }
+
+  .vars { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:620px){ .vars{ grid-template-columns:1fr } }
+  .var { background:var(--panel); border:1px solid var(--hair); border-radius:22px; padding:22px; text-align:center; }
+  .var.pick { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .var .vt { width:88px;height:88px;margin:0 auto;border-radius:24px;background:linear-gradient(150deg,var(--tile-a),var(--tile-b));display:grid;place-items:center;color:var(--mark) }
+  .var .vt svg{ width:56px;height:56px }
+  .var .vn { margin-top:14px; font-family:"Fraunces",Georgia,serif; font-size:19px; font-weight:600 }
+  .var .vd { margin-top:2px; font-size:13px; color:var(--muted) }
+  .var .tag { display:inline-block; margin-top:8px; font-size:10.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#fff; background:var(--accent); padding:3px 9px; border-radius:999px }
+
+  .ask { margin-top:36px; background:var(--panel); border:1px solid var(--hair); border-left:4px solid var(--accent); border-radius:18px; padding:22px 24px; }
+  .ask h2 { font-family:"Fraunces",Georgia,serif; font-size:19px; margin:0 0 8px; font-weight:600 }
+  .ask p { margin:0; color:var(--muted); font-size:15px; max-width:70ch }
+  .ask b { color:var(--text) }
+  .foot { margin-top:24px; color:var(--muted); font-size:13px }
+  @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<button class="toggle" onclick="const r=document.documentElement;r.dataset.theme=(r.dataset.theme==='dark'?'light':'dark')">🌗 Theme</button>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <!-- Default: shiny eyes + smile + blush -->
+  <symbol id="b-default" viewBox="0 0 100 100">
+    <path fill="currentColor" fill-rule="evenodd" d="M50 12 C70 12 82 26 82 47 L82 62 C82 79 68 87 50 87 C32 87 18 79 18 62 L18 47 C18 26 30 12 50 12 Z M32 45 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z M54 45 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z M39.3 42.5 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M61.3 42.5 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M26.5 57 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0 Z M66.7 57 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0 Z M39 60 Q50 70 61 60 Q50 64.5 39 60 Z"/>
+  </symbol>
+  <!-- Sprout: default + tiny leaf on head -->
+  <symbol id="b-sprout" viewBox="0 0 100 100">
+    <path fill="currentColor" d="M50 14 C49 7 51 2.5 55.5 1 C54 6.5 53 10.5 50 14 Z M50 14 C50.5 8 48.5 4.5 44 3.5 C45.5 8 47 11 50 14 Z"/>
+    <path fill="currentColor" fill-rule="evenodd" d="M50 15 C70 15 82 29 82 49 L82 63 C82 80 68 88 50 88 C32 88 18 80 18 63 L18 49 C18 29 30 15 50 15 Z M32 47 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z M54 47 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z M39.3 44.5 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M61.3 44.5 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M26.5 59 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0 Z M66.7 59 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0 Z M39 62 Q50 72 61 62 Q50 66.5 39 62 Z"/>
+  </symbol>
+  <!-- Wink -->
+  <symbol id="b-wink" viewBox="0 0 100 100">
+    <path fill="currentColor" fill-rule="evenodd" d="M50 12 C70 12 82 26 82 47 L82 62 C82 79 68 87 50 87 C32 87 18 79 18 62 L18 47 C18 26 30 12 50 12 Z M32 45 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0 Z M39.3 42.5 a2.2 2.2 0 1 0 4.4 0 a2.2 2.2 0 1 0 -4.4 0 Z M54 47 Q61 42 68 47 Q61 44 54 47 Z M26.5 57 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0 Z M66.7 57 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0 Z M39 60 Q50 70 61 60 Q50 64.5 39 60 Z"/>
+  </symbol>
+</defs></svg>
+
+<div class="wrap">
+  <div class="eyebrow">Saathi · Mascot · improved</div>
+  <h1 class="serif">Ab thoda aur jaan ke saath</h1>
+  <p class="lede">Aankhon me shine (alive feel), pyaari muskaan, aur gulaabi gaal. Chhota, warm, apna sa dost. Neeche contexts aur 3 expression variants — jo pasand ho batao.</p>
+
+  <div class="hero">
+    <div class="bigtile"><svg><use href="#b-default"/></svg></div>
+    <div class="bigtile dark"><svg><use href="#b-default"/></svg></div>
+    <div class="herocopy">
+      <div class="heroname serif">Saathi</div>
+      <div class="herosub">Terracotta tile pe (app icon) aur dark pe — dono me warm aur clear. Ek aisa dost jise dekh ke muskaan aa jaaye.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">Har jagah kaisa dikhega</div>
+    <div class="contexts">
+      <div>
+        <div class="favset">
+          <span class="f s32"><svg><use href="#b-default"/></svg></span>
+          <span class="f s24"><svg><use href="#b-default"/></svg></span>
+          <span class="f s16"><svg><use href="#b-default"/></svg></span>
+        </div>
+        <div class="cap">favicon / tab</div>
+      </div>
+      <div>
+        <div class="wordmark"><span class="chip"><svg><use href="#b-default"/></svg></span><span class="txt serif">Saathi</span></div>
+        <div class="cap">header lockup</div>
+      </div>
+      <div>
+        <div class="ondark"><svg><use href="#b-default"/></svg></div>
+        <div class="cap">on dark</div>
+      </div>
+      <div>
+        <div class="linev"><svg><use href="#b-default"/></svg></div>
+        <div class="cap">solid mark</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="label">Expression — kaunsa vibe?</div>
+    <div class="vars">
+      <div class="var pick">
+        <div class="vt"><svg><use href="#b-default"/></svg></div>
+        <div class="vn serif">Muskaan</div>
+        <div class="vd">warm & calm</div>
+        <div class="tag">Recommended</div>
+      </div>
+      <div class="var">
+        <div class="vt"><svg><use href="#b-sprout"/></svg></div>
+        <div class="vn serif">Sprout</div>
+        <div class="vd">nanha, growing saathi</div>
+      </div>
+      <div class="var">
+        <div class="vt"><svg><use href="#b-wink"/></svg></div>
+        <div class="vn serif">Wink</div>
+        <div class="vd">playful, "sab sambhaal lunga 😉"</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ask">
+    <h2 class="serif">Batao</h2>
+    <p><b>Muskaan</b> (default) sabse balanced aur professional lagta hai. <b>Sprout</b> me thoda extra pyaar/uniqueness, <b>Wink</b> me shararat. Bolo kaunsa — aur agar chhota tweak chahiye (aankhein aur badi, smile chhoti, body thodi round/oval, ya rang) to bata do. Final hone pe web + app sab jagah laga dunga.</p>
+  </div>
+  <p class="foot">Sab local · koi internet/claude.ai nahi. Colours = Saathi palette.</p>
+</div>
+</body>
+</html>

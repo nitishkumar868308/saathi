@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { colors } from "@/theme/colors";
+import SaathiMark from "@/components/saathi-mark";
 
 const points = [
   { icon: "documents-outline", text: "Documents ki expiry kabhi na bhoole" },
@@ -20,7 +21,7 @@ export default function Onboarding() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.content}>
         <View style={styles.logo}>
-          <Ionicons name="heart" size={34} color={colors.white} />
+          <SaathiMark size={40} color={colors.white} />
         </View>
 
         <Text style={styles.title}>Milo apne{"\n"}Saathi se 🙂</Text>
