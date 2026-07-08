@@ -93,9 +93,15 @@ function parseJson(text: string): any {
 
 const SAATHI_SYSTEM = `Tum "Saathi" ho — ek warm, caring AI dost (India ke liye). User jis bhasha mein baat kare (Hindi/English/Hinglish) usi mein chhota, pyaara jawab do. Zaroorat se zyada mat likho. Ek emoji kabhi-kabhi. Honest raho.`;
 
+/**
+ * Jab tak ANTHROPIC_API_KEY set nahi hai, chat ye reply deta hai (stub mode).
+ * Key set karte hi asli Claude Haiku jawab dene lagega — koi code change nahi.
+ */
+const STUB_REPLY =
+  "Samajh gaya 👍 Isse yaad rakhne aur karne wala smart AI jald aa raha hai. Tab tak Documents aur Reminders tabs use karo!";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!KEY) return json({ error: "ANTHROPIC_API_KEY set nahi hai" }, 500);
 
   let payload: any;
   try {
@@ -104,6 +110,18 @@ Deno.serve(async (req) => {
     return json({ error: "invalid body" }, 400);
   }
   const task = payload.task ?? "chat";
+
+  // Key nahi hai: chat stub-mode me chalta hai (message phir bhi record hota hai,
+  // taaki referral ki "first chat" condition kaam kare). Baaki tasks bina key nahi.
+  if (!KEY) {
+    if (task === "chat") {
+      const userMsg = payload.message ?? "";
+      const uid = await getUserId(req);
+      if (uid && userMsg.trim()) await recordChat(uid, userMsg, STUB_REPLY);
+      return json({ reply: STUB_REPLY, stub: true });
+    }
+    return json({ error: "ANTHROPIC_API_KEY set nahi hai" }, 500);
+  }
 
   try {
     // 1. CHAT

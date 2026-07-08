@@ -12,8 +12,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
+import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
 import { useUserName } from "@/components/auth-provider";
+import { askSaathi, type ChatTurn } from "@/lib/ai";
+import { checkReferralQualification } from "@/lib/plan";
 
 type Msg = { id: string; role: "user" | "saathi"; text: string };
 
@@ -35,20 +38,29 @@ export default function Chat() {
     },
   ]);
   const scrollRef = useRef<ScrollView>(null);
+  const [sending, setSending] = useState(false);
 
-  function sendText(text: string) {
+  async function sendText(text: string) {
     const t = text.trim();
-    if (!t) return;
-    setMessages((m) => [
-      ...m,
-      { id: String(m.length + 1), role: "user", text: t },
-      {
-        id: String(m.length + 2),
-        role: "saathi",
-        text: "Samajh gaya 👍 Isse yaad rakhne aur karne wala smart AI jald aa raha hai. Tab tak Documents aur Reminders tabs use karo!",
-      },
-    ]);
+    if (!t || sending) return;
+
+    // Purani baat-cheet AI ko bhejni hai (stub mode me ignore ho jaati hai).
+    const history: ChatTurn[] = messages.map((m) => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.text,
+    }));
+
+    setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
     setInput("");
+    setSending(true);
+
+    const reply = await askSaathi(t, history, name);
+
+    setMessages((m) => [...m, { id: String(m.length + 1), role: "saathi", text: reply }]);
+    setSending(false);
+
+    // Referral reward unlock ho sakta hai (document + chat dono hone pe).
+    checkReferralQualification().catch(() => {});
   }
 
   return (
@@ -56,7 +68,7 @@ export default function Chat() {
       {/* header */}
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <Ionicons name="heart" size={18} color={colors.white} />
+          <SaathiMark size={22} color={colors.white} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Saathi</Text>
@@ -83,7 +95,7 @@ export default function Chat() {
             m.role === "saathi" ? (
               <View key={m.id} style={styles.saathiRow}>
                 <View style={styles.miniAvatar}>
-                  <Ionicons name="heart" size={12} color={colors.white} />
+                  <SaathiMark size={15} color={colors.white} />
                 </View>
                 <View style={styles.saathiBubble}>
                   <Text style={styles.saathiText}>{m.text}</Text>
@@ -94,6 +106,17 @@ export default function Chat() {
                 <Text style={styles.userText}>{m.text}</Text>
               </View>
             ),
+          )}
+
+          {sending && (
+            <View style={styles.saathiRow}>
+              <View style={styles.miniAvatar}>
+                <SaathiMark size={15} color={colors.white} />
+              </View>
+              <View style={styles.saathiBubble}>
+                <Text style={styles.saathiText}>Soch raha hoon…</Text>
+              </View>
+            </View>
           )}
         </ScrollView>
 
@@ -126,7 +149,11 @@ export default function Chat() {
           />
           <Pressable
             onPress={() => sendText(input)}
-            style={({ pressed }) => [styles.sendBtn, pressed && { opacity: 0.85 }]}
+            disabled={sending}
+            style={({ pressed }) => [
+              styles.sendBtn,
+              (pressed || sending) && { opacity: 0.85 },
+            ]}
           >
             <Ionicons name="arrow-up" size={20} color={colors.white} />
           </Pressable>
