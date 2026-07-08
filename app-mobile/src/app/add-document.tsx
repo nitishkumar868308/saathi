@@ -18,6 +18,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
 import { addDocument, DocLimitError } from "@/lib/documents";
+import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
 import { dateAfterMonths, isValidDate } from "@/utils/expiry";
 import { extractExpiry } from "@/utils/extract-expiry";
@@ -125,6 +126,8 @@ export default function AddDocument() {
         expiry: expiry || null,
         file_uri: savedUri,
       });
+      // Referral reward unlock ho sakta hai (document + chat dono hone pe).
+      checkReferralQualification().catch(() => {});
       toast.show("Document add ho gaya 🎉", "success");
       router.back();
     } catch (e) {

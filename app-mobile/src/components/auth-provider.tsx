@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
-import { claimWaitlistReward } from "@/lib/plan";
+import { claimFirstNReward, checkReferralQualification } from "@/lib/plan";
 
 const AuthContext = createContext<{ session: Session | null; loading: boolean }>({
   session: null,
@@ -34,10 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      // Login pe waitlist reward claim karo (pehle 1000 → 1 saal Plus free).
-      // Idempotent hai — sirf ek baar grant hota hai.
       if (event === "SIGNED_IN" && s?.user) {
-        claimWaitlistReward().catch(() => {});
+        // Pehle N signups → X mahine Plus free. Idempotent.
+        claimFirstNReward().catch(() => {});
+        // Referral reward — document + chat dono ho chuke hon to grant ho jaye.
+        checkReferralQualification().catch(() => {});
       }
     });
     return () => sub.subscription.unsubscribe();

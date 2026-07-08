@@ -67,18 +67,93 @@ export async function canAddDocument(): Promise<boolean> {
 }
 
 /**
- * Waitlist reward claim karo — pehle 1000 waitlist users ko 1 saal Plus free.
- * Idempotent hai (ek hi baar grant hota hai). Login ke baad call karo.
- * Returns: 'granted' | 'not_eligible' | 'not_in_waitlist' | 'no_email' | 'error'
+ * Pehle N signups ko X mahine Plus free (config: app_config).
+ * Idempotent — ek hi baar grant hota hai. Login ke baad call karo.
+ * Returns: 'granted' | 'already' | 'not_eligible' | 'disabled' | 'no_auth' | 'error'
  */
-export async function claimWaitlistReward(): Promise<string> {
+export async function claimFirstNReward(): Promise<string> {
   try {
-    const { data, error } = await client().rpc("claim_waitlist_reward");
+    const { data, error } = await client().rpc("claim_first_n_reward");
     if (error) return "error";
     return (data as string) ?? "error";
   } catch {
     return "error";
   }
+}
+
+/**
+ * Kisi ka referral code apply karo (signup ke turant baad).
+ * Returns: 'applied' | 'invalid_code' | 'already_referred' | 'self' | 'disabled' | 'no_auth' | 'error'
+ */
+export async function applyReferralCode(code: string): Promise<string> {
+  try {
+    const { data, error } = await client().rpc("apply_referral_code", {
+      p_code: code,
+    });
+    if (error) return "error";
+    return (data as string) ?? "error";
+  } catch {
+    return "error";
+  }
+}
+
+/**
+ * Referral reward check karo — document upload + Saathi se chat dono hone pe
+ * dono users ko din milte hain. Best-effort, baar-baar call karna safe hai.
+ * Returns: 'rewarded' | 'need_document' | 'need_chat' | 'no_referral' | 'error'
+ */
+export async function checkReferralQualification(): Promise<string> {
+  try {
+    const { data, error } = await client().rpc("check_referral_qualification");
+    if (error) return "error";
+    return (data as string) ?? "error";
+  } catch {
+    return "error";
+  }
+}
+
+export type ReferralInfo = {
+  code: string | null;
+  daysEarned: number;
+  capDays: number;
+  referralDays: number;
+  totalReferrals: number;
+  rewardedReferrals: number;
+};
+
+/** Apna referral code + kitne referral/din — referral screen ke liye. */
+export async function getReferralInfo(): Promise<ReferralInfo> {
+  const sb = client();
+  const { data: userData } = await sb.auth.getUser();
+  const uid = userData.user?.id;
+  const empty: ReferralInfo = {
+    code: null,
+    daysEarned: 0,
+    capDays: 180,
+    referralDays: 15,
+    totalReferrals: 0,
+    rewardedReferrals: 0,
+  };
+  if (!uid) return empty;
+
+  const [{ data: prof }, { data: refs }, { data: cfg }] = await Promise.all([
+    sb.from("profiles").select("referral_code, referral_days_earned").eq("id", uid).single(),
+    sb.from("referrals").select("rewarded_at").eq("referrer_id", uid),
+    sb.from("app_config").select("key, value"),
+  ]);
+
+  const conf = new Map((cfg ?? []).map((r) => [r.key as string, r.value]));
+  const num = (k: string, d: number) => Number(conf.get(k) ?? d) || d;
+  const list = refs ?? [];
+
+  return {
+    code: (prof?.referral_code as string) ?? null,
+    daysEarned: (prof?.referral_days_earned as number) ?? 0,
+    capDays: num("referral_cap_months", 6) * 30,
+    referralDays: num("referral_days", 15),
+    totalReferrals: list.length,
+    rewardedReferrals: list.filter((r) => r.rewarded_at).length,
+  };
 }
 
 /** Purchase success ke baad profiles.plan = plus set karo (webhook aane tak bridge). */

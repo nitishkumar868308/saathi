@@ -43,13 +43,17 @@ export async function addDocument(input: {
   // Free plan limit check
   if (!(await canAddDocument())) throw new DocLimitError();
 
-  const { data, error } = await client()
+  const sb = client();
+  // Referral qualification (document upload) server-side isi se verify hota hai.
+  const { data: u } = await sb.auth.getUser();
+  const { data, error } = await sb
     .from("documents")
     .insert({
       name: input.name,
       type: input.type,
       expiry: input.expiry,
       file_uri: input.file_uri ?? null,
+      user_id: u.user?.id ?? null,
     })
     .select()
     .single();

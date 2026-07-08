@@ -6,6 +6,52 @@ const KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const MODEL = "claude-haiku-4-5"; // sasta — chat, reminder, brief
 const VISION_MODEL = "claude-sonnet-4-6"; // document reading — thoda better + accurate
 
+// Supabase auto-injects ye edge functions me.
+const SB_URL = Deno.env.get("SUPABASE_URL");
+const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY");
+const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+/** Caller ka user id (JWT se). Referral anti-fraud ke liye server-side chahiye. */
+async function getUserId(req: Request): Promise<string | null> {
+  const auth = req.headers.get("Authorization");
+  if (!auth || !SB_URL || !SB_ANON) return null;
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/user`, {
+      headers: { Authorization: auth, apikey: SB_ANON },
+    });
+    if (!res.ok) return null;
+    const u = await res.json();
+    return u?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Chat ko DB me record karo (service_role se, user_id ke saath).
+ * Best-effort — fail ho to chat fail nahi hota.
+ */
+async function recordChat(userId: string, userMsg: string, reply: string) {
+  if (!SB_URL || !SB_SERVICE) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/messages`, {
+      method: "POST",
+      headers: {
+        apikey: SB_SERVICE,
+        Authorization: `Bearer ${SB_SERVICE}`,
+        "content-type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify([
+        { role: "user", content: userMsg, user_id: userId },
+        { role: "saathi", content: reply, user_id: userId },
+      ]),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -65,13 +111,19 @@ Deno.serve(async (req) => {
       const nameNote = payload.name
         ? ` User ka naam "${payload.name}" hai — kabhi-kabhi naam se bulao, natural.`
         : "";
-      const messages = [...(payload.history ?? []), { role: "user", content: payload.message ?? "" }];
+      const userMsg = payload.message ?? "";
+      const messages = [...(payload.history ?? []), { role: "user", content: userMsg }];
       const reply = await claude({
         model: MODEL,
         max_tokens: 1024,
         system: SAATHI_SYSTEM + nameNote,
         messages,
       });
+
+      // Server-side record (referral qualification "first chat" isi se verify hota hai).
+      const uid = await getUserId(req);
+      if (uid && userMsg.trim()) await recordChat(uid, userMsg, reply);
+
       return json({ reply });
     }
 
