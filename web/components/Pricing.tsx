@@ -16,7 +16,7 @@ import { tpl } from "@/lib/offers";
 // }
 
 export default function Pricing() {
-  const { pricing: t } = useT();
+  const { pricing: t, download: dl } = useT();
   const [yearly, setYearly] = useState(false);
   const [showDownload, setShowDownload] = useState(false);
 
@@ -205,27 +205,23 @@ export default function Pricing() {
               <Sparkles size={30} />
             </div>
             <h3 className="mt-5 font-display text-2xl font-semibold">
-              Saathi ab app pe hai 📱
+              {dl.modalTitle}
             </h3>
-            <p className="mt-2.5 text-ink-soft">
-              Plus subscription aur saare features Saathi app ke andar milte hain.
-              Play Store se app download karo aur seedhe app se hi upgrade karo — bilkul
-              secure, Google Play ke through.
-            </p>
+            <p className="mt-2.5 text-ink-soft">{dl.modalBody}</p>
             <a
               href={PLAY_STORE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
             >
-              Play Store se download karo
+              {dl.modalCta}
             </a>
             <button
               type="button"
               onClick={() => setShowDownload(false)}
               className="mt-3 text-sm font-semibold text-ink-soft hover:text-ink"
             >
-              Abhi nahi
+              {dl.modalDismiss}
             </button>
           </div>
         </div>

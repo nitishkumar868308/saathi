@@ -3,6 +3,7 @@
 import { Smartphone, Gift } from "lucide-react";
 import { PLAY_STORE_URL } from "@/lib/links";
 import { useOffers } from "@/lib/useOffers";
+import { tpl } from "@/lib/offers";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 /**
@@ -33,10 +34,10 @@ export default function DownloadApp({ dark = false }: { dark?: boolean }) {
         >
           <Gift size={15} className="mt-0.5 shrink-0 text-terracotta" />
           <span>
-            Pehle {offers.firstNUsers.toLocaleString("en-IN")} users ko Saathi Plus{" "}
-            <strong className="font-semibold">
-              {offers.firstNFreeMonths} mahine free
-            </strong>
+            {tpl(t.download.offerLine, {
+              n: offers.firstNUsers.toLocaleString("en-IN"),
+              m: offers.firstNFreeMonths,
+            })}
           </span>
         </p>
       )}

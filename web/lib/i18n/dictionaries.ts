@@ -141,6 +141,7 @@ type Dict = {
       pricing: string;
       faq: string;
       about: string;
+      referral: string;
       contact: string;
       privacy: string;
       terms: string;
@@ -152,21 +153,12 @@ type Dict = {
   };
   download: {
     button: string;
-    sending: string;
-    emailPlaceholder: string;
-    thankTitle: string;
-    thankSub: string;
-    referTitle: string;
-    referSub: string;
-    copy: string;
-    copied: string;
-    share: string;
-    invalidEmail: string;
-    error: string;
-    already: string;
-    alreadySub: string;
-    noSpam: string;
-    countSuffix: string;
+    /** Template — {n} users, {m} mahine */
+    offerLine: string;
+    modalTitle: string;
+    modalBody: string;
+    modalCta: string;
+    modalDismiss: string;
   };
 };
 
@@ -485,6 +477,7 @@ const hinglish: Dict = {
       pricing: "Pricing",
       faq: "FAQ",
       about: "About",
+      referral: "Dost bulao 🎁",
       contact: "Contact",
       privacy: "Privacy Policy",
       terms: "Terms of Service",
@@ -496,21 +489,12 @@ const hinglish: Dict = {
   },
   download: {
     button: "Play Store se download karo",
-    sending: "Jod rahe hain...",
-    emailPlaceholder: "aapka@email.com",
-    already: "Aap pehle se list mein ho! 👋",
-    alreadySub: "Aapka email already early access list mein hai. Dobara add karne ki zaroorat nahi.",
-    thankTitle: "Ho gaya! Aap list mein ho 🎉",
-    thankSub: "Launch pe sabse pehle aapko batayenge.",
-    referTitle: "Ek dost ko invite karo, line mein aage jao 🚀",
-    referSub: "Jitne zyada dost, utni jaldi early access.",
-    copy: "Invite link copy karo",
-    copied: "Link copy ho gaya!",
-    share: "Share karo",
-    invalidEmail: "Sahi email daalo 🙂",
-    error: "Kuch gadbad ho gayi. Thodi der baad try karo.",
-    noSpam: "Koi spam nahi. Sirf launch ki khabar. Kabhi bhi unsubscribe.",
-    countSuffix: "log jud chuke hain",
+    offerLine: "Pehle {n} users ko Saathi Plus {m} mahine free",
+    modalTitle: "Saathi ab app pe hai 📱",
+    modalBody:
+      "Plus subscription aur saare features Saathi app ke andar milte hain. Play Store se app download karo aur seedhe app se hi upgrade karo — bilkul secure, Google Play ke through.",
+    modalCta: "Play Store se download karo",
+    modalDismiss: "Abhi nahi",
   },
 };
 
@@ -829,6 +813,7 @@ const hi: Dict = {
       pricing: "प्राइसिंग",
       faq: "FAQ",
       about: "हमारे बारे में",
+      referral: "दोस्त बुलाइए 🎁",
       contact: "संपर्क",
       privacy: "प्राइवेसी पॉलिसी",
       terms: "सेवा की शर्तें",
@@ -840,21 +825,12 @@ const hi: Dict = {
   },
   download: {
     button: "Play Store से डाउनलोड करें",
-    sending: "जोड़ रहे हैं...",
-    emailPlaceholder: "aapka@email.com",
-    already: "आप पहले से लिस्ट में हैं! 👋",
-    alreadySub: "आपका ईमेल पहले से अर्ली एक्सेस लिस्ट में है। दोबारा जोड़ने की ज़रूरत नहीं।",
-    thankTitle: "हो गया! आप लिस्ट में हैं 🎉",
-    thankSub: "लॉन्च पर सबसे पहले आपको बताएँगे।",
-    referTitle: "एक दोस्त को इनवाइट करें, लाइन में आगे जाएँ 🚀",
-    referSub: "जितने ज़्यादा दोस्त, उतनी जल्दी अर्ली एक्सेस।",
-    copy: "इनवाइट लिंक कॉपी करें",
-    copied: "लिंक कॉपी हो गया!",
-    share: "शेयर करें",
-    invalidEmail: "सही ईमेल डालिए 🙂",
-    error: "कुछ गड़बड़ हो गई। थोड़ी देर बाद ट्राई करें।",
-    noSpam: "कोई स्पैम नहीं। सिर्फ़ लॉन्च की ख़बर। कभी भी अनसब्सक्राइब।",
-    countSuffix: "लोग जुड़ चुके हैं",
+    offerLine: "पहले {n} यूज़र्स को साथी प्लस {m} महीने फ्री",
+    modalTitle: "साथी अब ऐप पर है 📱",
+    modalBody:
+      "प्लस सब्सक्रिप्शन और सारे फ़ीचर्स साथी ऐप के अंदर मिलते हैं। Play Store से ऐप डाउनलोड करें और सीधे ऐप से ही अपग्रेड करें — बिल्कुल सुरक्षित, Google Play के ज़रिए।",
+    modalCta: "Play Store से डाउनलोड करें",
+    modalDismiss: "अभी नहीं",
   },
 };
 
@@ -1173,6 +1149,7 @@ const en: Dict = {
       pricing: "Pricing",
       faq: "FAQ",
       about: "About",
+      referral: "Refer a friend 🎁",
       contact: "Contact",
       privacy: "Privacy Policy",
       terms: "Terms of Service",
@@ -1184,21 +1161,12 @@ const en: Dict = {
   },
   download: {
     button: "Download on Play Store",
-    sending: "Adding you...",
-    emailPlaceholder: "you@email.com",
-    already: "You're already on the list! 👋",
-    alreadySub: "Your email is already on the early access list. No need to add it again.",
-    thankTitle: "You're in! 🎉",
-    thankSub: "We'll tell you first when we launch.",
-    referTitle: "Invite a friend, move up the line 🚀",
-    referSub: "The more friends, the sooner your early access.",
-    copy: "Copy invite link",
-    copied: "Link copied!",
-    share: "Share",
-    invalidEmail: "Enter a valid email 🙂",
-    error: "Something went wrong. Please try again shortly.",
-    noSpam: "No spam. Only launch news. Unsubscribe anytime.",
-    countSuffix: "people have joined",
+    offerLine: "First {n} users get {m} months of Saathi Plus free",
+    modalTitle: "Saathi lives in the app 📱",
+    modalBody:
+      "Plus and every feature live inside the Saathi app. Download it from the Play Store and upgrade right there — secure, through Google Play.",
+    modalCta: "Download on Play Store",
+    modalDismiss: "Not now",
   },
 };
 
