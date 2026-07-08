@@ -29,7 +29,7 @@ export default function Pricing() {
         </p>
       </div>
 
-      {/* Waitlist reward banner */}
+      {/* Offer banner */}
       <div className="mx-auto mt-6 flex max-w-2xl items-center justify-center gap-2.5 rounded-2xl border border-terracotta/25 bg-terracotta/10 px-4 py-3 text-center">
         <Gift size={18} className="shrink-0 text-terracotta" />
         <p className="text-sm font-semibold text-ink">{t.reward}</p>

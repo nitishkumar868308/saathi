@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Script from "next/script";
 import { useSearchParams } from "next/navigation";
-import { Heart, ShieldCheck, Loader2, CheckCircle2, Lock } from "lucide-react";
+import { ShieldCheck, Loader2, CheckCircle2, Lock } from "lucide-react";
+import SaathiMark from "@/components/SaathiMark";
 
 type PlanId = "plus_monthly" | "plus_yearly";
 
@@ -88,7 +89,7 @@ export default function CheckoutClient() {
       <div className="w-full max-w-md rounded-4xl border border-line bg-surface p-7 shadow-warm sm:p-8">
         <div className="flex items-center gap-2.5">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-            <Heart size={18} className="fill-white" strokeWidth={2.4} />
+            <SaathiMark size={22} className="text-white" />
           </span>
           <span className="font-display text-xl font-semibold">Saathi</span>
         </div>

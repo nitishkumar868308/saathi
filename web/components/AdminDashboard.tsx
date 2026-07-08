@@ -4,76 +4,59 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Lock,
   LogOut,
-  Users,
   MessageSquare,
   Search,
   Download,
   RefreshCw,
   Loader2,
   Mail,
-  TrendingUp,
   Inbox,
+  Gift,
+  Menu,
+  X,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import AdminRewards from "@/components/AdminRewards";
 
-type WaitlistEntry = { email: string; createdAt: string };
 type ContactEntry = {
   name: string;
   email: string;
   message: string;
   createdAt: string;
 };
-type Data = {
-  waitlist: WaitlistEntry[];
-  contacts: ContactEntry[];
-  stats: { waitlist: number; contacts: number };
-};
 
-type Tab = "rewards" | "waitlist" | "contacts";
+type Data = { contacts: ContactEntry[] };
+type Section = "rewards" | "contacts";
+
+const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
+  { key: "rewards", label: "Rewards", icon: Gift },
+  { key: "contacts", label: "Contacts", icon: MessageSquare },
+];
+
+/* ------------------------------ helpers ------------------------------ */
 
 function fmt(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+  const d = new Date(iso);
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 function timeAgo(iso: string): string {
-  try {
-    const diff = Date.now() - new Date(iso).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return "abhi";
-    if (m < 60) return `${m}m pehle`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h pehle`;
-    const d = Math.floor(h / 24);
-    if (d < 30) return `${d}d pehle`;
-    return fmt(iso);
-  } catch {
-    return "";
-  }
-}
-
-function isToday(iso: string): boolean {
-  try {
-    const d = new Date(iso);
-    const n = new Date();
-    return (
-      d.getDate() === n.getDate() &&
-      d.getMonth() === n.getMonth() &&
-      d.getFullYear() === n.getFullYear()
-    );
-  } catch {
-    return false;
-  }
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return "abhi";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m pehle`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h pehle`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d pehle`;
+  return fmt(iso);
 }
 
 function toCsv(rows: string[][]): string {
@@ -92,6 +75,8 @@ function download(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+/* ------------------------------- Shell ------------------------------- */
+
 export default function AdminDashboard() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [data, setData] = useState<Data | null>(null);
@@ -105,8 +90,7 @@ export default function AdminDashboard() {
         setAuthed(false);
         return;
       }
-      const d = (await res.json()) as Data;
-      setData(d);
+      setData((await res.json()) as Data);
       setAuthed(true);
     } catch {
       setAuthed(false);
@@ -132,12 +116,9 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
   if (!authed) return <LoginGate onSuccess={load} />;
 
-  return (
-    <Dashboard data={data} loading={loading} onRefresh={load} onLogout={logout} />
-  );
+  return <Dashboard data={data} loading={loading} onRefresh={load} onLogout={logout} />;
 }
 
 /* ------------------------------- Login ------------------------------- */
@@ -183,12 +164,8 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
           <Lock size={22} />
         </span>
-        <h1 className="mt-5 font-display text-2xl font-semibold">
-          Admin dashboard
-        </h1>
-        <p className="mt-1 text-sm text-ink-soft">
-          Password daalo dashboard dekhne ke liye.
-        </p>
+        <h1 className="mt-5 font-display text-2xl font-semibold">Admin dashboard</h1>
+        <p className="mt-1 text-sm text-ink-soft">Password daalo dashboard dekhne ke liye.</p>
         <input
           type="password"
           autoFocus
@@ -197,19 +174,13 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
           onChange={(e) => setPassword(e.target.value)}
           className="mt-5 h-12 w-full rounded-2xl border border-line bg-cream px-4 text-base outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
         />
-        {error && (
-          <p className="mt-2 text-sm font-medium text-terracotta-dark">{error}</p>
-        )}
+        {error && <p className="mt-2 text-sm font-medium text-terracotta-dark">{error}</p>}
         <button
           type="submit"
           disabled={status === "loading"}
           className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-70"
         >
-          {status === "loading" ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : (
-            "Login"
-          )}
+          {status === "loading" ? <Loader2 size={18} className="animate-spin" /> : "Login"}
         </button>
       </form>
     </div>
@@ -229,24 +200,11 @@ function Dashboard({
   onRefresh: () => void;
   onLogout: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("rewards");
+  const [section, setSection] = useState<Section>("rewards");
+  const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const waitlist = data?.waitlist ?? [];
-  const contacts = data?.contacts ?? [];
-
-  const todayCount = useMemo(
-    () =>
-      waitlist.filter((w) => isToday(w.createdAt)).length +
-      contacts.filter((c) => isToday(c.createdAt)).length,
-    [waitlist, contacts],
-  );
-
-  const filteredWaitlist = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return waitlist;
-    return waitlist.filter((w) => w.email.toLowerCase().includes(q));
-  }, [waitlist, query]);
+  const contacts = useMemo(() => data?.contacts ?? [], [data]);
 
   const filteredContacts = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -260,242 +218,192 @@ function Dashboard({
   }, [contacts, query]);
 
   function exportCsv() {
-    if (tab === "waitlist") {
-      download(
-        "saathi-waitlist.csv",
-        toCsv([
-          ["Email", "Joined at"],
-          ...filteredWaitlist.map((w) => [w.email, fmt(w.createdAt)]),
-        ]),
-      );
-    } else {
-      download(
-        "saathi-contacts.csv",
-        toCsv([
-          ["Name", "Email", "Message", "Sent at"],
-          ...filteredContacts.map((c) => [
-            c.name,
-            c.email,
-            c.message,
-            fmt(c.createdAt),
-          ]),
-        ]),
-      );
-    }
+    download(
+      "apka-saathi-contacts.csv",
+      toCsv([
+        ["Name", "Email", "Message", "Received at"],
+        ...filteredContacts.map((c) => [c.name, c.email, c.message, fmt(c.createdAt)]),
+      ]),
+    );
   }
+
+  function go(s: Section) {
+    setSection(s);
+    setNavOpen(false);
+  }
+
+  const nav = (
+    <nav className="flex flex-col gap-1">
+      {NAV.map(({ key, label, icon: Icon }) => {
+        const active = section === key;
+        return (
+          <button
+            key={key}
+            onClick={() => go(key)}
+            className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+              active
+                ? "bg-terracotta text-white shadow-warm"
+                : "text-ink-soft hover:bg-cream-deep/50 hover:text-ink"
+            }`}
+          >
+            <Icon size={18} />
+            {label}
+            {key === "contacts" && contacts.length > 0 && (
+              <span
+                className={`ml-auto rounded-full px-2 py-0.5 text-xs font-bold ${
+                  active ? "bg-white/20" : "bg-cream-deep text-ink-soft"
+                }`}
+              >
+                {contacts.length}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 border-b border-line bg-cream/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:px-8 sm:py-3.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-              <SaathiMark size={20} className="text-white" />
-            </span>
-            <span className="truncate font-display text-lg font-semibold">
-              Saathi Admin
-            </span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              onClick={onRefresh}
-              className="inline-flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-3 text-sm font-semibold text-ink-soft transition hover:text-terracotta sm:px-4"
-            >
-              <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-            <button
-              onClick={onLogout}
-              className="inline-flex h-10 items-center gap-2 rounded-full bg-ink px-3 text-sm font-semibold text-cream transition hover:bg-ink/90 sm:px-4"
-            >
-              <LogOut size={15} />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
-          </div>
-        </div>
+      {/* Mobile top bar */}
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-cream/90 px-4 py-3 backdrop-blur-md lg:hidden">
+        <button
+          onClick={() => setNavOpen(true)}
+          aria-label="Menu"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink"
+        >
+          <Menu size={18} />
+        </button>
+        <span className="font-display text-lg font-semibold">Admin</span>
+        <button
+          onClick={onRefresh}
+          aria-label="Refresh"
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft"
+        >
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+        </button>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-7 sm:px-8 sm:py-10">
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-          <StatCard
-            icon={<Users size={20} />}
-            label="Waitlist signups"
-            value={waitlist.length}
-            accent="from-terracotta/15 to-terracotta/5 text-terracotta"
-          />
-          <StatCard
-            icon={<MessageSquare size={20} />}
-            label="Contact messages"
-            value={contacts.length}
-            accent="from-sage/20 to-sage/5 text-sage"
-          />
-          <StatCard
-            icon={<TrendingUp size={20} />}
-            label="Aaj naye"
-            value={todayCount}
-            accent="from-amber-warm/25 to-amber-warm/5 text-amber-warm"
-            className="col-span-2 lg:col-span-1"
-          />
-        </div>
-
-        {/* Controls */}
-        <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:items-center sm:justify-between">
-          <div className="inline-flex rounded-2xl border border-line bg-surface p-1">
-            <TabButton active={tab === "rewards"} onClick={() => setTab("rewards")}>
-              Rewards
-            </TabButton>
-            <TabButton active={tab === "waitlist"} onClick={() => setTab("waitlist")}>
-              Waitlist · {waitlist.length}
-            </TabButton>
-            <TabButton active={tab === "contacts"} onClick={() => setTab("contacts")}>
-              Contacts · {contacts.length}
-            </TabButton>
-          </div>
-
-          <div className={`flex items-center gap-2 ${tab === "rewards" ? "hidden" : ""}`}>
-            <div className="relative flex-1 sm:w-64">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft"
-              />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search..."
-                className="h-11 w-full rounded-2xl border border-line bg-surface pl-10 pr-4 text-sm outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
-              />
+      {/* Mobile drawer */}
+      {navOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setNavOpen(false)}>
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
+          <aside
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-line bg-surface p-5"
+          >
+            <div className="flex items-center justify-between">
+              <Brand />
+              <button
+                onClick={() => setNavOpen(false)}
+                aria-label="Band karo"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-soft"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <button
-              onClick={exportCsv}
-              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
-            >
-              <Download size={16} />
-              <span className="hidden sm:inline">CSV</span>
-            </button>
-          </div>
+            <div className="mt-7">{nav}</div>
+            <LogoutBtn onLogout={onLogout} className="mt-auto" />
+          </aside>
         </div>
+      )}
+
+      <div className="lg:flex">
+        {/* Desktop sidebar */}
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-surface p-5 lg:flex">
+          <Brand />
+          <div className="mt-8">{nav}</div>
+          <LogoutBtn onLogout={onLogout} className="mt-auto" />
+        </aside>
 
         {/* Content */}
-        <div className="mt-5">
-          {tab === "rewards" ? (
-            <AdminRewards />
-          ) : tab === "waitlist" ? (
-            <WaitlistView rows={filteredWaitlist} />
-          ) : (
-            <ContactsView rows={filteredContacts} />
-          )}
-        </div>
-      </main>
-    </div>
-  );
-}
+        <main className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-9">
+          <div className="mx-auto max-w-5xl">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {section === "rewards" ? "Rewards & Referrals" : "Contact messages"}
+                </h1>
+                <p className="mt-1 text-sm text-ink-soft">
+                  {section === "rewards"
+                    ? "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain."
+                    : `${contacts.length} message`}
+                </p>
+              </div>
 
-function StatCard({
-  icon,
-  label,
-  value,
-  accent,
-  className = "",
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  accent: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-3xl border border-line bg-gradient-to-br ${accent} p-5 shadow-soft sm:p-6 ${className}`}
-    >
-      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-surface/80 shadow-soft">
-        {icon}
-      </span>
-      <p className="mt-4 font-display text-3xl font-semibold text-ink sm:text-4xl">
-        {value.toLocaleString("en-IN")}
-      </p>
-      <p className="mt-1 text-sm font-medium text-ink-soft">{label}</p>
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-xl px-3.5 py-2 text-sm font-semibold transition sm:px-4 ${
-        active
-          ? "bg-terracotta text-white shadow-warm"
-          : "text-ink-soft hover:text-ink"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/* ------------------------------ Waitlist ----------------------------- */
-
-function WaitlistView({ rows }: { rows: WaitlistEntry[] }) {
-  if (!rows.length) return <Empty label="Abhi koi signup nahi." />;
-  return (
-    <div className="overflow-hidden rounded-3xl border border-line bg-surface shadow-soft">
-      {/* Desktop table */}
-      <table className="hidden w-full text-left text-sm md:table">
-        <thead>
-          <tr className="border-b border-line text-xs font-bold uppercase tracking-wide text-ink-soft">
-            <th className="px-5 py-3.5">#</th>
-            <th className="px-5 py-3.5">Email</th>
-            <th className="px-5 py-3.5">Joined</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.email + i} className="border-b border-line/60 last:border-0">
-              <td className="px-5 py-3.5 text-ink-soft">{i + 1}</td>
-              <td className="px-5 py-3.5 font-medium text-ink">
-                <span className="inline-flex items-center gap-2">
-                  <Mail size={14} className="text-terracotta" />
-                  {r.email}
-                </span>
-              </td>
-              <td className="whitespace-nowrap px-5 py-3.5 text-ink-soft">
-                {fmt(r.createdAt)} · {timeAgo(r.createdAt)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* Mobile cards */}
-      <div className="divide-y divide-line md:hidden">
-        {rows.map((r, i) => (
-          <div key={r.email + i} className="flex items-center gap-3 px-4 py-3.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-terracotta/10 text-terracotta">
-              <Mail size={15} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink">
-                {r.email}
-              </p>
-              <p className="text-xs text-ink-soft">{timeAgo(r.createdAt)}</p>
+              <div className="hidden items-center gap-2 lg:flex">
+                <button
+                  onClick={onRefresh}
+                  className="inline-flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
+                >
+                  <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+                  Refresh
+                </button>
+              </div>
             </div>
-            <span className="shrink-0 text-xs font-semibold text-ink-soft">
-              #{i + 1}
-            </span>
+
+            {section === "contacts" && (
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft"
+                  />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Naam, email ya message search karo..."
+                    className="h-11 w-full rounded-2xl border border-line bg-surface pl-10 pr-4 text-sm outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
+                  />
+                </div>
+                <button
+                  onClick={exportCsv}
+                  disabled={!filteredContacts.length}
+                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta disabled:opacity-50"
+                >
+                  <Download size={16} />
+                  CSV
+                </button>
+              </div>
+            )}
+
+            <div className="mt-6">
+              {section === "rewards" ? (
+                <AdminRewards />
+              ) : (
+                <ContactsView rows={filteredContacts} />
+              )}
+            </div>
           </div>
-        ))}
+        </main>
       </div>
     </div>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
+        <SaathiMark size={20} className="text-white" />
+      </span>
+      <div className="leading-tight">
+        <p className="font-display text-base font-semibold">Apka Saathi</p>
+        <p className="text-xs text-ink-soft">Admin</p>
+      </div>
+    </div>
+  );
+}
+
+function LogoutBtn({ onLogout, className = "" }: { onLogout: () => void; className?: string }) {
+  return (
+    <button
+      onClick={onLogout}
+      className={`inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-ink px-4 text-sm font-semibold text-cream transition hover:opacity-90 ${className}`}
+    >
+      <LogOut size={15} />
+      Logout
+    </button>
   );
 }
 
@@ -511,28 +419,28 @@ function ContactsView({ rows }: { rows: ContactEntry[] }) {
           className="rounded-3xl border border-line bg-surface p-5 shadow-soft transition hover:shadow-warm"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <span
-                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
                 style={{ backgroundColor: ["#C25A37", "#7C8A6B", "#E0A458"][i % 3] }}
               >
                 {r.name.charAt(0).toUpperCase()}
               </span>
-              <div>
-                <p className="font-semibold text-ink">{r.name}</p>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink">{r.name}</p>
                 <a
                   href={`mailto:${r.email}`}
-                  className="text-sm text-ink-soft transition hover:text-terracotta"
+                  className="block truncate text-sm text-ink-soft transition hover:text-terracotta"
                 >
                   {r.email}
                 </a>
               </div>
             </div>
-            <span className="text-xs font-medium text-ink-soft">
+            <span className="shrink-0 text-xs font-medium text-ink-soft">
               {timeAgo(r.createdAt)}
             </span>
           </div>
-          <p className="mt-3 whitespace-pre-wrap rounded-2xl bg-cream-deep/30 p-4 text-sm leading-relaxed text-ink">
+          <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-cream-deep/30 p-4 text-sm leading-relaxed text-ink">
             {r.message}
           </p>
           <div className="mt-3 flex justify-end">

@@ -9,7 +9,8 @@ import {
   useReducedMotion,
   AnimatePresence,
 } from "framer-motion";
-import { Heart, Mic, FileClock, Check } from "lucide-react";
+import { Mic, FileClock, Check } from "lucide-react";
+import SaathiMark from "@/components/SaathiMark";
 
 type Msg = {
   role: "user" | "saathi";
@@ -93,7 +94,7 @@ export default function PhoneDemo() {
           {/* status bar / header */}
           <div className="flex items-center gap-2.5 border-b border-line bg-surface px-4 py-3.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white">
-              <Heart size={16} className="fill-white" strokeWidth={2.4} />
+              <SaathiMark size={20} className="text-white" />
             </span>
             <div className="leading-tight">
               <p className="font-display text-base font-semibold">Saathi</p>

@@ -45,14 +45,20 @@ export default function AdminRewards() {
   const [grantMsg, setGrantMsg] = useState("");
 
   useEffect(() => {
-    fetch("/api/admin/config", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/config", { cache: "no-store" });
+        const d = await res.json();
+        // 503/500 pe bhi asli wajah dikhao — pehle chup-chaap defaults dikhte the.
+        if (!res.ok) throw new Error(d?.error || `load failed (${res.status})`);
         if (d?.config) setCfg({ ...DEFAULTS, ...d.config });
         if (d?.stats) setStats(d.stats);
-      })
-      .catch(() => setMsg("Config load nahi hua"))
-      .finally(() => setLoading(false));
+      } catch (e) {
+        setMsg(e instanceof Error ? e.message : "Config load nahi hua");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   async function save() {
@@ -103,8 +109,16 @@ export default function AdminRewards() {
     );
   }
 
+  const isError = Boolean(msg) && !msg.includes("✓");
+
   return (
     <div className="space-y-5">
+      {isError && (
+        <div className="rounded-2xl border border-terracotta/30 bg-terracotta/10 p-4 text-sm text-ink">
+          <strong className="font-semibold text-terracotta-dark">Nahi ho paya:</strong> {msg}
+        </div>
+      )}
+
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

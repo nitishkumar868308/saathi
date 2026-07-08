@@ -147,7 +147,7 @@ type Dict = {
     rights: string;
     madeIn: string;
   };
-  waitlist: {
+  download: {
     button: string;
     sending: string;
     emailPlaceholder: string;
@@ -454,7 +454,7 @@ const hinglish: Dict = {
       },
       {
         q: "iPhone app kab aayega?",
-        a: "Pehle Android pe early access aayega, phir jaldi hi iPhone. Waitlist mein judo — dono launch pe aapko sabse pehle khabar denge.",
+        a: "App abhi Android pe hai — Play Store se download karo. iPhone version jald aa raha hai.",
       },
       {
         q: "Family sharing kaise kaam karega?",
@@ -490,8 +490,8 @@ const hinglish: Dict = {
     rights: "Sabhi adhikaar surakshit.",
     madeIn: "Made with ❤️ for you",
   },
-  waitlist: {
-    button: "Join Early Access",
+  download: {
+    button: "Play Store se download karo",
     sending: "Jod rahe hain...",
     emailPlaceholder: "aapka@email.com",
     already: "Aap pehle se list mein ho! 👋",
@@ -797,7 +797,7 @@ const hi: Dict = {
       },
       {
         q: "iPhone ऐप कब आएगा?",
-        a: "पहले Android पर अर्ली एक्सेस आएगा, फिर जल्दी ही iPhone। वेटलिस्ट में जुड़िए — दोनों लॉन्च पर आपको सबसे पहले ख़बर देंगे।",
+        a: "ऐप अभी Android पर है — Play Store से डाउनलोड करें। iPhone वर्ज़न जल्द आ रहा है।",
       },
       {
         q: "फैमिली शेयरिंग कैसे काम करेगी?",
@@ -833,8 +833,8 @@ const hi: Dict = {
     rights: "सभी अधिकार सुरक्षित।",
     madeIn: "आपके लिए ❤️ से बना",
   },
-  waitlist: {
-    button: "अर्ली एक्सेस जॉइन करें",
+  download: {
+    button: "Play Store से डाउनलोड करें",
     sending: "जोड़ रहे हैं...",
     emailPlaceholder: "aapka@email.com",
     already: "आप पहले से लिस्ट में हैं! 👋",
@@ -1140,7 +1140,7 @@ const en: Dict = {
       },
       {
         q: "When is the iPhone app coming?",
-        a: "Early access lands on Android first, then iPhone soon after. Join the waitlist — we'll notify you first for both launches.",
+        a: "The app is on Android today — grab it from the Play Store. iPhone is coming soon.",
       },
       {
         q: "How does family sharing work?",
@@ -1176,8 +1176,8 @@ const en: Dict = {
     rights: "All rights reserved.",
     madeIn: "Made with ❤️ for you",
   },
-  waitlist: {
-    button: "Join Early Access",
+  download: {
+    button: "Download on Play Store",
     sending: "Adding you...",
     emailPlaceholder: "you@email.com",
     already: "You're already on the list! 👋",

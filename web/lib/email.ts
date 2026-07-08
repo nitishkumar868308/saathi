@@ -174,26 +174,6 @@ export async function sendReminderEmail(
 /*  Specific emails — bas templates, sendMail ke thin wrappers         */
 /* ------------------------------------------------------------------ */
 
-/** Waitlist welcome — subscriber ko. */
-export async function sendWaitlistWelcome(email: string) {
-  const html = renderEmail(
-    "Aap list mein ho! 🎉",
-    `${emailParagraph(
-      "Shukriya early access list mein judne ke liye. Aap un khaas logon mein ho jo Saathi ko sabse pehle try karenge.",
-    )}
-     ${emailParagraph(
-       "Launch hote hi aapko sabse pehle khabar milegi — koi spam nahi, bas woh pal jab Saathi taiyaar ho.",
-     )}
-     <p style="margin:0 0 8px;font-size:15px;color:${INK};font-weight:600;">Ek dost ko bhi bata do 👇</p>
-     ${emailButton(SITE_URL, "Saathi share karo")}`,
-  );
-  return sendMail({
-    to: email,
-    subject: "Aap Saathi ki early access list mein ho 🎉",
-    html,
-  });
-}
-
 /** Contact — admin ko notification + user ko confirmation. */
 export async function sendContactEmails(
   name: string,

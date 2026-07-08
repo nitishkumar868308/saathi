@@ -8,12 +8,13 @@ import path from "path";
  * sab kuch Supabase DB mein jaata hai. Warna local `data/*.json` file
  * fallback use hoti hai (dev ke liye).
  *
- * Tables (Supabase SQL Editor mein `supabase/landing.sql` run karo):
- *   waitlist(id, email unique, created_at)
+ * Tables:
  *   contact_messages(id, name, email, message, created_at)
+ *
+ * NOTE: waitlist hata di gayi — ab pehle N signups ko `claim_first_n_reward()`
+ * se Plus milta hai (dekho supabase/rewards-referrals.sql).
  */
 
-type WaitlistEntry = { email: string; createdAt: string };
 type ContactEntry = {
   name: string;
   email: string;
@@ -115,54 +116,6 @@ async function writeJson(file: string, data: unknown): Promise<void> {
 }
 
 /* --------------------------- Public API ---------------------------- */
-
-/**
- * Waitlist mein email add karo (dedup ke saath).
- * Returns { added, count }. added=false → email pehle se maujood.
- */
-export async function addToWaitlist(
-  email: string,
-  createdAt: string,
-): Promise<{ added: boolean; count: number }> {
-  const normalized = email.trim().toLowerCase();
-
-  if (usingSupabase()) {
-    const { inserted } = await sbInsert(
-      "waitlist",
-      { email: normalized, created_at: createdAt },
-      "email",
-    );
-    const count = await sbCount("waitlist");
-    return { added: inserted, count };
-  }
-
-  // File fallback
-  const list = await readJson<WaitlistEntry[]>("waitlist.json", []);
-  if (list.some((e) => e.email === normalized)) {
-    return { added: false, count: list.length };
-  }
-  list.push({ email: normalized, createdAt });
-  await writeJson("waitlist.json", list);
-  return { added: true, count: list.length };
-}
-
-export async function getWaitlistCount(): Promise<number> {
-  if (usingSupabase()) return sbCount("waitlist");
-  const list = await readJson<WaitlistEntry[]>("waitlist.json", []);
-  return list.length;
-}
-
-/** Admin — poori waitlist, newest pehle. */
-export async function getWaitlist(): Promise<WaitlistEntry[]> {
-  if (usingSupabase()) {
-    const rows = await sbSelect<{ email: string; created_at: string }>(
-      "waitlist?select=email,created_at&order=created_at.desc",
-    );
-    return rows.map((r) => ({ email: r.email, createdAt: r.created_at }));
-  }
-  const list = await readJson<WaitlistEntry[]>("waitlist.json", []);
-  return [...list].reverse();
-}
 
 export async function addContactMessage(entry: ContactEntry): Promise<void> {
   const normalized = entry.email.trim().toLowerCase();

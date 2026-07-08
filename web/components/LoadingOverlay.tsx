@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { Heart } from "lucide-react";
+import SaathiMark from "@/components/SaathiMark";
 
 /**
  * Pyaara full-screen loader — screen ke beech mein, backdrop blur ke saath.
@@ -53,7 +53,7 @@ export default function LoadingOverlay({ label }: { label?: string }) {
             }
             transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
           >
-            <Heart size={30} strokeWidth={2.4} className="fill-white" />
+            <SaathiMark size={34} className="text-white" />
           </motion.span>
         </div>
 

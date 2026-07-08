@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 const sections = [
   {
     h: "1. Hum kya collect karte hain",
-    p: "Sirf wahi jo Saathi ko kaam karne ke liye chahiye: aapka email (waitlist/account ke liye), aur woh documents/reminders jo aap khud add karte ho. Bas itna hi.",
+    p: "Sirf wahi jo Saathi ko kaam karne ke liye chahiye: aapka email (account ke liye), aur woh documents/reminders jo aap khud add karte ho. Bas itna hi.",
   },
   {
     h: "2. Aapke documents",
@@ -26,7 +26,7 @@ const sections = [
   },
   {
     h: "5. Email",
-    p: "Waitlist email sirf launch aur zaroori updates ke liye. Koi spam nahi — har email mein unsubscribe ka option hoga.",
+    p: "Aapka email sirf account aur zaroori reminders/updates ke liye. Koi spam nahi — har email mein unsubscribe ka option hoga.",
   },
   {
     h: "6. Sampark",
