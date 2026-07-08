@@ -18,8 +18,7 @@ import {
   Cake,
   IndianRupee,
 } from "lucide-react";
-import WaitlistForm from "@/components/WaitlistForm";
-import WaitlistCount from "@/components/WaitlistCount";
+import DownloadApp from "@/components/DownloadApp";
 import HeroVisual from "@/components/HeroVisual";
 import Marquee from "@/components/Marquee";
 import Faq from "@/components/Faq";
@@ -151,14 +150,9 @@ export default function Home() {
             </div>
 
             <div className="animate-fade-up [animation-delay:240ms]">
-              <div className="mt-7 max-w-xl sm:mt-8" id="waitlist">
-                <WaitlistForm id="hero" />
+              <div className="mt-7 max-w-xl sm:mt-8" id="download">
+                <DownloadApp />
               </div>
-            </div>
-
-            {/* Waitlist count */}
-            <div className="animate-fade-up mt-6 [animation-delay:300ms]">
-              <WaitlistCount />
             </div>
 
             <div className="animate-fade-up [animation-delay:360ms]">
@@ -269,7 +263,7 @@ export default function Home() {
                   {t.features.cta.body}
                 </p>
                 <a
-                  href="#waitlist"
+                  href="#download"
                   className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark active:scale-95"
                 >
                   {t.features.cta.button}
@@ -489,11 +483,8 @@ export default function Home() {
                 <p className="mt-4 text-base text-cream/75 sm:text-lg">
                   {t.finalCta.sub}
                 </p>
-                <div className="mx-auto mt-8 max-w-lg text-left">
-                  <WaitlistForm id="footer" dark />
-                </div>
-                <div className="mt-6 flex justify-center">
-                  <WaitlistCount dark />
+                <div className="mx-auto mt-8 flex max-w-lg flex-col items-center">
+                  <DownloadApp dark />
                 </div>
               </div>
             </div>

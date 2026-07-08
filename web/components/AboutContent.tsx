@@ -78,7 +78,7 @@ export default function AboutContent() {
               {t.finalCta.heading}
             </p>
             <Link
-              href="/#waitlist"
+              href="/#download"
               className="inline-flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark active:scale-95"
             >
               {t.waitlist.button}

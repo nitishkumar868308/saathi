@@ -399,7 +399,7 @@ const hinglish: Dict = {
     billYearly: "Saal",
     saveBadge: "2 mahine free",
     gstNote: "+ 18% GST",
-    reward: "🎁 Pehle 1000 waitlist users ko Saathi Plus — poora 1 saal bilkul FREE!",
+    reward: "🎁 Pehle 1000 users ko Saathi Plus — poore 3 mahine bilkul FREE!",
     plans: [
       {
         name: "Free",
@@ -435,7 +435,7 @@ const hinglish: Dict = {
         gst: true,
       },
     ],
-    note: "Waitlist ke pehle 1000 logon ko 1 saal Saathi Plus free. Baaki sabko launch pe special discount.",
+    note: "Pehle 1000 users ko 3 mahine Saathi Plus free. Dost bulao — dono ko 15 din extra Plus.",
   },
   faq: {
     heading: "Sawaal hain? Bilkul natural hai.",
@@ -742,7 +742,7 @@ const hi: Dict = {
     billYearly: "साल",
     saveBadge: "2 महीने फ्री",
     gstNote: "+ 18% GST",
-    reward: "🎁 पहले 1000 वेटलिस्ट यूज़र्स को साथी प्लस — पूरा 1 साल बिल्कुल फ्री!",
+    reward: "🎁 पहले 1000 यूज़र्स को साथी प्लस — पूरे 3 महीने बिल्कुल फ्री!",
     plans: [
       {
         name: "फ्री",
@@ -778,7 +778,7 @@ const hi: Dict = {
         gst: true,
       },
     ],
-    note: "वेटलिस्ट के पहले 1000 लोगों को 1 साल साथी प्लस फ्री। बाकी सबको लॉन्च पर स्पेशल डिस्काउंट।",
+    note: "पहले 1000 यूज़र्स को 3 महीने साथी प्लस फ्री। दोस्त बुलाइए — दोनों को 15 दिन एक्स्ट्रा प्लस।",
   },
   faq: {
     heading: "सवाल हैं? बिल्कुल स्वाभाविक है।",
@@ -1085,7 +1085,7 @@ const en: Dict = {
     billYearly: "Yearly",
     saveBadge: "2 months free",
     gstNote: "+ 18% GST",
-    reward: "🎁 First 1000 waitlist users get Saathi Plus — a full year absolutely FREE!",
+    reward: "🎁 First 1000 users get Saathi Plus — 3 full months absolutely FREE!",
     plans: [
       {
         name: "Free",
@@ -1121,7 +1121,7 @@ const en: Dict = {
         gst: true,
       },
     ],
-    note: "First 1000 waitlist users get 1 year of Saathi Plus free. Everyone else gets a special launch discount.",
+    note: "First 1000 users get 3 months of Saathi Plus free. Refer a friend — both get 15 extra days.",
   },
   faq: {
     heading: "Got questions? Totally natural.",

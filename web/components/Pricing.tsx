@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Sparkles, Gift } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { PLAY_STORE_URL } from "@/lib/links";
 
 // GST abhi comment out — humare paas GST registration nahi, isliye user se nahi lenge.
 // function gstTotal(price: string): string {
@@ -186,7 +187,7 @@ export default function Pricing() {
               secure, Google Play ke through.
             </p>
             <a
-              href="https://play.google.com/store/apps/details?id=com.saathi.app"
+              href={PLAY_STORE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
