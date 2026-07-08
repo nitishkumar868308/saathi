@@ -246,4 +246,26 @@ begin
   return 'granted';
 end;
 $$;
--- authenticated ko grant NAHI diya jaa raha (jaanbujh ke).
+
+/* ------------------------------------------------------------------ */
+/* 10. SECURITY — ye hissa bahut zaroori hai                            */
+/* ------------------------------------------------------------------ */
+--
+-- Postgres har nayi function pe PUBLIC ko EXECUTE apne aap de deta hai.
+-- `grant_plus_days` aur `admin_grant_days` SECURITY DEFINER hain — inke bina
+-- revoke ke koi bhi logged-in user `/rest/v1/rpc/grant_plus_days` call karke
+-- khud ko unlimited Plus de sakta tha. Isliye pehle sab se chheeno, phir
+-- sirf jo chahiye wahi do.
+
+revoke all on function public.grant_plus_days(uuid, int) from public, anon, authenticated;
+revoke all on function public.admin_grant_days(text, int) from public, anon, authenticated;
+-- Ye dono ab sirf service_role (admin API) se chalti hain.
+
+-- User-facing RPCs: anon se chheeno, sirf logged-in user ko do.
+revoke all on function public.claim_first_n_reward() from public, anon;
+revoke all on function public.apply_referral_code(text) from public, anon;
+revoke all on function public.check_referral_qualification() from public, anon;
+
+grant execute on function public.claim_first_n_reward() to authenticated;
+grant execute on function public.apply_referral_code(text) to authenticated;
+grant execute on function public.check_referral_qualification() to authenticated;

@@ -31,29 +31,58 @@ function headers(extra?: Record<string, string>) {
   };
 }
 
+/**
+ * Chup-chaap fail mat hone do. Pehle ye galti thi: env na hone pe setConfig
+ * kuch nahi karta tha par route `ok: true` lauta deta tha — "save hua" dikhta
+ * tha, hota kuch nahi tha.
+ */
+export class RewardsNotConfigured extends Error {
+  constructor() {
+    super(
+      "Supabase env missing (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY). Web ke env me set karo.",
+    );
+    this.name = "RewardsNotConfigured";
+  }
+}
+
+function assertConfigured() {
+  if (!rewardsDbConfigured()) throw new RewardsNotConfigured();
+}
+
+/** Supabase ki asli error message aage bhejo — "read failed" se kuch pata nahi chalta. */
+async function fail(what: string, res: Response): Promise<never> {
+  const body = await res.text().catch(() => "");
+  if (res.status === 404 || /does not exist|schema cache/i.test(body)) {
+    throw new Error(
+      `${what}: table/function nahi mila. Supabase me 'supabase/rewards-referrals.sql' run kiya?`,
+    );
+  }
+  throw new Error(`${what}: ${res.status} ${body.slice(0, 300)}`);
+}
+
 /** Saara config padho (app_config table). */
 export async function getConfig(): Promise<Partial<ConfigMap>> {
-  if (!rewardsDbConfigured()) return {};
+  assertConfigured();
   const res = await fetch(`${SUPABASE_URL}/rest/v1/app_config?select=key,value`, {
     headers: headers(),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`config read failed: ${res.status}`);
+  if (!res.ok) await fail("config read", res);
   const rows = (await res.json()) as { key: string; value: unknown }[];
   const out: Record<string, unknown> = {};
   for (const r of rows) out[r.key] = r.value;
   return out as Partial<ConfigMap>;
 }
 
-/** Sirf known keys likhta hai (upsert). */
+/** Sirf known keys likhta hai (upsert). Kuch na likhe to error. */
 export async function setConfig(patch: Partial<ConfigMap>): Promise<void> {
-  if (!rewardsDbConfigured()) return;
+  assertConfigured();
   const rows = CONFIG_KEYS.filter((k) => patch[k] !== undefined).map((k) => ({
     key: k,
     value: patch[k],
     updated_at: new Date().toISOString(),
   }));
-  if (rows.length === 0) return;
+  if (rows.length === 0) throw new Error("koi valid config key nahi mili");
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/app_config?on_conflict=key`, {
     method: "POST",
@@ -63,19 +92,19 @@ export async function setConfig(patch: Partial<ConfigMap>): Promise<void> {
     body: JSON.stringify(rows),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`config write failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) await fail("config write", res);
 }
 
 /** Kisi user ko manually N din Plus do (RPC). */
 export async function adminGrantDays(email: string, days: number): Promise<string> {
-  if (!rewardsDbConfigured()) return "not_configured";
+  assertConfigured();
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_grant_days`, {
     method: "POST",
     headers: headers(),
     body: JSON.stringify({ p_email: email, p_days: days }),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`grant failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) await fail("grant", res);
   return (await res.json()) as string; // 'granted' | 'user_not_found'
 }
 
@@ -88,9 +117,7 @@ export type RewardStats = {
 
 /** Dashboard ke numbers. */
 export async function getRewardStats(): Promise<RewardStats> {
-  if (!rewardsDbConfigured()) {
-    return { totalUsers: 0, firstNGranted: 0, referralsTotal: 0, referralsRewarded: 0 };
-  }
+  assertConfigured();
 
   async function count(query: string): Promise<number> {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${query}`, {

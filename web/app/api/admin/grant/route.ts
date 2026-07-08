@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin";
-import { adminGrantDays } from "@/lib/rewards-server";
+import { adminGrantDays, RewardsNotConfigured } from "@/lib/rewards-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     console.error("[admin/grant]", err);
-    return NextResponse.json({ error: "grant failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "grant failed" },
+      { status: err instanceof RewardsNotConfigured ? 503 : 500 },
+    );
   }
 }

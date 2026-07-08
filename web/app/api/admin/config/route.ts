@@ -4,6 +4,7 @@ import {
   getConfig,
   setConfig,
   getRewardStats,
+  RewardsNotConfigured,
   CONFIG_KEYS,
   type ConfigMap,
 } from "@/lib/rewards-server";
@@ -20,7 +21,10 @@ export async function GET() {
     return NextResponse.json({ config, stats });
   } catch (err) {
     console.error("[admin/config] GET", err);
-    return NextResponse.json({ error: "read failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "read failed" },
+      { status: err instanceof RewardsNotConfigured ? 503 : 500 },
+    );
   }
 }
 
@@ -58,6 +62,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ ok: true, config });
   } catch (err) {
     console.error("[admin/config] PUT", err);
-    return NextResponse.json({ error: "write failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "write failed" },
+      { status: err instanceof RewardsNotConfigured ? 503 : 500 },
+    );
   }
 }
