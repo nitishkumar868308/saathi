@@ -7,13 +7,12 @@ import {
   useReducedMotion,
 } from "framer-motion";
 import { Upload, ScanText, BellRing, Check, FileText } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 const STAGES = [
   {
     key: "upload",
     icon: Upload,
-    title: "Upload",
-    caption: "Document ki photo daali",
     accent: "text-terracotta",
     ring: "ring-terracotta/25",
     dot: "bg-terracotta",
@@ -21,8 +20,6 @@ const STAGES = [
   {
     key: "read",
     icon: ScanText,
-    title: "AI Read",
-    caption: "Saathi ne padha & samjha",
     accent: "text-amber-warm",
     ring: "ring-amber-warm/25",
     dot: "bg-amber-warm",
@@ -30,8 +27,6 @@ const STAGES = [
   {
     key: "reminder",
     icon: BellRing,
-    title: "Reminder Created",
-    caption: "Expiry se pehle yaad dila denge",
     accent: "text-sage",
     ring: "ring-sage/25",
     dot: "bg-sage",
@@ -39,6 +34,7 @@ const STAGES = [
 ] as const;
 
 export default function LiveDemo() {
+  const { demo } = useT();
   const reduce = useReducedMotion();
   const [active, setActive] = useState(0);
 
@@ -72,6 +68,7 @@ export default function LiveDemo() {
         />
 
         {STAGES.map((s, i) => {
+          const step = demo.steps[i];
           const on = i <= active;
           const isCurrent = i === active;
           const Icon = s.icon;
@@ -99,10 +96,10 @@ export default function LiveDemo() {
                   on ? "text-ink" : "text-ink-soft/50"
                 }`}
               >
-                {s.title}
+                {step.title}
               </span>
               <span className="mt-0.5 hidden text-xs text-ink-soft sm:block">
-                {s.caption}
+                {step.caption}
               </span>
             </div>
           );
@@ -168,7 +165,7 @@ export default function LiveDemo() {
                     Reminder set — 3 alerts
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {["1 mahina pehle", "1 hafta pehle", "Expiry ke din"].map(
+                    {demo.alerts.map(
                       (t) => (
                         <span
                           key={t}

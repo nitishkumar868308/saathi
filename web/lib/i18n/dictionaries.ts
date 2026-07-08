@@ -73,7 +73,13 @@ type Dict = {
     items: { title: string; body: string }[];
     cta: { title: string; body: string; button: string };
   };
-  demo: { badge: string; heading: string; sub: string };
+  demo: {
+    badge: string;
+    heading: string;
+    sub: string;
+    steps: { title: string; caption: string }[];
+    alerts: string[];
+  };
   how: {
     heading: string;
     sub: string;
@@ -313,6 +319,12 @@ const hinglish: Dict = {
     badge: "Live demo",
     heading: "Photo se reminder tak — 3 second mein",
     sub: "Dekho Saathi kaise ek document ko samajhke khud reminder bana deta hai.",
+    steps: [
+      { title: "Upload", caption: "Document ki photo daali" },
+      { title: "AI Read", caption: "Saathi ne padha & samjha" },
+      { title: "Reminder Created", caption: "Expiry se pehle yaad dila denge" },
+    ],
+    alerts: ["1 mahina pehle", "1 hafta pehle", "Expiry ke din"],
   },
   how: {
     heading: "Kaise kaam karta hai",
@@ -687,6 +699,12 @@ const hi: Dict = {
     badge: "लाइव डेमो",
     heading: "फोटो से reminder तक — 3 सेकंड में",
     sub: "देखिए साथी कैसे एक डॉक्युमेंट को समझकर खुद reminder बना देता है।",
+    steps: [
+      { title: "अपलोड", caption: "डॉक्यूमेंट की फ़ोटो डाली" },
+      { title: "AI ने पढ़ा", caption: "साथी ने पढ़ा और समझा" },
+      { title: "रिमाइंडर बना", caption: "एक्सपायरी से पहले याद दिला देंगे" },
+    ],
+    alerts: ["1 महीना पहले", "1 हफ़्ता पहले", "एक्सपायरी के दिन"],
   },
   how: {
     heading: "कैसे काम करता है",
@@ -1061,6 +1079,12 @@ const en: Dict = {
     badge: "Live demo",
     heading: "From photo to reminder — in 3 seconds",
     sub: "Watch Saathi understand a document and create the reminder itself.",
+    steps: [
+      { title: "Upload", caption: "You add a photo of the document" },
+      { title: "AI Read", caption: "Saathi reads and understands it" },
+      { title: "Reminder Created", caption: "We'll remind you before it expires" },
+    ],
+    alerts: ["1 month before", "1 week before", "On expiry day"],
   },
   how: {
     heading: "How it works",
