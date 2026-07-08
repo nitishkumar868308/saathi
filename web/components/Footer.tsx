@@ -67,6 +67,7 @@ export default function Footer() {
                 [t.links.pricing, "/#pricing"],
                 [t.links.faq, "/#faq"],
                 [t.links.about, "/about"],
+                ["Dost bulao 🎁", "/referral"],
               ].map(([label, href]) => (
                 <li key={href}>
                   <a href={href} className={linkCls(href)}>

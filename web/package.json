@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.109.0",
     "framer-motion": "^11.18.2",
     "lucide-react": "^0.428.0",
     "next": "^14.2.35",

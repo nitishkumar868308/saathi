@@ -48,6 +48,28 @@ Ye sab live change kar sakte ho (DB `app_config` table):
 
 Saath me **"Manually Plus din do"** — email + din daal ke kisi ko bhi din grant/extend kar sakte ho.
 
+## Web se referral share (`/referral`)
+User apne **app wale hi account** se web pe login karke apna code/link share kar sakta hai
+(copy, WhatsApp, native share) aur stats dekh sakta hai.
+
+Iske liye web env me ye **do naye** vars chahiye:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
+⚠️ **Anon key hi daalna** — service-role key browser me chali jayegi. Anon key public
+safe hai; suraksha RLS se aati hai (`profiles` own-row, `referrals` own-row).
+
+Google login web pe chahiye to Supabase → Authentication → URL Configuration me
+`https://apkasaathi.com/referral` ko redirect URL me add karo. (Email/password bina
+kisi extra setup ke chalta hai.)
+
+## Offer copy dynamic hai
+Admin se numbers badalte hi **web aur app dono ka text** khud badal jaata hai —
+koi deploy nahi chahiye. Offer band karo to uska banner/row poori tarah gayab.
+- Web: `lib/offers.ts` → `/api/offers` → `useOffers()`
+- App: `plan.getOffers()` → `use-offers.ts`
+
 ## Setup (order me)
 1. Supabase SQL Editor me run karo: **`supabase/rewards-referrals.sql`**
 2. `ai` edge function deploy karo (chat record + stub reply ke liye):
