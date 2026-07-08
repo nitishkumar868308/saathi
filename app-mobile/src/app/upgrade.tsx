@@ -156,7 +156,7 @@ export default function Upgrade() {
             <View style={styles.reward}>
               <Ionicons name="gift" size={18} color={colors.terracotta} />
               <Text style={styles.rewardText}>
-                Pehle 1000 waitlist users ko Saathi Plus 1 saal FREE!
+                Pehle 1000 users ko Saathi Plus 3 mahine FREE!
               </Text>
             </View>
 
