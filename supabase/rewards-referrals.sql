@@ -49,6 +49,13 @@ alter table public.profiles add column if not exists referred_by uuid references
 alter table public.profiles add column if not exists referral_days_earned int not null default 0;
 alter table public.profiles add column if not exists first_n_granted boolean not null default false;
 
+-- First-N ka poora record. Config badalta rehta hai (1000 -> 100, 3 mahine -> 1),
+-- isliye jo us waqt mila tha wo yahin freeze kar dete hain — warna history jhooth
+-- bolne lagegi.
+alter table public.profiles add column if not exists first_n_rank int;
+alter table public.profiles add column if not exists first_n_days int;
+alter table public.profiles add column if not exists first_n_granted_at timestamptz;
+
 -- Anti-fraud checks ke liye ownership chahiye.
 alter table public.documents add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.messages  add column if not exists user_id uuid references auth.users(id) on delete cascade;
@@ -71,6 +78,13 @@ create table if not exists public.referrals (
 );
 create index if not exists referrals_referrer_idx on public.referrals(referrer_id);
 
+-- Kitne din KIS WAQT diye the. Config kal badal sakta hai — reward ke waqt
+-- ka number yahin likh dete hain, taki "kab kitna mila" hamesha sach rahe.
+alter table public.referrals add column if not exists referrer_days int not null default 0;
+alter table public.referrals add column if not exists referee_days  int not null default 0;
+-- referrer cap (6 mahine) pe pahunch gaya tha, isliye usko din nahi mile
+alter table public.referrals add column if not exists cap_skipped boolean not null default false;
+
 alter table public.referrals enable row level security;
 drop policy if exists "own referrals" on public.referrals;
 create policy "own referrals" on public.referrals for select
@@ -86,7 +100,12 @@ create policy "own referrals" on public.referrals for select
 -- "abhi active, expiry set nahi"). Purana code us null ko `now()` maan leta tha,
 -- to referral ke 15 din milte hi uska Plus `now() + 15 din` ho jaata tha —
 -- yaani paid plan CHHOTA ho jaata tha. Ab null wale ko null hi rehne dete hain.
-create or replace function public.grant_plus_days(p_uid uuid, p_days int)
+-- Purana 2-arg version hata do, warna 3-arg add karne pe call ambiguous ho jaata hai.
+drop function if exists public.grant_plus_days(uuid, int);
+
+create or replace function public.grant_plus_days(
+  p_uid uuid, p_days int, p_source text default null
+)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   update public.profiles
@@ -97,7 +116,12 @@ begin
            else greatest(coalesce(plan_expires_at, now()), now())
                 + make_interval(days => p_days)
          end,
-         plan_source = coalesce(plan_source, 'reward')
+         -- Paid source sabse upar — reward ke din add hone se "google_play"
+         -- kabhi "referral" nahi ban jaana chahiye.
+         plan_source = case
+           when plan_source = 'google_play' then plan_source
+           else coalesce(p_source, plan_source, 'reward')
+         end
    where id = p_uid;
 end;
 $$;
@@ -154,8 +178,10 @@ begin
     return 'already';
   end if;
 
+  -- Rank har baar ABHI ke config ke against nikalte hain. Admin 1000 -> 100
+  -- kare to logic khud badal jaata hai; koi hardcoded number nahi.
   select rnk into urank from (
-    select id, row_number() over (order by created_at asc) as rnk
+    select id, row_number() over (order by created_at asc, id asc) as rnk
     from public.profiles
   ) t where t.id = auth.uid();
 
@@ -164,8 +190,13 @@ begin
   end if;
 
   months := public.cfg_int('first_n_free_months', 3);
-  perform public.grant_plus_days(auth.uid(), months * 30);
-  update public.profiles set first_n_granted = true where id = auth.uid();
+  perform public.grant_plus_days(auth.uid(), months * 30, 'first_n');
+  update public.profiles
+     set first_n_granted    = true,
+         first_n_rank       = urank,
+         first_n_days       = months * 30,
+         first_n_granted_at = now()
+   where id = auth.uid();
   return 'granted';
 end;
 $$;
@@ -204,9 +235,10 @@ grant execute on function public.apply_referral_code(text) to authenticated;
 
 create or replace function public.check_referral_qualification()
 returns text language plpgsql security definer set search_path = public as $$
-declare r record; days int; cap_days int; earned int;
+declare r record; days int; cap_days int; earned int; gave_referrer int := 0; skipped boolean := false;
 begin
   if auth.uid() is null then return 'no_auth'; end if;
+  if not public.cfg_bool('referrals_enabled', true) then return 'disabled'; end if;
 
   select * into r from public.referrals
    where referee_id = auth.uid() and rewarded_at is null;
@@ -226,16 +258,25 @@ begin
 
   select referral_days_earned into earned from public.profiles where id = r.referrer_id;
   if coalesce(earned, 0) + days <= cap_days then
-    perform public.grant_plus_days(r.referrer_id, days);
+    perform public.grant_plus_days(r.referrer_id, days, 'referral');
     update public.profiles set referral_days_earned = coalesce(earned, 0) + days
      where id = r.referrer_id;
+    gave_referrer := days;
+  else
+    skipped := true;   -- referrer cap pe pahunch gaya
   end if;
 
   -- Naye user ko hamesha (uska ek-baar ka reward)
-  perform public.grant_plus_days(auth.uid(), days);
+  perform public.grant_plus_days(auth.uid(), days, 'referral');
 
+  -- Aaj ke din ke numbers yahin freeze — kal admin 15 ko 30 kar de to bhi
+  -- ye referral 15 hi dikhega.
   update public.referrals
-     set qualified_at = coalesce(qualified_at, now()), rewarded_at = now()
+     set qualified_at  = coalesce(qualified_at, now()),
+         rewarded_at   = now(),
+         referrer_days = gave_referrer,
+         referee_days  = days,
+         cap_skipped   = skipped
    where id = r.id;
   return 'rewarded';
 end;
@@ -252,8 +293,120 @@ declare uid uuid;
 begin
   select id into uid from public.profiles where lower(email) = lower(trim(p_email));
   if uid is null then return 'user_not_found'; end if;
-  perform public.grant_plus_days(uid, p_days);
+  perform public.grant_plus_days(uid, p_days, 'admin');
   return 'granted';
+end;
+$$;
+
+/* ------------------------------------------------------------------ */
+/* 9b. Email masking — referrer ko referee ka poora email na dikhe      */
+/* ------------------------------------------------------------------ */
+
+create or replace function public.mask_email(e text)
+returns text language sql immutable as $$
+  select case
+    when e is null or position('@' in e) = 0 then null
+    else left(split_part(e, '@', 1), 2) || '••••@' || split_part(e, '@', 2)
+  end;
+$$;
+
+/* ------------------------------------------------------------------ */
+/* 9c. my_rewards() — app ki "Meri membership" screen ka poora data     */
+/* ------------------------------------------------------------------ */
+--
+-- Ek hi call me: kab aaye, plan kya hai, kab tak, kis wajah se, first-N se
+-- kitne din, referral se kitne din, aur kis-kis ko refer kiya (kisse mila,
+-- kisse abhi nahi mila).
+create or replace function public.my_rewards()
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); res jsonb;
+begin
+  if uid is null then return null; end if;
+
+  select jsonb_build_object(
+    'joined_at',            p.created_at,
+    'plan',                 p.plan,
+    'plan_expires_at',      p.plan_expires_at,
+    'plan_source',          p.plan_source,
+    'first_n_granted',      p.first_n_granted,
+    'first_n_rank',         p.first_n_rank,
+    'first_n_days',         p.first_n_days,
+    'first_n_granted_at',   p.first_n_granted_at,
+    'referral_code',        p.referral_code,
+    'referral_days_earned', p.referral_days_earned,
+    'referred_by_code',     (select referral_code from public.profiles where id = p.referred_by),
+    -- live config (badal sakta hai)
+    'referral_days_now',    public.cfg_int('referral_days', 15),
+    'cap_days',             public.cfg_int('referral_cap_months', 6) * 30,
+    'referrals_enabled',    public.cfg_bool('referrals_enabled', true),
+    'referrals', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id',           r.id,
+        'name',         rp.full_name,
+        'email',        public.mask_email(rp.email),
+        'joined_at',    r.created_at,
+        'qualified_at', r.qualified_at,
+        'rewarded_at',  r.rewarded_at,
+        'days',         r.referrer_days,
+        'cap_skipped',  r.cap_skipped
+      ) order by r.created_at desc)
+      from public.referrals r
+      left join public.profiles rp on rp.id = r.referee_id
+      where r.referrer_id = uid
+    ), '[]'::jsonb)
+  ) into res
+  from public.profiles p where p.id = uid;
+
+  return res;
+end;
+$$;
+
+/* ------------------------------------------------------------------ */
+/* 9d. admin_user_detail() — sirf service_role. Poore email dikhte hain */
+/* ------------------------------------------------------------------ */
+
+create or replace function public.admin_user_detail(p_uid uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare res jsonb;
+begin
+  select jsonb_build_object(
+    'id',                   p.id,
+    'email',                p.email,
+    'full_name',            p.full_name,
+    'joined_at',            p.created_at,
+    'plan',                 p.plan,
+    'plan_expires_at',      p.plan_expires_at,
+    'plan_source',          p.plan_source,
+    'first_n_granted',      p.first_n_granted,
+    'first_n_rank',         p.first_n_rank,
+    'first_n_days',         p.first_n_days,
+    'first_n_granted_at',   p.first_n_granted_at,
+    'referral_code',        p.referral_code,
+    'referral_days_earned', p.referral_days_earned,
+    'referred_by', (
+      select jsonb_build_object('email', rb.email, 'code', rb.referral_code)
+      from public.profiles rb where rb.id = p.referred_by
+    ),
+    'cap_days', public.cfg_int('referral_cap_months', 6) * 30,
+    'referrals', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id',           r.id,
+        'email',        rp.email,
+        'name',         rp.full_name,
+        'joined_at',    r.created_at,
+        'qualified_at', r.qualified_at,
+        'rewarded_at',  r.rewarded_at,
+        'days',         r.referrer_days,
+        'cap_skipped',  r.cap_skipped
+      ) order by r.created_at desc)
+      from public.referrals r
+      left join public.profiles rp on rp.id = r.referee_id
+      where r.referrer_id = p.id
+    ), '[]'::jsonb)
+  ) into res
+  from public.profiles p where p.id = p_uid;
+
+  return res;
 end;
 $$;
 
@@ -267,15 +420,35 @@ $$;
 -- khud ko unlimited Plus de sakta tha. Isliye pehle sab se chheeno, phir
 -- sirf jo chahiye wahi do.
 
-revoke all on function public.grant_plus_days(uuid, int) from public, anon, authenticated;
-revoke all on function public.admin_grant_days(text, int) from public, anon, authenticated;
--- Ye dono ab sirf service_role (admin API) se chalti hain.
+revoke all on function public.grant_plus_days(uuid, int, text) from public, anon, authenticated;
+revoke all on function public.admin_grant_days(text, int)      from public, anon, authenticated;
+revoke all on function public.admin_user_detail(uuid)          from public, anon, authenticated;
+-- Ye teeno ab sirf service_role (admin API) se chalti hain.
 
 -- User-facing RPCs: anon se chheeno, sirf logged-in user ko do.
 revoke all on function public.claim_first_n_reward() from public, anon;
 revoke all on function public.apply_referral_code(text) from public, anon;
 revoke all on function public.check_referral_qualification() from public, anon;
+revoke all on function public.my_rewards() from public, anon;
 
 grant execute on function public.claim_first_n_reward() to authenticated;
 grant execute on function public.apply_referral_code(text) to authenticated;
 grant execute on function public.check_referral_qualification() to authenticated;
+grant execute on function public.my_rewards() to authenticated;
+
+/* ------------------------------------------------------------------ */
+/* 11. Backfill — purane rewarded referrals ke din bhar do             */
+/* ------------------------------------------------------------------ */
+-- Naye columns default 0 hain. Jo referral pehle se rewarded hai uske liye
+-- abhi ka config hi sabse achha andaaza hai. (Sirf ek baar chalega — jinke
+-- din 0 hain unhi pe.)
+update public.referrals
+   set referrer_days = public.cfg_int('referral_days', 15),
+       referee_days  = public.cfg_int('referral_days', 15)
+ where rewarded_at is not null and referrer_days = 0 and referee_days = 0;
+
+-- Jinko first-N mila tha par record nahi bana
+update public.profiles
+   set first_n_days       = coalesce(first_n_days, public.cfg_int('first_n_free_months', 3) * 30),
+       first_n_granted_at = coalesce(first_n_granted_at, created_at)
+ where first_n_granted;

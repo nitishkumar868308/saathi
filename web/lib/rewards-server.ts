@@ -147,6 +147,50 @@ export async function getUsers(limit = 500): Promise<AdminUser[]> {
   }));
 }
 
+export type UserReferral = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  joined_at: string;
+  qualified_at: string | null;
+  rewarded_at: string | null;
+  /** Grant ke waqt jitne din diye the — config baad me badle to bhi yahi. */
+  days: number;
+  cap_skipped: boolean;
+};
+
+export type UserDetail = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  joined_at: string;
+  plan: "free" | "plus";
+  plan_expires_at: string | null;
+  plan_source: string | null;
+  first_n_granted: boolean;
+  first_n_rank: number | null;
+  first_n_days: number | null;
+  first_n_granted_at: string | null;
+  referral_code: string | null;
+  referral_days_earned: number;
+  referred_by: { email: string | null; code: string | null } | null;
+  cap_days: number;
+  referrals: UserReferral[];
+};
+
+/** Ek user ka poora record — kisko refer kiya, kab, kitne din. */
+export async function getUserDetail(uid: string): Promise<UserDetail | null> {
+  assertConfigured();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_user_detail`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ p_uid: uid }),
+    cache: "no-store",
+  });
+  if (!res.ok) await fail("user detail", res);
+  return (await res.json()) as UserDetail | null;
+}
+
 export type RewardStats = {
   totalUsers: number;
   firstNGranted: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Users as UsersIcon,
   Search,
@@ -9,6 +9,10 @@ import {
   AlertTriangle,
   Crown,
   Infinity as InfinityIcon,
+  ChevronDown,
+  Check,
+  Clock,
+  Ban,
 } from "lucide-react";
 
 type AdminUser = {
@@ -24,6 +28,36 @@ type AdminUser = {
   createdAt: string;
 };
 
+type UserReferral = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  joined_at: string;
+  qualified_at: string | null;
+  rewarded_at: string | null;
+  days: number;
+  cap_skipped: boolean;
+};
+
+type UserDetail = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  joined_at: string;
+  plan: "free" | "plus";
+  plan_expires_at: string | null;
+  plan_source: string | null;
+  first_n_granted: boolean;
+  first_n_rank: number | null;
+  first_n_days: number | null;
+  first_n_granted_at: string | null;
+  referral_code: string | null;
+  referral_days_earned: number;
+  referred_by: { email: string | null; code: string | null } | null;
+  cap_days: number;
+  referrals: UserReferral[];
+};
+
 /* ------------------------------ helpers ------------------------------ */
 
 function fmtDate(iso: string | null): string {
@@ -36,13 +70,13 @@ function fmtDate(iso: string | null): string {
 }
 
 /**
- * Plus + plan_expires_at === null  => lifetime / active subscription.
+ * Plus + plan_expires_at === null  => lifetime / chalti hui subscription.
  * Plus + future date              => tab tak active.
  * Plus + past date                => expire ho chuka (DB abhi bhi 'plus' keh sakta hai).
  */
 type Status = { label: string; tone: "plus" | "free" | "expired"; lifetime: boolean };
 
-function statusOf(u: AdminUser): Status {
+function statusOf(u: { plan: string; planExpiresAt: string | null }): Status {
   if (u.plan !== "plus") return { label: "Free", tone: "free", lifetime: false };
   if (!u.planExpiresAt) return { label: "Plus", tone: "plus", lifetime: true };
   const expired = new Date(u.planExpiresAt).getTime() < Date.now();
@@ -59,10 +93,7 @@ const SOURCE_LABEL: Record<string, string> = {
   admin: "Admin grant",
 };
 
-function sourceLabel(s: string | null): string {
-  if (!s) return "—";
-  return SOURCE_LABEL[s] ?? s;
-}
+const sourceLabel = (s: string | null) => (s ? (SOURCE_LABEL[s] ?? s) : "—");
 
 function toCsv(rows: string[][]): string {
   return rows
@@ -87,6 +118,7 @@ export default function AdminUsers() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "plus" | "free">("all");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError("");
@@ -152,6 +184,8 @@ export default function AdminUsers() {
     );
   }
 
+  const toggle = (id: string) => setOpenId((cur) => (cur === id ? null : id));
+
   if (!users) {
     return (
       <div className="flex justify-center py-16">
@@ -175,7 +209,6 @@ export default function AdminUsers() {
         <Stat label="First-N mila" value={stats.firstN} />
       </div>
 
-      {/* Search + filter + export */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search
@@ -236,39 +269,58 @@ export default function AdminUsers() {
                   <Th>Joined</Th>
                   <Th>Active till</Th>
                   <Th className="text-right">Referral din</Th>
+                  <Th className="w-10" />
                 </tr>
               </thead>
               <tbody>
                 {rows.map((u) => {
                   const st = statusOf(u);
+                  const open = openId === u.id;
                   return (
-                    <tr
-                      key={u.id}
-                      className="border-b border-line/60 transition last:border-0 hover:bg-cream-deep/20"
-                    >
-                      <td className="px-4 py-3.5">
-                        <p className="font-semibold text-ink">{u.fullName || "—"}</p>
-                        <p className="text-xs text-ink-soft">{u.email ?? "—"}</p>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <PlanBadge status={st} />
-                      </td>
-                      <td className="px-4 py-3.5 text-ink-soft">{sourceLabel(u.planSource)}</td>
-                      <td className="px-4 py-3.5 text-ink-soft">{fmtDate(u.createdAt)}</td>
-                      <td className="px-4 py-3.5 text-ink-soft">
-                        {st.lifetime ? (
-                          <span className="inline-flex items-center gap-1.5 font-medium text-sage">
-                            <InfinityIcon size={14} />
-                            Unlimited
-                          </span>
-                        ) : (
-                          fmtDate(u.planExpiresAt)
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-ink">
-                        {u.referralDaysEarned}
-                      </td>
-                    </tr>
+                    <Fragment key={u.id}>
+                      <tr
+                        onClick={() => toggle(u.id)}
+                        className={`cursor-pointer border-b border-line/60 transition hover:bg-cream-deep/20 ${
+                          open ? "bg-cream-deep/25" : ""
+                        }`}
+                      >
+                        <td className="px-4 py-3.5">
+                          <p className="font-semibold text-ink">{u.fullName || "—"}</p>
+                          <p className="text-xs text-ink-soft">{u.email ?? "—"}</p>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <PlanBadge status={st} />
+                        </td>
+                        <td className="px-4 py-3.5 text-ink-soft">{sourceLabel(u.planSource)}</td>
+                        <td className="px-4 py-3.5 text-ink-soft">{fmtDate(u.createdAt)}</td>
+                        <td className="px-4 py-3.5 text-ink-soft">
+                          {st.lifetime ? (
+                            <span className="inline-flex items-center gap-1.5 font-medium text-sage">
+                              <InfinityIcon size={14} />
+                              Unlimited
+                            </span>
+                          ) : (
+                            fmtDate(u.planExpiresAt)
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-semibold text-ink">
+                          {u.referralDaysEarned}
+                        </td>
+                        <td className="px-3 py-3.5 text-ink-soft">
+                          <ChevronDown
+                            size={16}
+                            className={`transition-transform ${open ? "rotate-180" : ""}`}
+                          />
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr className="border-b border-line/60">
+                          <td colSpan={7} className="bg-cream-deep/10 px-4 py-5">
+                            <Detail id={u.id} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -279,34 +331,50 @@ export default function AdminUsers() {
           <div className="space-y-3 lg:hidden">
             {rows.map((u) => {
               const st = statusOf(u);
+              const open = openId === u.id;
               return (
-                <div
-                  key={u.id}
-                  className="rounded-3xl border border-line bg-surface p-4 shadow-soft"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-ink">{u.fullName || "—"}</p>
-                      <p className="truncate text-xs text-ink-soft">{u.email ?? "—"}</p>
+                <div key={u.id} className="rounded-3xl border border-line bg-surface shadow-soft">
+                  <button
+                    onClick={() => toggle(u.id)}
+                    className="w-full p-4 text-left"
+                    aria-expanded={open}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-ink">{u.fullName || "—"}</p>
+                        <p className="truncate text-xs text-ink-soft">{u.email ?? "—"}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <PlanBadge status={st} />
+                        <ChevronDown
+                          size={16}
+                          className={`text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}
+                        />
+                      </div>
                     </div>
-                    <PlanBadge status={st} />
-                  </div>
-                  <dl className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-3.5 text-xs">
-                    <Field label="Joined" value={fmtDate(u.createdAt)} />
-                    <Field
-                      label="Active till"
-                      value={st.lifetime ? "Unlimited" : fmtDate(u.planExpiresAt)}
-                    />
-                    <Field label="Source" value={sourceLabel(u.planSource)} />
-                    <Field label="Referral din" value={String(u.referralDaysEarned)} />
-                  </dl>
+                    <dl className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-3.5 text-xs">
+                      <Field label="Joined" value={fmtDate(u.createdAt)} />
+                      <Field
+                        label="Active till"
+                        value={st.lifetime ? "Unlimited" : fmtDate(u.planExpiresAt)}
+                      />
+                      <Field label="Source" value={sourceLabel(u.planSource)} />
+                      <Field label="Referral din" value={String(u.referralDaysEarned)} />
+                    </dl>
+                  </button>
+                  {open && (
+                    <div className="border-t border-line bg-cream-deep/10 p-4">
+                      <Detail id={u.id} />
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           <p className="text-xs text-ink-soft">
-            {rows.length} me se {users.length} users dikh rahe hain. (Zyada se zyada 500 latest.)
+            {users.length} me se {rows.length} users dikh rahe hain. (Zyada se zyada 500 latest.)
+            Row pe click karo — poora referral history khulega.
           </p>
         </>
       )}
@@ -314,9 +382,173 @@ export default function AdminUsers() {
   );
 }
 
+/* ---------------------------- Detail panel ---------------------------- */
+
+/** Lazy — sirf expand karne pe fetch hota hai, list me har user ke liye nahi. */
+function Detail({ id }: { id: string }) {
+  const [detail, setDetail] = useState<UserDetail | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/users/${id}`, { cache: "no-store" });
+        const body = (await res.json()) as { detail?: UserDetail; error?: string };
+        if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+        if (alive) setDetail(body.detail ?? null);
+      } catch (e) {
+        if (alive) setError(e instanceof Error ? e.message : "Detail load nahi hui");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (error) return <p className="text-sm text-terracotta-dark">{error}</p>;
+  if (!detail) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="animate-spin text-terracotta" size={20} />
+      </div>
+    );
+  }
+
+  const capPct = Math.min(
+    100,
+    Math.round((detail.referral_days_earned / Math.max(1, detail.cap_days)) * 100),
+  );
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      {/* Left: facts */}
+      <div className="space-y-2.5">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-ink-soft">Details</h4>
+        <DetailRow label="Referral code" value={detail.referral_code ?? "—"} mono />
+        <DetailRow
+          label="Kis code se aaya"
+          value={
+            detail.referred_by
+              ? `${detail.referred_by.code ?? "—"} (${detail.referred_by.email ?? "—"})`
+              : "Kisi ne refer nahi kiya"
+          }
+        />
+        <DetailRow
+          label="First-N offer"
+          value={
+            detail.first_n_granted
+              ? `#${detail.first_n_rank ?? "?"} · ${detail.first_n_days ?? 0} din · ${fmtDate(detail.first_n_granted_at)}`
+              : "Nahi mila"
+          }
+        />
+        <DetailRow
+          label="Plan khatam"
+          value={
+            detail.plan === "plus" && !detail.plan_expires_at
+              ? "Unlimited"
+              : fmtDate(detail.plan_expires_at)
+          }
+        />
+
+        <div className="pt-1.5">
+          <div className="flex items-baseline justify-between text-xs">
+            <span className="text-ink-soft">Referral cap</span>
+            <span className="font-semibold text-ink">
+              {detail.referral_days_earned} / {detail.cap_days} din
+            </span>
+          </div>
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line">
+            <div className="h-full rounded-full bg-sage" style={{ width: `${capPct}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Right: kisko refer kiya */}
+      <div>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-ink-soft">
+          Kisko refer kiya ({detail.referrals.length})
+        </h4>
+        {detail.referrals.length === 0 ? (
+          <p className="mt-3 rounded-2xl border border-line bg-surface px-4 py-5 text-center text-sm text-ink-soft">
+            Abhi kisi ne iske code se join nahi kiya.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {detail.referrals.map((r) => (
+              <ReferralItem key={r.id} r={r} />
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReferralItem({ r }: { r: UserReferral }) {
+  const done = Boolean(r.rewarded_at);
+  // Rewarded par 0 din = us waqt referrer cap bhar chuka tha.
+  const tone = !done ? "pending" : r.cap_skipped ? "capped" : "done";
+
+  const Icon = tone === "done" ? Check : tone === "capped" ? Ban : Clock;
+  const iconCls =
+    tone === "done"
+      ? "bg-sage text-white"
+      : tone === "capped"
+        ? "bg-amber-warm/25 text-ink-soft"
+        : "bg-cream-deep text-ink-soft";
+
+  const note =
+    tone === "done"
+      ? `${fmtDate(r.rewarded_at)} · +${r.days} din`
+      : tone === "capped"
+        ? `${fmtDate(r.rewarded_at)} · cap bhar chuka tha, din nahi mile`
+        : `Joined ${fmtDate(r.joined_at)} · document + chat pending`;
+
+  return (
+    <li className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5">
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${iconCls}`}
+      >
+        <Icon size={14} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-ink">
+          {r.name?.trim() || r.email || "—"}
+        </p>
+        <p className="truncate text-xs text-ink-soft">{note}</p>
+      </div>
+      {tone === "done" && (
+        <span className="shrink-0 text-sm font-bold text-sage">+{r.days}</span>
+      )}
+    </li>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-sm">
+      <span className="shrink-0 text-ink-soft">{label}</span>
+      <span
+        className={`min-w-0 truncate text-right font-semibold text-ink ${mono ? "tracking-wider" : ""}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 /* ------------------------------- bits -------------------------------- */
 
-function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return <th className={`px-4 py-3 font-semibold ${className}`}>{children}</th>;
 }
 

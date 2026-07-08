@@ -39,7 +39,7 @@ const PLUS_FEATURES = [
 ];
 
 export default function Upgrade() {
-  const { session } = useAuth();
+  const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
   const [yearly, setYearly] = useState(true);
@@ -58,11 +58,13 @@ export default function Upgrade() {
     }
   }
 
+  // rewardsVersion dep: first-N / referral grant background me hota hai. Iske
+  // bina user ko "Plus lo" dikhta rehta tha jabki uska Plus already chalu hai.
   useEffect(() => {
     refresh();
     initPurchases(session?.user?.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [rewardsVersion]);
 
   const base = yearly ? 999 : 99;
   // GST abhi off (registration nahi) — base price hi lenge.

@@ -219,6 +219,53 @@ export async function getReferralInfo(): Promise<ReferralInfo> {
   };
 }
 
+export type MyReferral = {
+  id: string;
+  name: string | null;
+  /** Masked — `ni••••@gmail.com`. Poora email server bhejta hi nahi. */
+  email: string | null;
+  joined_at: string;
+  qualified_at: string | null;
+  rewarded_at: string | null;
+  /** Grant ke waqt jitne din mile the (config baad me badle to bhi yahi). */
+  days: number;
+  /** Cap pe pahunch chuke the, isliye din nahi mile. */
+  cap_skipped: boolean;
+};
+
+export type MyRewards = {
+  joined_at: string;
+  plan: "free" | "plus";
+  plan_expires_at: string | null;
+  plan_source: string | null;
+  first_n_granted: boolean;
+  first_n_rank: number | null;
+  first_n_days: number | null;
+  first_n_granted_at: string | null;
+  referral_code: string | null;
+  referral_days_earned: number;
+  referred_by_code: string | null;
+  referral_days_now: number;
+  cap_days: number;
+  referrals_enabled: boolean;
+  referrals: MyReferral[];
+};
+
+/**
+ * "Meri membership" screen ka poora data — ek RPC call me.
+ * Kab aaye, plan kya hai, kab tak, kis wajah se, aur kis-kis ko refer kiya
+ * (kisse din mile, kisse abhi nahi).
+ */
+export async function getMyRewards(): Promise<MyRewards | null> {
+  try {
+    const { data, error } = await client().rpc("my_rewards");
+    if (error || !data) return null;
+    return data as MyRewards;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Purchase success ke baad profiles.plan = plus (webhook aane tak bridge).
  *

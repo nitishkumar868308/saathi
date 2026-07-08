@@ -42,19 +42,21 @@ const groups: { title: string; rows: Row[] }[] = [
 ];
 
 export default function Settings() {
-  const { session } = useAuth();
+  const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
   const meta = session?.user?.user_metadata;
   const name = meta?.full_name || meta?.name || "Aapka account";
   const [isPlus, setIsPlus] = useState(false);
 
+  // rewardsVersion dep zaroori hai: first-N / referral grant login ke baad
+  // background me hota hai. Iske bina screen "Free" pe atki rehti thi.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     getPlan()
       .then((p) => setIsPlus(p.isPlus))
       .catch(() => {});
-  }, []);
+  }, [rewardsVersion]);
 
   async function logout() {
     try {
@@ -99,6 +101,16 @@ export default function Settings() {
             </Text>
           </View>
         </View>
+
+        {/* Meri membership — kab aaye, kab tak Plus, kis wajah se */}
+        <Pressable
+          onPress={() => router.push("/membership" as never)}
+          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
+        >
+          <Ionicons name="ribbon-outline" size={20} color={colors.terracotta} />
+          <Text style={styles.detailsText}>Meri membership</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.line} />
+        </Pressable>
 
         {/* Meri details */}
         <Pressable
