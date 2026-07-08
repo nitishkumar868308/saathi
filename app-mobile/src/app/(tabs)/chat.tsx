@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
+import { TypingDots } from "@/components/typing-dots";
 import { useUserName } from "@/components/auth-provider";
 import { askSaathi, type ChatTurn } from "@/lib/ai";
 import { checkReferralQualification } from "@/lib/plan";
@@ -114,7 +115,7 @@ export default function Chat() {
                 <SaathiMark size={15} color={colors.white} />
               </View>
               <View style={styles.saathiBubble}>
-                <Text style={styles.saathiText}>Soch raha hoon…</Text>
+                <TypingDots />
               </View>
             </View>
           )}

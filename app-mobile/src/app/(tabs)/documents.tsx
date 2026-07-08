@@ -109,9 +109,17 @@ export default function Documents() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.terracotta} size="large" />
-          <Text style={styles.centerText}>Load ho raha hai...</Text>
+        // Spinner ki jagah skeleton — content ka shape dikhta hai, jump nahi hota
+        <View style={styles.list}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.skeleton}>
+              <View style={styles.skelIcon} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <View style={[styles.skelLine, { width: "62%" }]} />
+                <View style={[styles.skelLine, { width: "38%", height: 10 }]} />
+              </View>
+            </View>
+          ))}
         </View>
       ) : (
         <ScrollView
@@ -138,8 +146,19 @@ export default function Documents() {
                 {docs.length === 0 ? "Abhi koi document nahi" : "Is category mein kuch nahi"}
               </Text>
               <Text style={styles.emptyBody}>
-                Neeche + dabake apna pehla document add karo — Saathi expiry yaad rakhega.
+                {docs.length === 0
+                  ? "Apna pehla document add karo — Saathi expiry yaad rakhega."
+                  : "Filter badal ke dekho, ya naya document add karo."}
               </Text>
+              {docs.length === 0 && (
+                <Pressable
+                  onPress={() => router.push("/add-document")}
+                  style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.9 }]}
+                >
+                  <Ionicons name="add" size={18} color={colors.white} />
+                  <Text style={styles.emptyBtnText}>Document add karo</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             list.map((doc) => (
@@ -211,6 +230,30 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 280,
   },
+  emptyBtn: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 16,
+    backgroundColor: colors.terracotta,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+  },
+  emptyBtnText: { color: colors.white, fontWeight: "700", fontSize: 14.5 },
+  skeleton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    padding: 14,
+    opacity: 0.65,
+  },
+  skelIcon: { height: 44, width: 44, borderRadius: 14, backgroundColor: colors.line },
+  skelLine: { height: 12, borderRadius: 6, backgroundColor: colors.line },
   hint: {
     textAlign: "center",
     marginTop: 8,
