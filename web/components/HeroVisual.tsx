@@ -2,8 +2,12 @@
 
 import PhoneDemo from "./PhoneDemo";
 import { FileClock, Check, Bell } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function HeroVisual() {
+  const { hero } = useT();
+  const v = hero.visual;
+
   return (
     <div className="relative mx-auto w-full max-w-md py-4 sm:py-8">
       {/* warm glow behind the phone */}
@@ -26,10 +30,8 @@ export default function HeroVisual() {
             <FileClock size={17} />
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-ink">Car Insurance</p>
-            <p className="text-[11px] font-semibold text-terracotta">
-              3 din mein expire
-            </p>
+            <p className="text-sm font-semibold text-ink">{v.docTitle}</p>
+            <p className="text-[11px] font-semibold text-terracotta">{v.docSub}</p>
           </div>
           <span className="ml-1 h-2 w-2 animate-pulse rounded-full bg-terracotta" />
         </div>
@@ -45,8 +47,8 @@ export default function HeroVisual() {
             <Check size={17} strokeWidth={2.5} />
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-ink">Gym · 7:00 AM</p>
-            <p className="text-[11px] font-semibold text-sage">Reminder set</p>
+            <p className="text-sm font-semibold text-ink">{v.remTitle}</p>
+            <p className="text-[11px] font-semibold text-sage">{v.remSub}</p>
           </div>
         </div>
       </div>

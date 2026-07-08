@@ -63,6 +63,7 @@ type Dict = {
     desc: { pre: string; strong: string; post: string };
     examplesLabel: string;
     examples: { label: string; sub: string }[];
+    visual: { docTitle: string; docSub: string; remTitle: string; remSub: string };
     trust: string[];
   };
   insight: { pre: string; accent: string };
@@ -151,6 +152,46 @@ type Dict = {
     rights: string;
     madeIn: string;
   };
+  referral: {
+    badge: string;
+    heading: string;
+    /** Template — {d} din */
+    sub: string;
+    steps: string[];
+    cta: string;
+    /** Template — {d} din, {cap} mahine */
+    capNote: string;
+    loginTitle: string;
+    loginSub: string;
+    email: string;
+    password: string;
+    loginBtn: string;
+    or: string;
+    google: string;
+    noAccount: string;
+    downloadApp: string;
+    /** Template — {d} */
+    cardTitle: string;
+    /** Template — {d} */
+    cardSub: string;
+    yourCode: string;
+    copy: string;
+    copied: string;
+    whatsapp: string;
+    share: string;
+    statReferrals: string;
+    statDays: string;
+    /** Template — {earned} {capDays} {cap} */
+    capLine: string;
+    /** Template — {x} */
+    pending: string;
+    openApp: string;
+    logout: string;
+    disabled: string;
+    notConfigured: string;
+    /** Template — {d} {link} */
+    shareMessage: string;
+  };
   download: {
     button: string;
     /** Template — {n} users, {m} mahine */
@@ -230,6 +271,7 @@ const hinglish: Dict = {
       { label: "Birthday", sub: "Kisi ki bhoolo mat" },
       { label: "EMI", sub: "Time pe yaad" },
     ],
+    visual: { docTitle: "Car Insurance", docSub: "3 din mein expire", remTitle: "Gym · 7:00 AM", remSub: "Reminder set" },
     trust: ["100% private", "Voice + text", "Hindi + English", "Android first"],
   },
   insight: {
@@ -487,6 +529,43 @@ const hinglish: Dict = {
     rights: "Sabhi adhikaar surakshit.",
     madeIn: "Made with ❤️ for you",
   },
+  referral: {
+    badge: "Dost bulao",
+    heading: "Dost ko bulao, dono ko Plus",
+    sub: "Aapka dost aapke code se join kare aur Saathi use karna shuru kare — dono ko {d} din Saathi Plus bilkul free.",
+    steps: [
+      "Apna referral link share karo",
+      "Dost app download karke account banaye",
+      "Woh apna pehla document daale aur Saathi se ek baar baat kare",
+    ],
+    cta: "Apna referral link lo",
+    capNote: "Har successful referral pe {d} din — {cap} mahine tak kama sakte ho.",
+    loginTitle: "Apna referral link lo",
+    loginSub: "Wahi account jo app me use karte ho — usi se login karo.",
+    email: "Email",
+    password: "Password",
+    loginBtn: "Login karo",
+    or: "ya",
+    google: "Google se continue karo",
+    noAccount: "Account nahi hai?",
+    downloadApp: "App download karo",
+    cardTitle: "Dono ko {d} din Plus free",
+    cardSub: "Apna link bhejo. Dost join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din Saathi Plus.",
+    yourCode: "Aapka code",
+    copy: "Copy",
+    copied: "Copied",
+    whatsapp: "WhatsApp",
+    share: "Share",
+    statReferrals: "Successful referrals",
+    statDays: "Din kamaaye",
+    capLine: "{earned} / {capDays} din (max {cap} mahine)",
+    pending: "{x} dost join to hue, par abhi unhone document add + chat poora nahi kiya.",
+    openApp: "App kholo",
+    logout: "Logout",
+    disabled: "Referral program abhi band hai. Baad me try karo 🙂",
+    notConfigured: "Referral abhi web pe set nahi hai. Tab tak app se share karo.",
+    shareMessage: "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din Saathi Plus FREE:\n{link}",
+  },
   download: {
     button: "Play Store se download karo",
     offerLine: "Pehle {n} users ko Saathi Plus {m} mahine free",
@@ -566,6 +645,7 @@ const hi: Dict = {
       { label: "जन्मदिन", sub: "किसी का मत भूलिए" },
       { label: "EMI", sub: "समय पर याद" },
     ],
+    visual: { docTitle: "कार इंश्योरेंस", docSub: "3 दिन में एक्सपायर", remTitle: "जिम · 7:00 AM", remSub: "रिमाइंडर सेट" },
     trust: ["100% प्राइवेट", "वॉइस + टेक्स्ट", "हिंदी + अंग्रेज़ी", "Android पहले"],
   },
   insight: {
@@ -823,6 +903,43 @@ const hi: Dict = {
     rights: "सभी अधिकार सुरक्षित।",
     madeIn: "आपके लिए ❤️ से बना",
   },
+  referral: {
+    badge: "दोस्त बुलाइए",
+    heading: "दोस्त को बुलाइए, दोनों को प्लस",
+    sub: "आपका दोस्त आपके कोड से जॉइन करे और साथी इस्तेमाल करना शुरू करे — दोनों को {d} दिन साथी प्लस बिल्कुल फ्री।",
+    steps: [
+      "अपना रेफ़रल लिंक शेयर करें",
+      "दोस्त ऐप डाउनलोड करके अकाउंट बनाए",
+      "वो अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे",
+    ],
+    cta: "अपना रेफ़रल लिंक लें",
+    capNote: "हर सफल रेफ़रल पर {d} दिन — {cap} महीने तक कमा सकते हैं।",
+    loginTitle: "अपना रेफ़रल लिंक लें",
+    loginSub: "वही अकाउंट जो ऐप में इस्तेमाल करते हैं — उसी से लॉगिन करें।",
+    email: "ईमेल",
+    password: "पासवर्ड",
+    loginBtn: "लॉगिन करें",
+    or: "या",
+    google: "Google से जारी रखें",
+    noAccount: "अकाउंट नहीं है?",
+    downloadApp: "ऐप डाउनलोड करें",
+    cardTitle: "दोनों को {d} दिन प्लस फ्री",
+    cardSub: "अपना लिंक भेजिए। दोस्त जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन साथी प्लस।",
+    yourCode: "आपका कोड",
+    copy: "कॉपी",
+    copied: "कॉपी हो गया",
+    whatsapp: "WhatsApp",
+    share: "शेयर",
+    statReferrals: "सफल रेफ़रल",
+    statDays: "दिन कमाए",
+    capLine: "{earned} / {capDays} दिन (अधिकतम {cap} महीने)",
+    pending: "{x} दोस्त जॉइन तो हुए, पर अभी उन्होंने डॉक्यूमेंट + चैट पूरा नहीं किया।",
+    openApp: "ऐप खोलें",
+    logout: "लॉगआउट",
+    disabled: "रेफ़रल प्रोग्राम अभी बंद है। बाद में कोशिश करें 🙂",
+    notConfigured: "रेफ़रल अभी वेब पर सेट नहीं है। तब तक ऐप से शेयर करें।",
+    shareMessage: "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्यूमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन साथी प्लस फ्री:\n{link}",
+  },
   download: {
     button: "Play Store से डाउनलोड करें",
     offerLine: "पहले {n} यूज़र्स को साथी प्लस {m} महीने फ्री",
@@ -902,6 +1019,7 @@ const en: Dict = {
       { label: "Birthday", sub: "Never miss one" },
       { label: "EMI", sub: "Right on time" },
     ],
+    visual: { docTitle: "Car Insurance", docSub: "Expires in 3 days", remTitle: "Gym · 7:00 AM", remSub: "Reminder set" },
     trust: ["100% private", "Voice + text", "Hindi + English", "Android first"],
   },
   insight: {
@@ -1158,6 +1276,43 @@ const en: Dict = {
     playstore: "Play Store — coming soon",
     rights: "All rights reserved.",
     madeIn: "Made with ❤️ for you",
+  },
+  referral: {
+    badge: "Refer a friend",
+    heading: "Invite a friend, both get Plus",
+    sub: "Your friend joins with your code and starts using Saathi — you both get {d} days of Saathi Plus, free.",
+    steps: [
+      "Share your referral link",
+      "Your friend downloads the app and creates an account",
+      "They add their first document and chat with Saathi once",
+    ],
+    cta: "Get your referral link",
+    capNote: "{d} days for every successful referral — earn up to {cap} months.",
+    loginTitle: "Get your referral link",
+    loginSub: "Same account you use in the app — sign in with it here.",
+    email: "Email",
+    password: "Password",
+    loginBtn: "Sign in",
+    or: "or",
+    google: "Continue with Google",
+    noAccount: "No account yet?",
+    downloadApp: "Download the app",
+    cardTitle: "You both get {d} days of Plus",
+    cardSub: "Send your link. Your friend joins, adds their first document and chats with Saathi once — you both get {d} days of Saathi Plus.",
+    yourCode: "Your code",
+    copy: "Copy",
+    copied: "Copied",
+    whatsapp: "WhatsApp",
+    share: "Share",
+    statReferrals: "Successful referrals",
+    statDays: "Days earned",
+    capLine: "{earned} / {capDays} days (max {cap} months)",
+    pending: "{x} friend(s) joined, but haven't added a document and chatted yet.",
+    openApp: "Open the app",
+    logout: "Sign out",
+    disabled: "The referral program is paused right now. Check back soon 🙂",
+    notConfigured: "Referrals aren't set up on the web yet. Share from the app for now.",
+    shareMessage: "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of Saathi Plus free:\n{link}",
   },
   download: {
     button: "Download on Play Store",

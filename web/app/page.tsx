@@ -28,6 +28,7 @@ import TrustSection from "@/components/TrustSection";
 import SupportedDocs from "@/components/SupportedDocs";
 import Testimonials from "@/components/Testimonials";
 import Pricing from "@/components/Pricing";
+import ReferralSection from "@/components/ReferralSection";
 import Footer from "@/components/Footer";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SaathiMark from "@/components/SaathiMark";
@@ -451,6 +452,13 @@ export default function Home() {
         <section id="pricing" className="container-page scroll-mt-24 py-16 sm:py-28">
           <Reveal>
             <Pricing />
+          </Reveal>
+        </section>
+
+        {/* Referral — click pe /referral (login ke peeche) */}
+        <section id="referral" className="container-page scroll-mt-24 pb-16 sm:pb-24">
+          <Reveal>
+            <ReferralSection />
           </Reveal>
         </section>
 

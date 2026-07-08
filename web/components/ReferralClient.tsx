@@ -15,6 +15,8 @@ import {
 import SaathiMark from "@/components/SaathiMark";
 import { supabaseBrowser, supabaseConfigured } from "@/lib/supabase-browser";
 import { useOffers } from "@/lib/useOffers";
+import { tpl } from "@/lib/offers";
+import { useT } from "@/lib/i18n/LanguageProvider";
 import { PLAY_STORE_URL } from "@/lib/links";
 
 type Info = { code: string | null; daysEarned: number; total: number; rewarded: number };
@@ -22,6 +24,7 @@ type Info = { code: string | null; daysEarned: number; total: number; rewarded: 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 
 export default function ReferralClient() {
+  const { referral: t } = useT();
   const offers = useOffers();
   const [session, setSession] = useState<Session | null>(null);
   const [booting, setBooting] = useState(true);
@@ -35,19 +38,14 @@ export default function ReferralClient() {
       setSession(data.session);
       setBooting(false);
     });
-    const { data: sub } = supabaseBrowser.auth.onAuthStateChange((_e, s) =>
-      setSession(s),
-    );
+    const { data: sub } = supabaseBrowser.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
   if (!supabaseConfigured) {
     return (
       <Shell>
-        <p className="text-center text-ink-soft">
-          Referral abhi web pe set nahi hai (<code>NEXT_PUBLIC_SUPABASE_URL</code> /{" "}
-          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> missing). Tab tak app se share karo.
-        </p>
+        <p className="text-center text-ink-soft">{t.notConfigured}</p>
       </Shell>
     );
   }
@@ -65,15 +63,17 @@ export default function ReferralClient() {
   if (!offers.referralsEnabled) {
     return (
       <Shell>
-        <p className="text-center text-ink-soft">
-          Referral program abhi band hai. Baad me try karo 🙂
-        </p>
+        <p className="text-center text-ink-soft">{t.disabled}</p>
       </Shell>
     );
   }
 
   return session ? (
-    <ReferralCard session={session} days={offers.referralDays} cap={offers.referralCapMonths} />
+    <ReferralCard
+      session={session}
+      days={offers.referralDays}
+      cap={offers.referralCapMonths}
+    />
   ) : (
     <LoginCard />
   );
@@ -85,12 +85,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream px-4 py-10 sm:px-5">
       <div className="w-full max-w-md rounded-4xl border border-line bg-surface p-6 shadow-warm sm:p-8">
-        <div className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2.5">
           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
             <SaathiMark size={21} className="text-white" />
           </span>
           <span className="font-display text-xl font-semibold">Apka Saathi</span>
-        </div>
+        </a>
         <div className="mt-6">{children}</div>
       </div>
     </div>
@@ -100,6 +100,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 /* ------------------------------- Login ------------------------------- */
 
 function LoginCard() {
+  const { referral: t } = useT();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -135,14 +136,12 @@ function LoginCard() {
         <Gift size={26} />
       </div>
       <h1 className="mt-5 text-center font-display text-2xl font-semibold">
-        Apna referral link lo
+        {t.loginTitle}
       </h1>
-      <p className="mt-2 text-center text-sm leading-relaxed text-ink-soft">
-        Wahi account jo app me use karte ho — usi se login karo.
-      </p>
+      <p className="mt-2 text-center text-sm leading-relaxed text-ink-soft">{t.loginSub}</p>
 
       <form onSubmit={login} className="mt-6">
-        <label className="text-sm font-semibold">Email</label>
+        <label className="text-sm font-semibold">{t.email}</label>
         <input
           type="email"
           value={email}
@@ -152,7 +151,7 @@ function LoginCard() {
           autoComplete="email"
           required
         />
-        <label className="mt-4 block text-sm font-semibold">Password</label>
+        <label className="mt-4 block text-sm font-semibold">{t.password}</label>
         <input
           type="password"
           value={password}
@@ -168,13 +167,13 @@ function LoginCard() {
           disabled={busy}
           className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-70"
         >
-          {busy ? <Loader2 size={18} className="animate-spin" /> : "Login karo"}
+          {busy ? <Loader2 size={18} className="animate-spin" /> : t.loginBtn}
         </button>
       </form>
 
       <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-line" />
-        <span className="text-xs text-ink-soft">ya</span>
+        <span className="text-xs text-ink-soft">{t.or}</span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
@@ -182,13 +181,13 @@ function LoginCard() {
         onClick={google}
         className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-6 text-sm font-semibold text-ink transition hover:bg-cream-deep/40"
       >
-        Google se continue karo
+        {t.google}
       </button>
 
       <p className="mt-6 text-center text-sm text-ink-soft">
-        Account nahi hai?{" "}
+        {t.noAccount}{" "}
         <a href={PLAY_STORE_URL} className="font-semibold text-terracotta hover:underline">
-          App download karo
+          {t.downloadApp}
         </a>
       </p>
     </Shell>
@@ -206,6 +205,7 @@ function ReferralCard({
   days: number;
   cap: number;
 }) {
+  const { referral: t } = useT();
   const [info, setInfo] = useState<Info | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -232,7 +232,7 @@ function ReferralCard({
         rewarded: list.filter((r) => r.rewarded_at).length,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Info load nahi hui");
+      setError(e instanceof Error ? e.message : "load failed");
     } finally {
       setLoading(false);
     }
@@ -243,7 +243,7 @@ function ReferralCard({
   }, [load]);
 
   const link = info?.code ? `${SITE}/r/${info.code}` : "";
-  const message = `Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko ${days} din Saathi Plus FREE:\n${link}`;
+  const message = tpl(t.shareMessage, { d: days, link });
 
   async function copy() {
     if (!link) return;
@@ -258,11 +258,8 @@ function ReferralCard({
 
   async function nativeShare() {
     if (!link) return;
-    if (navigator.share) {
-      await navigator.share({ text: message }).catch(() => {});
-    } else {
-      copy();
-    }
+    if (navigator.share) await navigator.share({ text: message }).catch(() => {});
+    else copy();
   }
 
   const capDays = cap * 30;
@@ -284,25 +281,22 @@ function ReferralCard({
               <Gift size={26} />
             </div>
             <h1 className="mt-4 font-display text-2xl font-semibold">
-              Dono ko {days} din Plus free
+              {tpl(t.cardTitle, { d: days })}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              Apna link bhejo. Dost join kare, apna pehla document daale aur Saathi se ek
-              baar baat kare — dono ko {days} din Saathi Plus.
+              {tpl(t.cardSub, { d: days })}
             </p>
           </div>
 
-          {/* Code */}
           <div className="mt-6 rounded-2xl border-2 border-dashed border-terracotta bg-terracotta/[0.07] py-5 text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-ink-soft">
-              Aapka code
+              {t.yourCode}
             </p>
             <p className="mt-1.5 font-display text-3xl font-bold tracking-[0.28em] text-terracotta">
               {info?.code ?? "—"}
             </p>
           </div>
 
-          {/* Link + actions */}
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-line bg-cream-deep/20 px-3 py-2.5">
             <p className="min-w-0 flex-1 truncate text-sm text-ink-soft">{link || "—"}</p>
             <button
@@ -311,7 +305,7 @@ function ReferralCard({
               className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-ink px-3 py-2 text-xs font-semibold text-cream transition hover:opacity-90 disabled:opacity-50"
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? t.copied : t.copy}
             </button>
           </div>
 
@@ -323,25 +317,24 @@ function ReferralCard({
               className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-sage px-4 text-sm font-semibold text-white transition hover:opacity-90"
             >
               <MessageCircle size={16} />
-              WhatsApp
+              {t.whatsapp}
             </a>
             <button
               onClick={nativeShare}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-terracotta px-4 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
             >
               <Share2 size={16} />
-              Share
+              {t.share}
             </button>
           </div>
 
-          {/* Stats */}
           <div className="mt-6 grid grid-cols-2 gap-2.5">
-            <Stat label="Successful referrals" value={info?.rewarded ?? 0} />
-            <Stat label="Din kamaaye" value={earned} />
+            <Stat label={t.statReferrals} value={info?.rewarded ?? 0} />
+            <Stat label={t.statDays} value={earned} />
           </div>
 
           <p className="mt-4 text-xs font-medium text-ink-soft">
-            {earned} / {capDays} din (max {cap} mahine)
+            {tpl(t.capLine, { earned, capDays, cap })}
           </p>
           <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-line">
             <div className="h-full rounded-full bg-sage" style={{ width: `${pct}%` }} />
@@ -349,8 +342,7 @@ function ReferralCard({
 
           {(info?.total ?? 0) > (info?.rewarded ?? 0) && (
             <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-              {(info!.total - info!.rewarded)} dost join to hue, par abhi unhone document
-              add + chat poora nahi kiya.
+              {tpl(t.pending, { x: (info?.total ?? 0) - (info?.rewarded ?? 0) })}
             </p>
           )}
 
@@ -360,14 +352,14 @@ function ReferralCard({
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:underline"
             >
               <Smartphone size={15} />
-              App kholo
+              {t.openApp}
             </a>
             <button
               onClick={() => supabaseBrowser?.auth.signOut()}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink"
             >
               <LogOut size={15} />
-              Logout
+              {t.logout}
             </button>
           </div>
         </>
