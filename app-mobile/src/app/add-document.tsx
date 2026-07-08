@@ -18,6 +18,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
 import { addDocument, DocLimitError } from "@/lib/documents";
+import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
 import { dateAfterMonths, isValidDate } from "@/utils/expiry";
@@ -120,15 +121,29 @@ export default function AddDocument() {
     }
     try {
       setSaving(true);
-      await addDocument({
+      const doc = await addDocument({
         name: name.trim(),
         type,
         expiry: expiry || null,
         file_uri: savedUri,
       });
+
+      // Expiry ke liye notification (14 din pehle, 3 din pehle, aur us din).
+      // Permission tabhi maango jab expiry hai — warna prompt bekaar lagta hai.
+      let notifOk = true;
+      if (doc.expiry) {
+        notifOk = await ensureNotifPermission();
+        if (notifOk) await scheduleDocumentExpiry(doc.id, doc.name, doc.expiry);
+      }
+
       // Referral reward unlock ho sakta hai (document + chat dono hone pe).
       checkReferralQualification().catch(() => {});
-      toast.show("Document add ho gaya 🎉", "success");
+      toast.show(
+        notifOk
+          ? "Document add ho gaya 🎉"
+          : "Document add ho gaya — notification permission do to expiry yaad dila dunga",
+        notifOk ? "success" : "info",
+      );
       router.back();
     } catch (e) {
       if (e instanceof DocLimitError) {

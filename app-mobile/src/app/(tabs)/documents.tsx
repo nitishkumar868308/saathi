@@ -15,6 +15,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { listDocuments, deleteDocument, type Document } from "@/lib/documents";
+import { cancelDocumentExpiry } from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { useToast } from "@/components/toast";
@@ -65,6 +66,8 @@ export default function Documents() {
         onPress: async () => {
           try {
             await deleteDocument(doc.id);
+            // Warna delete kiye document ki expiry notification aati rehti.
+            await cancelDocumentExpiry(doc.id);
             setDocs((prev) => prev.filter((d) => d.id !== doc.id));
             toast.show("Document delete ho gaya", "success");
           } catch {

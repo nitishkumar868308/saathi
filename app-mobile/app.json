@@ -23,7 +23,9 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ]
     },
     "web": {
@@ -50,7 +52,14 @@
       ],
       "expo-speech-recognition",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/adaptive-foreground.png",
+          "color": "#C25A37"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

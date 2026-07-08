@@ -112,12 +112,16 @@ export default function AddReminder() {
         bucket,
       });
       const allowed = await ensureNotifPermission();
-      if (allowed) await scheduleReminder(r.id, r.title, when);
+      // scheduleReminder guzre hue waqt ya OS error pe false deta hai — pehle
+      // toast phir bhi "Reminder set ✓" bolta tha, jo jhooth tha.
+      const scheduled = allowed && (await scheduleReminder(r.id, r.title, when));
       toast.show(
-        allowed
+        scheduled
           ? "Reminder set ✓ Time pe yaad dila dunga"
-          : "Saved (notification permission do)",
-        "success",
+          : allowed
+            ? "Save ho gaya, par notification set nahi hui"
+            : "Save ho gaya (notification permission do)",
+        scheduled ? "success" : "info",
       );
       router.back();
     } catch {
