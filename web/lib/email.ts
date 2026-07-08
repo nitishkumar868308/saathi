@@ -75,64 +75,95 @@ const CREAM = "#F7F2E9";
 const LINE = "#E5DBC9";
 
 /**
- * Branded email shell — table-based (email clients ke liye), responsive,
- * premium look. `inner` = raw HTML body.
+ * Branded email shell — table-based (purane email clients ke liye bhi chale),
+ * mobile pe responsive, logo ke saath.
+ *
+ * @param preheader Inbox preview me dikhne wali chhoti line. Na do to client
+ *                  body ka pehla text utha lega — aksar bhadda lagta hai.
  */
-export function renderEmail(title: string, inner: string): string {
-  return `
-  <!DOCTYPE html>
-  <html lang="hi">
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <meta name="color-scheme" content="light"/>
-  </head>
-  <body style="margin:0;padding:0;background:${CREAM};">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CREAM};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-      <tr>
-        <td align="center" style="padding:28px 16px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
-            <!-- Brand header -->
-            <tr>
-              <td align="center" style="padding-bottom:22px;">
-                <table role="presentation" cellpadding="0" cellspacing="0">
+export function renderEmail(title: string, inner: string, preheader = ""): string {
+  return `<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="light"/>
+  <meta name="supported-color-schemes" content="light"/>
+  <title>${title}</title>
+  <style>
+    /* Mobile: gutters chhote, text thoda bada — button poori chaudai me */
+    @media only screen and (max-width:600px) {
+      .es-card    { padding:26px 20px !important; border-radius:0 0 20px 20px !important; }
+      .es-outer   { padding:18px 12px !important; }
+      .es-title   { font-size:22px !important; }
+      .es-btn a   { display:block !important; text-align:center !important; }
+      .es-wordmark{ font-size:19px !important; }
+    }
+    /* Gmail/Outlook link auto-styling se bachao */
+    a[x-apple-data-detectors] { color:inherit !important; text-decoration:none !important; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:${CREAM};-webkit-font-smoothing:antialiased;">
+  <!-- Preview text (inbox me dikhta hai, email me nahi) -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">
+    ${escapeHtml(preheader)}
+    ${"&#8199;&#65279;&#847;".repeat(60)}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${CREAM};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <tr>
+      <td align="center" class="es-outer" style="padding:30px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+
+          <!-- Brand -->
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <a href="${SITE_URL}" style="text-decoration:none;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <img src="${SITE_URL}/logo.png" width="40" height="40" alt="Apka Saathi" style="display:block;width:40px;height:40px;border-radius:13px;background:${BRAND};"/>
+                      <img src="${SITE_URL}/logo.png" width="42" height="42" alt="Apka Saathi"
+                           style="display:block;width:42px;height:42px;border:0;border-radius:13px;background:${BRAND};"/>
                     </td>
-                    <td style="vertical-align:middle;padding-left:10px;font-size:22px;font-weight:700;color:${INK};letter-spacing:-0.5px;">Apka Saathi</td>
+                    <td class="es-wordmark" style="vertical-align:middle;padding-left:11px;font-size:21px;font-weight:700;color:${INK};letter-spacing:-0.4px;">Apka Saathi</td>
                   </tr>
                 </table>
-              </td>
-            </tr>
-            <!-- Accent bar -->
-            <tr><td style="height:4px;background:${BRAND};border-radius:4px 4px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
-            <!-- Card -->
-            <tr>
-              <td style="background:#FFFCF6;border:1px solid ${LINE};border-top:none;border-radius:0 0 24px 24px;padding:34px 30px;">
-                <h1 style="margin:0 0 14px;font-size:25px;line-height:1.25;color:${INK};letter-spacing:-0.5px;font-weight:700;">${title}</h1>
-                ${inner}
-              </td>
-            </tr>
-            <!-- Footer -->
-            <tr>
-              <td align="center" style="padding:22px 10px 0;color:${SOFT};font-size:12px;line-height:1.7;">
-                <strong style="color:${INK};">Apka Saathi</strong> — jo kuch nahi bhoolta.<br/>
-                Koi spam nahi. Sirf zaroori baat. 🤍
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-  </html>`;
+              </a>
+            </td>
+          </tr>
+
+          <!-- Accent bar -->
+          <tr><td style="height:4px;background:${BRAND};border-radius:5px 5px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+          <!-- Card -->
+          <tr>
+            <td class="es-card" style="background:#FFFCF6;border:1px solid ${LINE};border-top:none;border-radius:0 0 24px 24px;padding:34px 32px;">
+              <h1 class="es-title" style="margin:0 0 16px;font-size:25px;line-height:1.25;color:${INK};letter-spacing:-0.5px;font-weight:700;">${title}</h1>
+              ${inner}
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:24px 12px 0;color:${SOFT};font-size:12.5px;line-height:1.75;">
+              <strong style="color:${INK};">Apka Saathi</strong> — jo kuch nahi bhoolta.<br/>
+              <a href="${SITE_URL}" style="color:${SOFT};text-decoration:underline;">apkasaathi.com</a>
+              &nbsp;·&nbsp; Koi spam nahi. Sirf zaroori baat. 🤍
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 export function emailButton(href: string, label: string): string {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:6px;">
+  return `<table role="presentation" class="es-btn" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px;">
     <tr><td style="border-radius:14px;background:${BRAND};">
-      <a href="${href}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 28px;border-radius:14px;border:1px solid ${BRAND_DARK};">${label}</a>
+      <a href="${href}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;line-height:1.2;padding:15px 28px;border-radius:14px;border:1px solid ${BRAND_DARK};">${label}</a>
     </td></tr>
   </table>`;
 }
@@ -157,15 +188,22 @@ export async function sendReminderEmail(
 ): Promise<{ sent: boolean; skipped?: boolean }> {
   const inner =
     emailParagraph("Bas yaad dila raha hoon 🙂 — aapne ye set kiya tha:") +
-    `<div style="margin:6px 0 18px;padding:18px 20px;border:1px solid ${LINE};border-radius:16px;background:${CREAM};">
-       <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(title)}</div>
-       <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${escapeHtml(whenLabel)}</div>
-     </div>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
+       <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${BRAND};border-radius:14px;background:${CREAM};">
+         <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(title)}</div>
+         <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${escapeHtml(whenLabel)}</div>
+       </td></tr>
+     </table>` +
     emailParagraph("Ho gaya to badhiya — warna abhi kar lo. Main yahin hoon. 🤍");
+
   return sendMail({
     to,
     subject: `🔔 Reminder: ${title}`,
-    html: renderEmail("Aapka reminder ⏰", inner),
+    html: renderEmail(
+      "Aapka reminder ⏰",
+      inner,
+      `${title} · ${whenLabel}`, // inbox preview
+    ),
     fromName: "Apka Saathi",
   });
 }
@@ -186,7 +224,8 @@ export async function sendContactEmails(
         <tr><td style="padding:6px 0;color:${SOFT};width:80px;">Naam</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(name)}</td></tr>
         <tr><td style="padding:6px 0;color:${SOFT};">Email</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(email)}</td></tr>
       </table>
-      <div style="margin-top:16px;padding:16px;background:${CREAM};border-radius:14px;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap;">${escapeHtml(message)}</div>`,
+      <div style="margin-top:16px;padding:16px;background:${CREAM};border-radius:14px;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap;word-break:break-word;">${escapeHtml(message)}</div>`,
+    `${name} — ${message.slice(0, 90)}`,
   );
 
   const userHtml = renderEmail(
@@ -194,21 +233,23 @@ export async function sendContactEmails(
     `${emailParagraph(
       `Namaste ${escapeHtml(name)}, aapka message hum tak pahunch gaya hai. Hum jaldi hi jawab denge.`,
     )}
-     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">— Team Saathi</p>`,
+     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">— Team Apka Saathi</p>`,
+    "Hum jaldi hi jawab denge 🙏",
   );
 
   return Promise.all([
     sendMail({
       to: CONTACT_TO ?? email,
       replyTo: email,
-      fromName: "Saathi Contact",
+      fromName: "Apka Saathi Contact",
       subject: `📩 Naya message — ${name}`,
       html: adminHtml,
     }),
     sendMail({
       to: email,
-      subject: "Aapka message mil gaya — Saathi",
+      subject: "Aapka message mil gaya — Apka Saathi",
       html: userHtml,
+      fromName: "Apka Saathi",
     }),
   ]);
 }
