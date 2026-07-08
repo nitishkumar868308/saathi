@@ -43,11 +43,27 @@ export async function getPlusPackages(): Promise<any[]> {
   }
 }
 
+export type PurchaseResult = {
+  active: boolean;
+  /** ISO date, ya `null` = lifetime (koi expiry nahi). */
+  expiresAt: string | null;
+};
+
+/**
+ * Purchase karo aur entitlement ki ASLI expiry lauta do.
+ *
+ * Expiry zaroori hai: iske bina profile me plan_expires_at null reh jaata tha,
+ * jise "hamesha ke liye Plus" maan liya jaata — cancel/refund ke baad bhi.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function purchasePlus(pkg: any): Promise<boolean> {
+export async function purchasePlus(pkg: any): Promise<PurchaseResult> {
   if (!purchasesAvailable()) throw new Error("purchases unavailable");
   const { customerInfo } = await Purchases.purchasePackage(pkg);
-  return Boolean(customerInfo.entitlements.active[ENTITLEMENT]);
+  const ent = customerInfo.entitlements.active[ENTITLEMENT];
+  return {
+    active: Boolean(ent),
+    expiresAt: (ent?.expirationDate as string | null | undefined) ?? null,
+  };
 }
 
 export async function isPlusActive(): Promise<boolean> {

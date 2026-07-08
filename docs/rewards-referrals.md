@@ -90,6 +90,30 @@ koi deploy nahi chahiye. Offer band karo to uska banner/row poori tarah gayab.
 | `admin_grant_days(p_email, p_days)` | admin API (service_role) | `granted` / `user_not_found` |
 | `grant_plus_days(uid, days)` | internal helper | — |
 
+## Do bade bug jo theek hue (SQL dobara run karna zaroori)
+
+**1. Har user ko sabka data dikh raha tha.**
+`documents` / `reminders` / `messages` pe RLS `using (true)` thi aur app ki query me
+`user_id` filter nahi tha. Matlab har user SAB users ke documents dekh sakta tha,
+free-plan limit SAB ke documents ginti thi (10 docs global pe hi block), aur
+`deleteDocument(id)` se kisi aur ka document delete ho sakta tha.
+→ Ab own-row RLS (`schema.sql`) + app ki har query me `user_id` filter.
+
+**2. Referral ke din paid plan ko CHHOTA kar dete the.**
+Paid user ka `plan_expires_at` null hota tha (= active, expiry set nahi). Purana
+`grant_plus_days` us null ko `now()` maanta tha, to 15 din milte hi paid plan
+`now() + 15 din` ban jaata — 15 din baad Plus khatam.
+→ Ab null wale ko chheda hi nahi jaata, aur purchase ke baad **RevenueCat ki asli
+expiry** profile me set hoti hai (`markProfilePlus(expiresAt)`).
+
+**3. `grant_plus_days` / `admin_grant_days` PUBLIC ko EXECUTE.**
+Postgres default. Koi bhi logged-in user RPC se khud ko unlimited Plus de sakta tha.
+→ Revoke ho gaya; sirf `service_role`.
+
+⚠️ **Teeno fix SQL me hain — `schema.sql` aur `rewards-referrals.sql` dobara run karo.**
+(`schema.sql` purani rows ko chhupa dega jinme `user_id` null hai — pre-launch me theek;
+delete karna ho to file me commands likhi hain.)
+
 ## Notes / abhi baaki
 - `documents` / `messages` pe RLS abhi permissive hai (pre-launch). `user_id` add ho chuka hai — baad me own-row RLS lagana chahiye.
 - Purana `claim_waitlist_reward()` function DB me pada reh sakta hai; app ab use nahi karti.

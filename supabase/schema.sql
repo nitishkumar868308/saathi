@@ -32,8 +32,28 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
--- RLS on (Supabase best practice). Abhi dev ke liye anon ko allow.
--- (Baad mein login add karke per-user policies banayenge.)
+-- 4. Ownership — har row kis user ki hai
+--    (RLS aur free-plan document limit dono isi pe tike hain)
+alter table public.documents add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.reminders add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table public.messages  add column if not exists user_id uuid references auth.users(id) on delete cascade;
+
+create index if not exists documents_user_idx on public.documents(user_id);
+create index if not exists reminders_user_idx on public.reminders(user_id);
+create index if not exists messages_user_idx  on public.messages(user_id);
+
+-- 5. RLS — sirf apna data
+--
+-- ⚠️ Pehle yahan `using (true)` tha — matlab har user ko SAB users ke documents,
+-- reminders aur messages dikhte the, aur kisi ka bhi document delete ho sakta tha.
+-- Ab sirf apni rows.
+--
+-- NOTE: purani rows jinme user_id NULL hai, ab kisi ko nahi dikhengi (pre-launch
+-- me theek hai). Chaaho to pehle unhe delete kar do:
+--   delete from public.documents where user_id is null;
+--   delete from public.reminders where user_id is null;
+--   delete from public.messages  where user_id is null;
+
 alter table public.documents enable row level security;
 alter table public.reminders enable row level security;
 alter table public.messages  enable row level security;
@@ -42,6 +62,16 @@ drop policy if exists "dev all documents" on public.documents;
 drop policy if exists "dev all reminders" on public.reminders;
 drop policy if exists "dev all messages"  on public.messages;
 
-create policy "dev all documents" on public.documents for all using (true) with check (true);
-create policy "dev all reminders" on public.reminders for all using (true) with check (true);
-create policy "dev all messages"  on public.messages  for all using (true) with check (true);
+drop policy if exists "own documents" on public.documents;
+drop policy if exists "own reminders" on public.reminders;
+drop policy if exists "own messages"  on public.messages;
+
+create policy "own documents" on public.documents for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own reminders" on public.reminders for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own messages" on public.messages for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Reminder-sender cron aur `ai` edge function service_role se chalte hain —
+-- woh RLS bypass karte hain, isliye unhe koi policy nahi chahiye.

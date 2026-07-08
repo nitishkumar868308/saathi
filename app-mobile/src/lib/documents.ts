@@ -25,10 +25,22 @@ function client() {
   return supabase;
 }
 
+/**
+ * Sirf apne documents.
+ *
+ * RLS bhi ab own-row hai, par filter yahan bhi rakha hai — do reasons:
+ * (1) RLS galat configure ho to bhi leak na ho, (2) count sahi rahe.
+ */
 export async function listDocuments(): Promise<Document[]> {
-  const { data, error } = await client()
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return [];
+
+  const { data, error } = await sb
     .from("documents")
     .select("*")
+    .eq("user_id", uid)
     .order("expiry", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return (data ?? []) as Document[];

@@ -52,11 +52,22 @@ export async function getPlan(): Promise<PlanInfo> {
   };
 }
 
-/** Kitne documents hain (count). */
+/**
+ * Kitne documents hain (sirf apne).
+ *
+ * ⚠️ Pehle yahan user filter nahi tha — free-plan limit SAB users ke documents
+ * gin leti thi, to 10 documents ke baad har naya user block ho jaata.
+ */
 export async function countDocuments(): Promise<number> {
-  const { count } = await client()
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return 0;
+
+  const { count } = await sb
     .from("documents")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", uid);
   return count ?? 0;
 }
 
@@ -208,16 +219,37 @@ export async function getReferralInfo(): Promise<ReferralInfo> {
   };
 }
 
-/** Purchase success ke baad profiles.plan = plus set karo (webhook aane tak bridge). */
-export async function markProfilePlus(): Promise<void> {
+/**
+ * Purchase success ke baad profiles.plan = plus (webhook aane tak bridge).
+ *
+ * @param expiresAt  RevenueCat entitlement ki expiry (ISO).
+ *                   `null` = lifetime. `undefined` = pata nahi, mat chhedo.
+ *
+ * Expiry kabhi CHHOTI nahi karte — user ke paas referral/first-N ke din pehle se
+ * subscription se aage ke ho sakte hain.
+ */
+export async function markProfilePlus(expiresAt?: string | null): Promise<void> {
   const sb = client();
   const { data: userData } = await sb.auth.getUser();
   const uid = userData.user?.id;
   if (!uid) return;
-  await sb
-    .from("profiles")
-    .update({ plan: "plus", plan_source: "google_play" })
-    .eq("id", uid);
+
+  const patch: Record<string, unknown> = { plan: "plus", plan_source: "google_play" };
+
+  if (expiresAt === null) {
+    patch.plan_expires_at = null; // lifetime
+  } else if (expiresAt) {
+    const { data } = await sb
+      .from("profiles")
+      .select("plan_expires_at")
+      .eq("id", uid)
+      .single();
+    const current = data?.plan_expires_at as string | null | undefined;
+    patch.plan_expires_at =
+      current && new Date(current) > new Date(expiresAt) ? current : expiresAt;
+  }
+
+  await sb.from("profiles").update(patch).eq("id", uid);
 }
 
 /** Web Razorpay checkout URL (app in-app browser mein kholega). */

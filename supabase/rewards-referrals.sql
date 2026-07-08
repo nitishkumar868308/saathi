@@ -80,13 +80,23 @@ create policy "own referrals" on public.referrals for select
 /* 4. Grant helper — din ADD karo (paid plan bhi extend hota hai)       */
 /* ------------------------------------------------------------------ */
 
+-- Din ADD karo. Kabhi kisi ka plan chhota mat karo.
+--
+-- ⚠️ Pehle yahan bug tha: paid user ka `plan_expires_at` null hota hai (matlab
+-- "abhi active, expiry set nahi"). Purana code us null ko `now()` maan leta tha,
+-- to referral ke 15 din milte hi uska Plus `now() + 15 din` ho jaata tha —
+-- yaani paid plan CHHOTA ho jaata tha. Ab null wale ko null hi rehne dete hain.
 create or replace function public.grant_plus_days(p_uid uuid, p_days int)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   update public.profiles
      set plan = 'plus',
-         plan_expires_at = greatest(coalesce(plan_expires_at, now()), now())
-                           + make_interval(days => p_days),
+         plan_expires_at = case
+           -- pehle se unlimited/active-bina-expiry: mat chhedo
+           when plan = 'plus' and plan_expires_at is null then null
+           else greatest(coalesce(plan_expires_at, now()), now())
+                + make_interval(days => p_days)
+         end,
          plan_source = coalesce(plan_source, 'reward')
    where id = p_uid;
 end;

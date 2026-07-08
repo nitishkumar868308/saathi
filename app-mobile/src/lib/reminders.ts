@@ -16,10 +16,17 @@ function client() {
   return supabase;
 }
 
+/** Sirf apne reminders (RLS ke saath double safety). */
 export async function listReminders(): Promise<Reminder[]> {
-  const { data, error } = await client()
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return [];
+
+  const { data, error } = await sb
     .from("reminders")
     .select("*")
+    .eq("user_id", uid)
     .order("remind_at", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return (data ?? []) as Reminder[];

@@ -111,9 +111,10 @@ export default function Upgrade() {
         toast.show("Koi plan available nahi", "error");
         return;
       }
-      const ok = await purchasePlus(pkg);
-      if (ok) {
-        await markProfilePlus();
+      const result = await purchasePlus(pkg);
+      if (result.active) {
+        // Asli expiry bhejo — warna plan "hamesha" jaisa reh jaata hai.
+        await markProfilePlus(result.expiresAt);
         await refresh();
         toast.show("Saathi Plus active ho gaya! 🎉", "success");
       } else {
