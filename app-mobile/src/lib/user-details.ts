@@ -13,6 +13,7 @@ export type UserDetails = {
   country_id: number | null;
   state_id: number | null;
   city_id: number | null;
+  avatar_url: string | null;
 };
 
 function client() {

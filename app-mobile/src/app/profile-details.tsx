@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +25,7 @@ import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
 import { PhoneField } from "@/components/phone-field";
 import { SearchSelect } from "@/components/search-select";
+import { pickAndUploadAvatar, AvatarTooLargeError } from "@/lib/avatar";
 import {
   getCountries,
   getStates,
@@ -60,6 +62,8 @@ export default function ProfileDetails() {
   const [countryId, setCountryId] = useState<number | null>(null);
   const [stateId, setStateId] = useState<number | null>(null);
   const [cityId, setCityId] = useState<number | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -88,6 +92,7 @@ export default function ProfileDetails() {
             setCities(await getCities(existing.state_id));
           }
           if (existing.city_id) setCityId(existing.city_id);
+          if (existing.avatar_url) setAvatarUrl(existing.avatar_url);
         }
       } catch {
         toast.show("Details load nahi hui", "error");
@@ -97,6 +102,26 @@ export default function ProfileDetails() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function changePhoto() {
+    if (uploadingAvatar) return;
+    try {
+      setUploadingAvatar(true);
+      const url = await pickAndUploadAvatar();
+      if (url) {
+        setAvatarUrl(url);
+        toast.show("Photo update ho gayi", "success");
+      }
+    } catch (e) {
+      if (e instanceof AvatarTooLargeError) {
+        toast.show("Photo 2 MB se chhoti honi chahiye", "error");
+      } else {
+        toast.show("Photo upload nahi hui", "error");
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
 
   async function pickCountry(id: number) {
     setCountryId(id);
@@ -157,6 +182,7 @@ export default function ProfileDetails() {
         country_id: countryId,
         state_id: stateId,
         city_id: cityId,
+        avatar_url: avatarUrl,
       });
       toast.show("Details save ho gayi ✅", "success");
       if (returnTo) router.replace(returnTo as never);
@@ -186,6 +212,25 @@ export default function ProfileDetails() {
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
+            {/* Profile photo — max 2 MB */}
+            <View style={styles.avatarWrap}>
+              <Pressable onPress={changePhoto} disabled={uploadingAvatar} style={styles.avatar}>
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+                ) : (
+                  <Ionicons name="person" size={38} color={colors.inkSoft} />
+                )}
+                <View style={styles.avatarBadge}>
+                  {uploadingAvatar ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="camera" size={15} color={colors.white} />
+                  )}
+                </View>
+              </Pressable>
+              <Text style={styles.avatarHint}>Photo add karo (2 MB tak)</Text>
+            </View>
+
             <Text style={styles.label}>Poora naam</Text>
             <TextInput
               style={styles.input}
@@ -315,6 +360,32 @@ const styles = StyleSheet.create({
   back: { padding: 4 },
   title: { fontSize: 18, fontWeight: "700", color: colors.ink },
   content: { padding: 20, paddingBottom: 20 },
+  avatarWrap: { alignItems: "center", marginBottom: 8 },
+  avatar: {
+    height: 92,
+    width: 92,
+    borderRadius: 46,
+    backgroundColor: colors.creamDeep,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  avatarImg: { height: 92, width: 92, borderRadius: 46 },
+  avatarBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    height: 30,
+    width: 30,
+    borderRadius: 15,
+    backgroundColor: colors.terracotta,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.cream,
+  },
+  avatarHint: { marginTop: 10, fontSize: 13, color: colors.inkSoft },
   label: {
     marginTop: 18,
     marginBottom: 8,
