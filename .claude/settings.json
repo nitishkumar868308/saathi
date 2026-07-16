@@ -101,7 +101,22 @@
       "Read(//c/Users/Pratiek A Jain/Downloads/**)",
       "Bash(sed -i 's|executablePath: \"C:Program FilesGoogleChromeApplicationchrome.exe\"|executablePath: \"C:/Program Files/Google/Chrome/Application/chrome.exe\"|' sheet.mjs)",
       "Bash(node sheet.mjs)",
-      "Bash(printf '%s\\\\n' 'import puppeteer from \"puppeteer-core\";' 'const b = await puppeteer.launch\\({' '  executablePath: \"C:/Program Files/Google/Chrome/Application/chrome.exe\",' '  headless: \"new\",' '  args: [\"--allow-file-access-from-files\", \"--hide-scrollbars\"],' '}\\);' 'const pg = await b.newPage\\(\\);' 'await pg.setViewport\\({ width: 1000, height: 1810, deviceScaleFactor: 1 }\\);' 'await pg.goto\\(\"file:///d:/my-app/.reel/sheet.html\", { waitUntil: \"networkidle0\" }\\);' 'await pg.screenshot\\({ path: \"qa-sheet.png\" }\\);' 'await b.close\\(\\);' 'console.log\\(\"qa-sheet.png\"\\);')"
+      "Bash(printf '%s\\\\n' 'import puppeteer from \"puppeteer-core\";' 'const b = await puppeteer.launch\\({' '  executablePath: \"C:/Program Files/Google/Chrome/Application/chrome.exe\",' '  headless: \"new\",' '  args: [\"--allow-file-access-from-files\", \"--hide-scrollbars\"],' '}\\);' 'const pg = await b.newPage\\(\\);' 'await pg.setViewport\\({ width: 1000, height: 1810, deviceScaleFactor: 1 }\\);' 'await pg.goto\\(\"file:///d:/my-app/.reel/sheet.html\", { waitUntil: \"networkidle0\" }\\);' 'await pg.screenshot\\({ path: \"qa-sheet.png\" }\\);' 'await b.close\\(\\);' 'console.log\\(\"qa-sheet.png\"\\);')",
+      "Bash(node build-photo-clips.mjs)",
+      "Bash(awk '{print $NF, $5}')",
+      "Bash(curl -s \"http://localhost:3000/referral\" --max-time 30 -o /dev/null -w \"referral: %{http_code}\\\\n\")",
+      "Bash(curl -s \"http://localhost:3000/admin\" --max-time 30 -o /dev/null -w \"admin: %{http_code}\\\\n\")",
+      "Bash(echo \"=== referral/page.tsx ===\" && cat app/referral/page.tsx && echo \"=== admin/page.tsx ===\" && cat app/admin/page.tsx && echo \"=== FULL dev log ===\" && tail -40 /tmp/webdev.log)",
+      "Bash(curl -s \"http://localhost:3002/referral\" --max-time 30)",
+      "Bash(curl -s \"http://localhost:3002/admin\" --max-time 30)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(echo \"=== bacha hua first_n \\(comments/labels chhod ke\\) ===\" && grep -rn \"firstN\\\\|first_n\" web/components web/lib app-mobile/src | grep -v \"firstName\\\\|hata diya\\\\|SOURCE_LABEL\\\\|first_n: \\\\\"First-N offer\\\\\"\" | head; echo \"=== APP TSC ===\" && cd app-mobile && npx tsc --noEmit 2>&1 | head -10 && echo \"APP OK\" && cd ../web && echo \"=== WEB TSC ===\" && npx tsc --noEmit 2>&1 | head -10 && echo \"WEB OK\")",
+      "Read(//d//**)",
+      "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp OK'\\)\")",
+      "Bash(node _mark_preview.mjs)",
+      "Bash(node _mark_final.mjs)",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"
