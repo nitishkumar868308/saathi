@@ -80,16 +80,28 @@ async function countOwn(table: "documents" | "reminders"): Promise<number> {
   return count ?? 0;
 }
 
-/** Free user document limit (3) se aage nahi jaa sakta. */
+/**
+ * Free document limit se aage nahi jaa sakta.
+ * Limit admin (app_config) se aati hai — FREE_DOC_LIMIT sirf fallback hai.
+ * Warna admin 3 -> 10 kar de to bhi app 3 pe hi block karta rehta (server 10 pe).
+ */
 export async function canAddDocument(): Promise<boolean> {
-  const [{ isPlus }, count] = await Promise.all([getPlan(), countDocuments()]);
-  return isPlus || count < FREE_DOC_LIMIT;
+  const [{ isPlus }, count, offers] = await Promise.all([
+    getPlan(),
+    countDocuments(),
+    getOffers(),
+  ]);
+  return isPlus || count < (offers.freeDocuments || FREE_DOC_LIMIT);
 }
 
-/** Free user 5 se zyada reminders nahi bana sakta (spec item 2, 7). */
+/** Free reminder limit se aage nahi (admin config se; fallback 5). */
 export async function canAddReminder(): Promise<boolean> {
-  const [{ isPlus }, count] = await Promise.all([getPlan(), countReminders()]);
-  return isPlus || count < FREE_REMINDER_LIMIT;
+  const [{ isPlus }, count, offers] = await Promise.all([
+    getPlan(),
+    countReminders(),
+    getOffers(),
+  ]);
+  return isPlus || count < (offers.freeReminders || FREE_REMINDER_LIMIT);
 }
 
 /**
