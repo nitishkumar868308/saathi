@@ -117,9 +117,9 @@ type Dict = {
     billYearly: string;
     saveBadge: string;
     gstNote: string;
-    /** Template — {n} = users, {m} = mahine. `tpl()` se bharo. */
+    /** (Purana launch-offer text — ab use nahi hota.) */
     reward: string;
-    /** Template — {d} = din, {cap} = cap mahine. */
+    /** Template — {d} = referral din. `tpl()` se bharo. */
     referralHow: string;
     plans: {
       name: string;
@@ -165,7 +165,7 @@ type Dict = {
     sub: string;
     steps: string[];
     cta: string;
-    /** Template — {d} din, {cap} mahine */
+    /** Template — {d} referral din */
     capNote: string;
     loginTitle: string;
     loginSub: string;
@@ -187,7 +187,7 @@ type Dict = {
     share: string;
     statReferrals: string;
     statDays: string;
-    /** Template — {earned} {capDays} {cap} */
+    /** Template — {earned} din */
     capLine: string;
     /** Template — {x} */
     pending: string;
@@ -449,7 +449,7 @@ const hinglish: Dict = {
     saveBadge: "2 mahine free",
     gstNote: "+ 18% GST",
     reward: "🎁 Pehle {n} users ko Saathi Plus — poore {m} mahine bilkul FREE!",
-    referralHow: "Dost bulao: woh aapke code se join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din Plus free (max {cap} mahine).",
+    referralHow: "Refer & Earn: dost aapke code se join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din ka Saathi Plus plan free. Jitne chaaho, koi limit nahi.",
     plans: [
       {
         name: "Free",
@@ -485,7 +485,7 @@ const hinglish: Dict = {
         gst: true,
       },
     ],
-    note: "Dost bulao — dono ko {d} din Saathi Plus free. Plan kabhi bhi cancel karo.",
+    note: "Refer & Earn — dono ko {d} din ka Saathi Plus plan free. Subscription kabhi bhi cancel karo.",
   },
   faq: {
     heading: "Sawaal hain? Bilkul natural hai.",
@@ -531,7 +531,7 @@ const hinglish: Dict = {
       pricing: "Pricing",
       faq: "FAQ",
       about: "About",
-      referral: "Dost bulao 🎁",
+      referral: "Refer & Earn",
       contact: "Contact",
       privacy: "Privacy Policy",
       terms: "Terms of Service",
@@ -542,16 +542,16 @@ const hinglish: Dict = {
     madeIn: "Made with ❤️ for you",
   },
   referral: {
-    badge: "Dost bulao",
-    heading: "Dost ko bulao, dono ko Plus",
-    sub: "Aapka dost aapke code se join kare aur Saathi use karna shuru kare — dono ko {d} din Saathi Plus bilkul free.",
+    badge: "Refer & Earn",
+    heading: "Dost ko invite karo, dono ko Plus plan",
+    sub: "Aapka dost aapke code se join kare aur Saathi use karna shuru kare — dono ko {d} din ka Saathi Plus plan bilkul free.",
     steps: [
       "Apna referral link share karo",
       "Dost app download karke account banaye",
       "Woh apna pehla document daale aur Saathi se ek baar baat kare",
     ],
     cta: "Apna referral link lo",
-    capNote: "Har successful referral pe {d} din Plus — jitne chaaho, koi limit nahi.",
+    capNote: "Har successful referral pe {d} din ka Plus plan — jitne chaaho, koi limit nahi.",
     loginTitle: "Apna referral link lo",
     loginSub: "Wahi account jo app me use karte ho — usi se login karo.",
     email: "Email",
@@ -561,26 +561,26 @@ const hinglish: Dict = {
     google: "Google se continue karo",
     noAccount: "Account nahi hai?",
     downloadApp: "App download karo",
-    cardTitle: "Dono ko {d} din Plus free",
-    cardSub: "Apna link bhejo. Dost join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din Saathi Plus.",
+    cardTitle: "Dono ko {d} din ka Plus plan free",
+    cardSub: "Apna link bhejo. Dost join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din ka Saathi Plus plan.",
     yourCode: "Aapka code",
     copy: "Copy",
     copied: "Copied",
     whatsapp: "WhatsApp",
     share: "Share",
     statReferrals: "Successful referrals",
-    statDays: "Din kamaaye",
-    capLine: "{earned} / {capDays} din (max {cap} mahine)",
+    statDays: "Plus din kamaaye",
+    capLine: "Ab tak {earned} din ka Plus plan kamaaye.",
     pending: "{x} dost join to hue, par abhi unhone document add + chat poora nahi kiya.",
     openApp: "App kholo",
     logout: "Logout",
     disabled: "Referral program abhi band hai. Baad me dobara dekhein.",
     notConfigured: "Referral abhi web pe set nahi hai. Tab tak app se share karo.",
-    shareMessage: "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din Saathi Plus FREE:\n{link}",
+    shareMessage: "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din ka Saathi Plus plan FREE:\n{link}",
   },
   download: {
     button: "Play Store se download karo",
-    offerLine: "Dost bulao — dono ko {d} din Saathi Plus free",
+    offerLine: "Refer & Earn — dono ko {d} din ka Saathi Plus plan free",
     modalTitle: "Saathi ab app pe hai 📱",
     modalBody:
       "Plus subscription aur saare features Saathi app ke andar milte hain. Play Store se app download karo aur seedhe app se hi upgrade karo — bilkul secure, Google Play ke through.",
@@ -829,7 +829,7 @@ const hi: Dict = {
     saveBadge: "2 महीने फ्री",
     gstNote: "+ 18% GST",
     reward: "🎁 पहले {n} यूज़र्स को साथी प्लस — पूरे {m} महीने बिल्कुल फ्री!",
-    referralHow: "दोस्त बुलाइए: वो आपके कोड से जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन प्लस फ्री (अधिकतम {cap} महीने)।",
+    referralHow: "रेफ़र करें और पाएँ: दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन का साथी प्लस प्लान फ्री। जितने चाहें, कोई सीमा नहीं।",
     plans: [
       {
         name: "फ्री",
@@ -865,7 +865,7 @@ const hi: Dict = {
         gst: true,
       },
     ],
-    note: "दोस्त बुलाइए — दोनों को {d} दिन साथी प्लस फ्री। प्लान कभी भी कैंसल करें।",
+    note: "रेफ़र करें और पाएँ — दोनों को {d} दिन का साथी प्लस प्लान फ्री। सब्सक्रिप्शन कभी भी कैंसल करें।",
   },
   faq: {
     heading: "सवाल हैं? बिल्कुल स्वाभाविक है।",
@@ -911,7 +911,7 @@ const hi: Dict = {
       pricing: "प्राइसिंग",
       faq: "FAQ",
       about: "हमारे बारे में",
-      referral: "दोस्त बुलाइए 🎁",
+      referral: "रेफ़र करें और पाएँ",
       contact: "संपर्क",
       privacy: "प्राइवेसी पॉलिसी",
       terms: "सेवा की शर्तें",
@@ -922,16 +922,16 @@ const hi: Dict = {
     madeIn: "आपके लिए ❤️ से बना",
   },
   referral: {
-    badge: "दोस्त बुलाइए",
-    heading: "दोस्त को बुलाइए, दोनों को प्लस",
-    sub: "आपका दोस्त आपके कोड से जॉइन करे और साथी इस्तेमाल करना शुरू करे — दोनों को {d} दिन साथी प्लस बिल्कुल फ्री।",
+    badge: "रेफ़र करें और पाएँ",
+    heading: "दोस्त को इनवाइट करें, दोनों को प्लस प्लान",
+    sub: "आपका दोस्त आपके कोड से जॉइन करे और साथी इस्तेमाल करना शुरू करे — दोनों को {d} दिन का साथी प्लस प्लान बिल्कुल फ्री।",
     steps: [
       "अपना रेफ़रल लिंक शेयर करें",
       "दोस्त ऐप डाउनलोड करके अकाउंट बनाए",
       "वो अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे",
     ],
     cta: "अपना रेफ़रल लिंक लें",
-    capNote: "हर सफल रेफ़रल पर {d} दिन प्लस — जितने चाहें, कोई सीमा नहीं।",
+    capNote: "हर सफल रेफ़रल पर {d} दिन का प्लस प्लान — जितने चाहें, कोई सीमा नहीं।",
     loginTitle: "अपना रेफ़रल लिंक लें",
     loginSub: "वही अकाउंट जो ऐप में इस्तेमाल करते हैं — उसी से लॉगिन करें।",
     email: "ईमेल",
@@ -941,26 +941,26 @@ const hi: Dict = {
     google: "Google से जारी रखें",
     noAccount: "अकाउंट नहीं है?",
     downloadApp: "ऐप डाउनलोड करें",
-    cardTitle: "दोनों को {d} दिन प्लस फ्री",
-    cardSub: "अपना लिंक भेजिए। दोस्त जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन साथी प्लस।",
+    cardTitle: "दोनों को {d} दिन का प्लस प्लान फ्री",
+    cardSub: "अपना लिंक भेजिए। दोस्त जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन का साथी प्लस प्लान।",
     yourCode: "आपका कोड",
     copy: "कॉपी",
     copied: "कॉपी हो गया",
     whatsapp: "WhatsApp",
     share: "शेयर",
     statReferrals: "सफल रेफ़रल",
-    statDays: "दिन कमाए",
-    capLine: "{earned} / {capDays} दिन (अधिकतम {cap} महीने)",
+    statDays: "प्लस दिन कमाए",
+    capLine: "अब तक {earned} दिन का प्लस प्लान कमाया।",
     pending: "{x} दोस्त जॉइन तो हुए, पर अभी उन्होंने डॉक्यूमेंट + चैट पूरा नहीं किया।",
     openApp: "ऐप खोलें",
     logout: "लॉगआउट",
     disabled: "रेफ़रल प्रोग्राम अभी बंद है। बाद में दोबारा देखें।",
     notConfigured: "रेफ़रल अभी वेब पर सेट नहीं है। तब तक ऐप से शेयर करें।",
-    shareMessage: "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्यूमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन साथी प्लस फ्री:\n{link}",
+    shareMessage: "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्यूमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन का साथी प्लस प्लान फ्री:\n{link}",
   },
   download: {
     button: "Play Store से डाउनलोड करें",
-    offerLine: "दोस्त बुलाइए — दोनों को {d} दिन साथी प्लस फ्री",
+    offerLine: "रेफ़र करें और पाएँ — दोनों को {d} दिन का साथी प्लस प्लान फ्री",
     modalTitle: "साथी अब ऐप पर है 📱",
     modalBody:
       "प्लस सब्सक्रिप्शन और सारे फ़ीचर्स साथी ऐप के अंदर मिलते हैं। Play Store से ऐप डाउनलोड करें और सीधे ऐप से ही अपग्रेड करें — बिल्कुल सुरक्षित, Google Play के ज़रिए।",
@@ -1209,7 +1209,7 @@ const en: Dict = {
     saveBadge: "2 months free",
     gstNote: "+ 18% GST",
     reward: "🎁 First {n} users get Saathi Plus — {m} full months absolutely FREE!",
-    referralHow: "Refer a friend: they join with your code, add their first document and chat with Saathi once — you both get {d} days of Plus free (up to {cap} months).",
+    referralHow: "Refer & Earn: your friend joins with your code, adds their first document and chats with Saathi once — you both get {d} days of the Saathi Plus plan free. No limit.",
     plans: [
       {
         name: "Free",
@@ -1245,7 +1245,7 @@ const en: Dict = {
         gst: true,
       },
     ],
-    note: "First {n} users get {m} months of Saathi Plus free. Refer a friend — both get {d} extra days.",
+    note: "Refer & Earn — both get {d} days of the Saathi Plus plan free. Cancel your subscription anytime.",
   },
   faq: {
     heading: "Got questions? Totally natural.",
@@ -1291,7 +1291,7 @@ const en: Dict = {
       pricing: "Pricing",
       faq: "FAQ",
       about: "About",
-      referral: "Refer a friend 🎁",
+      referral: "Refer & Earn",
       contact: "Contact",
       privacy: "Privacy Policy",
       terms: "Terms of Service",
@@ -1302,16 +1302,16 @@ const en: Dict = {
     madeIn: "Made with ❤️ for you",
   },
   referral: {
-    badge: "Refer a friend",
-    heading: "Invite a friend, both get Plus",
-    sub: "Your friend joins with your code and starts using Saathi — you both get {d} days of Saathi Plus, free.",
+    badge: "Refer & Earn",
+    heading: "Invite a friend, both get the Plus plan",
+    sub: "Your friend joins with your code and starts using Saathi — you both get {d} days of the Saathi Plus plan, free.",
     steps: [
       "Share your referral link",
       "Your friend downloads the app and creates an account",
       "They add their first document and chat with Saathi once",
     ],
     cta: "Get your referral link",
-    capNote: "{d} days of Plus for every successful referral — no limit.",
+    capNote: "{d} days of the Plus plan for every successful referral — no limit.",
     loginTitle: "Get your referral link",
     loginSub: "Same account you use in the app — sign in with it here.",
     email: "Email",
@@ -1321,26 +1321,26 @@ const en: Dict = {
     google: "Continue with Google",
     noAccount: "No account yet?",
     downloadApp: "Download the app",
-    cardTitle: "You both get {d} days of Plus",
-    cardSub: "Send your link. Your friend joins, adds their first document and chats with Saathi once — you both get {d} days of Saathi Plus.",
+    cardTitle: "You both get {d} days of the Plus plan",
+    cardSub: "Send your link. Your friend joins, adds their first document and chats with Saathi once — you both get {d} days of the Saathi Plus plan.",
     yourCode: "Your code",
     copy: "Copy",
     copied: "Copied",
     whatsapp: "WhatsApp",
     share: "Share",
     statReferrals: "Successful referrals",
-    statDays: "Days earned",
-    capLine: "{earned} / {capDays} days (max {cap} months)",
+    statDays: "Plus days earned",
+    capLine: "You've earned {earned} days of the Plus plan so far.",
     pending: "{x} friend(s) joined, but haven't added a document and chatted yet.",
     openApp: "Open the app",
     logout: "Sign out",
     disabled: "The referral program is paused right now. Please check back soon.",
     notConfigured: "Referrals aren't set up on the web yet. Share from the app for now.",
-    shareMessage: "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of Saathi Plus free:\n{link}",
+    shareMessage: "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of the Saathi Plus plan free:\n{link}",
   },
   download: {
     button: "Download on Play Store",
-    offerLine: "Refer a friend — both get {d} days of Saathi Plus free",
+    offerLine: "Refer & Earn — both get {d} days of the Saathi Plus plan free",
     modalTitle: "Saathi lives in the app 📱",
     modalBody:
       "Plus and every feature live inside the Saathi app. Download it from the Play Store and upgrade right there — secure, through Google Play.",

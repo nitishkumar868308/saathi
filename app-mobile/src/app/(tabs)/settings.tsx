@@ -222,7 +222,7 @@ export default function Settings() {
           >
             <Ionicons name="gift-outline" size={20} color={colors.terracotta} />
             <Text style={styles.detailsText}>
-              Dost bulao — dono ko {offers.referralDays} din Plus free
+              Refer & Earn — dono ko {offers.referralDays} din ka Plus plan free
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.line} />
           </Pressable>

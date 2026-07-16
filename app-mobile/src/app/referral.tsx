@@ -37,7 +37,7 @@ export default function Referral() {
       await Share.share({
         message:
           `Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\n` +
-          `Mere code se join karo, dono ko ${info.referralDays} din Saathi Plus FREE:\n${link}`,
+          `Mere code se join karo, dono ko ${info.referralDays} din ka Saathi Plus plan FREE:\n${link}`,
       });
     } catch {
       /* user cancelled */
@@ -52,7 +52,7 @@ export default function Referral() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
           <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={styles.title}>Dost bulao</Text>
+        <Text style={styles.title}>Refer & Earn</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -66,11 +66,12 @@ export default function Referral() {
               <Ionicons name="gift" size={30} color={colors.white} />
             </View>
             <Text style={styles.heroTitle}>
-              Dono ko {info?.referralDays ?? 15} din Plus FREE
+              Dono ko {info?.referralDays ?? 15} din ka Plus plan FREE
             </Text>
             <Text style={styles.heroSub}>
               Aapka dost aapke code se join kare, apna pehla document daale aur Saathi se
-              baat kare — dono ko {info?.referralDays ?? 15} din Saathi Plus mil jaayega.
+              baat kare — dono ko {info?.referralDays ?? 15} din ka Saathi Plus plan mil
+              jaayega.
             </Text>
           </View>
 
@@ -93,14 +94,14 @@ export default function Referral() {
             </View>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{earned}</Text>
-              <Text style={styles.statLabel}>Din kamaaye</Text>
+              <Text style={styles.statLabel}>Plus din kamaaye</Text>
             </View>
           </View>
 
           {/* Koi limit nahi — jitne chaaho refer karo */}
           <Text style={styles.capLabel}>
-            Jitne dost bulao — har successful referral pe {info?.referralDays ?? 15} din
-            Plus. Koi limit nahi.
+            Jitne dost invite karo — har successful referral pe {info?.referralDays ?? 15}{" "}
+            din ka Plus plan. Koi limit nahi.
           </Text>
 
           {(info?.totalReferrals ?? 0) > (info?.rewardedReferrals ?? 0) && (

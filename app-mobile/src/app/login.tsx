@@ -176,7 +176,7 @@ export default function Login() {
               <TextInput
                 value={refCode}
                 onChangeText={(t) => setRefCode(t.toUpperCase())}
-                placeholder={`Dost ka code — dono ko ${offers.referralDays} din Plus free`}
+                placeholder={`Dost ka code — dono ko ${offers.referralDays} din ka Plus plan free`}
                 placeholderTextColor={colors.inkSoft}
                 autoCapitalize="characters"
                 autoCorrect={false}

@@ -35,7 +35,7 @@ export default async function ReferralInvite({ params }: { params: { code: strin
         </h1>
         <p className="mt-2.5 text-ink-soft">
           Is code se join karo — aapko aur aapke dost, <strong className="text-ink">dono ko{" "}
-          {days} din Saathi Plus free</strong> milega.
+          {days} din ka Saathi Plus plan free</strong> milega.
         </p>
 
         <div className="mt-6 rounded-2xl border-2 border-dashed border-terracotta bg-terracotta/[0.07] py-5">
@@ -76,7 +76,7 @@ export default async function ReferralInvite({ params }: { params: { code: strin
             ))}
           </ol>
           <p className="mt-3 text-xs text-ink-soft">
-            Chaaron ho gaye — dono ko {days} din Saathi Plus. 🎉
+            Chaaron ho gaye — dono ko {days} din ka Saathi Plus plan. 🎉
           </p>
         </div>
       </div>

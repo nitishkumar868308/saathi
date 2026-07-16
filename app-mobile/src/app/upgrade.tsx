@@ -231,10 +231,10 @@ export default function Upgrade() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.referTitle}>
-                    Ya {offers.referralDays} din Plus FREE kamao
+                    Ya {offers.referralDays} din ka Plus plan FREE kamao
                   </Text>
                   <Text style={styles.referSub}>
-                    Dost bulao — dono ko {offers.referralDays} din Saathi Plus
+                    Refer & Earn — dono ko {offers.referralDays} din ka Saathi Plus plan
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.terracotta} />

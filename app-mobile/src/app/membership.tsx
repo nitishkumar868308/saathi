@@ -134,7 +134,7 @@ export default function Membership() {
                 title="Aapke referrals"
                 right={
                   <Pressable onPress={() => router.push("/referral" as never)}>
-                    <Text style={styles.link}>Bulao</Text>
+                    <Text style={styles.link}>Invite karo</Text>
                   </Pressable>
                 }
               />
