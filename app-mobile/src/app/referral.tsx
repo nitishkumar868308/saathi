@@ -45,8 +45,6 @@ export default function Referral() {
   }
 
   const earned = info?.daysEarned ?? 0;
-  const cap = info?.capDays ?? 180;
-  const pct = Math.min(100, Math.round((earned / cap) * 100));
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -99,13 +97,11 @@ export default function Referral() {
             </View>
           </View>
 
-          {/* Cap progress */}
+          {/* Koi limit nahi — jitne chaaho refer karo */}
           <Text style={styles.capLabel}>
-            {earned} / {cap} din (max {Math.round(cap / 30)} mahine)
+            Jitne dost bulao — har successful referral pe {info?.referralDays ?? 15} din
+            Plus. Koi limit nahi.
           </Text>
-          <View style={styles.bar}>
-            <View style={[styles.barFill, { width: `${pct}%` }]} />
-          </View>
 
           {(info?.totalReferrals ?? 0) > (info?.rewardedReferrals ?? 0) && (
             <Text style={styles.pending}>

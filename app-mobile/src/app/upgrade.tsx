@@ -23,13 +23,6 @@ import {
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { useOffers } from "@/lib/use-offers";
 
-const FREE_FEATURES = [
-  "5 active reminders",
-  "3 documents",
-  "Expiry reminders",
-  "Voice + text reminders",
-];
-
 const PLUS_FEATURES = [
   "Unlimited reminders",
   "Unlimited documents",
@@ -66,10 +59,16 @@ export default function Upgrade() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rewardsVersion]);
 
-  const base = yearly ? 999 : 99;
-  // GST abhi off (registration nahi) — base price hi lenge.
-  // const total = Math.round(base * 1.18);
+  // Price aur Free limits admin se (app_config) aate hain.
+  const base = yearly ? offers.plusPriceYearly : offers.plusPriceMonthly;
   const period = yearly ? "/saal" : "/mahina";
+
+  const FREE_FEATURES = [
+    `${offers.freeReminders} active reminders`,
+    `${offers.freeDocuments} documents`,
+    "Expiry reminders",
+    "Voice + text reminders",
+  ];
 
   async function startCheckout() {
     if (paying) return;

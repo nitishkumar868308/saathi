@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gift, Loader2, Save, UserPlus } from "lucide-react";
+import { Gift, Loader2, Save, UserPlus, SlidersHorizontal } from "lucide-react";
 
-// Launch offer (first_n_*) hata diya gaya — sirf referral config rehta hai.
+// Launch offer (first_n_*) hata diya gaya — referral + plan limits + price.
 type Config = {
   referrals_enabled: boolean;
   referral_days: number;
-  referral_cap_months: number;
+  free_reminders: number;
+  free_documents: number;
+  plus_price_monthly: number;
+  plus_price_yearly: number;
 };
 
 type Stats = {
@@ -19,7 +22,10 @@ type Stats = {
 const DEFAULTS: Config = {
   referrals_enabled: true,
   referral_days: 15,
-  referral_cap_months: 6,
+  free_reminders: 5,
+  free_documents: 3,
+  plus_price_monthly: 99,
+  plus_price_yearly: 999,
 };
 
 const label = "block text-xs font-semibold uppercase tracking-wide text-ink-soft";
@@ -129,6 +135,73 @@ export default function AdminRewards() {
         </div>
       )}
 
+      {/* Plans & Limits — Free limits aur Plus price */}
+      <div className="rounded-2xl border border-line bg-surface p-5">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal size={17} className="text-terracotta" />
+          <h3 className="font-display text-lg font-semibold">Plans & Limits</h3>
+        </div>
+        <p className="mt-1.5 text-sm text-ink-soft">
+          Free plan ki limit aur Plus ka daam yahin se badlo — app aur web dono
+          turant utha lete hain.
+        </p>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className={label}>Free reminders</label>
+            <input
+              type="number"
+              className={input}
+              value={cfg.free_reminders}
+              onChange={(e) => setCfg({ ...cfg, free_reminders: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <label className={label}>Free documents</label>
+            <input
+              type="number"
+              className={input}
+              value={cfg.free_documents}
+              onChange={(e) => setCfg({ ...cfg, free_documents: Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <label className={label}>Plus ₹ / mahina</label>
+            <input
+              type="number"
+              className={input}
+              value={cfg.plus_price_monthly}
+              onChange={(e) =>
+                setCfg({ ...cfg, plus_price_monthly: Number(e.target.value) })
+              }
+            />
+          </div>
+          <div>
+            <label className={label}>Plus ₹ / saal</label>
+            <input
+              type="number"
+              className={input}
+              value={cfg.plus_price_yearly}
+              onChange={(e) =>
+                setCfg({ ...cfg, plus_price_yearly: Number(e.target.value) })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark disabled:opacity-60"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            Save
+          </button>
+          {msg && <span className="text-sm text-ink-soft">{msg}</span>}
+        </div>
+      </div>
+
       {/* Config */}
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-2">
@@ -136,7 +209,7 @@ export default function AdminRewards() {
           <h3 className="font-display text-lg font-semibold">Referrals</h3>
         </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-3">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
             <label className={label}>Referral din (dono ko)</label>
             <input
@@ -144,17 +217,6 @@ export default function AdminRewards() {
               className={input}
               value={cfg.referral_days}
               onChange={(e) => setCfg({ ...cfg, referral_days: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className={label}>Cap (mahine, referrer)</label>
-            <input
-              type="number"
-              className={input}
-              value={cfg.referral_cap_months}
-              onChange={(e) =>
-                setCfg({ ...cfg, referral_cap_months: Number(e.target.value) })
-              }
             />
           </div>
           <div className="flex items-end pb-1">

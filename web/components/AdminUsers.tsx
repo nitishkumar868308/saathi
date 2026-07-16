@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Check,
   Clock,
-  Ban,
 } from "lucide-react";
 
 type AdminUser = {
@@ -35,7 +34,6 @@ type UserReferral = {
   qualified_at: string | null;
   rewarded_at: string | null;
   days: number;
-  cap_skipped: boolean;
 };
 
 type UserDetail = {
@@ -49,7 +47,6 @@ type UserDetail = {
   referral_code: string | null;
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
-  cap_days: number;
   referrals: UserReferral[];
 };
 
@@ -408,11 +405,6 @@ function Detail({ id }: { id: string }) {
     );
   }
 
-  const capPct = Math.min(
-    100,
-    Math.round((detail.referral_days_earned / Math.max(1, detail.cap_days)) * 100),
-  );
-
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       {/* Left: facts */}
@@ -428,6 +420,10 @@ function Detail({ id }: { id: string }) {
           }
         />
         <DetailRow
+          label="Referral se kamaaye"
+          value={`${detail.referral_days_earned} din`}
+        />
+        <DetailRow
           label="Plan khatam"
           value={
             detail.plan === "plus" && !detail.plan_expires_at
@@ -435,18 +431,6 @@ function Detail({ id }: { id: string }) {
               : fmtDate(detail.plan_expires_at)
           }
         />
-
-        <div className="pt-1.5">
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-ink-soft">Referral cap</span>
-            <span className="font-semibold text-ink">
-              {detail.referral_days_earned} / {detail.cap_days} din
-            </span>
-          </div>
-          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-line">
-            <div className="h-full rounded-full bg-sage" style={{ width: `${capPct}%` }} />
-          </div>
-        </div>
       </div>
 
       {/* Right: kisko refer kiya */}
@@ -472,23 +456,13 @@ function Detail({ id }: { id: string }) {
 
 function ReferralItem({ r }: { r: UserReferral }) {
   const done = Boolean(r.rewarded_at);
-  // Rewarded par 0 din = us waqt referrer cap bhar chuka tha.
-  const tone = !done ? "pending" : r.cap_skipped ? "capped" : "done";
 
-  const Icon = tone === "done" ? Check : tone === "capped" ? Ban : Clock;
-  const iconCls =
-    tone === "done"
-      ? "bg-sage text-white"
-      : tone === "capped"
-        ? "bg-amber-warm/25 text-ink-soft"
-        : "bg-cream-deep text-ink-soft";
+  const Icon = done ? Check : Clock;
+  const iconCls = done ? "bg-sage text-white" : "bg-cream-deep text-ink-soft";
 
-  const note =
-    tone === "done"
-      ? `${fmtDate(r.rewarded_at)} · +${r.days} din`
-      : tone === "capped"
-        ? `${fmtDate(r.rewarded_at)} · cap bhar chuka tha, din nahi mile`
-        : `Joined ${fmtDate(r.joined_at)} · document + chat pending`;
+  const note = done
+    ? `${fmtDate(r.rewarded_at)} · +${r.days} din`
+    : `Joined ${fmtDate(r.joined_at)} · document + chat pending`;
 
   return (
     <li className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5">
@@ -503,7 +477,7 @@ function ReferralItem({ r }: { r: UserReferral }) {
         </p>
         <p className="truncate text-xs text-ink-soft">{note}</p>
       </div>
-      {tone === "done" && (
+      {done && (
         <span className="shrink-0 text-sm font-bold text-sage">+{r.days}</span>
       )}
     </li>

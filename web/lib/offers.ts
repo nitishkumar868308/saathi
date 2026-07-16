@@ -12,17 +12,24 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Launch offer (pehle-N users ko X mahine free) poori tarah HATA diya gaya —
-// spec item 1. Har naya user Free se shuru. Sirf referral rehta hai.
+// spec item 1. Har naya user Free se shuru. Referral + plan limits + price.
+// Referral pe koi cap nahi — jitne chaaho refer karo (cap hata diya gaya).
 export type Offers = {
   referralsEnabled: boolean;
   referralDays: number;
-  referralCapMonths: number;
+  freeReminders: number;
+  freeDocuments: number;
+  plusPriceMonthly: number;
+  plusPriceYearly: number;
 };
 
 export const DEFAULT_OFFERS: Offers = {
   referralsEnabled: true,
   referralDays: 15,
-  referralCapMonths: 6,
+  freeReminders: 5,
+  freeDocuments: 3,
+  plusPriceMonthly: 99,
+  plusPriceYearly: 999,
 };
 
 export async function getOffers(): Promise<Offers> {
@@ -52,7 +59,10 @@ export async function getOffers(): Promise<Offers> {
     return {
       referralsEnabled: bool("referrals_enabled", DEFAULT_OFFERS.referralsEnabled),
       referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
-      referralCapMonths: num("referral_cap_months", DEFAULT_OFFERS.referralCapMonths),
+      freeReminders: num("free_reminders", DEFAULT_OFFERS.freeReminders),
+      freeDocuments: num("free_documents", DEFAULT_OFFERS.freeDocuments),
+      plusPriceMonthly: num("plus_price_monthly", DEFAULT_OFFERS.plusPriceMonthly),
+      plusPriceYearly: num("plus_price_yearly", DEFAULT_OFFERS.plusPriceYearly),
     };
   } catch {
     return DEFAULT_OFFERS;

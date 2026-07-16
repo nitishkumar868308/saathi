@@ -140,17 +140,23 @@ export async function checkReferralQualification(): Promise<string> {
   }
 }
 
-// Launch offer (first_n_*) poori tarah hata diya gaya — sirf referral rehta hai.
+// Launch offer hata diya. Referral (bina cap) + Free limits + Plus price.
 export type Offers = {
   referralsEnabled: boolean;
   referralDays: number;
-  referralCapMonths: number;
+  freeReminders: number;
+  freeDocuments: number;
+  plusPriceMonthly: number;
+  plusPriceYearly: number;
 };
 
 export const DEFAULT_OFFERS: Offers = {
   referralsEnabled: true,
   referralDays: 15,
-  referralCapMonths: 6,
+  freeReminders: 5,
+  freeDocuments: 3,
+  plusPriceMonthly: 99,
+  plusPriceYearly: 999,
 };
 
 /**
@@ -177,7 +183,10 @@ export async function getOffers(): Promise<Offers> {
     return {
       referralsEnabled: bool("referrals_enabled", DEFAULT_OFFERS.referralsEnabled),
       referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
-      referralCapMonths: num("referral_cap_months", DEFAULT_OFFERS.referralCapMonths),
+      freeReminders: num("free_reminders", DEFAULT_OFFERS.freeReminders),
+      freeDocuments: num("free_documents", DEFAULT_OFFERS.freeDocuments),
+      plusPriceMonthly: num("plus_price_monthly", DEFAULT_OFFERS.plusPriceMonthly),
+      plusPriceYearly: num("plus_price_yearly", DEFAULT_OFFERS.plusPriceYearly),
     };
   } catch {
     return DEFAULT_OFFERS;
@@ -187,7 +196,6 @@ export async function getOffers(): Promise<Offers> {
 export type ReferralInfo = {
   code: string | null;
   daysEarned: number;
-  capDays: number;
   referralDays: number;
   totalReferrals: number;
   rewardedReferrals: number;
@@ -201,7 +209,6 @@ export async function getReferralInfo(): Promise<ReferralInfo> {
   const empty: ReferralInfo = {
     code: null,
     daysEarned: 0,
-    capDays: 180,
     referralDays: 15,
     totalReferrals: 0,
     rewardedReferrals: 0,
@@ -221,7 +228,6 @@ export async function getReferralInfo(): Promise<ReferralInfo> {
   return {
     code: (prof?.referral_code as string) ?? null,
     daysEarned: (prof?.referral_days_earned as number) ?? 0,
-    capDays: num("referral_cap_months", 6) * 30,
     referralDays: num("referral_days", 15),
     totalReferrals: list.length,
     rewardedReferrals: list.filter((r) => r.rewarded_at).length,
@@ -238,8 +244,6 @@ export type MyReferral = {
   rewarded_at: string | null;
   /** Grant ke waqt jitne din mile the (config baad me badle to bhi yahi). */
   days: number;
-  /** Cap pe pahunch chuke the, isliye din nahi mile. */
-  cap_skipped: boolean;
 };
 
 export type MyRewards = {
@@ -251,7 +255,6 @@ export type MyRewards = {
   referral_days_earned: number;
   referred_by_code: string | null;
   referral_days_now: number;
-  cap_days: number;
   referrals_enabled: boolean;
   referrals: MyReferral[];
 };

@@ -22,10 +22,7 @@ export default function Pricing() {
 
   // Admin se numbers badalte hi ye copy khud badal jaati hai.
   const offers = useOffers();
-  const vars = {
-    d: offers.referralDays,
-    cap: offers.referralCapMonths,
-  };
+  const vars = { d: offers.referralDays };
 
   return (
     <div>
@@ -87,7 +84,12 @@ export default function Pricing() {
       <div className="mx-auto mt-8 grid max-w-3xl gap-5 sm:grid-cols-2">
         {t.plans.map((plan) => {
           const highlight = plan.highlight;
-          const price = yearly && plan.priceYearly ? plan.priceYearly : plan.price;
+          // Plus ka daam admin (app_config) se; Free ₹0 hi rehta hai.
+          const price = highlight
+            ? `₹${yearly ? offers.plusPriceYearly : offers.plusPriceMonthly}`
+            : yearly && plan.priceYearly
+              ? plan.priceYearly
+              : plan.price;
           const period =
             yearly && plan.periodYearly ? plan.periodYearly : plan.period;
           // GST abhi off:

@@ -19,8 +19,7 @@ create table if not exists public.app_config (
 -- Launch offer (first_n_*) hata diya gaya — sirf referral config seed hota hai.
 insert into public.app_config(key, value) values
   ('referrals_enabled',   'true'::jsonb),
-  ('referral_days',       '15'::jsonb),
-  ('referral_cap_months', '6'::jsonb)
+  ('referral_days',       '15'::jsonb)
 on conflict (key) do nothing;
 
 alter table public.app_config enable row level security;
@@ -189,7 +188,7 @@ grant execute on function public.apply_referral_code(text) to authenticated;
 
 create or replace function public.check_referral_qualification()
 returns text language plpgsql security definer set search_path = public as $$
-declare r record; days int; cap_days int; earned int; gave_referrer int := 0; skipped boolean := false;
+declare r record; days int; earned int;
 begin
   if auth.uid() is null then return 'no_auth'; end if;
   if not public.cfg_bool('referrals_enabled', true) then return 'disabled'; end if;
@@ -207,30 +206,23 @@ begin
     return 'need_chat';
   end if;
 
-  days     := public.cfg_int('referral_days', 15);
-  cap_days := public.cfg_int('referral_cap_months', 6) * 30;
+  days := public.cfg_int('referral_days', 15);
 
+  -- Koi cap nahi — jitne referrals, utne din. Referrer ko hamesha milte hain.
   select referral_days_earned into earned from public.profiles where id = r.referrer_id;
-  if coalesce(earned, 0) + days <= cap_days then
-    perform public.grant_plus_days(r.referrer_id, days, 'referral');
-    update public.profiles set referral_days_earned = coalesce(earned, 0) + days
-     where id = r.referrer_id;
-    gave_referrer := days;
-  else
-    skipped := true;   -- referrer cap pe pahunch gaya
-  end if;
+  perform public.grant_plus_days(r.referrer_id, days, 'referral');
+  update public.profiles set referral_days_earned = coalesce(earned, 0) + days
+   where id = r.referrer_id;
 
-  -- Naye user ko hamesha (uska ek-baar ka reward)
+  -- Naye user ko bhi (uska ek-baar ka reward)
   perform public.grant_plus_days(auth.uid(), days, 'referral');
 
-  -- Aaj ke din ke numbers yahin freeze — kal admin 15 ko 30 kar de to bhi
-  -- ye referral 15 hi dikhega.
+  -- Aaj ke din ke din yahin freeze — kal admin 15 ko 30 kar de to bhi ye 15 hi rahe.
   update public.referrals
      set qualified_at  = coalesce(qualified_at, now()),
          rewarded_at   = now(),
-         referrer_days = gave_referrer,
-         referee_days  = days,
-         cap_skipped   = skipped
+         referrer_days = days,
+         referee_days  = days
    where id = r.id;
   return 'rewarded';
 end;
@@ -287,7 +279,6 @@ begin
     'referred_by_code',     (select referral_code from public.profiles where id = p.referred_by),
     -- live config (badal sakta hai)
     'referral_days_now',    public.cfg_int('referral_days', 15),
-    'cap_days',             public.cfg_int('referral_cap_months', 6) * 30,
     'referrals_enabled',    public.cfg_bool('referrals_enabled', true),
     'referrals', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -297,8 +288,7 @@ begin
         'joined_at',    r.created_at,
         'qualified_at', r.qualified_at,
         'rewarded_at',  r.rewarded_at,
-        'days',         r.referrer_days,
-        'cap_skipped',  r.cap_skipped
+        'days',         r.referrer_days
       ) order by r.created_at desc)
       from public.referrals r
       left join public.profiles rp on rp.id = r.referee_id
@@ -333,7 +323,6 @@ begin
       select jsonb_build_object('email', rb.email, 'code', rb.referral_code)
       from public.profiles rb where rb.id = p.referred_by
     ),
-    'cap_days', public.cfg_int('referral_cap_months', 6) * 30,
     'referrals', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id',           r.id,
@@ -342,8 +331,7 @@ begin
         'joined_at',    r.created_at,
         'qualified_at', r.qualified_at,
         'rewarded_at',  r.rewarded_at,
-        'days',         r.referrer_days,
-        'cap_skipped',  r.cap_skipped
+        'days',         r.referrer_days
       ) order by r.created_at desc)
       from public.referrals r
       left join public.profiles rp on rp.id = r.referee_id

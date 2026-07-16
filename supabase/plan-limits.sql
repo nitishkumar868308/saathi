@@ -23,6 +23,8 @@ insert into public.app_config(key, value) values
 on conflict (key) do nothing;
 
 -- Launch offer poori tarah hata diya gaya — dekho supabase/remove-launch-offer.sql.
+-- Referral cap bhi hata diya gaya — jitne chaaho referral karo, koi limit nahi.
+delete from public.app_config where key = 'referral_cap_months';
 
 /* ------------------------------------------------------------------ */
 /* 2. Naye columns — pause (reminders) aur lock (documents)            */

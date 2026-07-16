@@ -124,7 +124,7 @@ export default function Membership() {
             <Row
               icon="gift"
               label="Referral se kamaaye"
-              value={`${data.referral_days_earned} / ${data.cap_days} din`}
+              value={`${data.referral_days_earned} din`}
             />
           )}
 
@@ -215,12 +215,9 @@ function ReferralRow({ r }: { r: MyReferral }) {
   const done = Boolean(r.rewarded_at);
   const who = r.name?.trim() || r.email || "Naya dost";
 
-  // Reward mila par din 0 — matlab us waqt cap bhar chuka tha.
-  const detail = !done
-    ? `Joined ${fmt(r.joined_at)} · abhi pending`
-    : r.cap_skipped
-      ? `${fmt(r.rewarded_at)} · cap bhar chuka tha`
-      : `${fmt(r.rewarded_at)} · +${r.days} din`;
+  const detail = done
+    ? `${fmt(r.rewarded_at)} · +${r.days} din`
+    : `Joined ${fmt(r.joined_at)} · abhi pending`;
 
   return (
     <View style={styles.refRow}>
@@ -237,7 +234,7 @@ function ReferralRow({ r }: { r: MyReferral }) {
         </Text>
         <Text style={styles.refDetail}>{detail}</Text>
       </View>
-      {done && !r.cap_skipped && <Text style={styles.refDays}>+{r.days}</Text>}
+      {done && <Text style={styles.refDays}>+{r.days}</Text>}
     </View>
   );
 }

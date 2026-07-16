@@ -129,7 +129,6 @@ export default function ReferralClient() {
   }, []);
 
   const days = offers.referralDays;
-  const cap = offers.referralCapMonths;
   const hero = (
     <Hero badge={t.badge} heading={t.heading} sub={tpl(t.sub, { d: days })} />
   );
@@ -176,13 +175,13 @@ export default function ReferralClient() {
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-10">
           {/* Mobile pe pehle asli kaam (code / login), steps neeche */}
           <div className="order-1">
-            {session ? <ReferralCard session={session} days={days} cap={cap} /> : <LoginCard />}
+            {session ? <ReferralCard session={session} days={days} /> : <LoginCard />}
           </div>
           <Card className="order-2 lg:sticky lg:top-24">
             <h2 className="font-display text-xl font-semibold">{t.heading}</h2>
             <p className="mt-1.5 text-sm text-ink-soft">{tpl(t.sub, { d: days })}</p>
             <div className="mt-6">
-              <Steps steps={t.steps} capNote={tpl(t.capNote, { d: days, cap })} />
+              <Steps steps={t.steps} capNote={tpl(t.capNote, { d: days })} />
             </div>
           </Card>
         </div>
@@ -291,7 +290,7 @@ function LoginCard() {
 
 /* ------------------------------ Referral ----------------------------- */
 
-function ReferralCard({ session, days, cap }: { session: Session; days: number; cap: number }) {
+function ReferralCard({ session, days }: { session: Session; days: number }) {
   const { referral: t } = useT();
   const [info, setInfo] = useState<Info | null>(null);
   const [loading, setLoading] = useState(true);
@@ -349,9 +348,7 @@ function ReferralCard({ session, days, cap }: { session: Session; days: number; 
     else copy();
   }
 
-  const capDays = cap * 30;
   const earned = info?.daysEarned ?? 0;
-  const pct = Math.min(100, Math.round((earned / capDays) * 100));
 
   if (loading) {
     return (
@@ -421,21 +418,7 @@ function ReferralCard({ session, days, cap }: { session: Session; days: number; 
         <Stat label={t.statDays} value={earned} />
       </div>
 
-      <p className="mt-4 text-xs font-medium text-ink-soft">
-        {tpl(t.capLine, { earned, capDays, cap })}
-      </p>
-      <div
-        className="mt-2 h-2.5 overflow-hidden rounded-full bg-line"
-        role="progressbar"
-        aria-valuenow={earned}
-        aria-valuemin={0}
-        aria-valuemax={capDays}
-      >
-        <div
-          className="h-full rounded-full bg-sage transition-all duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <p className="mt-4 text-xs font-medium text-ink-soft">{tpl(t.capNote, { d: days })}</p>
 
       {(info?.total ?? 0) > (info?.rewarded ?? 0) && (
         <p className="mt-4 rounded-2xl bg-amber-warm/12 p-3.5 text-sm leading-relaxed text-ink-soft">

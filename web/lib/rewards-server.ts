@@ -6,11 +6,14 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Launch offer (first_n_*) hata diya gaya — sirf referral config rehta hai.
+// Launch offer (first_n_*) hata diya gaya. Referral + plan limits + price.
 export const CONFIG_KEYS = [
   "referrals_enabled",
   "referral_days",
-  "referral_cap_months",
+  "free_reminders",
+  "free_documents",
+  "plus_price_monthly",
+  "plus_price_yearly",
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
@@ -152,7 +155,6 @@ export type UserReferral = {
   rewarded_at: string | null;
   /** Grant ke waqt jitne din diye the — config baad me badle to bhi yahi. */
   days: number;
-  cap_skipped: boolean;
 };
 
 export type UserDetail = {
@@ -166,7 +168,6 @@ export type UserDetail = {
   referral_code: string | null;
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
-  cap_days: number;
   referrals: UserReferral[];
 };
 

@@ -16,7 +16,7 @@ export default function ReferralSection() {
 
   if (!offers.referralsEnabled) return null;
 
-  const vars = { d: offers.referralDays, cap: offers.referralCapMonths };
+  const vars = { d: offers.referralDays };
 
   return (
     <div className="overflow-hidden rounded-[2rem] border border-line bg-surface shadow-soft sm:rounded-[2.5rem]">
