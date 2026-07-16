@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { View, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router/js-stack";
 import { useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -10,6 +9,7 @@ import { ToastProvider } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/components/auth-provider";
 import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ReminderAlertHost } from "@/components/reminder-alert";
+import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
 
 export default function RootLayout() {
@@ -58,11 +58,7 @@ function RootNavigator() {
   }, [uid]);
 
   if (loading || !langReady) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
-        <ActivityIndicator size="large" color={colors.terracotta} />
-      </View>
-    );
+    return <ScreenLoader />;
   }
 
   return (

@@ -17,6 +17,7 @@ import {
   Users,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
+import Loader from "@/components/Loader";
 import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
 
@@ -127,7 +128,7 @@ export default function AdminDashboard() {
   if (authed === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-cream">
-        <Loader2 className="animate-spin text-terracotta" size={28} />
+        <Loader size={44} />
       </div>
     );
   }

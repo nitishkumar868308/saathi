@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,6 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 import { getMyRewards, type MyRewards, type MyReferral } from "@/lib/plan";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl, type Dict } from "@/lib/i18n/dictionaries";
+import { Loader } from "@/components/loader";
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -114,7 +114,9 @@ export default function Membership() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.terracotta} style={{ marginTop: 40 }} />
+        <View style={{ marginTop: 60 }}>
+          <Loader size={44} />
+        </View>
       ) : !data ? (
         <View style={styles.center}>
           <Text style={styles.muted}>{m.title} ✕</Text>

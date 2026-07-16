@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,6 +22,7 @@ import {
 } from "@/lib/plan";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+import { Loader } from "@/components/loader";
 
 export default function Referral() {
   const toast = useToast();
@@ -75,7 +75,9 @@ export default function Referral() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.terracotta} style={{ marginTop: 40 }} />
+        <View style={{ marginTop: 60 }}>
+          <Loader size={44} />
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Hero */}

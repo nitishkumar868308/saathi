@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import SubHeader from "@/components/SubHeader";
 import Footer from "@/components/Footer";
+import Loader from "@/components/Loader";
 import { supabaseBrowser, supabaseConfigured } from "@/lib/supabase-browser";
 import { useOffers } from "@/lib/useOffers";
 import { tpl } from "@/lib/offers";
@@ -161,7 +162,7 @@ export default function ReferralClient() {
         {hero}
         <Body>
           <div className="flex justify-center py-10">
-            <Loader2 className="animate-spin text-terracotta" size={28} />
+            <Loader size={40} />
           </div>
         </Body>
       </Page>
@@ -354,7 +355,7 @@ function ReferralCard({ session, days }: { session: Session; days: number }) {
     return (
       <Card>
         <div className="flex justify-center py-10">
-          <Loader2 className="animate-spin text-terracotta" size={26} />
+          <Loader size={40} />
         </div>
       </Card>
     );
