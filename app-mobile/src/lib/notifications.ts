@@ -164,7 +164,9 @@ export async function syncNotifications(): Promise<void> {
     const [reminders, documents] = await Promise.all([listReminders(), listDocuments()]);
 
     for (const r of reminders) {
-      if (r.is_on && r.remind_at) await scheduleReminder(r.id, r.title, new Date(r.remind_at));
+      // Paused reminder (Plus expire hone pe 5 se aage wale) notification nahi bhejte.
+      if (r.is_on && !r.is_paused && r.remind_at)
+        await scheduleReminder(r.id, r.title, new Date(r.remind_at));
       else await cancelReminder(r.id);
     }
     for (const d of documents) {

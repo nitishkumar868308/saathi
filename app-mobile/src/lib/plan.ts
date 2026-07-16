@@ -3,14 +3,15 @@ import { supabase } from "./supabase";
 /**
  * Plan / subscription helpers.
  *
- * Free: max 10 documents, basic reminders.
- * Plus: unlimited docs, family sharing, daily brief, priority reminders.
+ * Free: 5 active reminders, 3 documents. AI + premium locked.
+ * Plus: sab unlimited (₹99/mahina, ₹999/saal).
  *
- * Plan Supabase `profiles.plan` mein store hota hai. Payment web checkout se
- * hota hai (Razorpay) — dekho landing `/checkout`.
+ * Plan Supabase `profiles.plan` mein store hota hai. Limits `app_config` se
+ * aate hain (admin badal sakta hai) — ye default fallback hain.
  */
 
-export const FREE_DOC_LIMIT = 10;
+export const FREE_DOC_LIMIT = 3;
+export const FREE_REMINDER_LIMIT = 5;
 
 export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://apkasaathi.com";
 
@@ -59,22 +60,52 @@ export async function getPlan(): Promise<PlanInfo> {
  * gin leti thi, to 10 documents ke baad har naya user block ho jaata.
  */
 export async function countDocuments(): Promise<number> {
+  return countOwn("documents");
+}
+
+/** Kitne reminders hain (sirf apne). */
+export async function countReminders(): Promise<number> {
+  return countOwn("reminders");
+}
+
+async function countOwn(table: "documents" | "reminders"): Promise<number> {
   const sb = client();
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id;
   if (!uid) return 0;
-
   const { count } = await sb
-    .from("documents")
+    .from(table)
     .select("id", { count: "exact", head: true })
     .eq("user_id", uid);
   return count ?? 0;
 }
 
-/** Free user document limit se aage nahi jaa sakta. */
+/** Free user document limit (3) se aage nahi jaa sakta. */
 export async function canAddDocument(): Promise<boolean> {
   const [{ isPlus }, count] = await Promise.all([getPlan(), countDocuments()]);
   return isPlus || count < FREE_DOC_LIMIT;
+}
+
+/** Free user 5 se zyada reminders nahi bana sakta (spec item 2, 7). */
+export async function canAddReminder(): Promise<boolean> {
+  const [{ isPlus }, count] = await Promise.all([getPlan(), countReminders()]);
+  return isPlus || count < FREE_REMINDER_LIMIT;
+}
+
+/**
+ * Access ko current plan ke hisaab se sync karo (server pe).
+ * Plus expire ho gaya to 5 se aage ke reminders pause + 3 se aage ke documents
+ * lock ho jaate hain; Plus wapas milte hi sab khul jaata hai. Data delete nahi
+ * hota — sirf access badalta hai (spec item 6-14).
+ *
+ * Login ke baad aur plan badalne pe call karo. Best-effort.
+ */
+export async function enforcePlanLimits(): Promise<void> {
+  try {
+    await client().rpc("enforce_my_limits");
+  } catch {
+    /* best-effort — fail ho to app na ruke */
+  }
 }
 
 /**

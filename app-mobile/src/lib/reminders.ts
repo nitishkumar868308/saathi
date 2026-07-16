@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { canAddReminder, FREE_REMINDER_LIMIT } from "./plan";
 
 export type Reminder = {
   id: string;
@@ -6,10 +7,22 @@ export type Reminder = {
   time_label: string | null;
   remind_at: string | null; // ISO timestamp
   is_on: boolean;
+  /** Plus expire hone pe 5 se aage ke reminders paused ho jaate hain. */
+  is_paused: boolean;
   bucket: string; // 'today' | 'upcoming'
   user_id: string | null;
   created_at: string;
 };
+
+/** Free limit (5) cross karne pe. */
+export class ReminderLimitError extends Error {
+  constructor() {
+    super(
+      `Free plan me sirf ${FREE_REMINDER_LIMIT} active reminders. Unlimited ke liye Saathi Plus lo.`,
+    );
+    this.name = "ReminderLimitError";
+  }
+}
 
 function client() {
   if (!supabase) throw new Error("Supabase set nahi hai");
@@ -38,6 +51,9 @@ export async function addReminder(input: {
   remind_at: string | null;
   bucket: string;
 }): Promise<Reminder> {
+  // Free plan limit (5) — Plus na ho to naya reminder block.
+  if (!(await canAddReminder())) throw new ReminderLimitError();
+
   const sb = client();
   // WhatsApp/email reminder ke liye backend ko user chahiye.
   const { data: u } = await sb.auth.getUser();

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   try {
     due = await sbGet<DueReminder>(
       `reminders?select=id,title,time_label,remind_at,user_id` +
-        `&is_on=eq.true&notified_at=is.null&remind_at=lte.${nowIso}` +
+        `&is_on=eq.true&is_paused=eq.false&notified_at=is.null&remind_at=lte.${nowIso}` +
         `&order=remind_at.asc&limit=50`,
     );
   } catch (err) {

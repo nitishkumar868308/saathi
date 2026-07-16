@@ -18,7 +18,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 
 import { colors } from "@/theme/colors";
-import { addReminder } from "@/lib/reminders";
+import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { parseReminderTime } from "@/utils/parse-time";
 import { VoiceButton } from "@/components/voice-button";
@@ -124,8 +124,13 @@ export default function AddReminder() {
         scheduled ? "success" : "info",
       );
       router.back();
-    } catch {
-      toast.show("Save nahi hua", "error");
+    } catch (e) {
+      if (e instanceof ReminderLimitError) {
+        toast.show("Free me 5 active reminders — Plus lo unlimited ke liye", "info");
+        router.replace("/upgrade" as never);
+      } else {
+        toast.show("Save nahi hua", "error");
+      }
     } finally {
       setSaving(false);
     }

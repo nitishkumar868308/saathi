@@ -11,9 +11,9 @@ import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "@/lib/supabase";
 import {
-  claimFirstNReward,
   checkReferralQualification,
   applyReferralCode,
+  enforcePlanLimits,
 } from "@/lib/plan";
 import { takePendingReferral } from "@/lib/referral-pending";
 
@@ -77,10 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Signup pe diya gaya referral code ab apply karo (ek hi baar).
       const pending = await takePendingReferral();
       if (pending) await applyReferralCode(pending).catch(() => "error");
-      // Pehle N signups → X mahine Plus free. Idempotent.
-      await claimFirstNReward().catch(() => "error");
       // Referral reward — document + chat dono ho chuke hon to grant ho jaye.
+      // (Launch offer hata diya gaya — ab koi first-N claim nahi.)
       await checkReferralQualification().catch(() => "error");
+      // Plan ke hisaab se access sync — Plus expire hua to extra reminders
+      // pause + extra documents lock; Plus wapas mila to sab khul jaaye.
+      await enforcePlanLimits().catch(() => {});
       doneFor.current = uid;
       // Plan DB me badal chuka ho sakta hai — screens ko dobara padhne ka signal.
       setRewardsVersion((v) => v + 1);
