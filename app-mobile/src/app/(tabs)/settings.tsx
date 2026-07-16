@@ -1,42 +1,61 @@
 import { useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  Alert,
+  Linking,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 
 import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
-import { getPlan } from "@/lib/plan";
+import { getPlan, WEB_URL } from "@/lib/plan";
 import { useOffers } from "@/lib/use-offers";
 
-type Row = { icon: string; label: string; tint?: string };
+type RowId =
+  | "saathi_name"
+  | "notifications"
+  | "language"
+  | "privacy"
+  | "export"
+  | "delete_all"
+  | "help"
+  | "about";
+
+type Row = { id: RowId; icon: string; label: string; tint?: string };
 
 const groups: { title: string; rows: Row[] }[] = [
   {
     title: "Saathi",
     rows: [
-      { icon: "happy-outline", label: "Saathi ka naam" },
-      { icon: "notifications-outline", label: "Notifications" },
-      { icon: "language-outline", label: "Bhasha (Hindi / English)" },
+      { id: "saathi_name", icon: "happy-outline", label: "Saathi ka naam" },
+      { id: "notifications", icon: "notifications-outline", label: "Notifications" },
+      { id: "language", icon: "language-outline", label: "Bhasha (Hindi / English)" },
     ],
   },
   {
     title: "Privacy",
     rows: [
-      { icon: "lock-closed-outline", label: "Privacy & data" },
-      { icon: "download-outline", label: "Mera data export karo" },
-      { icon: "trash-outline", label: "Sab data delete", tint: "#B23B3B" },
+      { id: "privacy", icon: "lock-closed-outline", label: "Privacy & data" },
+      { id: "export", icon: "download-outline", label: "Mera data export karo" },
+      { id: "delete_all", icon: "trash-outline", label: "Sab data delete", tint: "#B23B3B" },
     ],
   },
   {
     title: "Aur",
     rows: [
-      { icon: "help-circle-outline", label: "Help & support" },
-      { icon: "information-circle-outline", label: "About Apka Saathi" },
+      { id: "help", icon: "help-circle-outline", label: "Help & support" },
+      { id: "about", icon: "information-circle-outline", label: "About Apka Saathi" },
     ],
   },
 ];
@@ -63,6 +82,79 @@ export default function Settings() {
       await signOut();
     } catch {
       toast.show("Logout nahi hua", "error");
+    }
+  }
+
+  async function openUrl(path: string) {
+    try {
+      await WebBrowser.openBrowserAsync(`${WEB_URL}${path}`);
+    } catch {
+      toast.show("Link nahi khula", "error");
+    }
+  }
+
+  /** Sirf apna data (documents + reminders) delete — account nahi. */
+  async function deleteAllData() {
+    Alert.alert(
+      "Sab data delete karein?",
+      "Aapke saare documents aur reminders hamesha ke liye hat jaayenge. Account nahi hatega. Ye wapas nahi aayega.",
+      [
+        { text: "Nahi", style: "cancel" },
+        {
+          text: "Haan, delete karo",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const sb = supabase;
+              const uid = session?.user?.id;
+              if (!sb || !uid) throw new Error("no session");
+              await Promise.all([
+                sb.from("documents").delete().eq("user_id", uid),
+                sb.from("reminders").delete().eq("user_id", uid),
+              ]);
+              toast.show("Aapka data delete ho gaya", "success");
+            } catch {
+              toast.show("Delete nahi ho paya", "error");
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  function handleRow(id: RowId) {
+    switch (id) {
+      case "saathi_name":
+      case "export":
+        // Naam + details (aur export ke liye contact) ek hi jagah.
+        router.push("/profile-details" as never);
+        if (id === "export") {
+          toast.show("Data export ke liye help se contact karo", "info");
+        }
+        return;
+      case "notifications":
+        Linking.openSettings().catch(() =>
+          toast.show("Settings nahi khuli", "error"),
+        );
+        return;
+      case "language":
+        Alert.alert(
+          "Bhasha",
+          "Apka Saathi abhi Hinglish (Hindi + English) me hai — dono samajh me aata hai. Aur bhashaayein jald aa rahi hain.",
+        );
+        return;
+      case "privacy":
+        openUrl("/privacy");
+        return;
+      case "delete_all":
+        deleteAllData();
+        return;
+      case "help":
+        openUrl("/contact");
+        return;
+      case "about":
+        openUrl("/about");
+        return;
     }
   }
 
@@ -167,7 +259,8 @@ export default function Settings() {
             <View style={styles.card}>
               {g.rows.map((r, i) => (
                 <Pressable
-                  key={r.label}
+                  key={r.id}
+                  onPress={() => handleRow(r.id)}
                   style={({ pressed }) => [
                     styles.row,
                     i < g.rows.length - 1 && styles.rowBorder,
