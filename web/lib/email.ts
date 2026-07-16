@@ -209,6 +209,105 @@ export async function sendReminderEmail(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Welcome email — naye user ko (email + Google dono)                 */
+/* ------------------------------------------------------------------ */
+
+type WelcomeCopy = {
+  subject: string;
+  title: string;
+  preheader: string;
+  intro: string;
+  featuresLabel: string;
+  features: [string, string][]; // [emoji, text]
+  cta: string;
+  outro: string;
+};
+
+const WELCOME: Record<"hinglish" | "hi" | "en", WelcomeCopy> = {
+  hinglish: {
+    subject: "Welcome to Apka Saathi 🎉",
+    title: "Aa gaye aap! Chalo shuru karein 🎉",
+    preheader: "Ab kuch yaad rakhne ki tension nahi — Saathi sambhal lega.",
+    intro:
+      "Namaste{name}! Main hoon aapka <b>Saathi</b> — ab documents ki expiry, zaroori dates aur roz ke kaam yaad rakhne ki tension khatam. Aap bas batao, baaki main sambhal lunga. 🤍",
+    featuresLabel: "Ye kar sakte ho:",
+    features: [
+      ["📄", "Document ki photo daalo — expiry khud yaad rakhunga"],
+      ["⏰", "Bol ke ya likh ke reminder set karo — sahi time pe yaad dila dunga"],
+      ["🔔", "Notification, WhatsApp aur email — sab pe yaad"],
+    ],
+    cta: "App kholo aur pehla document add karo",
+    outro: "Koi dikkat ho to bas reply kar do. Main yahin hoon. 🙂",
+  },
+  hi: {
+    subject: "Apka Saathi में आपका स्वागत है 🎉",
+    title: "आप आ गए! चलिए शुरू करें 🎉",
+    preheader: "अब कुछ याद रखने की टेंशन नहीं — साथी सँभाल लेगा।",
+    intro:
+      "नमस्ते{name}! मैं हूँ आपका <b>साथी</b> — अब डॉक्युमेंट्स की एक्सपायरी, ज़रूरी तारीख़ें और रोज़ के काम याद रखने की टेंशन खत्म। आप बस बताइए, बाकी मैं सँभाल लूँगा। 🤍",
+    featuresLabel: "आप ये कर सकते हैं:",
+    features: [
+      ["📄", "डॉक्युमेंट की फ़ोटो डालें — एक्सपायरी खुद याद रखूँगा"],
+      ["⏰", "बोलकर या लिखकर रिमाइंडर सेट करें — सही समय पर याद दिला दूँगा"],
+      ["🔔", "नोटिफ़िकेशन, WhatsApp और ईमेल — सब पर याद"],
+    ],
+    cta: "ऐप खोलें और पहला डॉक्युमेंट जोड़ें",
+    outro: "कोई दिक्कत हो तो बस reply कर दें। मैं यहीं हूँ। 🙂",
+  },
+  en: {
+    subject: "Welcome to Apka Saathi 🎉",
+    title: "You're in! Let's get started 🎉",
+    preheader: "No more remembering things yourself — Saathi's got it.",
+    intro:
+      "Namaste{name}! I'm your <b>Saathi</b> — no more stressing over document expiries, important dates and everyday tasks. Just tell me, and I'll handle the rest. 🤍",
+    featuresLabel: "Here's what you can do:",
+    features: [
+      ["📄", "Add a photo of a document — I'll remember its expiry"],
+      ["⏰", "Set reminders by voice or text — I'll nudge you at the right time"],
+      ["🔔", "Notifications, WhatsApp and email — reminders everywhere"],
+    ],
+    cta: "Open the app and add your first document",
+    outro: "If you ever need anything, just reply. I'm right here. 🙂",
+  },
+};
+
+/** Welcome email naye user ko — user ki chuni bhasha me. */
+export async function sendWelcomeEmail(
+  to: string,
+  name: string,
+  locale: "hinglish" | "hi" | "en" = "hinglish",
+): Promise<{ sent: boolean; skipped?: boolean }> {
+  const w = WELCOME[locale] ?? WELCOME.hinglish;
+  const firstName = (name || "").trim().split(" ")[0];
+  const namePart = firstName ? ` ${escapeHtml(firstName)}` : "";
+
+  const featureRows = w.features
+    .map(
+      ([emoji, text]) =>
+        `<tr>
+           <td style="vertical-align:top;padding:0 12px 14px 0;font-size:22px;line-height:1.3;">${emoji}</td>
+           <td style="vertical-align:top;padding:0 0 14px;font-size:15.5px;line-height:1.55;color:${SOFT};">${text}</td>
+         </tr>`,
+    )
+    .join("");
+
+  const inner =
+    emailParagraph(w.intro.replace("{name}", namePart)) +
+    `<p style="margin:22px 0 10px;font-size:13px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:${INK};">${w.featuresLabel}</p>
+     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">${featureRows}</table>` +
+    emailButton(`${SITE_URL}`, w.cta) +
+    `<div style="height:18px;line-height:18px;font-size:0;">&nbsp;</div>` +
+    emailParagraph(w.outro);
+
+  return sendMail({
+    to,
+    subject: w.subject,
+    html: renderEmail(w.title, inner, w.preheader),
+    fromName: "Apka Saathi",
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /*  Specific emails — bas templates, sendMail ke thin wrappers         */
 /* ------------------------------------------------------------------ */
 

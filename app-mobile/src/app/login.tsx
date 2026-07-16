@@ -96,7 +96,9 @@ export default function Login() {
     if (googleLoading) return;
     try {
       setGoogleLoading(true);
-      if (mode === "signup") await savePendingReferral(refCode);
+      // Referral code ho to hamesha save karo — naya Google user chahe "login"
+      // dabaye, uska referral + welcome (server-side) miss na ho.
+      if (refCode.trim()) await savePendingReferral(refCode);
       await signInGoogle();
     } catch (e: any) {
       if (e?.message !== "cancelled") {

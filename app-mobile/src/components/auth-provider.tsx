@@ -16,6 +16,8 @@ import {
   enforcePlanLimits,
 } from "@/lib/plan";
 import { takePendingReferral } from "@/lib/referral-pending";
+import { sendWelcomeEmail } from "@/lib/welcome";
+import { useLocale } from "@/lib/i18n/LanguageProvider";
 
 type AuthValue = {
   session: Session | null;
@@ -51,11 +53,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [rewardsVersion, setRewardsVersion] = useState(0);
+  const { locale } = useLocale();
 
   // Ek hi user ke liye pipeline baar-baar na chale (TOKEN_REFRESHED har ghante
   // aata hai). Manual refresh isko bypass karta hai.
   const doneFor = useRef<string | null>(null);
   const running = useRef(false);
+  // Locale ref — runRewards ko stable rakhne ke liye (dep me na daalna pade).
+  const localeRef = useRef(locale);
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
 
   /**
    * Referral reward pipeline.
@@ -82,6 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Plan ke hisaab se access sync — Plus expire hua to extra reminders
       // pause + extra documents lock; Plus wapas mila to sab khul jaaye.
       await enforcePlanLimits().catch(() => {});
+      // Naye user ko welcome email (server ek hi baar bhejta hai — welcomed_at).
+      await sendWelcomeEmail(localeRef.current).catch(() => {});
       doneFor.current = uid;
       // Plan DB me badal chuka ho sakta hai — screens ko dobara padhne ka signal.
       setRewardsVersion((v) => v + 1);
