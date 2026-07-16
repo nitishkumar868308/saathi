@@ -26,6 +26,7 @@ import { extractExpiry } from "@/utils/extract-expiry";
 import { detectDocType, guessName } from "@/utils/detect-doc";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 const quick = [
   { label: "+6 mahine", months: 6 },
@@ -50,6 +51,7 @@ async function persistImage(cacheUri: string): Promise<string> {
 export default function AddDocument() {
   const router = useRouter();
   const toast = useToast();
+  const { addDocument: d } = useT();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [savedUri, setSavedUri] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -115,9 +117,9 @@ export default function AddDocument() {
 
   async function save() {
     if (saving) return;
-    if (!name.trim()) return toast.show("Naam daalo (ya photo scan karo)", "info");
+    if (!name.trim()) return toast.show(d.nameRequired, "info");
     if (expiry && !isValidDate(expiry)) {
-      return toast.show("Date format: YYYY-MM-DD", "error");
+      return toast.show(d.badDate, "error");
     }
     try {
       setSaving(true);
@@ -138,19 +140,14 @@ export default function AddDocument() {
 
       // Referral reward unlock ho sakta hai (document + chat dono hone pe).
       checkReferralQualification().catch(() => {});
-      toast.show(
-        notifOk
-          ? "Document add ho gaya 🎉"
-          : "Document add ho gaya — notification permission do to expiry yaad dila dunga",
-        notifOk ? "success" : "info",
-      );
+      toast.show(notifOk ? d.added : d.addedNoNotif, notifOk ? "success" : "info");
       router.back();
     } catch (e) {
       if (e instanceof DocLimitError) {
-        toast.show("Free limit poori — Saathi Plus lo unlimited ke liye", "info");
+        toast.show(d.limitReached, "info");
         router.push("/upgrade" as never);
       } else {
-        toast.show("Save nahi ho paya", "error");
+        toast.show(d.saveFailed, "error");
       }
     } finally {
       setSaving(false);
@@ -160,7 +157,7 @@ export default function AddDocument() {
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Document add karo</Text>
+        <Text style={styles.title}>{d.title}</Text>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close}>
           <Ionicons name="close" size={22} color={colors.ink} />
         </Pressable>
@@ -181,18 +178,12 @@ export default function AddDocument() {
             {scanning ? (
               <View style={styles.scanningRow}>
                 <ActivityIndicator color={colors.terracotta} />
-                <Text style={styles.scanningText}>Samajh raha hoon...</Text>
+                <Text style={styles.scanningText}>{d.scanning}</Text>
               </View>
             ) : (
               <>
-                <Text style={styles.scanTitle}>
-                  {scanned ? "Ho gaya! Neeche check karo ✨" : "Photo daalo"}
-                </Text>
-                <Text style={styles.scanSub}>
-                  {scanned
-                    ? "Saathi ne document khud samajh liya"
-                    : "Document ki photo daalo — kaunsa hai aur kab expire hai, Saathi khud samajh lega"}
-                </Text>
+                <Text style={styles.scanTitle}>{scanned ? d.doneTitle : d.photoTitle}</Text>
+                <Text style={styles.scanSub}>{scanned ? d.doneSub : d.photoSub}</Text>
               </>
             )}
 
@@ -203,7 +194,7 @@ export default function AddDocument() {
                 style={({ pressed }) => [styles.sBtn, pressed && styles.pressed]}
               >
                 <Ionicons name="camera" size={18} color={colors.white} />
-                <Text style={styles.sBtnText}>Camera</Text>
+                <Text style={styles.sBtnText}>{d.camera}</Text>
               </Pressable>
               <Pressable
                 onPress={() => pickImage("gallery")}
@@ -211,7 +202,7 @@ export default function AddDocument() {
                 style={({ pressed }) => [styles.sBtnAlt, pressed && styles.pressed]}
               >
                 <Ionicons name="images" size={18} color={colors.terracotta} />
-                <Text style={styles.sBtnAltText}>Gallery</Text>
+                <Text style={styles.sBtnAltText}>{d.gallery}</Text>
               </Pressable>
             </View>
           </View>
@@ -223,7 +214,7 @@ export default function AddDocument() {
                 <Ionicons name={iconForType(type) as any} size={20} color={colors.terracotta} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.detLabel}>Saathi ke hisaab se</Text>
+                <Text style={styles.detLabel}>{d.detectedLabel}</Text>
                 <Text style={styles.detType}>{labelForType(type)}</Text>
               </View>
               <Ionicons name="checkmark-circle" size={22} color={colors.sage} />
@@ -231,21 +222,23 @@ export default function AddDocument() {
           )}
 
           {/* Name (editable) */}
-          <Text style={styles.label}>Naam {scanned && <Text style={styles.editHint}>(theek kar sakte ho)</Text>}</Text>
+          <Text style={styles.label}>
+            {d.name} {scanned && <Text style={styles.editHint}>{d.editHint}</Text>}
+          </Text>
           <TextInput
             value={name}
             onChangeText={setName}
-            placeholder="Photo scan karo, ya naam khud daalo"
+            placeholder={d.namePlaceholder}
             placeholderTextColor={colors.inkSoft}
             style={[styles.input, scanned && name ? styles.inputFilled : null]}
           />
 
           {/* Expiry (editable) */}
-          <Text style={styles.label}>Expiry date</Text>
+          <Text style={styles.label}>{d.expiry}</Text>
           <TextInput
             value={expiry}
             onChangeText={setExpiry}
-            placeholder="YYYY-MM-DD"
+            placeholder={d.expiryPlaceholder}
             placeholderTextColor={colors.inkSoft}
             style={[styles.input, scanned && expiry ? styles.inputFilled : null]}
             keyboardType="numbers-and-punctuation"
@@ -272,7 +265,7 @@ export default function AddDocument() {
         {saving ? (
           <ActivityIndicator color={colors.white} />
         ) : (
-          <Text style={styles.saveText}>Save karo</Text>
+          <Text style={styles.saveText}>{d.save}</Text>
         )}
       </Pressable>
     </SafeAreaView>

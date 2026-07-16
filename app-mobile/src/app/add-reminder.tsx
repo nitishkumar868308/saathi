@@ -19,6 +19,7 @@ import DateTimePicker, {
 
 import { colors } from "@/theme/colors";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
+import { useT } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { parseReminderTime } from "@/utils/parse-time";
 import { VoiceButton } from "@/components/voice-button";
@@ -51,6 +52,7 @@ function formatWhen(d: Date): string {
 export default function AddReminder() {
   const router = useRouter();
   const toast = useToast();
+  const { addReminder: a } = useT();
   const [title, setTitle] = useState("");
   const [picked, setPicked] = useState<Date | null>(null);
   const [showIosPicker, setShowIosPicker] = useState(false);
@@ -92,9 +94,9 @@ export default function AddReminder() {
   async function save() {
     if (saving) return;
     const rawTitle = title.trim();
-    if (!rawTitle) return toast.show("Kya yaad dilana hai?", "info");
+    if (!rawTitle) return toast.show(a.whatLabel, "info");
     if (!when) {
-      toast.show("Kab yaad dilaun? Date & time chuno", "info");
+      toast.show(a.askTime, "info");
       openPicker();
       return;
     }
@@ -116,20 +118,16 @@ export default function AddReminder() {
       // toast phir bhi "Reminder set ✓" bolta tha, jo jhooth tha.
       const scheduled = allowed && (await scheduleReminder(r.id, r.title, when));
       toast.show(
-        scheduled
-          ? "Reminder set ✓ Time pe yaad dila dunga"
-          : allowed
-            ? "Save ho gaya, par notification set nahi hui"
-            : "Save ho gaya (notification permission do)",
+        scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
         scheduled ? "success" : "info",
       );
       router.back();
     } catch (e) {
       if (e instanceof ReminderLimitError) {
-        toast.show("Free me 5 active reminders — Plus lo unlimited ke liye", "info");
+        toast.show(a.limitReached, "info");
         router.replace("/upgrade" as never);
       } else {
-        toast.show("Save nahi hua", "error");
+        toast.show(a.title + " ✕", "error");
       }
     } finally {
       setSaving(false);
@@ -139,7 +137,7 @@ export default function AddReminder() {
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Naya reminder</Text>
+        <Text style={styles.title}>{a.title}</Text>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close}>
           <Ionicons name="close" size={22} color={colors.ink} />
         </Pressable>
@@ -150,21 +148,19 @@ export default function AddReminder() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.label}>Kya yaad dilaun?</Text>
+          <Text style={styles.label}>{a.whatLabel}</Text>
           <View style={styles.inputRow}>
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="Jaise: kal subah 8 baje mummy ko call karna"
+              placeholder={a.whatPlaceholder}
               placeholderTextColor={colors.inkSoft}
               style={styles.input}
               multiline
             />
-            <VoiceButton onText={(t) => setTitle((p) => (p ? p + " " + t : t))} />
+            <VoiceButton onText={(txt) => setTitle((p) => (p ? p + " " + txt : txt))} />
           </View>
-          <Text style={styles.hint}>
-            🎤 Mic dabake bolo — time bhi bol do, main samajh lunga
-          </Text>
+          <Text style={styles.hint}>🎤 {a.micHint}</Text>
 
           {/* Auto-detected time (text se) */}
           {parsed && !picked && (
@@ -172,7 +168,7 @@ export default function AddReminder() {
               <Ionicons name="sparkles" size={18} color={colors.white} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.detLabel, { color: "rgba(255,255,255,0.8)" }]}>
-                  Samajh gaya ✨
+                  {a.understood} ✨
                 </Text>
                 <Text style={[styles.detTime, { color: colors.white }]}>
                   {parsed.label}
@@ -183,7 +179,7 @@ export default function AddReminder() {
           )}
 
           {/* Kab? — time na mile to yahan se chuno */}
-          <Text style={styles.label}>Kab yaad dilaun?</Text>
+          <Text style={styles.label}>{a.whenLabel}</Text>
 
           {when ? (
             <View style={styles.whenRow}>
@@ -193,21 +189,17 @@ export default function AddReminder() {
               </View>
               <Pressable onPress={openPicker} style={styles.changeBtn}>
                 <Ionicons name="create-outline" size={16} color={colors.terracotta} />
-                <Text style={styles.changeText}>Badlo</Text>
+                <Text style={styles.changeText}>{a.change}</Text>
               </Pressable>
             </View>
           ) : (
             <Pressable onPress={openPicker} style={styles.pickBtn}>
               <Ionicons name="calendar-outline" size={18} color={colors.white} />
-              <Text style={styles.pickText}>Date & time chuno</Text>
+              <Text style={styles.pickText}>{a.pickDateTime}</Text>
             </Pressable>
           )}
 
-          {!when && (
-            <Text style={styles.hint}>
-              Time text me nahi mila — upar button se date aur time chuno.
-            </Text>
-          )}
+          {!when && <Text style={styles.hint}>{a.noTimeHint}</Text>}
 
           {/* iOS inline picker */}
           {showIosPicker && Platform.OS === "ios" && (
@@ -243,7 +235,7 @@ export default function AddReminder() {
         {saving ? (
           <ActivityIndicator color={colors.white} />
         ) : (
-          <Text style={styles.saveText}>Reminder set karo</Text>
+          <Text style={styles.saveText}>{a.save}</Text>
         )}
       </Pressable>
     </SafeAreaView>

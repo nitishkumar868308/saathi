@@ -22,19 +22,15 @@ import {
 } from "@/lib/purchases";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { useOffers } from "@/lib/use-offers";
-
-const PLUS_FEATURES = [
-  "Unlimited reminders",
-  "Unlimited documents",
-  "AI Saathi (smart chat + brief)",
-  "WhatsApp + email reminders",
-  "Aane wale saare premium features",
-];
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 export default function Upgrade() {
   const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
+  const { upgrade: u } = useT();
+  const PLUS_FEATURES = u.plusFeatures;
   const [yearly, setYearly] = useState(true);
   const [isPlus, setIsPlus] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -61,14 +57,11 @@ export default function Upgrade() {
 
   // Price aur Free limits admin se (app_config) aate hain.
   const base = yearly ? offers.plusPriceYearly : offers.plusPriceMonthly;
-  const period = yearly ? "/saal" : "/mahina";
+  const period = yearly ? u.perYear : u.perMonth;
 
-  const FREE_FEATURES = [
-    `${offers.freeReminders} active reminders`,
-    `${offers.freeDocuments} documents`,
-    "Expiry reminders",
-    "Voice + text reminders",
-  ];
+  const FREE_FEATURES = u.freeFeatures.map((f) =>
+    tpl(f, { rem: offers.freeReminders, docs: offers.freeDocuments }),
+  );
 
   async function startCheckout() {
     if (paying) return;
@@ -86,7 +79,7 @@ export default function Upgrade() {
       /* ignore, treat as incomplete */
     }
     if (!isDetailsComplete(details)) {
-      toast.show("Pehle apni details bharo", "info");
+      toast.show(u.needDetails, "info");
       router.push({
         pathname: "/profile-details",
         params: { returnTo: "/upgrade" },
@@ -96,7 +89,7 @@ export default function Upgrade() {
 
     // 2. RevenueCat available? (dev build + key chahiye)
     if (!purchasesAvailable()) {
-      toast.show("Payment abhi is build me available nahi (dev build chahiye)", "info");
+      toast.show(u.notAvailable, "info");
       return;
     }
 
@@ -117,9 +110,9 @@ export default function Upgrade() {
         // Asli expiry bhejo — warna plan "hamesha" jaisa reh jaata hai.
         await markProfilePlus(result.expiresAt);
         await refresh();
-        toast.show("Saathi Plus active ho gaya! 🎉", "success");
+        toast.show(u.activated, "success");
       } else {
-        toast.show("Purchase complete nahi hua", "error");
+        toast.show(u.purchaseFailed, "error");
       }
     } catch {
       toast.show("Payment shuru nahi hua", "error");
@@ -134,7 +127,7 @@ export default function Upgrade() {
         <Pressable onPress={() => router.back()} style={styles.back} hitSlop={10}>
           <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={styles.headerTitle}>Saathi Plus</Text>
+        <Text style={styles.headerTitle}>{u.title}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -149,11 +142,8 @@ export default function Upgrade() {
             <View style={styles.plusBadge}>
               <Ionicons name="checkmark-circle" size={30} color={colors.white} />
             </View>
-            <Text style={styles.plusActiveTitle}>Aap Saathi Plus par ho 🎉</Text>
-            <Text style={styles.plusActiveSub}>
-              Unlimited reminders, documents aur AI — sab unlocked. "Meri
-              membership" me expiry aur din dekho.
-            </Text>
+            <Text style={styles.plusActiveTitle}>{u.activeTitle} 🎉</Text>
+            <Text style={styles.plusActiveSub}>{u.activeSub}</Text>
           </View>
         ) : (
           <>
@@ -164,7 +154,7 @@ export default function Upgrade() {
                 style={[styles.toggleBtn, !yearly && styles.toggleActive]}
               >
                 <Text style={[styles.toggleText, !yearly && styles.toggleTextActive]}>
-                  Mahina
+                  {u.monthly}
                 </Text>
               </Pressable>
               <Pressable
@@ -172,14 +162,14 @@ export default function Upgrade() {
                 style={[styles.toggleBtn, yearly && styles.toggleActive]}
               >
                 <Text style={[styles.toggleText, yearly && styles.toggleTextActive]}>
-                  Saal · 2 mahine free
+                  {u.yearlyTab}
                 </Text>
               </Pressable>
             </View>
 
             {/* Plus card */}
             <View style={styles.plusCard}>
-              <Text style={styles.plusName}>Saathi Plus</Text>
+              <Text style={styles.plusName}>{u.planName}</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.price}>₹{base}</Text>
                 <Text style={styles.period}>{period}</Text>
@@ -211,13 +201,11 @@ export default function Upgrade() {
                 ) : (
                   <>
                     <Ionicons name="lock-closed" size={16} color={colors.white} />
-                    <Text style={styles.payText}>₹{base} — Securely pay</Text>
+                    <Text style={styles.payText}>{tpl(u.payBtn, { price: base })}</Text>
                   </>
                 )}
               </Pressable>
-              <Text style={styles.payNote}>
-                Google Play se secure · UPI, card, netbanking
-              </Text>
+              <Text style={styles.payNote}>{u.payNote}</Text>
             </View>
 
             {/* Referral — paise ke bina Plus (spec item 11) */}
@@ -231,10 +219,10 @@ export default function Upgrade() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.referTitle}>
-                    Ya {offers.referralDays} din ka Plus plan FREE kamao
+                    {tpl(u.referTitle, { d: offers.referralDays })}
                   </Text>
                   <Text style={styles.referSub}>
-                    Refer & Earn — dono ko {offers.referralDays} din ka Saathi Plus plan
+                    {tpl(u.referSub, { d: offers.referralDays })}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.terracotta} />
@@ -243,8 +231,8 @@ export default function Upgrade() {
 
             {/* Free card */}
             <View style={styles.freeCard}>
-              <Text style={styles.freeName}>Free</Text>
-              <Text style={styles.freePrice}>₹0 / hamesha</Text>
+              <Text style={styles.freeName}>{u.freeName}</Text>
+              <Text style={styles.freePrice}>{u.freePrice}</Text>
               <View style={{ marginTop: 12, gap: 10 }}>
                 {FREE_FEATURES.map((f) => (
                   <View key={f} style={styles.featRow}>

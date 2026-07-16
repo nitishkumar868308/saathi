@@ -15,6 +15,8 @@ import { router } from "expo-router";
 import { colors } from "@/theme/colors";
 import { useAuth } from "@/components/auth-provider";
 import { getMyRewards, type MyRewards, type MyReferral } from "@/lib/plan";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl, type Dict } from "@/lib/i18n/dictionaries";
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -32,12 +34,27 @@ function daysLeft(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
 
-const SOURCE: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  referral: { label: "Referral se", icon: "gift" },
-  google_play: { label: "Aapne kharida hai", icon: "card" },
-  admin: { label: "Team ne diya", icon: "shield-checkmark" },
-  reward: { label: "Reward se", icon: "gift" },
+const SOURCE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  referral: "gift",
+  google_play: "card",
+  admin: "shield-checkmark",
+  reward: "gift",
 };
+
+function sourceLabel(m: Dict["membership"], src: string | null): string | undefined {
+  switch (src) {
+    case "referral":
+      return m.sourceReferral;
+    case "google_play":
+      return m.sourcePaid;
+    case "admin":
+      return m.sourceAdmin;
+    case "reward":
+      return m.sourceReward;
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Plan ki asli haalat. `plan_expires_at` null + plus = chalti hui subscription
@@ -63,6 +80,7 @@ function stateOf(r: MyRewards): State {
 
 export default function Membership() {
   const { rewardsVersion, refreshRewards } = useAuth();
+  const { membership: m } = useT();
   const [data, setData] = useState<MyRewards | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,7 +109,7 @@ export default function Membership() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
           <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={styles.title}>Meri membership</Text>
+        <Text style={styles.title}>{m.title}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -99,7 +117,7 @@ export default function Membership() {
         <ActivityIndicator color={colors.terracotta} style={{ marginTop: 40 }} />
       ) : !data ? (
         <View style={styles.center}>
-          <Text style={styles.muted}>Info load nahi hui. Neeche kheench ke dobara try karo.</Text>
+          <Text style={styles.muted}>{m.title} ✕</Text>
         </View>
       ) : (
         <ScrollView
@@ -113,46 +131,37 @@ export default function Membership() {
             />
           }
         >
-          <PlanCard data={data} />
+          <PlanCard data={data} m={m} />
 
-          <Section title="Aapka safar" />
-          <Row icon="calendar" label="Saathi se jude" value={fmt(data.joined_at)} />
+          <Section title={m.journey} />
+          <Row icon="calendar" label={m.joined} value={fmt(data.joined_at)} />
           {data.referred_by_code && (
-            <Row icon="person-add" label="Kis code se aaye" value={data.referred_by_code} />
+            <Row icon="person-add" label={m.referredByCode} value={data.referred_by_code} />
           )}
           {data.referral_days_earned > 0 && (
-            <Row
-              icon="gift"
-              label="Referral se kamaaye"
-              value={`${data.referral_days_earned} din`}
-            />
+            <Row icon="gift" label={m.referralEarned} value={`${data.referral_days_earned} din`} />
           )}
 
           {data.referrals_enabled && (
             <>
               <Section
-                title="Aapke referrals"
+                title={m.yourReferrals}
                 right={
                   <Pressable onPress={() => router.push("/referral" as never)}>
-                    <Text style={styles.link}>Invite karo</Text>
+                    <Text style={styles.link}>{m.invite}</Text>
                   </Pressable>
                 }
               />
               {data.referrals.length === 0 ? (
                 <View style={styles.empty}>
                   <Ionicons name="people-outline" size={22} color={colors.inkSoft} />
-                  <Text style={styles.emptyText}>
-                    Abhi kisi ne aapke code se join nahi kiya.
-                  </Text>
+                  <Text style={styles.emptyText}>{m.noReferrals}</Text>
                 </View>
               ) : (
-                data.referrals.map((r) => <ReferralRow key={r.id} r={r} />)
+                data.referrals.map((r) => <ReferralRow key={r.id} r={r} m={m} />)
               )}
               {data.referrals.some((r) => !r.rewarded_at) && (
-                <Text style={styles.note}>
-                  Din tabhi milte hain jab dost apna pehla document daale AUR Saathi se ek baar
-                  baat kare.
-                </Text>
+                <Text style={styles.note}>{m.referNote}</Text>
               )}
             </>
           )}
@@ -164,9 +173,10 @@ export default function Membership() {
 
 /* ------------------------------- pieces ------------------------------- */
 
-function PlanCard({ data }: { data: MyRewards }) {
+function PlanCard({ data, m }: { data: MyRewards; m: Dict["membership"] }) {
   const st = stateOf(data);
-  const src = data.plan_source ? SOURCE[data.plan_source] : undefined;
+  const srcLabel = data.plan_source ? sourceLabel(m, data.plan_source) : undefined;
+  const srcIcon = data.plan_source ? SOURCE_ICON[data.plan_source] : undefined;
   const plus = st.kind === "plus_forever" || st.kind === "plus_until";
 
   return (
@@ -179,31 +189,31 @@ function PlanCard({ data }: { data: MyRewards }) {
             color={plus ? colors.white : colors.inkSoft}
           />
           <Text style={[styles.planBadgeText, plus && { color: colors.white }]}>
-            {plus ? "Saathi Plus" : "Free plan"}
+            {plus ? m.planPlus : m.planFree}
           </Text>
         </View>
         {st.kind === "plus_until" && (
-          <Text style={styles.planLeft}>{st.left} din bache</Text>
+          <Text style={styles.planLeft}>{tpl(m.daysLeft, { n: st.left })}</Text>
         )}
       </View>
 
       <Text style={[styles.planLine, plus && { color: colors.white }]}>
-        {st.kind === "plus_forever" && "Aapka Plus chalu hai — koi expiry nahi."}
-        {st.kind === "plus_until" && `Plus ${fmt(st.until)} tak active hai.`}
-        {st.kind === "expired" && `Plus ${fmt(st.until)} ko khatam ho gaya.`}
-        {st.kind === "free" && "Free plan pe ho — 10 documents tak."}
+        {st.kind === "plus_forever" && m.lineForever}
+        {st.kind === "plus_until" && tpl(m.lineUntil, { date: fmt(st.until) })}
+        {st.kind === "expired" && tpl(m.lineExpired, { date: fmt(st.until) })}
+        {st.kind === "free" && m.lineFree}
       </Text>
 
-      {plus && src && (
+      {plus && srcLabel && srcIcon && (
         <View style={styles.planSrc}>
-          <Ionicons name={src.icon} size={13} color="rgba(255,255,255,0.85)" />
-          <Text style={styles.planSrcText}>{src.label}</Text>
+          <Ionicons name={srcIcon} size={13} color="rgba(255,255,255,0.85)" />
+          <Text style={styles.planSrcText}>{srcLabel}</Text>
         </View>
       )}
 
       {!plus && (
         <Pressable onPress={() => router.push("/upgrade" as never)} style={styles.upgradeBtn}>
-          <Text style={styles.upgradeText}>Plus lo</Text>
+          <Text style={styles.upgradeText}>{m.plusLo}</Text>
           <Ionicons name="arrow-forward" size={15} color={colors.white} />
         </Pressable>
       )}
@@ -211,13 +221,13 @@ function PlanCard({ data }: { data: MyRewards }) {
   );
 }
 
-function ReferralRow({ r }: { r: MyReferral }) {
+function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
   const done = Boolean(r.rewarded_at);
-  const who = r.name?.trim() || r.email || "Naya dost";
+  const who = r.name?.trim() || r.email || "—";
 
   const detail = done
     ? `${fmt(r.rewarded_at)} · +${r.days} din`
-    : `Joined ${fmt(r.joined_at)} · abhi pending`;
+    : `${fmt(r.joined_at)} · ${m.pending}`;
 
   return (
     <View style={styles.refRow}>

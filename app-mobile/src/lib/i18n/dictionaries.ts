@@ -117,6 +117,11 @@ export type Dict = {
     title: string;
     photoTitle: string;
     photoSub: string;
+    scanning: string;
+    doneTitle: string;
+    doneSub: string;
+    detectedLabel: string;
+    editHint: string;
     camera: string;
     gallery: string;
     name: string;
@@ -127,6 +132,9 @@ export type Dict = {
     added: string;
     addedNoNotif: string;
     limitReached: string;
+    nameRequired: string;
+    badDate: string;
+    saveFailed: string;
   };
   reminders: {
     title: string;
@@ -352,6 +360,11 @@ const hinglish: Dict = {
     title: "Document add karo",
     photoTitle: "Photo daalo",
     photoSub: "Document ki photo daalo — kaunsa hai aur kab expire hai, Saathi khud samajh lega",
+    scanning: "Samajh raha hoon…",
+    doneTitle: "Ho gaya! Neeche check karo ✨",
+    doneSub: "Saathi ne document khud samajh liya",
+    detectedLabel: "Saathi ke hisaab se",
+    editHint: "(theek kar sakte ho)",
     camera: "Camera",
     gallery: "Gallery",
     name: "Naam",
@@ -359,9 +372,12 @@ const hinglish: Dict = {
     expiry: "Expiry date",
     expiryPlaceholder: "YYYY-MM-DD",
     save: "Save karo",
-    added: "Document add ho gaya",
+    added: "Document add ho gaya 🎉",
     addedNoNotif: "Document add ho gaya — notification permission do to expiry yaad dila dunga",
     limitReached: "Free limit poori — Plus lo unlimited ke liye",
+    nameRequired: "Naam daalo (ya photo scan karo)",
+    badDate: "Date format: YYYY-MM-DD",
+    saveFailed: "Save nahi ho paya",
   },
   reminders: {
     title: "Reminders",
@@ -588,6 +604,11 @@ const hi: Dict = {
     title: "डॉक्युमेंट जोड़ें",
     photoTitle: "फ़ोटो डालें",
     photoSub: "डॉक्युमेंट की फ़ोटो डालें — कौन-सा है और कब एक्सपायर है, साथी खुद समझ लेगा",
+    scanning: "समझ रहा हूँ…",
+    doneTitle: "हो गया! नीचे देखें ✨",
+    doneSub: "साथी ने डॉक्युमेंट खुद समझ लिया",
+    detectedLabel: "साथी के हिसाब से",
+    editHint: "(ठीक कर सकते हैं)",
     camera: "कैमरा",
     gallery: "गैलरी",
     name: "नाम",
@@ -595,9 +616,12 @@ const hi: Dict = {
     expiry: "एक्सपायरी डेट",
     expiryPlaceholder: "YYYY-MM-DD",
     save: "सेव करें",
-    added: "डॉक्युमेंट जुड़ गया",
+    added: "डॉक्युमेंट जुड़ गया 🎉",
     addedNoNotif: "डॉक्युमेंट जुड़ गया — notification permission दें तो एक्सपायरी याद दिला दूँगा",
     limitReached: "फ्री लिमिट पूरी — अनलिमिटेड के लिए प्लस लें",
+    nameRequired: "नाम डालें (या फ़ोटो स्कैन करें)",
+    badDate: "डेट फ़ॉर्मैट: YYYY-MM-DD",
+    saveFailed: "सेव नहीं हो पाया",
   },
   reminders: {
     title: "रिमाइंडर्स",
@@ -823,6 +847,11 @@ const en: Dict = {
     title: "Add document",
     photoTitle: "Add a photo",
     photoSub: "Add a photo of the document — Saathi figures out what it is and when it expires",
+    scanning: "Reading…",
+    doneTitle: "Done! Check below ✨",
+    doneSub: "Saathi read the document automatically",
+    detectedLabel: "According to Saathi",
+    editHint: "(you can fix it)",
     camera: "Camera",
     gallery: "Gallery",
     name: "Name",
@@ -830,9 +859,12 @@ const en: Dict = {
     expiry: "Expiry date",
     expiryPlaceholder: "YYYY-MM-DD",
     save: "Save",
-    added: "Document added",
+    added: "Document added 🎉",
     addedNoNotif: "Document added — allow notifications and I'll remind you of the expiry",
     limitReached: "Free limit reached — get Plus for unlimited",
+    nameRequired: "Enter a name (or scan a photo)",
+    badDate: "Date format: YYYY-MM-DD",
+    saveFailed: "Couldn't save",
   },
   reminders: {
     title: "Reminders",
