@@ -58,12 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const running = useRef(false);
 
   /**
-   * Signup reward + referral reward.
+   * Referral reward pipeline.
    *
    * Sab kuch `app_config` se decide hota hai, hardcoded kuch nahi — admin
-   * 1000 → 100 ya 3 mahine → 1 kar de to agli call pe naya rule lag jaata hai.
-   * Isliye ye har session pe chalti hai, sirf pehle signup pe nahi: offer band
-   * tha aur baad me chalu hua, to purana user bhi le paayega.
+   * referral din badle to agli call pe naya rule lag jaata hai. Har session pe
+   * chalti hai (sirf signup pe nahi), taaki referral qualify hote hi grant ho.
    */
   const runRewards = useCallback(async (force = false) => {
     if (!supabase) return;

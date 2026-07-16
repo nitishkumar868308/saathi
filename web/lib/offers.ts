@@ -69,7 +69,7 @@ export async function getOffers(): Promise<Offers> {
   }
 }
 
-/** "Pehle {n} users ko {m} mahine free" jaisi strings bharne ke liye. */
+/** "Dono ko {d} din free" jaisi template strings bharne ke liye. */
 export function tpl(s: string, vars: Record<string, string | number>): string {
   return s.replace(/\{(\w+)\}/g, (_, k) =>
     k in vars ? String(vars[k as keyof typeof vars]) : `{${k}}`,

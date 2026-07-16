@@ -44,24 +44,11 @@ Domain Namecheap / GoDaddy / Hostinger se ~₹800/saal mein milega.
 
 ---
 
-## 📨 Waitlist ko Supabase se jodna (jab ready ho)
-
-Abhi waitlist form kaam karta hai (success dikhata hai) par email **save nahi** hota — sirf server log mein print hota hai.
-
-DB se jodne ke liye:
-
-1. Supabase mein table banao: **`waitlist`** (columns: `id`, `email` _unique_, `created_at`).
-2. `.env.local.example` ko copy karke `.env.local` banao, values bharo.
-3. `app/api/waitlist/route.ts` mein TODO wali jagah Supabase insert add karo (us file mein poora example comment mein hai).
-4. Vercel pe wahi env vars **Settings → Environment Variables** mein daalo.
-
----
-
 ## 🎨 Customize
 
 - **Colors / fonts:** `tailwind.config.ts`
 - **Content / sections:** `app/page.tsx`
-- **Form behaviour:** `components/WaitlistForm.tsx`
+- **Copy / bhasha:** `lib/i18n/dictionaries.ts`
 - **App ka naam / SEO:** `app/layout.tsx`
 
 ---
