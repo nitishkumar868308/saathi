@@ -116,7 +116,8 @@
       "Bash(node -e \"require\\('sharp'\\); console.log\\('sharp OK'\\)\")",
       "Bash(node _mark_preview.mjs)",
       "Bash(node _mark_final.mjs)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(awk -F= '/^ADMIN_PASSWORD=/{v=$2; print \"raw length \\(CR included agar ho\\):\", length\\(v\\)}' .env.local)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"
