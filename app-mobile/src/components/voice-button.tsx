@@ -14,12 +14,21 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   const [listening, setListening] = useState(false);
   const pulse = useRef(new Animated.Value(1)).current;
 
+  // ⚠️ Pehle har interim result pe onText call hota tha, aur onText text ko
+  // APPEND karta hai — isliye bolte waqt "call call mummy call mummy ko" jaisa
+  // garble ho jaata tha. Ab sirf FINAL transcript ek baar emit karte hain.
   useSpeechRecognitionEvent("result", (e) => {
-    const t = e.results?.[0]?.transcript;
+    if (!e.isFinal) return;
+    const t = e.results?.[0]?.transcript?.trim();
     if (t) onText(t);
   });
   useSpeechRecognitionEvent("end", () => stop());
-  useSpeechRecognitionEvent("error", () => stop());
+  useSpeechRecognitionEvent("error", (e) => {
+    stop();
+    if (e?.error && e.error !== "no-speech") {
+      toast.show("Awaaz saaf nahi aayi, dobara boliye", "info");
+    }
+  });
 
   function start() {
     setListening(true);
@@ -51,7 +60,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
       start();
       ExpoSpeechRecognitionModule.start({
         lang: "en-IN",
-        interimResults: true,
+        interimResults: false, // sirf final chahiye (append-garble se bachne ke liye)
         continuous: false,
       });
     } catch {
