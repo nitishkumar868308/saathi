@@ -158,17 +158,6 @@ export default function Upgrade() {
           </View>
         ) : (
           <>
-            {/* Offer — numbers admin se aate hain; band ho to dikhta bhi nahi */}
-            {offers.firstNEnabled && (
-              <View style={styles.reward}>
-                <Ionicons name="gift" size={18} color={colors.terracotta} />
-                <Text style={styles.rewardText}>
-                  Pehle {offers.firstNUsers.toLocaleString("en-IN")} users ko Saathi
-                  Plus {offers.firstNFreeMonths} mahine FREE!
-                </Text>
-              </View>
-            )}
-
             {/* Billing toggle */}
             <View style={styles.toggle}>
               <Pressable

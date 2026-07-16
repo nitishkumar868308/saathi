@@ -108,20 +108,6 @@ export async function enforcePlanLimits(): Promise<void> {
   }
 }
 
-/**
- * Pehle N signups ko X mahine Plus free (config: app_config).
- * Idempotent — ek hi baar grant hota hai. Login ke baad call karo.
- * Returns: 'granted' | 'already' | 'not_eligible' | 'disabled' | 'no_auth' | 'error'
- */
-export async function claimFirstNReward(): Promise<string> {
-  try {
-    const { data, error } = await client().rpc("claim_first_n_reward");
-    if (error) return "error";
-    return (data as string) ?? "error";
-  } catch {
-    return "error";
-  }
-}
 
 /**
  * Kisi ka referral code apply karo (signup ke turant baad).
@@ -154,19 +140,14 @@ export async function checkReferralQualification(): Promise<string> {
   }
 }
 
+// Launch offer (first_n_*) poori tarah hata diya gaya — sirf referral rehta hai.
 export type Offers = {
-  firstNEnabled: boolean;
-  firstNUsers: number;
-  firstNFreeMonths: number;
   referralsEnabled: boolean;
   referralDays: number;
   referralCapMonths: number;
 };
 
 export const DEFAULT_OFFERS: Offers = {
-  firstNEnabled: true,
-  firstNUsers: 1000,
-  firstNFreeMonths: 3,
   referralsEnabled: true,
   referralDays: 15,
   referralCapMonths: 6,
@@ -194,9 +175,6 @@ export async function getOffers(): Promise<Offers> {
     };
 
     return {
-      firstNEnabled: bool("first_n_enabled", DEFAULT_OFFERS.firstNEnabled),
-      firstNUsers: num("first_n_users", DEFAULT_OFFERS.firstNUsers),
-      firstNFreeMonths: num("first_n_free_months", DEFAULT_OFFERS.firstNFreeMonths),
       referralsEnabled: bool("referrals_enabled", DEFAULT_OFFERS.referralsEnabled),
       referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
       referralCapMonths: num("referral_cap_months", DEFAULT_OFFERS.referralCapMonths),
@@ -269,10 +247,6 @@ export type MyRewards = {
   plan: "free" | "plus";
   plan_expires_at: string | null;
   plan_source: string | null;
-  first_n_granted: boolean;
-  first_n_rank: number | null;
-  first_n_days: number | null;
-  first_n_granted_at: string | null;
   referral_code: string | null;
   referral_days_earned: number;
   referred_by_code: string | null;

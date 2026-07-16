@@ -11,19 +11,15 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Launch offer (pehle-N users ko X mahine free) poori tarah HATA diya gaya —
+// spec item 1. Har naya user Free se shuru. Sirf referral rehta hai.
 export type Offers = {
-  firstNEnabled: boolean;
-  firstNUsers: number;
-  firstNFreeMonths: number;
   referralsEnabled: boolean;
   referralDays: number;
   referralCapMonths: number;
 };
 
 export const DEFAULT_OFFERS: Offers = {
-  firstNEnabled: true,
-  firstNUsers: 1000,
-  firstNFreeMonths: 3,
   referralsEnabled: true,
   referralDays: 15,
   referralCapMonths: 6,
@@ -54,9 +50,6 @@ export async function getOffers(): Promise<Offers> {
     };
 
     return {
-      firstNEnabled: bool("first_n_enabled", DEFAULT_OFFERS.firstNEnabled),
-      firstNUsers: num("first_n_users", DEFAULT_OFFERS.firstNUsers),
-      firstNFreeMonths: num("first_n_free_months", DEFAULT_OFFERS.firstNFreeMonths),
       referralsEnabled: bool("referrals_enabled", DEFAULT_OFFERS.referralsEnabled),
       referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
       referralCapMonths: num("referral_cap_months", DEFAULT_OFFERS.referralCapMonths),

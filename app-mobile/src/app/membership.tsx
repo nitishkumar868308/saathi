@@ -33,7 +33,6 @@ function daysLeft(iso: string): number {
 }
 
 const SOURCE: Record<string, { label: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  first_n: { label: "Shuruaati offer se", icon: "sparkles" },
   referral: { label: "Referral se", icon: "gift" },
   google_play: { label: "Aapne kharida hai", icon: "card" },
   admin: { label: "Team ne diya", icon: "shield-checkmark" },
@@ -118,17 +117,6 @@ export default function Membership() {
 
           <Section title="Aapka safar" />
           <Row icon="calendar" label="Saathi se jude" value={fmt(data.joined_at)} />
-          {data.first_n_granted && (
-            <Row
-              icon="sparkles"
-              label={
-                data.first_n_rank
-                  ? `Shuruaati offer — aap #${data.first_n_rank} the`
-                  : "Shuruaati offer"
-              }
-              value={`${data.first_n_days ?? 0} din · ${fmt(data.first_n_granted_at)}`}
-            />
-          )}
           {data.referred_by_code && (
             <Row icon="person-add" label="Kis code se aaye" value={data.referred_by_code} />
           )}

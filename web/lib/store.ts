@@ -11,8 +11,8 @@ import path from "path";
  * Tables:
  *   contact_messages(id, name, email, message, created_at)
  *
- * NOTE: waitlist hata di gayi — ab pehle N signups ko `claim_first_n_reward()`
- * se Plus milta hai (dekho supabase/rewards-referrals.sql).
+ * NOTE: waitlist aur launch offer dono hata diye gaye — ab sirf referral se
+ * Plus milta hai (dekho supabase/rewards-referrals.sql).
  */
 
 type ContactEntry = {

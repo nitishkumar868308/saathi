@@ -6,10 +6,8 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Launch offer (first_n_*) hata diya gaya — sirf referral config rehta hai.
 export const CONFIG_KEYS = [
-  "first_n_enabled",
-  "first_n_users",
-  "first_n_free_months",
   "referrals_enabled",
   "referral_days",
   "referral_cap_months",
@@ -115,7 +113,6 @@ export type AdminUser = {
   plan: "free" | "plus";
   planExpiresAt: string | null;
   planSource: string | null;
-  firstNGranted: boolean;
   referralDaysEarned: number;
   referralCode: string | null;
   createdAt: string;
@@ -125,7 +122,7 @@ export type AdminUser = {
 export async function getUsers(limit = 500): Promise<AdminUser[]> {
   assertConfigured();
   const cols =
-    "id,email,full_name,plan,plan_expires_at,plan_source,first_n_granted,referral_days_earned,referral_code,created_at";
+    "id,email,full_name,plan,plan_expires_at,plan_source,referral_days_earned,referral_code,created_at";
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/profiles?select=${cols}&order=created_at.desc&limit=${limit}`,
     { headers: headers(), cache: "no-store" },
@@ -140,7 +137,6 @@ export async function getUsers(limit = 500): Promise<AdminUser[]> {
     plan: (r.plan as "free" | "plus") ?? "free",
     planExpiresAt: (r.plan_expires_at as string) ?? null,
     planSource: (r.plan_source as string) ?? null,
-    firstNGranted: Boolean(r.first_n_granted),
     referralDaysEarned: Number(r.referral_days_earned ?? 0),
     referralCode: (r.referral_code as string) ?? null,
     createdAt: String(r.created_at),
@@ -167,10 +163,6 @@ export type UserDetail = {
   plan: "free" | "plus";
   plan_expires_at: string | null;
   plan_source: string | null;
-  first_n_granted: boolean;
-  first_n_rank: number | null;
-  first_n_days: number | null;
-  first_n_granted_at: string | null;
   referral_code: string | null;
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
@@ -193,7 +185,6 @@ export async function getUserDetail(uid: string): Promise<UserDetail | null> {
 
 export type RewardStats = {
   totalUsers: number;
-  firstNGranted: number;
   referralsTotal: number;
   referralsRewarded: number;
 };
@@ -213,12 +204,11 @@ export async function getRewardStats(): Promise<RewardStats> {
     return Number.isFinite(total) ? total : 0;
   }
 
-  const [totalUsers, firstNGranted, referralsTotal, referralsRewarded] = await Promise.all([
+  const [totalUsers, referralsTotal, referralsRewarded] = await Promise.all([
     count("profiles?select=id"),
-    count("profiles?select=id&first_n_granted=is.true"),
     count("referrals?select=id"),
     count("referrals?select=id&rewarded_at=not.is.null"),
   ]);
 
-  return { totalUsers, firstNGranted, referralsTotal, referralsRewarded };
+  return { totalUsers, referralsTotal, referralsRewarded };
 }

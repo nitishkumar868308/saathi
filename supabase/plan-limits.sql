@@ -22,9 +22,7 @@ insert into public.app_config(key, value) values
   ('plus_price_yearly',   '999'::jsonb)
 on conflict (key) do nothing;
 
--- Launch offer poori tarah band. (Admin chaahe to dobara on kar sakta hai,
--- par default ab OFF hai — spec item 1.)
-update public.app_config set value = 'false'::jsonb where key = 'first_n_enabled';
+-- Launch offer poori tarah hata diya gaya — dekho supabase/remove-launch-offer.sql.
 
 /* ------------------------------------------------------------------ */
 /* 2. Naye columns — pause (reminders) aur lock (documents)            */

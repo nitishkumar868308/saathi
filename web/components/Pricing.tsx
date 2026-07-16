@@ -23,8 +23,6 @@ export default function Pricing() {
   // Admin se numbers badalte hi ye copy khud badal jaati hai.
   const offers = useOffers();
   const vars = {
-    n: offers.firstNUsers.toLocaleString("en-IN"),
-    m: offers.firstNFreeMonths,
     d: offers.referralDays,
     cap: offers.referralCapMonths,
   };
@@ -40,24 +38,13 @@ export default function Pricing() {
         </p>
       </div>
 
-      {/* Offer banner + referral condition — offer band ho to dikhta bhi nahi */}
-      {(offers.firstNEnabled || offers.referralsEnabled) && (
+      {/* Referral condition — offer band ho to dikhta bhi nahi */}
+      {offers.referralsEnabled && (
         <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-terracotta/25 bg-terracotta/10 px-4 py-3.5 sm:px-5">
-          {offers.firstNEnabled && (
-            <p className="flex items-start justify-center gap-2.5 text-center text-sm font-semibold text-ink">
-              <Gift size={18} className="mt-px shrink-0 text-terracotta" />
-              {tpl(t.reward, vars)}
-            </p>
-          )}
-          {offers.referralsEnabled && (
-            <p
-              className={`text-center text-xs leading-relaxed text-ink-soft sm:text-[13px] ${
-                offers.firstNEnabled ? "mt-2.5 border-t border-terracotta/20 pt-2.5" : ""
-              }`}
-            >
-              {tpl(t.referralHow, vars)}
-            </p>
-          )}
+          <p className="flex items-start justify-center gap-2.5 text-center text-sm font-semibold text-ink">
+            <Gift size={18} className="mt-px shrink-0 text-terracotta" />
+            {tpl(t.referralHow, vars)}
+          </p>
         </div>
       )}
 

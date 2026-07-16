@@ -26,19 +26,14 @@ export default function DownloadApp({ dark = false }: { dark?: boolean }) {
         {t.download.button}
       </a>
 
-      {offers.firstNEnabled && (
+      {offers.referralsEnabled && (
         <p
           className={`mt-3.5 flex items-start gap-2 text-sm font-medium ${
             dark ? "text-cream/75" : "text-ink-soft"
           }`}
         >
           <Gift size={15} className="mt-0.5 shrink-0 text-terracotta" />
-          <span>
-            {tpl(t.download.offerLine, {
-              n: offers.firstNUsers.toLocaleString("en-IN"),
-              m: offers.firstNFreeMonths,
-            })}
-          </span>
+          <span>{tpl(t.download.offerLine, { d: offers.referralDays })}</span>
         </p>
       )}
     </div>

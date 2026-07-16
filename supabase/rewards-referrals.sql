@@ -16,10 +16,8 @@ create table if not exists public.app_config (
   updated_at timestamptz not null default now()
 );
 
+-- Launch offer (first_n_*) hata diya gaya — sirf referral config seed hota hai.
 insert into public.app_config(key, value) values
-  ('first_n_enabled',     'true'::jsonb),
-  ('first_n_users',       '1000'::jsonb),
-  ('first_n_free_months', '3'::jsonb),
   ('referrals_enabled',   'true'::jsonb),
   ('referral_days',       '15'::jsonb),
   ('referral_cap_months', '6'::jsonb)
@@ -47,14 +45,6 @@ $$;
 alter table public.profiles add column if not exists referral_code text unique;
 alter table public.profiles add column if not exists referred_by uuid references auth.users(id);
 alter table public.profiles add column if not exists referral_days_earned int not null default 0;
-alter table public.profiles add column if not exists first_n_granted boolean not null default false;
-
--- First-N ka poora record. Config badalta rehta hai (1000 -> 100, 3 mahine -> 1),
--- isliye jo us waqt mila tha wo yahin freeze kar dete hain — warna history jhooth
--- bolne lagegi.
-alter table public.profiles add column if not exists first_n_rank int;
-alter table public.profiles add column if not exists first_n_days int;
-alter table public.profiles add column if not exists first_n_granted_at timestamptz;
 
 -- Anti-fraud checks ke liye ownership chahiye.
 alter table public.documents add column if not exists user_id uuid references auth.users(id) on delete cascade;
@@ -164,43 +154,7 @@ create trigger on_auth_user_created
 update public.profiles set referral_code = public.gen_referral_code()
 where referral_code is null;
 
-/* ------------------------------------------------------------------ */
-/* 6. First-N reward (waitlist ki jagah)                                */
-/* ------------------------------------------------------------------ */
-
-create or replace function public.claim_first_n_reward()
-returns text language plpgsql security definer set search_path = public as $$
-declare urank int; months int;
-begin
-  if auth.uid() is null then return 'no_auth'; end if;
-  if not public.cfg_bool('first_n_enabled', true) then return 'disabled'; end if;
-  if (select first_n_granted from public.profiles where id = auth.uid()) then
-    return 'already';
-  end if;
-
-  -- Rank har baar ABHI ke config ke against nikalte hain. Admin 1000 -> 100
-  -- kare to logic khud badal jaata hai; koi hardcoded number nahi.
-  select rnk into urank from (
-    select id, row_number() over (order by created_at asc, id asc) as rnk
-    from public.profiles
-  ) t where t.id = auth.uid();
-
-  if urank is null or urank > public.cfg_int('first_n_users', 1000) then
-    return 'not_eligible';
-  end if;
-
-  months := public.cfg_int('first_n_free_months', 3);
-  perform public.grant_plus_days(auth.uid(), months * 30, 'first_n');
-  update public.profiles
-     set first_n_granted    = true,
-         first_n_rank       = urank,
-         first_n_days       = months * 30,
-         first_n_granted_at = now()
-   where id = auth.uid();
-  return 'granted';
-end;
-$$;
-grant execute on function public.claim_first_n_reward() to authenticated;
+/* 6. (Launch offer hata diya gaya — pehle yahan claim_first_n_reward tha.)     */
 
 /* ------------------------------------------------------------------ */
 /* 7. Referral code apply (signup pe)                                   */
@@ -328,10 +282,6 @@ begin
     'plan',                 p.plan,
     'plan_expires_at',      p.plan_expires_at,
     'plan_source',          p.plan_source,
-    'first_n_granted',      p.first_n_granted,
-    'first_n_rank',         p.first_n_rank,
-    'first_n_days',         p.first_n_days,
-    'first_n_granted_at',   p.first_n_granted_at,
     'referral_code',        p.referral_code,
     'referral_days_earned', p.referral_days_earned,
     'referred_by_code',     (select referral_code from public.profiles where id = p.referred_by),
@@ -377,10 +327,6 @@ begin
     'plan',                 p.plan,
     'plan_expires_at',      p.plan_expires_at,
     'plan_source',          p.plan_source,
-    'first_n_granted',      p.first_n_granted,
-    'first_n_rank',         p.first_n_rank,
-    'first_n_days',         p.first_n_days,
-    'first_n_granted_at',   p.first_n_granted_at,
     'referral_code',        p.referral_code,
     'referral_days_earned', p.referral_days_earned,
     'referred_by', (
@@ -426,12 +372,10 @@ revoke all on function public.admin_user_detail(uuid)          from public, anon
 -- Ye teeno ab sirf service_role (admin API) se chalti hain.
 
 -- User-facing RPCs: anon se chheeno, sirf logged-in user ko do.
-revoke all on function public.claim_first_n_reward() from public, anon;
 revoke all on function public.apply_referral_code(text) from public, anon;
 revoke all on function public.check_referral_qualification() from public, anon;
 revoke all on function public.my_rewards() from public, anon;
 
-grant execute on function public.claim_first_n_reward() to authenticated;
 grant execute on function public.apply_referral_code(text) to authenticated;
 grant execute on function public.check_referral_qualification() to authenticated;
 grant execute on function public.my_rewards() to authenticated;
@@ -446,9 +390,3 @@ update public.referrals
    set referrer_days = public.cfg_int('referral_days', 15),
        referee_days  = public.cfg_int('referral_days', 15)
  where rewarded_at is not null and referrer_days = 0 and referee_days = 0;
-
--- Jinko first-N mila tha par record nahi bana
-update public.profiles
-   set first_n_days       = coalesce(first_n_days, public.cfg_int('first_n_free_months', 3) * 30),
-       first_n_granted_at = coalesce(first_n_granted_at, created_at)
- where first_n_granted;

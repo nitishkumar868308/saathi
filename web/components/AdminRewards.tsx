@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { Gift, Loader2, Save, UserPlus } from "lucide-react";
 
+// Launch offer (first_n_*) hata diya gaya — sirf referral config rehta hai.
 type Config = {
-  first_n_enabled: boolean;
-  first_n_users: number;
-  first_n_free_months: number;
   referrals_enabled: boolean;
   referral_days: number;
   referral_cap_months: number;
@@ -14,15 +12,11 @@ type Config = {
 
 type Stats = {
   totalUsers: number;
-  firstNGranted: number;
   referralsTotal: number;
   referralsRewarded: number;
 };
 
 const DEFAULTS: Config = {
-  first_n_enabled: true,
-  first_n_users: 1000,
-  first_n_free_months: 3,
   referrals_enabled: true,
   referral_days: 15,
   referral_cap_months: 6,
@@ -121,10 +115,9 @@ export default function AdminRewards() {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-3">
           {[
             ["Total users", stats.totalUsers],
-            ["First-1000 diye", stats.firstNGranted],
             ["Referrals", stats.referralsTotal],
             ["Rewarded", stats.referralsRewarded],
           ].map(([k, v]) => (
@@ -140,41 +133,10 @@ export default function AdminRewards() {
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-2">
           <Gift size={17} className="text-terracotta" />
-          <h3 className="font-display text-lg font-semibold">Offers & Referrals</h3>
+          <h3 className="font-display text-lg font-semibold">Referrals</h3>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
-          <div>
-            <label className={label}>Pehle kitne users</label>
-            <input
-              type="number"
-              className={input}
-              value={cfg.first_n_users}
-              onChange={(e) => setCfg({ ...cfg, first_n_users: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className={label}>Free mahine</label>
-            <input
-              type="number"
-              className={input}
-              value={cfg.first_n_free_months}
-              onChange={(e) =>
-                setCfg({ ...cfg, first_n_free_months: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div className="flex items-end pb-1">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                checked={cfg.first_n_enabled}
-                onChange={(e) => setCfg({ ...cfg, first_n_enabled: e.target.checked })}
-              />
-              First-1000 offer chalu
-            </label>
-          </div>
-
           <div>
             <label className={label}>Referral din (dono ko)</label>
             <input

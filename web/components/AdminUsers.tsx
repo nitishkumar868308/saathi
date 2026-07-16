@@ -22,7 +22,6 @@ type AdminUser = {
   plan: "free" | "plus";
   planExpiresAt: string | null;
   planSource: string | null;
-  firstNGranted: boolean;
   referralDaysEarned: number;
   referralCode: string | null;
   createdAt: string;
@@ -47,10 +46,6 @@ type UserDetail = {
   plan: "free" | "plus";
   plan_expires_at: string | null;
   plan_source: string | null;
-  first_n_granted: boolean;
-  first_n_rank: number | null;
-  first_n_days: number | null;
-  first_n_granted_at: string | null;
   referral_code: string | null;
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
@@ -158,7 +153,6 @@ export default function AdminUsers() {
     return {
       total: list.length,
       plus: list.filter((u) => statusOf(u).tone === "plus").length,
-      firstN: list.filter((u) => u.firstNGranted).length,
     };
   }, [users]);
 
@@ -203,10 +197,9 @@ export default function AdminUsers() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         <Stat label="Total users" value={stats.total} />
         <Stat label="Plus (active)" value={stats.plus} />
-        <Stat label="First-N mila" value={stats.firstN} />
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -432,14 +425,6 @@ function Detail({ id }: { id: string }) {
             detail.referred_by
               ? `${detail.referred_by.code ?? "—"} (${detail.referred_by.email ?? "—"})`
               : "Kisi ne refer nahi kiya"
-          }
-        />
-        <DetailRow
-          label="First-N offer"
-          value={
-            detail.first_n_granted
-              ? `#${detail.first_n_rank ?? "?"} · ${detail.first_n_days ?? 0} din · ${fmtDate(detail.first_n_granted_at)}`
-              : "Nahi mila"
           }
         />
         <DetailRow

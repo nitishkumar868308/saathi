@@ -485,7 +485,7 @@ const hinglish: Dict = {
         gst: true,
       },
     ],
-    note: "Pehle {n} users ko {m} mahine Saathi Plus free. Dost bulao — dono ko {d} din extra Plus.",
+    note: "Dost bulao — dono ko {d} din Saathi Plus free. Plan kabhi bhi cancel karo.",
   },
   faq: {
     heading: "Sawaal hain? Bilkul natural hai.",
@@ -580,7 +580,7 @@ const hinglish: Dict = {
   },
   download: {
     button: "Play Store se download karo",
-    offerLine: "Pehle {n} users ko Saathi Plus {m} mahine free",
+    offerLine: "Dost bulao — dono ko {d} din Saathi Plus free",
     modalTitle: "Saathi ab app pe hai 📱",
     modalBody:
       "Plus subscription aur saare features Saathi app ke andar milte hain. Play Store se app download karo aur seedhe app se hi upgrade karo — bilkul secure, Google Play ke through.",
@@ -865,7 +865,7 @@ const hi: Dict = {
         gst: true,
       },
     ],
-    note: "पहले {n} यूज़र्स को {m} महीने साथी प्लस फ्री। दोस्त बुलाइए — दोनों को {d} दिन एक्स्ट्रा प्लस।",
+    note: "दोस्त बुलाइए — दोनों को {d} दिन साथी प्लस फ्री। प्लान कभी भी कैंसल करें।",
   },
   faq: {
     heading: "सवाल हैं? बिल्कुल स्वाभाविक है।",
@@ -960,7 +960,7 @@ const hi: Dict = {
   },
   download: {
     button: "Play Store से डाउनलोड करें",
-    offerLine: "पहले {n} यूज़र्स को साथी प्लस {m} महीने फ्री",
+    offerLine: "दोस्त बुलाइए — दोनों को {d} दिन साथी प्लस फ्री",
     modalTitle: "साथी अब ऐप पर है 📱",
     modalBody:
       "प्लस सब्सक्रिप्शन और सारे फ़ीचर्स साथी ऐप के अंदर मिलते हैं। Play Store से ऐप डाउनलोड करें और सीधे ऐप से ही अपग्रेड करें — बिल्कुल सुरक्षित, Google Play के ज़रिए।",
@@ -1340,7 +1340,7 @@ const en: Dict = {
   },
   download: {
     button: "Download on Play Store",
-    offerLine: "First {n} users get {m} months of Saathi Plus free",
+    offerLine: "Refer a friend — both get {d} days of Saathi Plus free",
     modalTitle: "Saathi lives in the app 📱",
     modalBody:
       "Plus and every feature live inside the Saathi app. Download it from the Play Store and upgrade right there — secure, through Google Play.",
