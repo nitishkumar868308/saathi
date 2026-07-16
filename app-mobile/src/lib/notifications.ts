@@ -1,8 +1,22 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { listReminders } from "./reminders";
 import { listDocuments } from "./documents";
+import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionaries";
+
+/** Notification text user ki chuni bhasha me — AsyncStorage se locale padhke. */
+async function notifDict() {
+  let loc: Locale = DEFAULT_LOCALE;
+  try {
+    const saved = await AsyncStorage.getItem("saathi-locale");
+    if (saved === "hi" || saved === "en" || saved === "hinglish") loc = saved;
+  } catch {
+    /* default */
+  }
+  return dictionaries[loc].notif;
+}
 
 /** Android channel id. Trigger me dena ZAROORI hai (neeche dekho). */
 const CHANNEL_ID = "reminders";
@@ -100,7 +114,8 @@ export async function scheduleReminder(
   title: string,
   when: Date,
 ): Promise<boolean> {
-  return schedule(id, "Saathi 🔔", title, when);
+  const n = await notifDict();
+  return schedule(id, n.reminderTitle, title, when);
 }
 
 export async function cancelReminder(id: string): Promise<void> {
@@ -137,14 +152,15 @@ export async function scheduleDocumentExpiry(
   await cancelDocumentExpiry(docId);
   if (!expiry) return;
 
+  const n = await notifDict();
   for (const lead of EXPIRY_LEAD_DAYS) {
     const when = expiryDate(expiry, lead);
     if (!when) continue;
     const body =
       lead === 0
-        ? `${name} aaj expire ho raha hai.`
-        : `${name} ${lead} din me expire ho raha hai.`;
-    await schedule(docNotifId(docId, lead), "Saathi 📄", body, when, "expiry");
+        ? tpl(n.expiryToday, { name })
+        : tpl(n.expiryInDays, { name, n: lead });
+    await schedule(docNotifId(docId, lead), n.expiryTitle, body, when, "expiry");
   }
 }
 

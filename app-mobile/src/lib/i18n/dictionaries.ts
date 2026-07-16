@@ -50,6 +50,17 @@ export type Dict = {
     start: string;
   };
   tabs: { home: string; saathi: string; docs: string; alerts: string; you: string };
+  notif: {
+    reminderTitle: string;
+    expiryTitle: string;
+    /** {name} */
+    expiryToday: string;
+    /** {name} {n} */
+    expiryInDays: string;
+    alertReminder: string;
+    alertExpiry: string;
+    alertOk: string;
+  };
   login: {
     welcomeBack: string;
     loginSub: string;
@@ -325,6 +336,15 @@ const hinglish: Dict = {
     start: "Chalo shuru karein",
   },
   tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Alerts", you: "You" },
+  notif: {
+    reminderTitle: "Saathi 🔔",
+    expiryTitle: "Saathi 📄",
+    expiryToday: "{name} aaj expire ho raha hai.",
+    expiryInDays: "{name} {n} din me expire ho raha hai.",
+    alertReminder: "Reminder",
+    alertExpiry: "Document expiry",
+    alertOk: "Theek hai, samajh gaya",
+  },
   login: {
     welcomeBack: "Wapas aa gaye",
     loginSub: "Login karo aur apni life sambhalo",
@@ -596,6 +616,15 @@ const hi: Dict = {
     start: "चलिए शुरू करें",
   },
   tabs: { home: "होम", saathi: "साथी", docs: "डॉक्स", alerts: "अलर्ट", you: "आप" },
+  notif: {
+    reminderTitle: "साथी 🔔",
+    expiryTitle: "साथी 📄",
+    expiryToday: "{name} आज एक्सपायर हो रहा है।",
+    expiryInDays: "{name} {n} दिन में एक्सपायर हो रहा है।",
+    alertReminder: "रिमाइंडर",
+    alertExpiry: "डॉक्युमेंट एक्सपायरी",
+    alertOk: "ठीक है, समझ गया",
+  },
   login: {
     welcomeBack: "वापस आ गए",
     loginSub: "लॉगिन करें और अपनी ज़िंदगी सँभालें",
@@ -866,6 +895,15 @@ const en: Dict = {
     start: "Let's get started",
   },
   tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Alerts", you: "You" },
+  notif: {
+    reminderTitle: "Saathi 🔔",
+    expiryTitle: "Saathi 📄",
+    expiryToday: "{name} expires today.",
+    expiryInDays: "{name} expires in {n} days.",
+    alertReminder: "Reminder",
+    alertExpiry: "Document expiry",
+    alertOk: "Okay, got it",
+  },
   login: {
     welcomeBack: "Welcome back",
     loginSub: "Sign in and let Saathi handle the rest",

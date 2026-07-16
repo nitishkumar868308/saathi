@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 
 import { colors } from "@/theme/colors";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 type Alert = { title: string; body: string; kind: "reminder" | "expiry" };
 
@@ -25,6 +26,7 @@ function fromNotification(n: Notifications.Notification): Alert {
  * Root me mount hai (_layout), isliye kisi bhi screen pe kaam karta hai.
  */
 export function ReminderAlertHost() {
+  const { notif: n } = useT();
   const [alert, setAlert] = useState<Alert | null>(null);
   const scale = useRef(new Animated.Value(0.9)).current;
 
@@ -68,7 +70,7 @@ export function ReminderAlertHost() {
               color={colors.white}
             />
           </View>
-          <Text style={styles.kicker}>{isExpiry ? "Document expiry" : "Reminder"}</Text>
+          <Text style={styles.kicker}>{isExpiry ? n.alertExpiry : n.alertReminder}</Text>
           <Text style={styles.body}>{alert.body}</Text>
 
           <Pressable
@@ -76,7 +78,7 @@ export function ReminderAlertHost() {
             style={({ pressed }) => [styles.btn, pressed && { opacity: 0.9 }]}
           >
             <Ionicons name="checkmark" size={18} color={colors.white} />
-            <Text style={styles.btnText}>Theek hai, samajh gaya</Text>
+            <Text style={styles.btnText}>{n.alertOk}</Text>
           </Pressable>
         </Animated.View>
       </View>
