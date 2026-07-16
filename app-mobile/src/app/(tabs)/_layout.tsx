@@ -2,8 +2,10 @@ import { Tabs } from "expo-router/js-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function TabsLayout() {
+  const { tabs } = useT();
   return (
     <Tabs
       screenOptions={{
@@ -20,7 +22,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: tabs.home,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" color={color} size={size} />
           ),
@@ -29,7 +31,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Saathi",
+          title: tabs.saathi,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-ellipses" color={color} size={size} />
           ),
@@ -38,7 +40,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="documents"
         options={{
-          title: "Docs",
+          title: tabs.docs,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text" color={color} size={size} />
           ),
@@ -47,7 +49,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reminders"
         options={{
-          title: "Alerts",
+          title: tabs.alerts,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="alarm" color={color} size={size} />
           ),
@@ -56,7 +58,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "You",
+          title: tabs.you,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-circle" color={color} size={size} />
           ),

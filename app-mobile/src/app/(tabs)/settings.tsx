@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   Linking,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,8 @@ import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 import { getPlan, WEB_URL } from "@/lib/plan";
 import { useOffers } from "@/lib/use-offers";
+import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
+import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
 
 type RowId =
   | "saathi_name"
@@ -34,39 +37,47 @@ type RowId =
 
 type Row = { id: RowId; icon: string; label: string; tint?: string };
 
-const groups: { title: string; rows: Row[] }[] = [
-  {
-    title: "Saathi",
-    rows: [
-      { id: "saathi_name", icon: "happy-outline", label: "Saathi ka naam" },
-      { id: "notifications", icon: "notifications-outline", label: "Notifications" },
-      { id: "language", icon: "language-outline", label: "Bhasha (Hindi / English)" },
-    ],
-  },
-  {
-    title: "Privacy",
-    rows: [
-      { id: "privacy", icon: "lock-closed-outline", label: "Privacy & data" },
-      { id: "export", icon: "download-outline", label: "Mera data export karo" },
-      { id: "delete_all", icon: "trash-outline", label: "Sab data delete", tint: "#B23B3B" },
-    ],
-  },
-  {
-    title: "Aur",
-    rows: [
-      { id: "help", icon: "help-circle-outline", label: "Help & support" },
-      { id: "about", icon: "information-circle-outline", label: "About Apka Saathi" },
-    ],
-  },
-];
-
 export default function Settings() {
   const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
+  const t = useT();
+  const { locale, setLocale } = useLocale();
+  const s = t.settings;
   const meta = session?.user?.user_metadata;
-  const name = meta?.full_name || meta?.name || "Aapka account";
+  const name = meta?.full_name || meta?.name || s.account;
   const [isPlus, setIsPlus] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+
+  const groups: { title: string; rows: Row[] }[] = [
+    {
+      title: s.groupSaathi,
+      rows: [
+        { id: "saathi_name", icon: "happy-outline", label: s.saathiName },
+        { id: "notifications", icon: "notifications-outline", label: s.notifications },
+        {
+          id: "language",
+          icon: "language-outline",
+          label: `${s.language} · ${LOCALE_META[locale].native}`,
+        },
+      ],
+    },
+    {
+      title: s.groupPrivacy,
+      rows: [
+        { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
+        { id: "export", icon: "download-outline", label: s.exportData },
+        { id: "delete_all", icon: "trash-outline", label: s.deleteAll, tint: "#B23B3B" },
+      ],
+    },
+    {
+      title: s.groupMore,
+      rows: [
+        { id: "help", icon: "help-circle-outline", label: s.help },
+        { id: "about", icon: "information-circle-outline", label: s.about },
+      ],
+    },
+  ];
 
   // rewardsVersion dep zaroori hai: first-N / referral grant login ke baad
   // background me hota hai. Iske bina screen "Free" pe atki rehti thi.
@@ -81,7 +92,7 @@ export default function Settings() {
     try {
       await signOut();
     } catch {
-      toast.show("Logout nahi hua", "error");
+      toast.show(s.logout + " ✕", "error");
     }
   }
 
@@ -95,31 +106,27 @@ export default function Settings() {
 
   /** Sirf apna data (documents + reminders) delete — account nahi. */
   async function deleteAllData() {
-    Alert.alert(
-      "Sab data delete karein?",
-      "Aapke saare documents aur reminders hamesha ke liye hat jaayenge. Account nahi hatega. Ye wapas nahi aayega.",
-      [
-        { text: "Nahi", style: "cancel" },
-        {
-          text: "Haan, delete karo",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const sb = supabase;
-              const uid = session?.user?.id;
-              if (!sb || !uid) throw new Error("no session");
-              await Promise.all([
-                sb.from("documents").delete().eq("user_id", uid),
-                sb.from("reminders").delete().eq("user_id", uid),
-              ]);
-              toast.show("Aapka data delete ho gaya", "success");
-            } catch {
-              toast.show("Delete nahi ho paya", "error");
-            }
-          },
+    Alert.alert(s.deleteTitle, s.deleteBody, [
+      { text: t.common.no, style: "cancel" },
+      {
+        text: s.deleteYes,
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const sb = supabase;
+            const uid = session?.user?.id;
+            if (!sb || !uid) throw new Error("no session");
+            await Promise.all([
+              sb.from("documents").delete().eq("user_id", uid),
+              sb.from("reminders").delete().eq("user_id", uid),
+            ]);
+            toast.show(s.deleted, "success");
+          } catch {
+            toast.show(s.deleteAll + " ✕", "error");
+          }
         },
-      ],
-    );
+      },
+    ]);
   }
 
   function handleRow(id: RowId) {
@@ -138,10 +145,7 @@ export default function Settings() {
         );
         return;
       case "language":
-        Alert.alert(
-          "Bhasha",
-          "Apka Saathi abhi Hinglish (Hindi + English) me hai — dono samajh me aata hai. Aur bhashaayein jald aa rahi hain.",
-        );
+        setLangOpen(true);
         return;
       case "privacy":
         openUrl("/privacy");
@@ -189,7 +193,7 @@ export default function Settings() {
                 { color: isSupabaseConfigured ? colors.sage : colors.terracotta },
               ]}
             >
-              {isSupabaseConfigured ? "Backend juda hai" : "Backend set nahi (.env bharo)"}
+              {isSupabaseConfigured ? s.backendOk : s.backendMissing}
             </Text>
           </View>
         </View>
@@ -200,7 +204,7 @@ export default function Settings() {
           style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
         >
           <Ionicons name="ribbon-outline" size={20} color={colors.terracotta} />
-          <Text style={styles.detailsText}>Meri membership</Text>
+          <Text style={styles.detailsText}>{s.membership}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.line} />
         </Pressable>
 
@@ -210,11 +214,11 @@ export default function Settings() {
           style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
         >
           <Ionicons name="person-outline" size={20} color={colors.terracotta} />
-          <Text style={styles.detailsText}>Meri details (name, phone, address…)</Text>
+          <Text style={styles.detailsText}>{s.myDetails}</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.line} />
         </Pressable>
 
-        {/* Dost bulao — referral (band ho to row hi nahi) */}
+        {/* Refer & Earn — referral (band ho to row hi nahi) */}
         {offers.referralsEnabled && (
           <Pressable
             onPress={() => router.push("/referral" as never)}
@@ -222,7 +226,7 @@ export default function Settings() {
           >
             <Ionicons name="gift-outline" size={20} color={colors.terracotta} />
             <Text style={styles.detailsText}>
-              Refer & Earn — dono ko {offers.referralDays} din ka Plus plan free
+              {tpl(s.referRow, { d: offers.referralDays })}
             </Text>
             <Ionicons name="chevron-forward" size={18} color={colors.line} />
           </Pressable>
@@ -241,14 +245,8 @@ export default function Settings() {
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.planTitle}>
-              {isPlus ? "Saathi Plus — active" : "Saathi Plus lo"}
-            </Text>
-            <Text style={styles.planSub}>
-              {isPlus
-                ? "Unlimited docs, family sharing, daily brief"
-                : "Unlimited docs, family sharing + aur bahut kuch"}
-            </Text>
+            <Text style={styles.planTitle}>{isPlus ? s.plusActive : s.plusLo}</Text>
+            <Text style={styles.planSub}>{isPlus ? s.plusActiveSub : s.plusSub}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="rgba(247,242,233,0.7)" />
         </Pressable>
@@ -287,11 +285,53 @@ export default function Settings() {
           style={({ pressed }) => [styles.logout, pressed && { opacity: 0.85 }]}
         >
           <Ionicons name="log-out-outline" size={20} color="#B23B3B" />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{s.logout}</Text>
         </Pressable>
 
-        <Text style={styles.version}>Apka Saathi · v0.1.0 · Made in India ❤️</Text>
+        <Text style={styles.version}>{s.version} ❤️</Text>
       </ScrollView>
+
+      {/* Bhasha picker */}
+      <Modal
+        visible={langOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLangOpen(false)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setLangOpen(false)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{s.language}</Text>
+            <Text style={styles.sheetSub}>{s.langAlertBody}</Text>
+            {LOCALES.map((l) => {
+              const active = locale === l;
+              return (
+                <Pressable
+                  key={l}
+                  onPress={() => {
+                    setLocale(l);
+                    setLangOpen(false);
+                  }}
+                  style={[styles.langOpt, active && styles.langOptActive]}
+                >
+                  <Text style={[styles.langNative, active && { color: colors.terracotta }]}>
+                    {LOCALE_META[l].native}
+                  </Text>
+                  <Text style={styles.langSub}>{LOCALE_META[l].sub}</Text>
+                  {active && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={22}
+                      color={colors.terracotta}
+                      style={{ marginLeft: "auto" }}
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -397,5 +437,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkSoft,
   },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(46,40,35,0.5)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 22,
+    paddingBottom: 34,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.line,
+    marginBottom: 16,
+  },
+  sheetTitle: { fontSize: 20, fontWeight: "800", color: colors.ink },
+  sheetSub: { marginTop: 4, fontSize: 13.5, color: colors.inkSoft, marginBottom: 14 },
+  langOpt: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  langOptActive: { borderColor: colors.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
+  langNative: { fontSize: 16.5, fontWeight: "700", color: colors.ink },
+  langSub: { fontSize: 13, color: colors.inkSoft, marginLeft: 10 },
 });
 

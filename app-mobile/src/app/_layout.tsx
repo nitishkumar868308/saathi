@@ -8,36 +8,46 @@ import { StatusBar } from "expo-status-bar";
 import { colors } from "@/theme/colors";
 import { ToastProvider } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/components/auth-provider";
+import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ReminderAlertHost } from "@/components/reminder-alert";
 import { syncNotifications } from "@/lib/notifications";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ToastProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
-          {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
-          <ReminderAlertHost />
-        </ToastProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <StatusBar style="dark" />
+            <RootNavigator />
+            {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
+            <ReminderAlertHost />
+          </ToastProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
 
 function RootNavigator() {
   const { session, loading } = useAuth();
+  const { ready: langReady, chosen: langChosen } = useLocale();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
-    const first = segments[0];
+    if (loading || !langReady) return;
+    // `language` naya typed-route hai — string compare ke liye cast (codebase idiom).
+    const first = segments[0] as string | undefined;
+    // Pehli baar: bhasha choose karne se pehle kuch aur mat dikhao.
+    if (!langChosen) {
+      if (first !== "language") router.replace("/language" as never);
+      return;
+    }
     const inAuthFlow = first === "login" || first === "auth";
-    if (!session && !inAuthFlow) router.replace("/login");
-    else if (session && first === "login") router.replace("/");
-  }, [session, loading, segments, router]);
+    if (!session && !inAuthFlow && first !== "language") router.replace("/login");
+    else if (session && (first === "login" || first === "language")) router.replace("/");
+  }, [session, loading, langReady, langChosen, segments, router]);
 
   // Reminders + document expiries OS me dobara schedule karo. Zaroori hai kyunki
   // scheduled notifications reinstall ke baad nahi bachti, aur doosre device pe
@@ -47,7 +57,7 @@ function RootNavigator() {
     if (uid) void syncNotifications();
   }, [uid]);
 
-  if (loading) {
+  if (loading || !langReady) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
         <ActivityIndicator size="large" color={colors.terracotta} />
@@ -63,6 +73,7 @@ function RootNavigator() {
       }}
     >
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="language" />
       <Stack.Screen name="login" />
       <Stack.Screen name="auth" />
       <Stack.Screen name="add-document" options={{ presentation: "modal" }} />
