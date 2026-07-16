@@ -75,8 +75,10 @@ export default function Home() {
               Apka Saathi
             </span>
           </a>
-          <div className="flex items-center gap-1 sm:gap-2.5">
-            <nav className="flex items-center">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
+            {/* Nav mobile pe chhup jaata hai — warna language switcher squeeze
+                hoke screen se bahar chala jaata tha. Footer me saare links hain. */}
+            <nav className="hidden items-center sm:flex">
               <a
                 href="/"
                 className="rounded-full bg-terracotta/10 px-2.5 py-2 text-[13px] font-semibold text-terracotta transition sm:px-3 sm:text-sm"

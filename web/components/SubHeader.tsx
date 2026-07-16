@@ -28,8 +28,10 @@ export default function SubHeader() {
             Apka Saathi
           </span>
         </Link>
-        <div className="flex items-center gap-1 sm:gap-2.5">
-          <nav className="flex items-center">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
+          {/* Mobile pe nav chhupao taaki language switcher hamesha dikhe.
+              Logo tap se home; footer me saare links. */}
+          <nav className="hidden items-center sm:flex">
             <Link href="/" className={linkCls("/")}>
               {t.nav.home}
             </Link>
