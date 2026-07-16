@@ -13,8 +13,8 @@ export function parseReminderTime(
 
   let found: { date: Date; label: string; matched: string } | null = null;
 
-  // X minute baad
-  const min = t.match(/(\d+)\s*(minute|minutes|min|mins|minat|minat|मिनट)/);
+  // X minute baad ("minut"/"minit" jaisi common spellings bhi)
+  const min = t.match(/(\d+)\s*(minutes?|mins?|min[aui]t|मिनट)/);
   if (min) {
     const n = +min[1];
     found = { date: new Date(now.getTime() + n * 60000), label: `${n} minute baad`, matched: min[0] };
@@ -41,25 +41,33 @@ export function parseReminderTime(
     }
   }
 
-  // "8 baje" / "subah 8 baje" / "8 pm"
+  // "8 baje" / "subah 8 baje" / "6:00 baje" / "8:30 pm"
   if (!found) {
+    // ⚠️ Pehle minutes (`:MM`) handle nahi hote the — "6:00 baje" me se parser
+    // "00 baje" (=12 AM) pakad leta tha. Ab `(\d{1,2})(?::(\d{2}))?` se ghanta
+    // aur minute dono lete hain.
     const bj = t.match(
-      /(subah|shaam|sham|dopahar|raat|morning|evening|night|afternoon)?\s*(\d{1,2})\s*(baje|bje|am|pm|o'clock|बजे)/,
+      /(subah|shaam|sham|dopahar|raat|morning|evening|night|afternoon)?\s*(\d{1,2})(?::(\d{2}))?\s*(baje|bje|am|pm|o'clock|बजे)/,
     );
     if (bj) {
       let hour = +bj[2];
+      const min = bj[3] ? Math.min(59, +bj[3]) : 0;
       const part = bj[1] || "";
-      const ap = bj[3];
+      const ap = bj[4];
       if (ap === "pm" && hour < 12) hour += 12;
       if (ap === "am" && hour === 12) hour = 0;
+      if (/subah|morning/.test(part) && hour === 12) hour = 0;
       if (/shaam|sham|evening/.test(part) && hour < 12) hour += 12;
       if (/raat|night/.test(part) && hour < 12) hour += 12;
       if (/dopahar|afternoon/.test(part) && hour < 12) hour += 12;
       const d = new Date(now);
-      d.setHours(hour, 0, 0, 0);
-      if (/kal/.test(t)) d.setDate(d.getDate() + 1);
+      d.setHours(hour, min, 0, 0);
+      if (/\bkal\b|\bcal\b/.test(t)) d.setDate(d.getDate() + 1);
       else if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
-      found = { date: d, label: bj[0].trim(), matched: bj[0] };
+      const hr12 = hour % 12 === 0 ? 12 : hour % 12;
+      const ampm = hour < 12 ? "AM" : "PM";
+      const mm = String(min).padStart(2, "0");
+      found = { date: d, label: `${hr12}:${mm} ${ampm}`, matched: bj[0] };
     }
   }
 
