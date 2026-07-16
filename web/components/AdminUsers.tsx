@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Check,
   Clock,
+  FileText,
 } from "lucide-react";
 
 type AdminUser = {
@@ -48,9 +49,29 @@ type UserDetail = {
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
   referrals: UserReferral[];
+  documents: UserDocument[];
+  documents_count: number;
+  storage_bytes: number;
+};
+
+type UserDocument = {
+  id: string;
+  name: string;
+  type: string;
+  expiry: string | null;
+  file_size: number | null;
+  in_storage: boolean;
+  created_at: string;
 };
 
 /* ------------------------------ helpers ------------------------------ */
+
+function fmtBytes(n: number | null): string {
+  if (!n || n <= 0) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -446,6 +467,40 @@ function Detail({ id }: { id: string }) {
           <ul className="mt-3 space-y-2">
             {detail.referrals.map((r) => (
               <ReferralItem key={r.id} r={r} />
+            ))}
+          </ul>
+        )}
+
+        {/* Documents — kya upload kiya, kab, size */}
+        <h4 className="mt-5 text-xs font-bold uppercase tracking-wider text-ink-soft">
+          Documents ({detail.documents_count}) · {fmtBytes(detail.storage_bytes)}
+        </h4>
+        {detail.documents.length === 0 ? (
+          <p className="mt-3 rounded-2xl border border-line bg-surface px-4 py-5 text-center text-sm text-ink-soft">
+            Koi document nahi.
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {detail.documents.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cream-deep text-ink-soft">
+                  <FileText size={14} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-ink">{d.name}</p>
+                  <p className="truncate text-xs text-ink-soft">
+                    {fmtDate(d.created_at)}
+                    {d.expiry ? ` · exp ${fmtDate(d.expiry)}` : ""}
+                    {d.in_storage ? "" : " · sirf device pe"}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-ink-soft">
+                  {fmtBytes(d.file_size)}
+                </span>
+              </li>
             ))}
           </ul>
         )}

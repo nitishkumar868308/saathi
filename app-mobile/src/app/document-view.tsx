@@ -1,12 +1,43 @@
-import { View, Text, Image, Pressable, StyleSheet, Dimensions } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  Image,
+  Pressable,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { colors } from "@/theme/colors";
+import { signedUrl } from "@/lib/storage";
 
 export default function DocumentView() {
-  const { uri, name } = useLocalSearchParams<{ uri?: string; name?: string }>();
+  const { uri, path, name } = useLocalSearchParams<{
+    uri?: string;
+    path?: string;
+    name?: string;
+  }>();
   const { width, height } = Dimensions.get("window");
+
+  // Local uri sabse fast; na ho to private storage se signed URL.
+  const [resolved, setResolved] = useState<string | null>(uri || null);
+  const [loading, setLoading] = useState(!uri && !!path);
+
+  useEffect(() => {
+    let alive = true;
+    if (!uri && path) {
+      signedUrl("documents", path)
+        .then((u) => alive && setResolved(u))
+        .finally(() => alive && setLoading(false));
+    }
+    return () => {
+      alive = false;
+    };
+  }, [uri, path]);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
@@ -19,9 +50,11 @@ export default function DocumentView() {
         <View style={{ width: 22 }} />
       </View>
       <View style={styles.body}>
-        {uri ? (
+        {loading ? (
+          <ActivityIndicator color={colors.terracotta} />
+        ) : resolved ? (
           <Image
-            source={{ uri }}
+            source={{ uri: resolved }}
             style={{ width: width - 32, height: height * 0.72 }}
             resizeMode="contain"
           />

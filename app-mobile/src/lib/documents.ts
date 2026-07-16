@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { canAddDocument, FREE_DOC_LIMIT } from "./plan";
+import { uploadFile, signedUrl } from "./storage";
 
 /** Free-plan document limit cross hone par throw hota hai. */
 export class DocLimitError extends Error {
@@ -16,11 +17,48 @@ export type Document = {
   name: string;
   type: string;
   expiry: string | null; // 'YYYY-MM-DD'
-  file_uri: string | null;
+  file_uri: string | null; // local device path (fast offline view)
+  file_path: string | null; // Supabase Storage path (cloud backup)
+  file_size: number | null; // bytes
+  mime_type: string | null;
   /** Plus expire hone pe 3 se aage ke documents lock ho jaate hain. */
   is_locked: boolean;
   created_at: string;
 };
+
+/** Storage upload ke baad document pe file info save karo. */
+export async function setDocumentFile(
+  id: string,
+  file_path: string,
+  file_size: number,
+  mime_type: string,
+): Promise<void> {
+  const { error } = await client()
+    .from("documents")
+    .update({ file_path, file_size, mime_type })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Local image ko private `documents` bucket me upload + document pe info save. */
+export async function uploadDocumentImage(docId: string, localUri: string): Promise<void> {
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return;
+  const ext = (localUri.split(".").pop() || "jpg").split("?")[0].slice(0, 5) || "jpg";
+  const mime = ext.toLowerCase() === "png" ? "image/png" : "image/jpeg";
+  const path = `${uid}/${docId}.${ext}`;
+  const { size } = await uploadFile("documents", path, localUri, mime);
+  await setDocumentFile(docId, path, size, mime);
+}
+
+/** Document dekhne ke liye signed URL (private bucket). Na ho to null. */
+export async function getDocumentViewUrl(doc: Document): Promise<string | null> {
+  if (doc.file_uri) return doc.file_uri; // local — fastest
+  if (doc.file_path) return signedUrl("documents", doc.file_path);
+  return null;
+}
 
 function client() {
   if (!supabase) throw new Error("Supabase set nahi hai (.env check karo)");

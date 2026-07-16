@@ -17,7 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
-import { addDocument, DocLimitError } from "@/lib/documents";
+import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
@@ -129,6 +129,12 @@ export default function AddDocument() {
         expiry: expiry || null,
         file_uri: savedUri,
       });
+
+      // Cloud backup — document image Supabase Storage me (private). Best-effort:
+      // fail ho to local copy to hai hi. Admin/size/cross-device iske liye.
+      if (savedUri) {
+        uploadDocumentImage(doc.id, savedUri).catch(() => {});
+      }
 
       // Expiry ke liye notification (14 din pehle, 3 din pehle, aur us din).
       // Permission tabhi maango jab expiry hai — warna prompt bekaar lagta hai.

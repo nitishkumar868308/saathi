@@ -159,7 +159,11 @@ export default function Home() {
                 onPress={() =>
                   router.push({
                     pathname: "/document-view",
-                    params: { uri: doc.file_uri ?? "", name: doc.name },
+                    params: {
+                      uri: doc.file_uri ?? "",
+                      path: doc.file_path ?? "",
+                      name: doc.name,
+                    },
                   } as never)
                 }
               />

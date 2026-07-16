@@ -336,7 +336,22 @@ begin
       from public.referrals r
       left join public.profiles rp on rp.id = r.referee_id
       where r.referrer_id = p.id
-    ), '[]'::jsonb)
+    ), '[]'::jsonb),
+    -- Kisne kya/kab/kitna size upload kiya (storage me file bhi hai kya).
+    'documents', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id',          d.id,
+        'name',        d.name,
+        'type',        d.type,
+        'expiry',      d.expiry,
+        'file_size',   d.file_size,
+        'in_storage',  (d.file_path is not null),
+        'created_at',  d.created_at
+      ) order by d.created_at desc)
+      from public.documents d where d.user_id = p.id
+    ), '[]'::jsonb),
+    'documents_count', (select count(*) from public.documents d where d.user_id = p.id),
+    'storage_bytes',   (select coalesce(sum(d.file_size), 0) from public.documents d where d.user_id = p.id)
   ) into res
   from public.profiles p where p.id = p_uid;
 

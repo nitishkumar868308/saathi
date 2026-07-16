@@ -157,6 +157,16 @@ export type UserReferral = {
   days: number;
 };
 
+export type UserDocument = {
+  id: string;
+  name: string;
+  type: string;
+  expiry: string | null;
+  file_size: number | null;
+  in_storage: boolean;
+  created_at: string;
+};
+
 export type UserDetail = {
   id: string;
   email: string | null;
@@ -169,6 +179,9 @@ export type UserDetail = {
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
   referrals: UserReferral[];
+  documents: UserDocument[];
+  documents_count: number;
+  storage_bytes: number;
 };
 
 /** Ek user ka poora record — kisko refer kiya, kab, kitne din. */
