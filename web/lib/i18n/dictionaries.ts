@@ -255,7 +255,7 @@ const hinglish: Dict = {
     sending: "Bhej rahe hain...",
     successToast: "Message mil gaya! Hum jaldi jawab denge. 🎉",
     errorToast: "Kuch gadbad ho gayi. Thodi der baad try karo.",
-    invalid: "Naam, sahi email aur message zaroori hai 🙂",
+    invalid: "Naam, sahi email aur message zaroori hai.",
     orEmail: "Ya seedhe email karo:",
     back: "Wapas",
   },
@@ -294,7 +294,7 @@ const hinglish: Dict = {
       },
       {
         title: "Subah ka Brief",
-        body: "Har subah ek chhota, pyaara message — aaj ke kaam, is hafte kya expire ho raha hai, aur aaj ka gym/reminder. Poora din ek nazar mein.",
+        body: "Har subah ek chhota, saaf summary — aaj ke kaam, is hafte kya expire ho raha hai, aur aaj ke reminders. Poora din ek nazar mein.",
       },
       {
         title: "Bas bol do.",
@@ -311,8 +311,8 @@ const hinglish: Dict = {
     ],
     cta: {
       title: "Aur dheere-dheere, poori life ka saathi.",
-      body: "Gym, goals, aur bahut kuch — sab isi mein add hota jayega.",
-      button: "Mujhe chahiye",
+      body: "Gym, goals, aur bahut kuch — sab isi mein judta jayega.",
+      button: "App download karo",
     },
   },
   demo: {
@@ -574,7 +574,7 @@ const hinglish: Dict = {
     pending: "{x} dost join to hue, par abhi unhone document add + chat poora nahi kiya.",
     openApp: "App kholo",
     logout: "Logout",
-    disabled: "Referral program abhi band hai. Baad me try karo 🙂",
+    disabled: "Referral program abhi band hai. Baad me dobara dekhein.",
     notConfigured: "Referral abhi web pe set nahi hai. Tab tak app se share karo.",
     shareMessage: "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din Saathi Plus FREE:\n{link}",
   },
@@ -635,7 +635,7 @@ const hi: Dict = {
     sending: "भेज रहे हैं...",
     successToast: "मैसेज मिल गया! हम जल्दी जवाब देंगे। 🎉",
     errorToast: "कुछ गड़बड़ हो गई। थोड़ी देर बाद ट्राई करें।",
-    invalid: "नाम, सही ईमेल और मैसेज ज़रूरी है 🙂",
+    invalid: "नाम, सही ईमेल और मैसेज ज़रूरी है।",
     orEmail: "या सीधे ईमेल करें:",
     back: "वापस",
   },
@@ -674,7 +674,7 @@ const hi: Dict = {
       },
       {
         title: "सुबह का ब्रीफ़",
-        body: "हर सुबह एक छोटा, प्यारा संदेश — आज के काम, इस हफ़्ते क्या एक्सपायर हो रहा है, और आज का reminder। पूरा दिन एक नज़र में।",
+        body: "हर सुबह एक छोटा, साफ़ सारांश — आज के काम, इस हफ़्ते क्या एक्सपायर हो रहा है, और आज के reminders। पूरा दिन एक नज़र में।",
       },
       {
         title: "बस बोल दीजिए।",
@@ -692,7 +692,7 @@ const hi: Dict = {
     cta: {
       title: "और धीरे-धीरे, पूरी ज़िंदगी का साथी।",
       body: "जिम, गोल्स, और बहुत कुछ — सब इसी में जुड़ता जाएगा।",
-      button: "मुझे चाहिए",
+      button: "ऐप डाउनलोड करें",
     },
   },
   demo: {
@@ -954,7 +954,7 @@ const hi: Dict = {
     pending: "{x} दोस्त जॉइन तो हुए, पर अभी उन्होंने डॉक्यूमेंट + चैट पूरा नहीं किया।",
     openApp: "ऐप खोलें",
     logout: "लॉगआउट",
-    disabled: "रेफ़रल प्रोग्राम अभी बंद है। बाद में कोशिश करें 🙂",
+    disabled: "रेफ़रल प्रोग्राम अभी बंद है। बाद में दोबारा देखें।",
     notConfigured: "रेफ़रल अभी वेब पर सेट नहीं है। तब तक ऐप से शेयर करें।",
     shareMessage: "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्यूमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन साथी प्लस फ्री:\n{link}",
   },
@@ -1015,7 +1015,7 @@ const en: Dict = {
     sending: "Sending...",
     successToast: "Got your message! We'll reply soon. 🎉",
     errorToast: "Something went wrong. Please try again shortly.",
-    invalid: "Name, a valid email and a message are required 🙂",
+    invalid: "Name, a valid email and a message are required.",
     orEmail: "Or email us directly:",
     back: "Back",
   },
@@ -1054,7 +1054,7 @@ const en: Dict = {
       },
       {
         title: "Your Morning Brief",
-        body: "A short, warm message every morning — today's tasks, what's expiring this week, and today's reminders. Your whole day at a glance.",
+        body: "A short, clear summary every morning — today's tasks, what's expiring this week, and today's reminders. Your whole day at a glance.",
       },
       {
         title: "Just say it.",
@@ -1072,7 +1072,7 @@ const en: Dict = {
     cta: {
       title: "And over time, a companion for all of life.",
       body: "Gym, goals, and much more — it all gets added here.",
-      button: "I want this",
+      button: "Download the app",
     },
   },
   demo: {
@@ -1334,7 +1334,7 @@ const en: Dict = {
     pending: "{x} friend(s) joined, but haven't added a document and chatted yet.",
     openApp: "Open the app",
     logout: "Sign out",
-    disabled: "The referral program is paused right now. Check back soon 🙂",
+    disabled: "The referral program is paused right now. Please check back soon.",
     notConfigured: "Referrals aren't set up on the web yet. Share from the app for now.",
     shareMessage: "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of Saathi Plus free:\n{link}",
   },
