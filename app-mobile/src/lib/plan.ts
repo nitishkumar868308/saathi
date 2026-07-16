@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { getUserDetails, isDetailsComplete } from "./user-details";
 
 /**
  * Plan / subscription helpers.
@@ -203,6 +204,36 @@ export async function getOffers(): Promise<Offers> {
   } catch {
     return DEFAULT_OFFERS;
   }
+}
+
+export type ReferralGate = {
+  hasDocument: boolean;
+  hasReminder: boolean;
+  profileComplete: boolean;
+  /** Teeno poore ho tabhi code/share dikhta hai. */
+  unlocked: boolean;
+};
+
+/**
+ * Referral tabhi khulta hai jab user: 1 document add kare, 1 reminder set kare,
+ * aur apni profile complete kare. Tab tak na code na share — sirf conditions.
+ * (Fake/khali accounts se referral abuse rokne ke liye.)
+ */
+export async function getReferralGate(): Promise<ReferralGate> {
+  const [docs, rems, details] = await Promise.all([
+    countDocuments(),
+    countReminders(),
+    getUserDetails().catch(() => null),
+  ]);
+  const hasDocument = docs > 0;
+  const hasReminder = rems > 0;
+  const profileComplete = isDetailsComplete(details);
+  return {
+    hasDocument,
+    hasReminder,
+    profileComplete,
+    unlocked: hasDocument && hasReminder && profileComplete,
+  };
 }
 
 export type ReferralInfo = {

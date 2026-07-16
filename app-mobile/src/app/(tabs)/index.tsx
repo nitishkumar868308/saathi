@@ -22,12 +22,14 @@ import { useToast } from "@/components/toast";
 import { useUserName } from "@/components/auth-provider";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+import { useOffers } from "@/lib/use-offers";
 
 export default function Home() {
   const router = useRouter();
   const toast = useToast();
   const firstName = useUserName();
   const { home: h } = useT();
+  const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -164,6 +166,25 @@ export default function Home() {
             ))}
           </View>
         )}
+
+        {/* Refer & Earn — home pe (referrals band ho to nahi) */}
+        {offers.referralsEnabled && (
+          <Pressable
+            onPress={() => router.push("/referral" as never)}
+            style={({ pressed }) => [styles.referCard, pressed && { opacity: 0.92 }]}
+          >
+            <View style={styles.referIcon}>
+              <Ionicons name="gift" size={20} color={colors.white} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.referTitle}>
+                {tpl(h.referCard, { d: offers.referralDays })}
+              </Text>
+              <Text style={styles.referSub}>{h.referCardSub}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.terracotta} />
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -174,6 +195,27 @@ const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 20, paddingBottom: 32, ...CONTENT },
+  referCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.25)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    padding: 16,
+  },
+  referIcon: {
+    height: 42,
+    width: 42,
+    borderRadius: 14,
+    backgroundColor: colors.terracotta,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  referTitle: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
+  referSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

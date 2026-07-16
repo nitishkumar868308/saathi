@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -10,41 +10,59 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { useToast } from "@/components/toast";
-import { getReferralInfo, WEB_URL, type ReferralInfo } from "@/lib/plan";
+import {
+  getReferralInfo,
+  getReferralGate,
+  WEB_URL,
+  type ReferralInfo,
+  type ReferralGate,
+} from "@/lib/plan";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 export default function Referral() {
   const toast = useToast();
+  const { referral: t } = useT();
   const [info, setInfo] = useState<ReferralInfo | null>(null);
+  const [gate, setGate] = useState<ReferralGate | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    getReferralInfo()
-      .then(setInfo)
-      .catch(() => toast.show("Referral info load nahi hui", "error"))
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const load = useCallback(async () => {
+    try {
+      const [i, g] = await Promise.all([getReferralInfo(), getReferralGate()]);
+      setInfo(i);
+      setGate(g);
+    } catch {
+      toast.show(t.loadError, "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast, t.loadError]);
 
+  // Focus pe reload — user document/reminder/profile karke wapas aaye to unlock dikhe.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const days = info?.referralDays ?? 15;
   const link = info?.code ? `${WEB_URL}/r/${info.code}` : WEB_URL;
+  const earned = info?.daysEarned ?? 0;
+  const unlocked = gate?.unlocked ?? false;
 
   async function share() {
     if (!info?.code) return;
     try {
-      await Share.share({
-        message:
-          `Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\n` +
-          `Mere code se join karo, dono ko ${info.referralDays} din ka Saathi Plus plan FREE:\n${link}`,
-      });
+      await Share.share({ message: tpl(t.shareMessage, { d: days, link }) });
     } catch {
       /* user cancelled */
     }
   }
-
-  const earned = info?.daysEarned ?? 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -52,7 +70,7 @@ export default function Referral() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
           <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={styles.title}>Refer & Earn</Text>
+        <Text style={styles.title}>{t.title}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -65,54 +83,105 @@ export default function Referral() {
             <View style={styles.giftIcon}>
               <Ionicons name="gift" size={30} color={colors.white} />
             </View>
-            <Text style={styles.heroTitle}>
-              Dono ko {info?.referralDays ?? 15} din ka Plus plan FREE
-            </Text>
-            <Text style={styles.heroSub}>
-              Aapka dost aapke code se join kare, apna pehla document daale aur Saathi se
-              baat kare — dono ko {info?.referralDays ?? 15} din ka Saathi Plus plan mil
-              jaayega.
-            </Text>
+            <Text style={styles.heroTitle}>{tpl(t.heroTitle, { d: days })}</Text>
+            <Text style={styles.heroSub}>{tpl(t.heroSub, { d: days })}</Text>
           </View>
 
-          {/* Code */}
-          <Text style={styles.label}>Aapka referral code</Text>
-          <View style={styles.codeBox}>
-            <Text style={styles.code}>{info?.code ?? "—"}</Text>
-          </View>
+          {unlocked ? (
+            <>
+              {/* Code */}
+              <Text style={styles.label}>{t.yourCode}</Text>
+              <View style={styles.codeBox}>
+                <Text style={styles.code}>{info?.code ?? "—"}</Text>
+              </View>
 
-          <Pressable onPress={share} disabled={!info?.code} style={styles.shareBtn}>
-            <Ionicons name="share-social" size={18} color={colors.white} />
-            <Text style={styles.shareText}>Dost ko bhejo</Text>
-          </Pressable>
+              <Pressable onPress={share} disabled={!info?.code} style={styles.shareBtn}>
+                <Ionicons name="share-social" size={18} color={colors.white} />
+                <Text style={styles.shareText}>{t.shareBtn}</Text>
+              </Pressable>
 
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>{info?.rewardedReferrals ?? 0}</Text>
-              <Text style={styles.statLabel}>Successful referrals</Text>
+              {/* Stats */}
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <Text style={styles.statNum}>{info?.rewardedReferrals ?? 0}</Text>
+                  <Text style={styles.statLabel}>{t.statReferrals}</Text>
+                </View>
+                <View style={styles.stat}>
+                  <Text style={styles.statNum}>{earned}</Text>
+                  <Text style={styles.statLabel}>{t.statDays}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.capLabel}>{tpl(t.noLimit, { d: days })}</Text>
+
+              {(info?.totalReferrals ?? 0) > (info?.rewardedReferrals ?? 0) && (
+                <Text style={styles.pending}>
+                  {tpl(t.pending, {
+                    x: (info?.totalReferrals ?? 0) - (info?.rewardedReferrals ?? 0),
+                  })}
+                </Text>
+              )}
+            </>
+          ) : (
+            /* Locked — conditions checklist */
+            <View style={styles.lockCard}>
+              <Text style={styles.lockTitle}>{t.lockedTitle}</Text>
+              <Text style={styles.lockSub}>{t.lockedSub}</Text>
+
+              <Condition
+                done={gate?.hasDocument ?? false}
+                label={t.condDocument}
+                cta={t.goDo}
+                onPress={() => router.push("/add-document")}
+              />
+              <Condition
+                done={gate?.hasReminder ?? false}
+                label={t.condReminder}
+                cta={t.goDo}
+                onPress={() => router.push("/add-reminder")}
+              />
+              <Condition
+                done={gate?.profileComplete ?? false}
+                label={t.condProfile}
+                cta={t.goDo}
+                onPress={() => router.push("/profile-details" as never)}
+              />
             </View>
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>{earned}</Text>
-              <Text style={styles.statLabel}>Plus din kamaaye</Text>
-            </View>
-          </View>
-
-          {/* Koi limit nahi — jitne chaaho refer karo */}
-          <Text style={styles.capLabel}>
-            Jitne dost invite karo — har successful referral pe {info?.referralDays ?? 15}{" "}
-            din ka Plus plan. Koi limit nahi.
-          </Text>
-
-          {(info?.totalReferrals ?? 0) > (info?.rewardedReferrals ?? 0) && (
-            <Text style={styles.pending}>
-              {(info!.totalReferrals - info!.rewardedReferrals)} dost join to hue, par abhi
-              unhone document + chat poora nahi kiya.
-            </Text>
           )}
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function Condition({
+  done,
+  label,
+  cta,
+  onPress,
+}: {
+  done: boolean;
+  label: string;
+  cta: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={styles.cond}>
+      <View style={[styles.condTick, done ? styles.condTickDone : styles.condTickTodo]}>
+        <Ionicons
+          name={done ? "checkmark" : "ellipse-outline"}
+          size={16}
+          color={done ? colors.white : colors.inkSoft}
+        />
+      </View>
+      <Text style={[styles.condLabel, done && styles.condLabelDone]}>{label}</Text>
+      {!done && (
+        <Pressable onPress={onPress} style={styles.condCta}>
+          <Text style={styles.condCtaText}>{cta}</Text>
+          <Ionicons name="arrow-forward" size={13} color={colors.terracotta} />
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -151,6 +220,39 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     textAlign: "center",
   },
+  /* Locked */
+  lockCard: {
+    marginTop: 26,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    padding: 20,
+  },
+  lockTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
+  lockSub: { marginTop: 4, fontSize: 13.5, lineHeight: 20, color: colors.inkSoft, marginBottom: 8 },
+  cond: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  condTick: {
+    height: 28,
+    width: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  condTickDone: { backgroundColor: colors.sage },
+  condTickTodo: { backgroundColor: colors.creamDeep },
+  condLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
+  condLabelDone: { color: colors.inkSoft, textDecorationLine: "line-through" },
+  condCta: { flexDirection: "row", alignItems: "center", gap: 3 },
+  condCtaText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
+  /* Unlocked */
   label: {
     marginTop: 26,
     marginBottom: 10,
@@ -191,14 +293,6 @@ const styles = StyleSheet.create({
   },
   statNum: { fontSize: 26, fontWeight: "800", color: colors.ink },
   statLabel: { marginTop: 4, fontSize: 12.5, color: colors.inkSoft, textAlign: "center" },
-  capLabel: { marginTop: 22, fontSize: 13, fontWeight: "600", color: colors.inkSoft },
-  bar: {
-    marginTop: 8,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: colors.line,
-    overflow: "hidden",
-  },
-  barFill: { height: 10, borderRadius: 999, backgroundColor: colors.sage },
+  capLabel: { marginTop: 22, fontSize: 13, fontWeight: "600", color: colors.inkSoft, lineHeight: 19 },
   pending: { marginTop: 16, fontSize: 13.5, lineHeight: 20, color: colors.inkSoft },
 });

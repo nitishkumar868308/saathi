@@ -92,6 +92,9 @@ export type Dict = {
     attention: string;
     seeAll: string;
     nothingUrgent: string;
+    /** {d} */
+    referCard: string;
+    referCardSub: string;
   };
   documents: {
     title: string;
@@ -227,6 +230,30 @@ export type Dict = {
     sourceAdmin: string;
     sourceReward: string;
   };
+  referral: {
+    title: string;
+    /** {d} */
+    heroTitle: string;
+    /** {d} */
+    heroSub: string;
+    lockedTitle: string;
+    lockedSub: string;
+    condDocument: string;
+    condReminder: string;
+    condProfile: string;
+    goDo: string;
+    yourCode: string;
+    shareBtn: string;
+    statReferrals: string;
+    statDays: string;
+    /** {d} */
+    noLimit: string;
+    /** {x} */
+    pending: string;
+    /** {d} {link} */
+    shareMessage: string;
+    loadError: string;
+  };
   settings: {
     account: string;
     backendOk: string;
@@ -337,6 +364,8 @@ const hinglish: Dict = {
     attention: "Dhyan dena hai",
     seeAll: "Sab dekho",
     nothingUrgent: "Abhi kuch urgent nahi",
+    referCard: "Refer & Earn — dono ko {d} din Plus free",
+    referCardSub: "Dost ko invite karo, dono ko Saathi Plus plan",
   },
   documents: {
     title: "Documents",
@@ -472,6 +501,28 @@ const hinglish: Dict = {
     sourceAdmin: "Team ne diya",
     sourceReward: "Reward se",
   },
+  referral: {
+    title: "Refer & Earn",
+    heroTitle: "Dono ko {d} din ka Plus plan FREE",
+    heroSub:
+      "Aapka dost aapke code se join kare, apna pehla document daale aur Saathi se baat kare — dono ko {d} din ka Saathi Plus plan mil jaayega.",
+    lockedTitle: "Pehle ye poora karo",
+    lockedSub: "Uske baad aapka referral code aur share unlock ho jayega.",
+    condDocument: "Ek document add karo",
+    condReminder: "Ek reminder set karo",
+    condProfile: "Profile complete karo",
+    goDo: "Karo",
+    yourCode: "Aapka referral code",
+    shareBtn: "Dost ko bhejo",
+    statReferrals: "Successful referrals",
+    statDays: "Plus din kamaaye",
+    noLimit:
+      "Jitne dost invite karo — har successful referral pe {d} din ka Plus plan. Koi limit nahi.",
+    pending: "{x} dost join to hue, par abhi unhone document add + chat poora nahi kiya.",
+    shareMessage:
+      "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din ka Saathi Plus plan FREE:\n{link}",
+    loadError: "Referral info load nahi hui",
+  },
   settings: {
     account: "Aapka account",
     backendOk: "Backend juda hai",
@@ -581,6 +632,8 @@ const hi: Dict = {
     attention: "ध्यान देना है",
     seeAll: "सब देखें",
     nothingUrgent: "अभी कुछ ज़रूरी नहीं",
+    referCard: "Refer & Earn — दोनों को {d} दिन प्लस फ्री",
+    referCardSub: "दोस्त को इनवाइट करें, दोनों को साथी प्लस प्लान",
   },
   documents: {
     title: "डॉक्युमेंट्स",
@@ -716,6 +769,28 @@ const hi: Dict = {
     sourceAdmin: "टीम ने दिया",
     sourceReward: "रिवॉर्ड से",
   },
+  referral: {
+    title: "Refer & Earn",
+    heroTitle: "दोनों को {d} दिन का प्लस प्लान FREE",
+    heroSub:
+      "आपका दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्युमेंट डाले और साथी से बात करे — दोनों को {d} दिन का साथी प्लस प्लान मिल जाएगा।",
+    lockedTitle: "पहले ये पूरा करें",
+    lockedSub: "उसके बाद आपका रेफ़रल कोड और शेयर अनलॉक हो जाएगा।",
+    condDocument: "एक डॉक्युमेंट जोड़ें",
+    condReminder: "एक रिमाइंडर सेट करें",
+    condProfile: "प्रोफ़ाइल पूरी करें",
+    goDo: "करें",
+    yourCode: "आपका रेफ़रल कोड",
+    shareBtn: "दोस्त को भेजें",
+    statReferrals: "सफल रेफ़रल",
+    statDays: "प्लस दिन कमाए",
+    noLimit:
+      "जितने दोस्त इनवाइट करें — हर सफल रेफ़रल पर {d} दिन का प्लस प्लान। कोई सीमा नहीं।",
+    pending: "{x} दोस्त जॉइन तो हुए, पर अभी उन्होंने डॉक्युमेंट + चैट पूरा नहीं किया।",
+    shareMessage:
+      "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्युमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन का साथी प्लस प्लान FREE:\n{link}",
+    loadError: "रेफ़रल जानकारी लोड नहीं हुई",
+  },
   settings: {
     account: "आपका अकाउंट",
     backendOk: "बैकएंड जुड़ा है",
@@ -824,6 +899,8 @@ const en: Dict = {
     attention: "Needs attention",
     seeAll: "See all",
     nothingUrgent: "Nothing urgent right now",
+    referCard: "Refer & Earn — you both get {d} days of Plus free",
+    referCardSub: "Invite a friend, you both get the Saathi Plus plan",
   },
   documents: {
     title: "Documents",
@@ -958,6 +1035,28 @@ const en: Dict = {
     sourcePaid: "You purchased it",
     sourceAdmin: "Given by the team",
     sourceReward: "From a reward",
+  },
+  referral: {
+    title: "Refer & Earn",
+    heroTitle: "You both get {d} days of the Plus plan FREE",
+    heroSub:
+      "Your friend joins with your code, adds their first document and chats with Saathi — you both get {d} days of the Saathi Plus plan.",
+    lockedTitle: "First, finish these",
+    lockedSub: "Then your referral code and sharing unlock.",
+    condDocument: "Add one document",
+    condReminder: "Set one reminder",
+    condProfile: "Complete your profile",
+    goDo: "Do it",
+    yourCode: "Your referral code",
+    shareBtn: "Send to a friend",
+    statReferrals: "Successful referrals",
+    statDays: "Plus days earned",
+    noLimit:
+      "Invite as many friends as you like — {d} days of the Plus plan per successful referral. No limit.",
+    pending: "{x} friend(s) joined, but haven't added a document and chatted yet.",
+    shareMessage:
+      "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of the Saathi Plus plan FREE:\n{link}",
+    loadError: "Couldn't load referral info",
   },
   settings: {
     account: "Your account",
