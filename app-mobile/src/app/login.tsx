@@ -20,6 +20,8 @@ import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 import { savePendingReferral } from "@/lib/referral-pending";
 import { useOffers } from "@/lib/use-offers";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 /** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
 function referralFromUrl(url: string | null): string | null {
@@ -38,6 +40,7 @@ function referralFromUrl(url: string | null): string | null {
 export default function Login() {
   const toast = useToast();
   const offers = useOffers();
+  const { login: l } = useT();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -119,22 +122,18 @@ export default function Login() {
             <SaathiMark size={36} color={colors.white} />
           </View>
           <Text style={styles.title}>
-            {mode === "login" ? "Wapas aa gaye 🙂" : "Milo apne Saathi se"}
+            {mode === "login" ? `${l.welcomeBack} 🙂` : l.signupTitle}
           </Text>
-          <Text style={styles.sub}>
-            {mode === "login"
-              ? "Login karo aur apni life sambhalo"
-              : "Naya account banao — free hai"}
-          </Text>
+          <Text style={styles.sub}>{mode === "login" ? l.loginSub : l.signupSub}</Text>
 
           {/* name (signup only) */}
           {mode === "signup" && (
             <>
-              <Text style={styles.label}>Aapka naam</Text>
+              <Text style={styles.label}>{l.name}</Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="Jaise: Rahul"
+                placeholder={l.namePlaceholder}
                 placeholderTextColor={colors.inkSoft}
                 autoCapitalize="words"
                 style={styles.input}
@@ -143,11 +142,11 @@ export default function Login() {
           )}
 
           {/* email */}
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{l.email}</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="aapka@email.com"
+            placeholder={l.emailPlaceholder}
             placeholderTextColor={colors.inkSoft}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -156,11 +155,11 @@ export default function Login() {
           />
 
           {/* password */}
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{l.password}</Text>
           <TextInput
             value={password}
             onChangeText={setPassword}
-            placeholder="Kam se kam 6 characters"
+            placeholder={l.passwordPlaceholder}
             placeholderTextColor={colors.inkSoft}
             secureTextEntry
             autoCapitalize="none"
@@ -171,22 +170,19 @@ export default function Login() {
           {mode === "signup" && offers.referralsEnabled && (
             <>
               <Text style={styles.label}>
-                Referral code <Text style={styles.optional}>(optional)</Text>
+                {l.referralCode} <Text style={styles.optional}>({l.referralOptional})</Text>
               </Text>
               <TextInput
                 value={refCode}
-                onChangeText={(t) => setRefCode(t.toUpperCase())}
-                placeholder={`Dost ka code — dono ko ${offers.referralDays} din ka Plus plan free`}
+                onChangeText={(txt) => setRefCode(txt.toUpperCase())}
+                placeholder={tpl(l.referralPlaceholderTpl, { d: offers.referralDays })}
                 placeholderTextColor={colors.inkSoft}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={10}
                 style={styles.input}
               />
-              <Text style={styles.refHint}>
-                Reward tab milega jab aap apna pehla document add karo aur Saathi se ek
-                baar baat karo.
-              </Text>
+              <Text style={styles.refHint}>{l.referralHint}</Text>
             </>
           )}
 
@@ -198,14 +194,14 @@ export default function Login() {
             {loading ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.btnText}>{mode === "login" ? "Login karo" : "Account banao"}</Text>
+              <Text style={styles.btnText}>{mode === "login" ? l.loginBtn : l.signupBtn}</Text>
             )}
           </Pressable>
 
           {/* divider */}
           <View style={styles.divider}>
             <View style={styles.line} />
-            <Text style={styles.or}>ya</Text>
+            <Text style={styles.or}>{l.or}</Text>
             <View style={styles.line} />
           </View>
 
@@ -220,7 +216,7 @@ export default function Login() {
             ) : (
               <>
                 <Ionicons name="logo-google" size={19} color="#DB4437" />
-                <Text style={styles.googleText}>Google se continue karo</Text>
+                <Text style={styles.googleText}>{l.google}</Text>
               </>
             )}
           </Pressable>
@@ -231,9 +227,9 @@ export default function Login() {
             style={styles.toggle}
           >
             <Text style={styles.toggleText}>
-              {mode === "login" ? "Naya ho? " : "Pehle se account hai? "}
+              {mode === "login" ? `${l.noAccount} ` : `${l.haveAccount} `}
               <Text style={styles.toggleLink}>
-                {mode === "login" ? "Account banao" : "Login karo"}
+                {mode === "login" ? l.createAccount : l.loginInstead}
               </Text>
             </Text>
           </Pressable>

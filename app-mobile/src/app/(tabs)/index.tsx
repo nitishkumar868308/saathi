@@ -20,11 +20,14 @@ import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { useToast } from "@/components/toast";
 import { useUserName } from "@/components/auth-provider";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 export default function Home() {
   const router = useRouter();
   const toast = useToast();
   const firstName = useUserName();
+  const { home: h } = useT();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,9 +77,9 @@ export default function Home() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greeting}>
-              Namaste{firstName ? ` ${firstName}` : ""} 👋
+              {tpl(h.greeting, { name: firstName ? ` ${firstName}` : "" })} 👋
             </Text>
-            <Text style={styles.sub}>Aaj ka aapka Saathi brief</Text>
+            <Text style={styles.sub}>{h.briefLabel}</Text>
           </View>
           <View style={styles.avatar}>
             <SaathiMark size={24} color={colors.white} />
@@ -89,16 +92,19 @@ export default function Home() {
         <View style={styles.briefCard}>
           <View style={styles.briefTag}>
             <Ionicons name="sunny" size={13} color={colors.amber} />
-            <Text style={styles.briefTagText}>Aaj ka brief</Text>
+            <Text style={styles.briefTagText}>{h.briefLabel}</Text>
           </View>
           <Text style={styles.briefBody}>
             {loading
-              ? "Dekh raha hoon aapke documents..."
+              ? h.briefLoading
               : attention.length > 0
-                ? `Dhyan do${firstName ? " " + firstName : ""} — ${attention.length} document jald expire ho rahe hain. Neeche dekho, main yaad rakh raha hoon. 🙂`
+                ? tpl(h.briefAttention, {
+                    name: firstName ? " " + firstName : "",
+                    n: attention.length,
+                  }) + " 🙂"
                 : docs.length === 0
-                  ? `Chalo shuru karein${firstName ? " " + firstName : ""}! Pehla document add karo, main uski expiry sambhal lunga. 📄`
-                  : `Sab set hai${firstName ? " " + firstName : ""}! Koi document jald expire nahi ho raha. Relax karo 🌿`}
+                  ? tpl(h.briefStart, { name: firstName ? " " + firstName : "" }) + " 📄"
+                  : tpl(h.briefAllSet, { name: firstName ? " " + firstName : "" }) + " 🌿"}
           </Text>
         </View>
 
@@ -111,7 +117,7 @@ export default function Home() {
             <View style={[styles.actionIcon, { backgroundColor: "rgba(194,90,55,0.12)" }]}>
               <Ionicons name="add-circle" size={22} color={colors.terracotta} />
             </View>
-            <Text style={styles.actionText}>Document add</Text>
+            <Text style={styles.actionText}>{h.quickDoc}</Text>
           </Pressable>
 
           <Pressable
@@ -121,15 +127,15 @@ export default function Home() {
             <View style={[styles.actionIcon, { backgroundColor: "rgba(124,138,107,0.15)" }]}>
               <Ionicons name="chatbubble-ellipses" size={20} color={colors.sage} />
             </View>
-            <Text style={styles.actionText}>Saathi se baat</Text>
+            <Text style={styles.actionText}>{h.quickChat}</Text>
           </Pressable>
         </View>
 
         {/* Attention */}
         <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Dhyan dena hai</Text>
+          <Text style={styles.sectionTitle}>{h.attention}</Text>
           <Pressable onPress={() => router.push("/documents")}>
-            <Text style={styles.link}>Sab dekho</Text>
+            <Text style={styles.link}>{h.seeAll}</Text>
           </Pressable>
         </View>
 
@@ -140,7 +146,7 @@ export default function Home() {
         ) : attention.length === 0 ? (
           <View style={styles.emptyBox}>
             <Ionicons name="checkmark-circle" size={22} color={colors.sage} />
-            <Text style={styles.emptyText}>Abhi kuch urgent nahi 🌿</Text>
+            <Text style={styles.emptyText}>{h.nothingUrgent} 🌿</Text>
           </View>
         ) : (
           <View style={{ gap: 10 }}>
