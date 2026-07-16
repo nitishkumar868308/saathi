@@ -155,7 +155,11 @@ export default function Pricing() {
                       <Check size={12} strokeWidth={3} />
                     </span>
                     <span className={highlight ? "text-cream/90" : "text-ink"}>
-                      {f}
+                      {/* Free ki limits admin (app_config) se — {docs}/{rem} bharo */}
+                      {tpl(f, {
+                        docs: offers.freeDocuments,
+                        rem: offers.freeReminders,
+                      })}
                     </span>
                   </li>
                 ))}
