@@ -18,6 +18,7 @@ import { listDocuments, deleteDocument, type Document } from "@/lib/documents";
 import { cancelDocumentExpiry } from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
+import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 
 type Filter = "all" | "soon" | "expired";
@@ -110,6 +111,8 @@ export default function Documents() {
           })}
         </View>
       </View>
+
+      <UpgradeBanner compact />
 
       {loading ? (
         // Spinner ki jagah skeleton — content ka shape dikhta hai, jump nahi hota

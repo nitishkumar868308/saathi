@@ -14,6 +14,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
+import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
@@ -81,6 +82,8 @@ export default function Home() {
             <SaathiMark size={24} color={colors.white} />
           </View>
         </View>
+
+        <UpgradeBanner flush />
 
         {/* Daily brief card */}
         <View style={styles.briefCard}>

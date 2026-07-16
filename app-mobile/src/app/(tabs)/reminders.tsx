@@ -21,6 +21,7 @@ import {
   type Reminder,
 } from "@/lib/reminders";
 import { scheduleReminder, cancelReminder } from "@/lib/notifications";
+import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 
 export default function Reminders() {
@@ -91,6 +92,8 @@ export default function Reminders() {
         <Text style={styles.title}>Reminders</Text>
         <Text style={styles.sub}>Saathi sahi time pe yaad dilayega</Text>
       </View>
+
+      <UpgradeBanner compact />
 
       {loading ? (
         <View style={styles.center}>

@@ -15,6 +15,7 @@ import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
 import { TypingDots } from "@/components/typing-dots";
+import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
 import { askSaathi, type ChatTurn } from "@/lib/ai";
 import { checkReferralQualification } from "@/lib/plan";
@@ -79,6 +80,8 @@ export default function Chat() {
           </View>
         </View>
       </View>
+
+      <UpgradeBanner compact />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
