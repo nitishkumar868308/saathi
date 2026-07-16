@@ -23,6 +23,7 @@ import { colors } from "@/theme/colors";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
 import { PhoneField } from "@/components/phone-field";
+import { SearchSelect } from "@/components/search-select";
 import {
   getCountries,
   getStates,
@@ -247,27 +248,33 @@ export default function ProfileDetails() {
             </View>
 
             <Text style={styles.label}>Country</Text>
-            <SelectRow
+            <SearchSelect
               items={countries}
               value={countryId}
               placeholder={countries.length ? "Country chuno" : "Data import karo"}
+              searchPlaceholder="Country search karo…"
+              emptyText="Kuch nahi mila"
               onSelect={pickCountry}
             />
 
             <Text style={styles.label}>State</Text>
-            <SelectRow
+            <SearchSelect
               items={states}
               value={stateId}
               placeholder={countryId ? "State chuno" : "Pehle country"}
+              searchPlaceholder="State search karo…"
+              emptyText="Kuch nahi mila"
               onSelect={pickState}
               disabled={!countryId}
             />
 
             <Text style={styles.label}>City</Text>
-            <SelectRow
+            <SearchSelect
               items={cities}
               value={cityId}
               placeholder={stateId ? "City chuno" : "Pehle state"}
+              searchPlaceholder="City search karo…"
+              emptyText="Kuch nahi mila"
               onSelect={setCityId}
               disabled={!stateId}
             />
@@ -296,41 +303,6 @@ export default function ProfileDetails() {
 }
 
 // Simple inline select (chips-wrap). Chhoti lists ke liye theek.
-function SelectRow({
-  items,
-  value,
-  placeholder,
-  onSelect,
-  disabled,
-}: {
-  items: LocationItem[];
-  value: number | null;
-  placeholder: string;
-  onSelect: (id: number) => void;
-  disabled?: boolean;
-}) {
-  if (disabled || items.length === 0) {
-    return <Text style={styles.selectEmpty}>{placeholder}</Text>;
-  }
-  return (
-    <View style={styles.chips}>
-      {items.map((it) => (
-        <Pressable
-          key={it.id}
-          onPress={() => onSelect(it.id)}
-          style={[styles.chip, value === it.id && styles.chipActive]}
-        >
-          <Text
-            style={[styles.chipText, value === it.id && styles.chipTextActive]}
-          >
-            {it.name}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.cream },
   header: {
