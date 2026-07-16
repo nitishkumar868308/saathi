@@ -21,15 +21,18 @@ import {
   type Reminder,
 } from "@/lib/reminders";
 import { scheduleReminder, cancelReminder } from "@/lib/notifications";
+import { formatWhen } from "@/utils/parse-time";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
 export default function Reminders() {
   const router = useRouter();
   const toast = useToast();
   const { reminders: r0, common: c } = useT();
+  const { locale } = useLocale();
+  const words = { today: c.today, tomorrow: c.tomorrow };
   const [items, setItems] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +92,10 @@ export default function Reminders() {
   const today = items.filter((r) => r.bucket === "today");
   const upcoming = items.filter((r) => r.bucket !== "today");
 
+  // Card pe time hamesha current bhasha me — stored label ki jagah remind_at se.
+  const timeOf = (r: Reminder): string | null =>
+    r.remind_at ? formatWhen(new Date(r.remind_at), words, locale) : r.time_label ?? null;
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerWrap}>
@@ -112,8 +119,8 @@ export default function Reminders() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Section title={r0.today} items={today} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} />
-          <Section title={r0.upcoming} items={upcoming} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} />
+          <Section title={r0.today} items={today} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
+          <Section title={r0.upcoming} items={upcoming} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
           <Text style={styles.hint}>{r0.longPressHint}</Text>
         </ScrollView>
       )}
@@ -135,12 +142,14 @@ function Section({
   onToggle,
   onDelete,
   pausedTag,
+  timeOf,
 }: {
   title: string;
   items: Reminder[];
   onToggle: (r: Reminder) => void;
   onDelete: (r: Reminder) => void;
   pausedTag: string;
+  timeOf: (r: Reminder) => string | null;
 }) {
   if (items.length === 0) return null;
   return (
@@ -171,8 +180,8 @@ function Section({
               </Text>
               {r.is_paused ? (
                 <Text style={styles.pausedTag}>{pausedTag}</Text>
-              ) : r.time_label ? (
-                <Text style={styles.rTime}>{r.time_label}</Text>
+              ) : timeOf(r) ? (
+                <Text style={styles.rTime}>{timeOf(r)}</Text>
               ) : null}
             </View>
             {r.is_paused ? (

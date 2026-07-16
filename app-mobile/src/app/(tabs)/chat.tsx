@@ -19,7 +19,7 @@ import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
 import { askSaathi, type ChatTurn } from "@/lib/ai";
 import { checkReferralQualification } from "@/lib/plan";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
 type Msg = { id: string; role: "user" | "saathi"; text: string };
@@ -27,6 +27,7 @@ type Msg = { id: string; role: "user" | "saathi"; text: string };
 export default function Chat() {
   const name = useUserName();
   const { chat: ch } = useT();
+  const { locale } = useLocale();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
@@ -52,7 +53,10 @@ export default function Chat() {
     setInput("");
     setSending(true);
 
-    const reply = await askSaathi(t, history, name);
+    const reply = await askSaathi(t, history, name, {
+      fallback: ch.stubReply,
+      locale,
+    });
 
     setMessages((m) => [...m, { id: String(m.length + 1), role: "saathi", text: reply }]);
     setSending(false);

@@ -27,6 +27,7 @@ import { detectDocType, guessName } from "@/utils/detect-doc";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 const quick = [
   { label: "+6 mahine", months: 6 },
@@ -71,7 +72,7 @@ export default function AddDocument() {
       let result: ImagePicker.ImagePickerResult;
       if (source === "camera") {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) return toast.show("Camera permission chahiye", "info");
+        if (!perm.granted) return toast.show(d.cameraPermission, "info");
         result = await ImagePicker.launchCameraAsync(opts);
       } else {
         result = await ImagePicker.launchImageLibraryAsync(opts);
@@ -100,18 +101,18 @@ export default function AddDocument() {
 
         const bits: string[] = [];
         if (nm) bits.push(nm);
-        if (exp) bits.push("expiry mil gayi");
+        if (exp) bits.push(d.ocrExpiryFound);
         toast.show(
-          bits.length ? `Padh liya: ${bits.join(" · ")} ✨` : "Padha, par saaf nahi — details khud daal do",
+          bits.length ? tpl(d.ocrReadTpl, { bits: bits.join(" · ") }) : d.ocrUnclear,
           bits.length ? "success" : "info",
         );
       } catch {
-        toast.show("Photo padhne mein dikkat — details khud daal do", "error");
+        toast.show(d.ocrFailed, "error");
       } finally {
         setScanning(false);
       }
     } catch {
-      toast.show("Image select nahi hui", "error");
+      toast.show(d.imageFailed, "error");
     }
   }
 

@@ -13,8 +13,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { colors } from "@/theme/colors";
 import { signedUrl } from "@/lib/storage";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function DocumentView() {
+  const { documents: d } = useT();
   const { uri, path, name } = useLocalSearchParams<{
     uri?: string;
     path?: string;
@@ -61,7 +63,7 @@ export default function DocumentView() {
         ) : (
           <View style={styles.empty}>
             <Ionicons name="document-outline" size={40} color={colors.inkSoft} />
-            <Text style={styles.emptyText}>Is document ki file save nahi hai.</Text>
+            <Text style={styles.emptyText}>{d.noFileSaved}</Text>
           </View>
         )}
       </View>

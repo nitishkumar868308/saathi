@@ -6,16 +6,15 @@ import { useRouter } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
-const points = [
-  { icon: "documents-outline", text: "Documents ki expiry kabhi na bhoole" },
-  { icon: "sunny-outline", text: "Har subah pyaara daily brief" },
-  { icon: "lock-closed-outline", text: "100% private — sab aapke control mein" },
-];
+const pointIcons = ["documents-outline", "sunny-outline", "lock-closed-outline"];
 
 export default function Onboarding() {
   const router = useRouter();
+  const { onboarding: o } = useT();
   const [name, setName] = useState("");
+  const points = o.points.map((text, i) => ({ icon: pointIcons[i], text }));
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -24,10 +23,8 @@ export default function Onboarding() {
           <SaathiMark size={40} color={colors.white} />
         </View>
 
-        <Text style={styles.title}>Milo apne{"\n"}Saathi se 🙂</Text>
-        <Text style={styles.sub}>
-          Ek dost jo aapki life ka khayal rakhta hai — bina pooche.
-        </Text>
+        <Text style={styles.title}>{o.title} 🙂</Text>
+        <Text style={styles.sub}>{o.sub}</Text>
 
         <View style={styles.points}>
           {points.map((p) => (
@@ -42,11 +39,11 @@ export default function Onboarding() {
 
         <View style={{ flex: 1 }} />
 
-        <Text style={styles.label}>Aap Saathi ko kya bulaoge?</Text>
+        <Text style={styles.label}>{o.nameLabel}</Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="Saathi"
+          placeholder={o.namePlaceholder}
           placeholderTextColor={colors.inkSoft}
           style={styles.input}
         />
@@ -55,7 +52,7 @@ export default function Onboarding() {
           onPress={() => router.replace("/")}
           style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
         >
-          <Text style={styles.btnText}>Shuru karo</Text>
+          <Text style={styles.btnText}>{o.start}</Text>
           <Ionicons name="arrow-forward" size={18} color={colors.white} />
         </Pressable>
       </View>

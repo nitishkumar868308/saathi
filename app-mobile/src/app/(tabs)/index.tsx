@@ -40,7 +40,7 @@ export default function Home() {
         if (!isRefresh) setLoading(true);
         setDocs(await listDocuments());
       } catch {
-        toast.show("Data load nahi ho paya", "error");
+        toast.show(h.loadFailed, "error");
       } finally {
         setLoading(false);
         setRefreshing(false);

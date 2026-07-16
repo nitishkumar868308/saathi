@@ -35,6 +35,9 @@ export type Dict = {
     loading: string;
     upgrade: string;
     plusBadge: string;
+    today: string;
+    tomorrow: string;
+    done: string;
   };
   langSelect: {
     welcome: string;
@@ -48,6 +51,8 @@ export type Dict = {
     sub: string;
     points: string[];
     start: string;
+    nameLabel: string;
+    namePlaceholder: string;
   };
   tabs: { home: string; saathi: string; docs: string; alerts: string; you: string };
   notif: {
@@ -60,6 +65,18 @@ export type Dict = {
     alertReminder: string;
     alertExpiry: string;
     alertOk: string;
+  };
+  voice: {
+    /** BCP-47 tag for speech recognition, e.g. "en-IN" / "hi-IN" */
+    recogLang: string;
+    unclear: string;
+    micPermission: string;
+    unavailable: string;
+  };
+  phoneField: {
+    placeholder: string;
+    searchPlaceholder: string;
+    close: string;
   };
   login: {
     welcomeBack: string;
@@ -86,6 +103,14 @@ export type Dict = {
     loginInstead: string;
     /** {d} = referral din */
     referralPlaceholderTpl: string;
+    nameRequired: string;
+    badEmail: string;
+    shortPassword: string;
+    confirmSent: string;
+    welcomeNew: string;
+    welcomeBackToast: string;
+    somethingWrong: string;
+    googleFailed: string;
   };
   home: {
     /** {name} */
@@ -106,6 +131,7 @@ export type Dict = {
     /** {d} */
     referCard: string;
     referCardSub: string;
+    loadFailed: string;
   };
   documents: {
     title: string;
@@ -122,6 +148,12 @@ export type Dict = {
     longPressHint: string;
     lockedSub: string;
     expiryNotSet: string;
+    expiryExpired: string;
+    expiryTodayLabel: string;
+    expiryTomorrowLabel: string;
+    /** {n} */
+    expiryInDaysLabel: string;
+    noFileSaved: string;
     deleted: string;
     deleteConfirmTitle: string;
     /** {name} */
@@ -149,6 +181,13 @@ export type Dict = {
     nameRequired: string;
     badDate: string;
     saveFailed: string;
+    cameraPermission: string;
+    ocrExpiryFound: string;
+    /** {bits} */
+    ocrReadTpl: string;
+    ocrUnclear: string;
+    ocrFailed: string;
+    imageFailed: string;
   };
   reminders: {
     title: string;
@@ -212,6 +251,9 @@ export type Dict = {
     notAvailable: string;
     purchaseFailed: string;
     activated: string;
+    loginFirst: string;
+    noPlan: string;
+    paymentFailed: string;
   };
   membership: {
     title: string;
@@ -265,6 +307,43 @@ export type Dict = {
     shareMessage: string;
     loadError: string;
   };
+  profileDetails: {
+    title: string;
+    photoHint: string;
+    fullName: string;
+    fullNamePlaceholder: string;
+    email: string;
+    emailPlaceholder: string;
+    phone: string;
+    phoneError: string;
+    address: string;
+    addressPlaceholder: string;
+    gender: string;
+    male: string;
+    female: string;
+    other: string;
+    country: string;
+    countryPick: string;
+    countryNoData: string;
+    countrySearch: string;
+    state: string;
+    statePick: string;
+    stateFirst: string;
+    stateSearch: string;
+    city: string;
+    cityPick: string;
+    cityFirst: string;
+    citySearch: string;
+    searchEmpty: string;
+    save: string;
+    loadError: string;
+    photoUpdated: string;
+    photoTooLarge: string;
+    photoFailed: string;
+    fillAll: string;
+    saved: string;
+    saveFailed: string;
+  };
   settings: {
     account: string;
     backendOk: string;
@@ -298,6 +377,9 @@ export type Dict = {
     deleteBody: string;
     deleteYes: string;
     deleted: string;
+    linkFailed: string;
+    exportContact: string;
+    settingsFailed: string;
   };
 };
 
@@ -317,6 +399,9 @@ const hinglish: Dict = {
     loading: "Load ho raha hai…",
     upgrade: "Upgrade",
     plusBadge: "Plus",
+    today: "Aaj",
+    tomorrow: "Kal",
+    done: "Ho gaya",
   },
   langSelect: {
     welcome: "Welcome to Apka Saathi",
@@ -334,6 +419,8 @@ const hinglish: Dict = {
       "100% private — sab aapke control mein",
     ],
     start: "Chalo shuru karein",
+    nameLabel: "Aap Saathi ko kya bulaoge?",
+    namePlaceholder: "Saathi",
   },
   tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Alerts", you: "You" },
   notif: {
@@ -344,6 +431,17 @@ const hinglish: Dict = {
     alertReminder: "Reminder",
     alertExpiry: "Document expiry",
     alertOk: "Theek hai, samajh gaya",
+  },
+  voice: {
+    recogLang: "en-IN",
+    unclear: "Awaaz saaf nahi aayi, dobara boliye",
+    micPermission: "Mic permission chahiye",
+    unavailable: "Voice available nahi hai is device pe",
+  },
+  phoneField: {
+    placeholder: "Phone number",
+    searchPlaceholder: "Country ya code search karo",
+    close: "Band karo",
   },
   login: {
     welcomeBack: "Wapas aa gaye",
@@ -370,6 +468,14 @@ const hinglish: Dict = {
     haveAccount: "Pehle se account hai?",
     loginInstead: "Login karo",
     referralPlaceholderTpl: "Dost ka code — dono ko {d} din ka Plus plan free",
+    nameRequired: "Apna naam daalo",
+    badEmail: "Sahi email daalo",
+    shortPassword: "Password kam se kam 6 characters",
+    confirmSent: "Email pe confirmation link bheja — check karo",
+    welcomeNew: "Welcome to Apka Saathi! 🎉",
+    welcomeBackToast: "Wapas aa gaye! 🙂",
+    somethingWrong: "Kuch gadbad ho gayi",
+    googleFailed: "Google login nahi hua",
   },
   home: {
     greeting: "Namaste{name}",
@@ -388,6 +494,7 @@ const hinglish: Dict = {
     nothingUrgent: "Abhi kuch urgent nahi",
     referCard: "Refer & Earn — dono ko {d} din Plus free",
     referCardSub: "Dost ko invite karo, dono ko Saathi Plus plan",
+    loadFailed: "Data load nahi ho paya",
   },
   documents: {
     title: "Documents",
@@ -403,6 +510,11 @@ const hinglish: Dict = {
     longPressHint: "Delete karne ke liye card ko dabaye rakho",
     lockedSub: "Saathi Plus me dekh sakte ho",
     expiryNotSet: "Expiry set nahi",
+    expiryExpired: "Expire ho gaya",
+    expiryTodayLabel: "Aaj expire",
+    expiryTomorrowLabel: "Kal expire",
+    expiryInDaysLabel: "{n} din mein expire",
+    noFileSaved: "Is document ki file save nahi hai.",
     deleted: "Document delete ho gaya",
     deleteConfirmTitle: "Delete karein?",
     deleteConfirmBody: "\"{name}\" hata denge?",
@@ -429,6 +541,12 @@ const hinglish: Dict = {
     nameRequired: "Naam daalo (ya photo scan karo)",
     badDate: "Date format: YYYY-MM-DD",
     saveFailed: "Save nahi ho paya",
+    cameraPermission: "Camera permission chahiye",
+    ocrExpiryFound: "expiry mil gayi",
+    ocrReadTpl: "Padh liya: {bits} ✨",
+    ocrUnclear: "Padha, par saaf nahi — details khud daal do",
+    ocrFailed: "Photo padhne mein dikkat — details khud daal do",
+    imageFailed: "Image select nahi hui",
   },
   reminders: {
     title: "Reminders",
@@ -496,6 +614,9 @@ const hinglish: Dict = {
     notAvailable: "Payment abhi is build me available nahi (dev build chahiye)",
     purchaseFailed: "Purchase complete nahi hua",
     activated: "Saathi Plus active ho gaya!",
+    loginFirst: "Pehle login karo",
+    noPlan: "Koi plan available nahi",
+    paymentFailed: "Payment shuru nahi hua",
   },
   membership: {
     title: "Meri membership",
@@ -545,6 +666,43 @@ const hinglish: Dict = {
       "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din ka Saathi Plus plan FREE:\n{link}",
     loadError: "Referral info load nahi hui",
   },
+  profileDetails: {
+    title: "Meri details",
+    photoHint: "Photo add karo (2 MB tak)",
+    fullName: "Poora naam",
+    fullNamePlaceholder: "Aapka naam",
+    email: "Email",
+    emailPlaceholder: "you@email.com",
+    phone: "Phone number",
+    phoneError: "Sahi phone number daalo",
+    address: "Address",
+    addressPlaceholder: "Ghar / office ka pata",
+    gender: "Gender",
+    male: "Male",
+    female: "Female",
+    other: "Other",
+    country: "Country",
+    countryPick: "Country chuno",
+    countryNoData: "Data import karo",
+    countrySearch: "Country search karo…",
+    state: "State",
+    statePick: "State chuno",
+    stateFirst: "Pehle country",
+    stateSearch: "State search karo…",
+    city: "City",
+    cityPick: "City chuno",
+    cityFirst: "Pehle state",
+    citySearch: "City search karo…",
+    searchEmpty: "Kuch nahi mila",
+    save: "Save karo",
+    loadError: "Details load nahi hui",
+    photoUpdated: "Photo update ho gayi",
+    photoTooLarge: "Photo 2 MB se chhoti honi chahiye",
+    photoFailed: "Photo upload nahi hui",
+    fillAll: "Saare fields sahi se bharo",
+    saved: "Details save ho gayi ✅",
+    saveFailed: "Save nahi hua",
+  },
   settings: {
     account: "Aapka account",
     backendOk: "Backend juda hai",
@@ -578,6 +736,9 @@ const hinglish: Dict = {
       "Aapke saare documents aur reminders hamesha ke liye hat jaayenge. Account nahi hatega. Ye wapas nahi aayega.",
     deleteYes: "Haan, delete karo",
     deleted: "Aapka data delete ho gaya",
+    linkFailed: "Link nahi khula",
+    exportContact: "Data export ke liye help se contact karo",
+    settingsFailed: "Settings nahi khuli",
   },
 };
 
@@ -597,6 +758,9 @@ const hi: Dict = {
     loading: "लोड हो रहा है…",
     upgrade: "अपग्रेड",
     plusBadge: "प्लस",
+    today: "आज",
+    tomorrow: "कल",
+    done: "हो गया",
   },
   langSelect: {
     welcome: "Apka Saathi में आपका स्वागत है",
@@ -614,6 +778,8 @@ const hi: Dict = {
       "100% प्राइवेट — सब आपके कंट्रोल में",
     ],
     start: "चलिए शुरू करें",
+    nameLabel: "साथी को क्या बुलाएँगे?",
+    namePlaceholder: "साथी",
   },
   tabs: { home: "होम", saathi: "साथी", docs: "डॉक्स", alerts: "अलर्ट", you: "आप" },
   notif: {
@@ -624,6 +790,17 @@ const hi: Dict = {
     alertReminder: "रिमाइंडर",
     alertExpiry: "डॉक्युमेंट एक्सपायरी",
     alertOk: "ठीक है, समझ गया",
+  },
+  voice: {
+    recogLang: "hi-IN",
+    unclear: "आवाज़ साफ़ नहीं आई, दोबारा बोलिए",
+    micPermission: "माइक permission चाहिए",
+    unavailable: "इस डिवाइस पर voice available नहीं है",
+  },
+  phoneField: {
+    placeholder: "फ़ोन नंबर",
+    searchPlaceholder: "देश या कोड search करें",
+    close: "बंद करें",
   },
   login: {
     welcomeBack: "वापस आ गए",
@@ -650,6 +827,14 @@ const hi: Dict = {
     haveAccount: "पहले से अकाउंट है?",
     loginInstead: "लॉगिन करें",
     referralPlaceholderTpl: "दोस्त का कोड — दोनों को {d} दिन का प्लस प्लान फ्री",
+    nameRequired: "अपना नाम डालें",
+    badEmail: "सही ईमेल डालें",
+    shortPassword: "पासवर्ड कम से कम 6 अक्षर का हो",
+    confirmSent: "ईमेल पर confirmation link भेजा — चेक करें",
+    welcomeNew: "आपके साथी में स्वागत है! 🎉",
+    welcomeBackToast: "वापस आ गए! 🙂",
+    somethingWrong: "कुछ गड़बड़ हो गई",
+    googleFailed: "Google लॉगिन नहीं हुआ",
   },
   home: {
     greeting: "नमस्ते{name}",
@@ -667,6 +852,7 @@ const hi: Dict = {
     nothingUrgent: "अभी कुछ ज़रूरी नहीं",
     referCard: "Refer & Earn — दोनों को {d} दिन प्लस फ्री",
     referCardSub: "दोस्त को इनवाइट करें, दोनों को साथी प्लस प्लान",
+    loadFailed: "डेटा लोड नहीं हो पाया",
   },
   documents: {
     title: "डॉक्युमेंट्स",
@@ -682,6 +868,11 @@ const hi: Dict = {
     longPressHint: "डिलीट करने के लिए कार्ड को दबाए रखें",
     lockedSub: "साथी प्लस में देख सकते हैं",
     expiryNotSet: "एक्सपायरी सेट नहीं",
+    expiryExpired: "एक्सपायर हो गया",
+    expiryTodayLabel: "आज एक्सपायर",
+    expiryTomorrowLabel: "कल एक्सपायर",
+    expiryInDaysLabel: "{n} दिन में एक्सपायर",
+    noFileSaved: "इस डॉक्युमेंट की फ़ाइल सेव नहीं है।",
     deleted: "डॉक्युमेंट डिलीट हो गया",
     deleteConfirmTitle: "डिलीट करें?",
     deleteConfirmBody: "\"{name}\" हटा दें?",
@@ -708,6 +899,12 @@ const hi: Dict = {
     nameRequired: "नाम डालें (या फ़ोटो स्कैन करें)",
     badDate: "डेट फ़ॉर्मैट: YYYY-MM-DD",
     saveFailed: "सेव नहीं हो पाया",
+    cameraPermission: "कैमरा permission चाहिए",
+    ocrExpiryFound: "एक्सपायरी मिल गई",
+    ocrReadTpl: "पढ़ लिया: {bits} ✨",
+    ocrUnclear: "पढ़ा, पर साफ़ नहीं — details खुद डाल दें",
+    ocrFailed: "फ़ोटो पढ़ने में दिक्कत — details खुद डाल दें",
+    imageFailed: "इमेज सेलेक्ट नहीं हुई",
   },
   reminders: {
     title: "रिमाइंडर्स",
@@ -775,6 +972,9 @@ const hi: Dict = {
     notAvailable: "पेमेंट अभी इस build में available नहीं (dev build चाहिए)",
     purchaseFailed: "परचेज़ पूरा नहीं हुआ",
     activated: "साथी प्लस active हो गया!",
+    loginFirst: "पहले लॉगिन करें",
+    noPlan: "कोई प्लान available नहीं",
+    paymentFailed: "पेमेंट शुरू नहीं हुई",
   },
   membership: {
     title: "मेरी membership",
@@ -824,6 +1024,43 @@ const hi: Dict = {
       "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्युमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन का साथी प्लस प्लान FREE:\n{link}",
     loadError: "रेफ़रल जानकारी लोड नहीं हुई",
   },
+  profileDetails: {
+    title: "मेरी details",
+    photoHint: "फ़ोटो जोड़ें (2 MB तक)",
+    fullName: "पूरा नाम",
+    fullNamePlaceholder: "आपका नाम",
+    email: "ईमेल",
+    emailPlaceholder: "you@email.com",
+    phone: "फ़ोन नंबर",
+    phoneError: "सही फ़ोन नंबर डालें",
+    address: "पता",
+    addressPlaceholder: "घर / ऑफ़िस का पता",
+    gender: "लिंग",
+    male: "पुरुष",
+    female: "महिला",
+    other: "अन्य",
+    country: "देश",
+    countryPick: "देश चुनें",
+    countryNoData: "डेटा इम्पोर्ट करें",
+    countrySearch: "देश search करें…",
+    state: "राज्य",
+    statePick: "राज्य चुनें",
+    stateFirst: "पहले देश",
+    stateSearch: "राज्य search करें…",
+    city: "शहर",
+    cityPick: "शहर चुनें",
+    cityFirst: "पहले राज्य",
+    citySearch: "शहर search करें…",
+    searchEmpty: "कुछ नहीं मिला",
+    save: "सेव करें",
+    loadError: "details लोड नहीं हुई",
+    photoUpdated: "फ़ोटो अपडेट हो गई",
+    photoTooLarge: "फ़ोटो 2 MB से छोटी होनी चाहिए",
+    photoFailed: "फ़ोटो अपलोड नहीं हुई",
+    fillAll: "सारे fields सही से भरें",
+    saved: "details सेव हो गई ✅",
+    saveFailed: "सेव नहीं हुआ",
+  },
   settings: {
     account: "आपका अकाउंट",
     backendOk: "बैकएंड जुड़ा है",
@@ -857,6 +1094,9 @@ const hi: Dict = {
       "आपके सारे डॉक्युमेंट और रिमाइंडर हमेशा के लिए हट जाएँगे। अकाउंट नहीं हटेगा। यह वापस नहीं आएगा।",
     deleteYes: "हाँ, डिलीट करें",
     deleted: "आपका डेटा डिलीट हो गया",
+    linkFailed: "लिंक नहीं खुला",
+    exportContact: "डेटा एक्सपोर्ट के लिए help से संपर्क करें",
+    settingsFailed: "सेटिंग्स नहीं खुलीं",
   },
 };
 
@@ -876,6 +1116,9 @@ const en: Dict = {
     loading: "Loading…",
     upgrade: "Upgrade",
     plusBadge: "Plus",
+    today: "Today",
+    tomorrow: "Tomorrow",
+    done: "Done",
   },
   langSelect: {
     welcome: "Welcome to Apka Saathi",
@@ -893,6 +1136,8 @@ const en: Dict = {
       "100% private — all in your control",
     ],
     start: "Let's get started",
+    nameLabel: "What will you call your Saathi?",
+    namePlaceholder: "Saathi",
   },
   tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Alerts", you: "You" },
   notif: {
@@ -903,6 +1148,17 @@ const en: Dict = {
     alertReminder: "Reminder",
     alertExpiry: "Document expiry",
     alertOk: "Okay, got it",
+  },
+  voice: {
+    recogLang: "en-IN",
+    unclear: "Didn't catch that, please say it again",
+    micPermission: "Mic permission needed",
+    unavailable: "Voice isn't available on this device",
+  },
+  phoneField: {
+    placeholder: "Phone number",
+    searchPlaceholder: "Search country or code",
+    close: "Close",
   },
   login: {
     welcomeBack: "Welcome back",
@@ -929,6 +1185,14 @@ const en: Dict = {
     haveAccount: "Already have an account?",
     loginInstead: "Sign in",
     referralPlaceholderTpl: "Friend's code — you both get {d} days of the Plus plan free",
+    nameRequired: "Enter your name",
+    badEmail: "Enter a valid email",
+    shortPassword: "Password must be at least 6 characters",
+    confirmSent: "Sent a confirmation link to your email — please check",
+    welcomeNew: "Welcome to Apka Saathi! 🎉",
+    welcomeBackToast: "Welcome back! 🙂",
+    somethingWrong: "Something went wrong",
+    googleFailed: "Google sign-in failed",
   },
   home: {
     greeting: "Namaste{name}",
@@ -945,6 +1209,7 @@ const en: Dict = {
     nothingUrgent: "Nothing urgent right now",
     referCard: "Refer & Earn — you both get {d} days of Plus free",
     referCardSub: "Invite a friend, you both get the Saathi Plus plan",
+    loadFailed: "Couldn't load your data",
   },
   documents: {
     title: "Documents",
@@ -960,6 +1225,11 @@ const en: Dict = {
     longPressHint: "Press and hold a card to delete",
     lockedSub: "Available on Saathi Plus",
     expiryNotSet: "No expiry set",
+    expiryExpired: "Expired",
+    expiryTodayLabel: "Expires today",
+    expiryTomorrowLabel: "Expires tomorrow",
+    expiryInDaysLabel: "Expires in {n} days",
+    noFileSaved: "No file saved for this document.",
     deleted: "Document deleted",
     deleteConfirmTitle: "Delete?",
     deleteConfirmBody: "Remove \"{name}\"?",
@@ -986,6 +1256,12 @@ const en: Dict = {
     nameRequired: "Enter a name (or scan a photo)",
     badDate: "Date format: YYYY-MM-DD",
     saveFailed: "Couldn't save",
+    cameraPermission: "Camera permission needed",
+    ocrExpiryFound: "found the expiry",
+    ocrReadTpl: "Read it: {bits} ✨",
+    ocrUnclear: "Read it, but it wasn't clear — please fill in the details",
+    ocrFailed: "Trouble reading the photo — please fill in the details",
+    imageFailed: "Couldn't select the image",
   },
   reminders: {
     title: "Reminders",
@@ -1053,6 +1329,9 @@ const en: Dict = {
     notAvailable: "Payments aren't available in this build yet (needs a dev build)",
     purchaseFailed: "Purchase didn't complete",
     activated: "Saathi Plus is active!",
+    loginFirst: "Please sign in first",
+    noPlan: "No plan available",
+    paymentFailed: "Couldn't start the payment",
   },
   membership: {
     title: "My membership",
@@ -1102,6 +1381,43 @@ const en: Dict = {
       "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of the Saathi Plus plan FREE:\n{link}",
     loadError: "Couldn't load referral info",
   },
+  profileDetails: {
+    title: "My details",
+    photoHint: "Add a photo (up to 2 MB)",
+    fullName: "Full name",
+    fullNamePlaceholder: "Your name",
+    email: "Email",
+    emailPlaceholder: "you@email.com",
+    phone: "Phone number",
+    phoneError: "Enter a valid phone number",
+    address: "Address",
+    addressPlaceholder: "Home / office address",
+    gender: "Gender",
+    male: "Male",
+    female: "Female",
+    other: "Other",
+    country: "Country",
+    countryPick: "Choose country",
+    countryNoData: "Import data",
+    countrySearch: "Search country…",
+    state: "State",
+    statePick: "Choose state",
+    stateFirst: "Country first",
+    stateSearch: "Search state…",
+    city: "City",
+    cityPick: "Choose city",
+    cityFirst: "State first",
+    citySearch: "Search city…",
+    searchEmpty: "Nothing found",
+    save: "Save",
+    loadError: "Couldn't load details",
+    photoUpdated: "Photo updated",
+    photoTooLarge: "Photo must be under 2 MB",
+    photoFailed: "Photo upload failed",
+    fillAll: "Please fill all fields correctly",
+    saved: "Details saved ✅",
+    saveFailed: "Couldn't save",
+  },
   settings: {
     account: "Your account",
     backendOk: "Backend connected",
@@ -1135,6 +1451,9 @@ const en: Dict = {
       "All your documents and reminders will be gone forever. Your account stays. This can't be undone.",
     deleteYes: "Yes, delete",
     deleted: "Your data has been deleted",
+    linkFailed: "Couldn't open the link",
+    exportContact: "For a data export, please reach out via Help",
+    settingsFailed: "Couldn't open settings",
   },
 };
 

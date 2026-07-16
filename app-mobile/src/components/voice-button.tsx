@@ -8,9 +8,11 @@ import {
 
 import { colors } from "@/theme/colors";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   const toast = useToast();
+  const { voice: v } = useT();
   const [listening, setListening] = useState(false);
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -26,7 +28,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   useSpeechRecognitionEvent("error", (e) => {
     stop();
     if (e?.error && e.error !== "no-speech") {
-      toast.show("Awaaz saaf nahi aayi, dobara boliye", "info");
+      toast.show(v.unclear, "info");
     }
   });
 
@@ -54,18 +56,18 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     try {
       const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
       if (!perm.granted) {
-        toast.show("Mic permission chahiye", "info");
+        toast.show(v.micPermission, "info");
         return;
       }
       start();
       ExpoSpeechRecognitionModule.start({
-        lang: "en-IN",
+        lang: v.recogLang,
         interimResults: false, // sirf final chahiye (append-garble se bachne ke liye)
         continuous: false,
       });
     } catch {
       stop();
-      toast.show("Voice available nahi hai is device pe", "error");
+      toast.show(v.unavailable, "error");
     }
   }
 

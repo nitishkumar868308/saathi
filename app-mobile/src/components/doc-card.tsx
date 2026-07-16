@@ -20,7 +20,14 @@ export function DocCard({
   const locked = doc.is_locked;
   const hasExpiry = !!doc.expiry;
   const s = hasExpiry ? statusStyle[expiryStatus(doc.expiry as string)] : neutralStyle;
-  const label = hasExpiry ? expiryLabel(doc.expiry as string) : d.expiryNotSet;
+  const label = hasExpiry
+    ? expiryLabel(doc.expiry as string, {
+        expired: d.expiryExpired,
+        today: d.expiryTodayLabel,
+        tomorrow: d.expiryTomorrowLabel,
+        inDays: d.expiryInDaysLabel,
+      })
+    : d.expiryNotSet;
 
   return (
     <Pressable

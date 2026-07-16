@@ -62,13 +62,13 @@ export default function Login() {
   async function submit() {
     if (loading) return;
     if (mode === "signup" && name.trim().length < 2) {
-      return toast.show("Apna naam daalo", "info");
+      return toast.show(l.nameRequired, "info");
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      return toast.show("Sahi email daalo", "info");
+      return toast.show(l.badEmail, "info");
     }
     if (password.length < 6) {
-      return toast.show("Password kam se kam 6 characters", "info");
+      return toast.show(l.shortPassword, "info");
     }
     try {
       setLoading(true);
@@ -77,16 +77,16 @@ export default function Login() {
         await savePendingReferral(refCode);
         const { needsConfirm } = await signUpEmail(email.trim(), password, name.trim());
         if (needsConfirm) {
-          toast.show("Email pe confirmation link bheja — check karo", "success");
+          toast.show(l.confirmSent, "success");
         } else {
-          toast.show("Welcome to Apka Saathi! 🎉", "success");
+          toast.show(l.welcomeNew, "success");
         }
       } else {
         await signInEmail(email.trim(), password);
-        toast.show("Welcome back! 🙂", "success");
+        toast.show(l.welcomeBackToast, "success");
       }
     } catch (e: any) {
-      toast.show(e?.message || "Kuch gadbad ho gayi", "error");
+      toast.show(e?.message || l.somethingWrong, "error");
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,9 @@ export default function Login() {
       await signInGoogle();
     } catch (e: any) {
       if (e?.message !== "cancelled") {
-        toast.show(e?.message || "Google login nahi hua", "error");
+        // Google flow ke technical errors user ko localized dikhao — lib ke
+        // raw (Hinglish) messages leak na ho.
+        toast.show(l.googleFailed, "error");
       }
     } finally {
       setGoogleLoading(false);

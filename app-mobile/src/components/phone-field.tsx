@@ -14,6 +14,7 @@ import {
   type CountryCode,
 } from "libphonenumber-js";
 import { colors } from "@/theme/colors";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 function flag(cc: string) {
   return cc
@@ -32,6 +33,7 @@ export function PhoneField({
   national: string;
   onNational: (v: string) => void;
 }) {
+  const { phoneField: p } = useT();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
@@ -58,7 +60,7 @@ export function PhoneField({
         style={styles.input}
         value={national}
         onChangeText={onNational}
-        placeholder="Phone number"
+        placeholder={p.placeholder}
         placeholderTextColor={colors.inkSoft}
         keyboardType="phone-pad"
       />
@@ -73,7 +75,7 @@ export function PhoneField({
             style={styles.search}
             value={q}
             onChangeText={setQ}
-            placeholder="Country ya code search karo"
+            placeholder={p.searchPlaceholder}
             placeholderTextColor={colors.inkSoft}
             autoFocus
           />
@@ -97,7 +99,7 @@ export function PhoneField({
             )}
           />
           <Pressable style={styles.close} onPress={() => setOpen(false)}>
-            <Text style={styles.closeText}>Band karo</Text>
+            <Text style={styles.closeText}>{p.close}</Text>
           </Pressable>
         </View>
       </Modal>

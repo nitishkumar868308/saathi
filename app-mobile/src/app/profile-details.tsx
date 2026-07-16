@@ -23,6 +23,7 @@ import {
 import { colors } from "@/theme/colors";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
+import { useT } from "@/lib/i18n/LanguageProvider";
 import { PhoneField } from "@/components/phone-field";
 import { SearchSelect } from "@/components/search-select";
 import { pickAndUploadAvatar, AvatarTooLargeError } from "@/lib/avatar";
@@ -35,13 +36,13 @@ import {
   type LocationItem,
 } from "@/lib/user-details";
 
-const GENDERS = [
-  { key: "male", label: "Male" },
-  { key: "female", label: "Female" },
-  { key: "other", label: "Other" },
-];
-
 export default function ProfileDetails() {
+  const { profileDetails: t } = useT();
+  const genders = [
+    { key: "male", label: t.male },
+    { key: "female", label: t.female },
+    { key: "other", label: t.other },
+  ];
   const toast = useToast();
   const { session } = useAuth();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
@@ -95,7 +96,7 @@ export default function ProfileDetails() {
           if (existing.avatar_url) setAvatarUrl(existing.avatar_url);
         }
       } catch {
-        toast.show("Details load nahi hui", "error");
+        toast.show(t.loadError, "error");
       } finally {
         setLoading(false);
       }
@@ -110,13 +111,13 @@ export default function ProfileDetails() {
       const url = await pickAndUploadAvatar();
       if (url) {
         setAvatarUrl(url);
-        toast.show("Photo update ho gayi", "success");
+        toast.show(t.photoUpdated, "success");
       }
     } catch (e) {
       if (e instanceof AvatarTooLargeError) {
-        toast.show("Photo 2 MB se chhoti honi chahiye", "error");
+        toast.show(t.photoTooLarge, "error");
       } else {
-        toast.show("Photo upload nahi hui", "error");
+        toast.show(t.photoFailed, "error");
       }
     } finally {
       setUploadingAvatar(false);
@@ -165,7 +166,7 @@ export default function ProfileDetails() {
   async function onSave() {
     if (saving) return;
     if (!valid) {
-      toast.show("Saare fields sahi se bharo", "info");
+      toast.show(t.fillAll, "info");
       return;
     }
     setSaving(true);
@@ -184,11 +185,11 @@ export default function ProfileDetails() {
         city_id: cityId,
         avatar_url: avatarUrl,
       });
-      toast.show("Details save ho gayi ✅", "success");
+      toast.show(t.saved, "success");
       if (returnTo) router.replace(returnTo as never);
       else router.back();
     } catch {
-      toast.show("Save nahi hua", "error");
+      toast.show(t.saveFailed, "error");
     } finally {
       setSaving(false);
     }
@@ -200,7 +201,7 @@ export default function ProfileDetails() {
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
           <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </Pressable>
-        <Text style={styles.title}>Meri details</Text>
+        <Text style={styles.title}>{t.title}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -228,30 +229,30 @@ export default function ProfileDetails() {
                   )}
                 </View>
               </Pressable>
-              <Text style={styles.avatarHint}>Photo add karo (2 MB tak)</Text>
+              <Text style={styles.avatarHint}>{t.photoHint}</Text>
             </View>
 
-            <Text style={styles.label}>Poora naam</Text>
+            <Text style={styles.label}>{t.fullName}</Text>
             <TextInput
               style={styles.input}
               value={fullName}
               onChangeText={setFullName}
-              placeholder="Aapka naam"
+              placeholder={t.fullNamePlaceholder}
               placeholderTextColor={colors.inkSoft}
             />
 
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t.email}</Text>
             <TextInput
               style={styles.input}
               value={email}
               onChangeText={setEmail}
-              placeholder="you@email.com"
+              placeholder={t.emailPlaceholder}
               placeholderTextColor={colors.inkSoft}
               keyboardType="email-address"
               autoCapitalize="none"
             />
 
-            <Text style={styles.label}>Phone number</Text>
+            <Text style={styles.label}>{t.phone}</Text>
             <PhoneField
               country={phoneCountry}
               onCountry={setPhoneCountry}
@@ -259,22 +260,22 @@ export default function ProfileDetails() {
               onNational={setPhoneNational}
             />
             {phoneNational.length > 0 && !phoneOk && (
-              <Text style={styles.err}>Sahi phone number daalo</Text>
+              <Text style={styles.err}>{t.phoneError}</Text>
             )}
 
-            <Text style={styles.label}>Address</Text>
+            <Text style={styles.label}>{t.address}</Text>
             <TextInput
               style={[styles.input, { height: 72 }]}
               value={address}
               onChangeText={setAddress}
-              placeholder="Ghar / office ka pata"
+              placeholder={t.addressPlaceholder}
               placeholderTextColor={colors.inkSoft}
               multiline
             />
 
-            <Text style={styles.label}>Gender</Text>
+            <Text style={styles.label}>{t.gender}</Text>
             <View style={styles.chips}>
-              {GENDERS.map((g) => (
+              {genders.map((g) => (
                 <Pressable
                   key={g.key}
                   onPress={() => setGender(g.key)}
@@ -292,34 +293,34 @@ export default function ProfileDetails() {
               ))}
             </View>
 
-            <Text style={styles.label}>Country</Text>
+            <Text style={styles.label}>{t.country}</Text>
             <SearchSelect
               items={countries}
               value={countryId}
-              placeholder={countries.length ? "Country chuno" : "Data import karo"}
-              searchPlaceholder="Country search karo…"
-              emptyText="Kuch nahi mila"
+              placeholder={countries.length ? t.countryPick : t.countryNoData}
+              searchPlaceholder={t.countrySearch}
+              emptyText={t.searchEmpty}
               onSelect={pickCountry}
             />
 
-            <Text style={styles.label}>State</Text>
+            <Text style={styles.label}>{t.state}</Text>
             <SearchSelect
               items={states}
               value={stateId}
-              placeholder={countryId ? "State chuno" : "Pehle country"}
-              searchPlaceholder="State search karo…"
-              emptyText="Kuch nahi mila"
+              placeholder={countryId ? t.statePick : t.stateFirst}
+              searchPlaceholder={t.stateSearch}
+              emptyText={t.searchEmpty}
               onSelect={pickState}
               disabled={!countryId}
             />
 
-            <Text style={styles.label}>City</Text>
+            <Text style={styles.label}>{t.city}</Text>
             <SearchSelect
               items={cities}
               value={cityId}
-              placeholder={stateId ? "City chuno" : "Pehle state"}
-              searchPlaceholder="City search karo…"
-              emptyText="Kuch nahi mila"
+              placeholder={stateId ? t.cityPick : t.cityFirst}
+              searchPlaceholder={t.citySearch}
+              emptyText={t.searchEmpty}
               onSelect={setCityId}
               disabled={!stateId}
             />
@@ -338,7 +339,7 @@ export default function ProfileDetails() {
             {saving ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.saveText}>Save karo</Text>
+              <Text style={styles.saveText}>{t.save}</Text>
             )}
           </Pressable>
         </KeyboardAvoidingView>

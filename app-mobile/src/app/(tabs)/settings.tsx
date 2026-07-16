@@ -110,7 +110,7 @@ export default function Settings() {
     try {
       await WebBrowser.openBrowserAsync(`${WEB_URL}${path}`);
     } catch {
-      toast.show("Link nahi khula", "error");
+      toast.show(s.linkFailed, "error");
     }
   }
 
@@ -146,12 +146,12 @@ export default function Settings() {
         // Naam + details (aur export ke liye contact) ek hi jagah.
         router.push("/profile-details" as never);
         if (id === "export") {
-          toast.show("Data export ke liye help se contact karo", "info");
+          toast.show(s.exportContact, "info");
         }
         return;
       case "notifications":
         Linking.openSettings().catch(() =>
-          toast.show("Settings nahi khuli", "error"),
+          toast.show(s.settingsFailed, "error"),
         );
         return;
       case "language":

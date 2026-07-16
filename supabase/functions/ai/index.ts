@@ -91,7 +91,23 @@ function parseJson(text: string): any {
   }
 }
 
-const SAATHI_SYSTEM = `Tum "Saathi" ho — ek warm, caring AI dost (India ke liye). User jis bhasha mein baat kare (Hindi/English/Hinglish) usi mein chhota, pyaara jawab do. Zaroorat se zyada mat likho. Ek emoji kabhi-kabhi. Honest raho.`;
+const SAATHI_SYSTEM = `Tum "Saathi" ho — ek warm, caring AI dost (India ke liye). Chhota, pyaara jawab do. Zaroorat se zyada mat likho. Ek emoji kabhi-kabhi. Honest raho.`;
+
+/**
+ * User ne app mein jo bhasha chuni hai usi mein jawab aaye — chahe wo kisi aur
+ * bhasha mein type kare. App har request mein `locale` bhejti hai.
+ */
+function langNote(locale?: string): string {
+  switch (locale) {
+    case "hi":
+      return ` HAMESHA shuddh Hindi mein (Devanagari script) jawab do.`;
+    case "en":
+      return ` ALWAYS reply in English.`;
+    case "hinglish":
+    default:
+      return ` Hamesha Hinglish mein jawab do (Roman script, Hindi-English mix jaise log WhatsApp pe likhte hain).`;
+  }
+}
 
 /**
  * Jab tak ANTHROPIC_API_KEY set nahi hai, chat ye reply deta hai (stub mode).
@@ -134,7 +150,7 @@ Deno.serve(async (req) => {
       const reply = await claude({
         model: MODEL,
         max_tokens: 1024,
-        system: SAATHI_SYSTEM + nameNote,
+        system: SAATHI_SYSTEM + langNote(payload.locale) + nameNote,
         messages,
       });
 
@@ -172,8 +188,14 @@ type: insurance/RC/vehicle = car; driving licence = license; health/life insuran
     // 3. REMINDER PARSE — text se {title, remind_at, label}
     if (task === "reminder") {
       const now = payload.now ?? new Date().toISOString();
+      const labelLang =
+        payload.locale === "hi"
+          ? "Hindi (Devanagari) jaise 'कल सुबह 8 बजे'"
+          : payload.locale === "en"
+            ? "English like 'Tomorrow 8 AM'"
+            : "Hinglish jaise '1 minute baad' ya 'Kal subah 8 baje'";
       const system = `Abhi ka time (ISO): ${now}. User ke reminder text se SIRF JSON do:
-{"title": "kaam (time-phrase ke bina)", "remind_at": "ISO 8601 datetime", "label": "chhota Hinglish time jaise '1 minute baad' ya 'Kal subah 8 baje'"}
+{"title": "kaam (time-phrase ke bina)", "remind_at": "ISO 8601 datetime", "label": "chhota ${labelLang}"}
 "1 minute baad", "2 ghante baad", "kal subah", "aaj raat 9 baje" jaise samajho. Agar time clear na ho to remind_at null.`;
       const text = await claude({
         model: MODEL,
@@ -187,7 +209,7 @@ type: insurance/RC/vehicle = car; driving licence = license; health/life insuran
     // 4. DAILY BRIEF
     if (task === "brief") {
       const nameNote = payload.name ? ` User ka naam "${payload.name}" hai — naam se greet karo.` : "";
-      const system = `${SAATHI_SYSTEM}${nameNote} User ke aaj ke data se ek chhota warm morning brief likho (2-3 line, Hinglish). Sirf brief text do.`;
+      const system = `${SAATHI_SYSTEM}${langNote(payload.locale)}${nameNote} User ke aaj ke data se ek chhota warm morning brief likho (2-3 line). Sirf brief text do.`;
       const reply = await claude({
         model: MODEL,
         max_tokens: 300,

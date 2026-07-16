@@ -30,13 +30,29 @@ export function isValidDate(s: string): boolean {
   return !isNaN(d.getTime());
 }
 
-/** Human-friendly label like "3 din mein expire" / "expire ho gaya". */
-export function expiryLabel(expiryDate: string, now: Date = new Date()): string {
+/** Labels for {@link expiryLabel} — user ki chuni bhasha se aate hain. */
+export type ExpiryLabels = {
+  expired: string;
+  today: string;
+  tomorrow: string;
+  /** "{n}" din ki jagah lega */
+  inDays: string;
+};
+
+/**
+ * Human-friendly expiry label, chuni hui bhasha me. Labels caller (doc-card)
+ * dict se pass karta hai — is util ko koi hardcoded text nahi rakhna.
+ */
+export function expiryLabel(
+  expiryDate: string,
+  labels: ExpiryLabels,
+  now: Date = new Date(),
+): string {
   const expiry = new Date(expiryDate);
   const msPerDay = 1000 * 60 * 60 * 24;
   const days = Math.ceil((expiry.getTime() - now.getTime()) / msPerDay);
-  if (days < 0) return "Expire ho gaya";
-  if (days === 0) return "Aaj expire";
-  if (days === 1) return "Kal expire";
-  return `${days} din mein expire`;
+  if (days < 0) return labels.expired;
+  if (days === 0) return labels.today;
+  if (days === 1) return labels.tomorrow;
+  return labels.inDays.replace("{n}", String(days));
 }

@@ -3,6 +3,41 @@
 
 export type ParsedTime = { date: Date; label: string; title: string };
 
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * Reminder ka time user ki chuni bhasha me: "Aaj 9:30 PM" / "आज 9:30 PM" /
+ * "Today 9:30 PM". `today`/`tomorrow` shabd caller dict se deta hai; date/time
+ * ka number-format locale se. Isi liye bhasha badalne pe purane reminders bhi
+ * sahi bhasha me dikhte hain — hum stored label pe nahi, `remind_at` pe formatte
+ * karte hain.
+ */
+export function formatWhen(
+  d: Date,
+  words: { today: string; tomorrow: string },
+  locale?: string,
+  now: Date = new Date(),
+): string {
+  const bcp = locale === "hi" ? "hi-IN" : "en-IN";
+  const time = d.toLocaleTimeString(bcp, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  const tmrw = new Date(now);
+  tmrw.setDate(now.getDate() + 1);
+  if (sameDay(d, now)) return `${words.today} ${time}`;
+  if (sameDay(d, tmrw)) return `${words.tomorrow} ${time}`;
+  const date = d.toLocaleDateString(bcp, { day: "numeric", month: "short" });
+  return `${date}, ${time}`;
+}
+
 export function parseReminderTime(
   input: string,
   now: Date = new Date(),

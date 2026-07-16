@@ -19,9 +19,9 @@ import DateTimePicker, {
 
 import { colors } from "@/theme/colors";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
-import { parseReminderTime } from "@/utils/parse-time";
+import { parseReminderTime, formatWhen } from "@/utils/parse-time";
 import { VoiceButton } from "@/components/voice-button";
 import { useToast } from "@/components/toast";
 
@@ -33,26 +33,13 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
-/** "Aaj 9:30 PM" / "Kal 8:00 AM" / "12 Jul, 3:00 PM" */
-function formatWhen(d: Date): string {
-  const now = new Date();
-  const tmrw = new Date(now);
-  tmrw.setDate(now.getDate() + 1);
-  const time = d.toLocaleTimeString("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  if (isSameDay(d, now)) return `Aaj ${time}`;
-  if (isSameDay(d, tmrw)) return `Kal ${time}`;
-  const date = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  return `${date}, ${time}`;
-}
-
 export default function AddReminder() {
   const router = useRouter();
   const toast = useToast();
-  const { addReminder: a } = useT();
+  const { addReminder: a, common: c } = useT();
+  const { locale } = useLocale();
+  const words = { today: c.today, tomorrow: c.tomorrow };
+  const fmt = (d: Date) => formatWhen(d, words, locale);
   const [title, setTitle] = useState("");
   const [picked, setPicked] = useState<Date | null>(null);
   const [showIosPicker, setShowIosPicker] = useState(false);
@@ -102,7 +89,9 @@ export default function AddReminder() {
     }
 
     const finalTitle = picked ? rawTitle : parsed?.title || rawTitle;
-    const finalLabel = picked ? formatWhen(picked) : parsed?.label ?? formatWhen(when);
+    // Label hamesha locale-aware formatter se — parser ka Hinglish label display
+    // ke liye use nahi karte (bhasha follow karni hai).
+    const finalLabel = fmt(when);
 
     try {
       setSaving(true);
@@ -171,7 +160,7 @@ export default function AddReminder() {
                   {a.understood} ✨
                 </Text>
                 <Text style={[styles.detTime, { color: colors.white }]}>
-                  {parsed.label}
+                  {fmt(parsed.date)}
                 </Text>
               </View>
               <Ionicons name="checkmark-circle" size={20} color={colors.white} />
@@ -185,7 +174,7 @@ export default function AddReminder() {
             <View style={styles.whenRow}>
               <View style={styles.whenChip}>
                 <Ionicons name="alarm" size={18} color={colors.terracotta} />
-                <Text style={styles.whenText}>{formatWhen(when)}</Text>
+                <Text style={styles.whenText}>{fmt(when)}</Text>
               </View>
               <Pressable onPress={openPicker} style={styles.changeBtn}>
                 <Ionicons name="create-outline" size={16} color={colors.terracotta} />
@@ -217,7 +206,7 @@ export default function AddReminder() {
                 onPress={() => setShowIosPicker(false)}
                 style={styles.iosDone}
               >
-                <Text style={styles.iosDoneText}>Ho gaya</Text>
+                <Text style={styles.iosDoneText}>{c.done}</Text>
               </Pressable>
             </View>
           )}

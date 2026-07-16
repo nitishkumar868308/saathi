@@ -67,7 +67,7 @@ export default function Upgrade() {
     if (paying) return;
     const user = session?.user;
     if (!user) {
-      toast.show("Pehle login karo", "error");
+      toast.show(u.loginFirst, "error");
       return;
     }
 
@@ -102,7 +102,7 @@ export default function Upgrade() {
           String(p.product?.identifier ?? "").includes(wanted),
         ) ?? pkgs[0];
       if (!pkg) {
-        toast.show("Koi plan available nahi", "error");
+        toast.show(u.noPlan, "error");
         return;
       }
       const result = await purchasePlus(pkg);
@@ -115,7 +115,7 @@ export default function Upgrade() {
         toast.show(u.purchaseFailed, "error");
       }
     } catch {
-      toast.show("Payment shuru nahi hua", "error");
+      toast.show(u.paymentFailed, "error");
     } finally {
       setPaying(false);
     }
