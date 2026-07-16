@@ -8,6 +8,7 @@ import { StatusBar } from "expo-status-bar";
 import { colors } from "@/theme/colors";
 import { ToastProvider } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/components/auth-provider";
+import { ReminderAlertHost } from "@/components/reminder-alert";
 import { syncNotifications } from "@/lib/notifications";
 
 export default function RootLayout() {
@@ -17,6 +18,8 @@ export default function RootLayout() {
         <ToastProvider>
           <StatusBar style="dark" />
           <RootNavigator />
+          {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
+          <ReminderAlertHost />
         </ToastProvider>
       </AuthProvider>
     </SafeAreaProvider>

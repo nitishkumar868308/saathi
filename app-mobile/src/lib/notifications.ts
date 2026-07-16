@@ -58,13 +58,21 @@ export async function hasNotifPermission(): Promise<boolean> {
  * Same `identifier` dobara dene se purani schedule replace ho jaati hai, isliye
  * sync baar-baar chalana safe hai — duplicate notifications nahi aayengi.
  */
-async function schedule(id: string, title: string, body: string, when: Date): Promise<boolean> {
+async function schedule(
+  id: string,
+  title: string,
+  body: string,
+  when: Date,
+  kind: "reminder" | "expiry" = "reminder",
+): Promise<boolean> {
   if (when.getTime() <= Date.now()) return false;
   try {
     await ensureChannel();
     await Notifications.scheduleNotificationAsync({
       identifier: id,
-      content: { title, body },
+      // sound iOS pe content se aata hai; Android pe channel se. Dono set.
+      // data.kind + data.body se app ka full-screen alert modal bharta hai.
+      content: { title, body, sound: "default", data: { kind, body, title } },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: when,
@@ -136,7 +144,7 @@ export async function scheduleDocumentExpiry(
       lead === 0
         ? `${name} aaj expire ho raha hai.`
         : `${name} ${lead} din me expire ho raha hai.`;
-    await schedule(docNotifId(docId, lead), "Saathi 📄", body, when);
+    await schedule(docNotifId(docId, lead), "Saathi 📄", body, when, "expiry");
   }
 }
 
