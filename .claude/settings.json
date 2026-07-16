@@ -117,7 +117,14 @@
       "Bash(node _mark_preview.mjs)",
       "Bash(node _mark_final.mjs)",
       "Bash(git rm *)",
-      "Bash(awk -F= '/^ADMIN_PASSWORD=/{v=$2; print \"raw length \\(CR included agar ho\\):\", length\\(v\\)}' .env.local)"
+      "Bash(awk -F= '/^ADMIN_PASSWORD=/{v=$2; print \"raw length \\(CR included agar ho\\):\", length\\(v\\)}' .env.local)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"console.log\\(typeof atob\\)\")",
+      "Bash(grep -n 'tabs: { home: \"Home\"\\\\|tabs: { home: \"होम\"\\\\|tabs: { home: \"Home\", saathi: \"Saathi\", docs: \"Docs\", alerts: \"Alerts\", you: \"You\" }' src/lib/i18n/dictionaries.ts)",
+      "Bash(grep -noE '\"[A-Z][a-z][^\"]{3,50}\"|placeholder=\"[^\"]*\"|>[A-Z][a-z][^<>{}]{3,40}<' src/app/profile-details.tsx)",
+      "Bash(grep -noE '\"[A-Za-z][^\"]{3,50}\"|>[A-Z][a-z][^<>{}]{2,40}<' src/app/profile-details.tsx)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(awk '/^  addReminder: \\\\{/{f=1} f{print NR\": \"$0} /^  \\\\};/{if\\(f\\)exit}' src/lib/i18n/dictionaries.ts)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

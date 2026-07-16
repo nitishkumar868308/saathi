@@ -30,8 +30,7 @@ import Testimonials from "@/components/Testimonials";
 import Pricing from "@/components/Pricing";
 import ReferralSection from "@/components/ReferralSection";
 import Footer from "@/components/Footer";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
-import SaathiMark from "@/components/SaathiMark";
+import SubHeader from "@/components/SubHeader";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 const featureIcons = [FileClock, Sunrise, Mic, MessageCircleHeart, Lock];
@@ -64,44 +63,8 @@ export default function Home() {
         <div className="blob bottom-[20%] left-1/4 h-72 w-72 bg-sage/15" />
       </div>
 
-      {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-line/0 bg-cream/80 backdrop-blur-md">
-        <div className="container-page flex items-center justify-between gap-2 py-3 sm:py-4">
-          <a href="/" className="flex shrink-0 items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm sm:h-10 sm:w-10">
-              <SaathiMark size={22} className="text-white" />
-            </span>
-            <span className="font-display text-lg font-semibold tracking-tight sm:text-2xl">
-              Apka Saathi
-            </span>
-          </a>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2.5">
-            {/* Nav mobile pe chhup jaata hai — warna language switcher squeeze
-                hoke screen se bahar chala jaata tha. Footer me saare links hain. */}
-            <nav className="hidden items-center sm:flex">
-              <a
-                href="/"
-                className="rounded-full bg-terracotta/10 px-2.5 py-2 text-[13px] font-semibold text-terracotta transition sm:px-3 sm:text-sm"
-              >
-                {t.nav.home}
-              </a>
-              <a
-                href="/about"
-                className="rounded-full px-2.5 py-2 text-[13px] font-semibold text-ink-soft transition hover:bg-cream-deep/50 hover:text-ink sm:px-3 sm:text-sm"
-              >
-                {t.nav.about}
-              </a>
-              <a
-                href="/contact"
-                className="rounded-full px-2.5 py-2 text-[13px] font-semibold text-ink-soft transition hover:bg-cream-deep/50 hover:text-ink sm:px-3 sm:text-sm"
-              >
-                {t.nav.contact}
-              </a>
-            </nav>
-            <LanguageSwitcher />
-          </div>
-        </div>
-      </header>
+      {/* Nav — poora responsive header (mobile menu + invite button) */}
+      <SubHeader />
 
       <main>
         {/* Hero */}

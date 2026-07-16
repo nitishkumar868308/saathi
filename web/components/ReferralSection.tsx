@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Gift, ArrowRight } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useOffers } from "@/lib/useOffers";
@@ -15,6 +15,26 @@ export default function ReferralSection() {
   const { referral: t } = useT();
   const offers = useOffers();
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Home page khulte hi ek baar referral modal dikhao (marketing) — session me
+  // sirf ek baar, warna har reload pe pop-up annoying lagega.
+  useEffect(() => {
+    if (!offers.referralsEnabled) return;
+    try {
+      if (sessionStorage.getItem("saathi-referral-popup")) return;
+    } catch {
+      return;
+    }
+    const id = setTimeout(() => {
+      setModalOpen(true);
+      try {
+        sessionStorage.setItem("saathi-referral-popup", "1");
+      } catch {
+        /* ignore */
+      }
+    }, 1400);
+    return () => clearTimeout(id);
+  }, [offers.referralsEnabled]);
 
   if (!offers.referralsEnabled) return null;
 

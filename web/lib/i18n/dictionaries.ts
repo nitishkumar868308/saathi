@@ -27,6 +27,8 @@ type Dict = {
     about: string;
     contact: string;
     backHome: string;
+    invite: string;
+    menu: string;
   };
   about: {
     badge: string;
@@ -217,6 +219,8 @@ const hinglish: Dict = {
     about: "About",
     contact: "Contact",
     backHome: "Home pe wapas",
+    invite: "Dost ko bulao",
+    menu: "Menu",
   },
   about: {
     badge: "Hamari kahani",
@@ -508,8 +512,8 @@ const hinglish: Dict = {
         a: "App abhi Android pe hai — Play Store se download karo. iPhone version jald aa raha hai.",
       },
       {
-        q: "Family sharing kaise kaam karega?",
-        a: "Saathi Plus mein aap parivaar ke members ke documents aur reminders share kar sakte ho — sabki expiry ek jagah, sabko time pe yaad. Mummy-papa ke documents bhi miss nahi honge.",
+        q: "Saathi Plus mein kya extra milta hai?",
+        a: "Plus mein unlimited documents aur unlimited reminders — koi limit nahi. Aur reminders sirf app mein nahi, aapke email aur WhatsApp pe bhi aate hain, taaki koi zaroori date miss na ho.",
       },
       {
         q: "Saathi free hai?",
@@ -598,6 +602,8 @@ const hi: Dict = {
     about: "हमारे बारे में",
     contact: "संपर्क",
     backHome: "होम पर वापस",
+    invite: "दोस्त को बुलाएँ",
+    menu: "मेन्यू",
   },
   about: {
     badge: "हमारी कहानी",
@@ -889,8 +895,8 @@ const hi: Dict = {
         a: "ऐप अभी Android पर है — Play Store से डाउनलोड करें। iPhone वर्ज़न जल्द आ रहा है।",
       },
       {
-        q: "फैमिली शेयरिंग कैसे काम करेगी?",
-        a: "साथी प्लस में आप परिवार के सदस्यों के डॉक्युमेंट्स और reminders शेयर कर सकते हैं — सबकी एक्सपायरी एक जगह, सबको समय पर याद।",
+        q: "साथी प्लस में क्या एक्स्ट्रा मिलता है?",
+        a: "प्लस में अनलिमिटेड डॉक्युमेंट्स और अनलिमिटेड reminders — कोई लिमिट नहीं। और reminders सिर्फ़ ऐप में नहीं, आपके ईमेल और WhatsApp पर भी आते हैं, ताकि कोई ज़रूरी डेट मिस न हो।",
       },
       {
         q: "साथी फ्री है?",
@@ -979,6 +985,8 @@ const en: Dict = {
     about: "About",
     contact: "Contact",
     backHome: "Back to home",
+    invite: "Invite a friend",
+    menu: "Menu",
   },
   about: {
     badge: "Our story",
@@ -1270,8 +1278,8 @@ const en: Dict = {
         a: "The app is on Android today — grab it from the Play Store. iPhone is coming soon.",
       },
       {
-        q: "How does family sharing work?",
-        a: "With Saathi Plus you can share family members' documents and reminders — everyone's expiries in one place, everyone reminded on time.",
+        q: "What extra do I get with Saathi Plus?",
+        a: "Plus gives you unlimited documents and unlimited reminders — no limits. And reminders reach you not just in the app but on your email and WhatsApp too, so no important date is ever missed.",
       },
       {
         q: "Is Saathi free?",

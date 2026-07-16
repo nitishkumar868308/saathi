@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
-import { Gift, X, Smartphone, ArrowRight } from "lucide-react";
+import { Gift, X, Smartphone } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useOffers } from "@/lib/useOffers";
 import { tpl } from "@/lib/offers";
@@ -91,7 +90,7 @@ export default function ReferralModal({
           {tpl(t.capNote, vars)}
         </p>
 
-        {/* CTAs — primary download (non-app users), secondary manage on web */}
+        {/* CTA — sirf app download (referral app ke andar se hi manage hota hai) */}
         <a
           href={PLAY_STORE_URL}
           target="_blank"
@@ -101,13 +100,6 @@ export default function ReferralModal({
           <Smartphone size={19} />
           {t.downloadApp}
         </a>
-        <Link
-          href="/referral"
-          className="mt-3 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-line bg-surface px-6 text-sm font-semibold text-ink transition hover:bg-cream-deep/40"
-        >
-          {t.manageOnWeb}
-          <ArrowRight size={16} />
-        </Link>
       </div>
     </div>
   );
