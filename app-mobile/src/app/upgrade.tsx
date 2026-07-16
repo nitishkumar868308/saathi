@@ -24,18 +24,18 @@ import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { useOffers } from "@/lib/use-offers";
 
 const FREE_FEATURES = [
-  "10 documents tak",
+  "5 active reminders",
+  "3 documents",
   "Expiry reminders",
   "Voice + text reminders",
-  "Hindi + English",
 ];
 
 const PLUS_FEATURES = [
+  "Unlimited reminders",
   "Unlimited documents",
-  "Family sharing (parivaar ke docs)",
-  "Subah ka daily brief",
-  "Priority + WhatsApp reminders",
-  "Sab kuch Free wala",
+  "AI Saathi (smart chat + brief)",
+  "WhatsApp + email reminders",
+  "Aane wale saare premium features",
 ];
 
 export default function Upgrade() {
@@ -152,7 +152,8 @@ export default function Upgrade() {
             </View>
             <Text style={styles.plusActiveTitle}>Aap Saathi Plus par ho 🎉</Text>
             <Text style={styles.plusActiveSub}>
-              Unlimited documents, family sharing aur daily brief — sab unlocked.
+              Unlimited reminders, documents aur AI — sab unlocked. "Meri
+              membership" me expiry aur din dekho.
             </Text>
           </View>
         ) : (
@@ -227,9 +228,30 @@ export default function Upgrade() {
                 )}
               </Pressable>
               <Text style={styles.payNote}>
-                Razorpay se secure · UPI, card, netbanking
+                Google Play se secure · UPI, card, netbanking
               </Text>
             </View>
+
+            {/* Referral — paise ke bina Plus (spec item 11) */}
+            {offers.referralsEnabled && (
+              <Pressable
+                onPress={() => router.push("/referral" as never)}
+                style={({ pressed }) => [styles.referCard, pressed && { opacity: 0.9 }]}
+              >
+                <View style={styles.referIcon}>
+                  <Ionicons name="gift" size={20} color={colors.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.referTitle}>
+                    Ya {offers.referralDays} din Plus FREE kamao
+                  </Text>
+                  <Text style={styles.referSub}>
+                    Dost bulao — dono ko {offers.referralDays} din Saathi Plus
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.terracotta} />
+              </Pressable>
+            )}
 
             {/* Free card */}
             <View style={styles.freeCard}>
@@ -336,6 +358,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(247,242,233,0.55)",
   },
+  referCard: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.25)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    padding: 16,
+  },
+  referIcon: {
+    height: 42,
+    width: 42,
+    borderRadius: 14,
+    backgroundColor: colors.terracotta,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  referTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
+  referSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
   freeCard: {
     marginTop: 16,
     borderRadius: 22,
