@@ -260,6 +260,8 @@ export type Dict = {
     backendMissing: string;
     membership: string;
     myDetails: string;
+    completeTitle: string;
+    completeSub: string;
     /** {d} */
     referRow: string;
     plusActive: string;
@@ -529,6 +531,8 @@ const hinglish: Dict = {
     backendMissing: "Backend set nahi (.env bharo)",
     membership: "Meri membership",
     myDetails: "Meri details (name, phone, address…)",
+    completeTitle: "Profile complete karo",
+    completeSub: "Naam, phone, address bharo — referral aur Plus ke liye zaroori",
     referRow: "Refer & Earn — dono ko {d} din ka Plus plan free",
     plusActive: "Saathi Plus — active",
     plusLo: "Saathi Plus lo",
@@ -797,6 +801,8 @@ const hi: Dict = {
     backendMissing: "बैकएंड सेट नहीं (.env भरें)",
     membership: "मेरी membership",
     myDetails: "मेरी details (name, phone, address…)",
+    completeTitle: "प्रोफ़ाइल पूरी करें",
+    completeSub: "नाम, फ़ोन, पता भरें — रेफ़रल और प्लस के लिए ज़रूरी",
     referRow: "Refer & Earn — दोनों को {d} दिन का प्लस प्लान फ्री",
     plusActive: "साथी प्लस — active",
     plusLo: "साथी प्लस लें",
@@ -1064,6 +1070,8 @@ const en: Dict = {
     backendMissing: "Backend not set (fill .env)",
     membership: "My membership",
     myDetails: "My details (name, phone, address…)",
+    completeTitle: "Complete your profile",
+    completeSub: "Add name, phone, address — needed for referrals and Plus",
     referRow: "Refer & Earn — you both get {d} days of Plus free",
     plusActive: "Saathi Plus — active",
     plusLo: "Get Saathi Plus",

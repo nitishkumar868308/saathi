@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,6 +25,7 @@ import { getPlan, WEB_URL } from "@/lib/plan";
 import { useOffers } from "@/lib/use-offers";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
+import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 
 type RowId =
   | "saathi_name"
@@ -48,6 +50,8 @@ export default function Settings() {
   const name = meta?.full_name || meta?.name || s.account;
   const [isPlus, setIsPlus] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [profileComplete, setProfileComplete] = useState(true);
 
   const groups: { title: string; rows: Row[] }[] = [
     {
@@ -85,6 +89,12 @@ export default function Settings() {
     if (!isSupabaseConfigured) return;
     getPlan()
       .then((p) => setIsPlus(p.isPlus))
+      .catch(() => {});
+    getUserDetails()
+      .then((d) => {
+        setAvatarUrl(d?.avatar_url ?? null);
+        setProfileComplete(isDetailsComplete(d));
+      })
       .catch(() => {});
   }, [rewardsVersion]);
 
@@ -171,7 +181,11 @@ export default function Settings() {
         {/* Profile card */}
         <View style={styles.profile}>
           <View style={styles.pAvatar}>
-            <SaathiMark size={32} color={colors.white} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.pAvatarImg} />
+            ) : (
+              <SaathiMark size={32} color={colors.white} />
+            )}
           </View>
           <Text style={styles.pName}>{name}</Text>
           <Text style={styles.pSub}>{session?.user?.email ?? ""}</Text>
@@ -198,7 +212,37 @@ export default function Settings() {
           </View>
         </View>
 
-        {/* Meri membership — kab aaye, kab tak Plus, kis wajah se */}
+        {/* Plan / Saathi Plus — sabse upar */}
+        <Pressable
+          onPress={() => router.push("/upgrade" as never)}
+          style={({ pressed }) => [styles.planCard, pressed && { opacity: 0.92 }]}
+        >
+          <View style={styles.planIcon}>
+            <Ionicons name={isPlus ? "star" : "sparkles"} size={22} color={colors.white} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.planTitle}>{isPlus ? s.plusActive : s.plusLo}</Text>
+            <Text style={styles.planSub}>{isPlus ? s.plusActiveSub : s.plusSub}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="rgba(247,242,233,0.7)" />
+        </Pressable>
+
+        {/* Profile complete karo — nudge (adhoora ho to) */}
+        {!profileComplete && (
+          <Pressable
+            onPress={() => router.push("/profile-details" as never)}
+            style={({ pressed }) => [styles.nudge, pressed && { opacity: 0.92 }]}
+          >
+            <Ionicons name="alert-circle" size={20} color={colors.terracotta} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nudgeTitle}>{s.completeTitle}</Text>
+              <Text style={styles.nudgeSub}>{s.completeSub}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.terracotta} />
+          </Pressable>
+        )}
+
+        {/* Meri membership */}
         <Pressable
           onPress={() => router.push("/membership" as never)}
           style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
@@ -231,25 +275,6 @@ export default function Settings() {
             <Ionicons name="chevron-forward" size={18} color={colors.line} />
           </Pressable>
         )}
-
-        {/* Plan / Saathi Plus */}
-        <Pressable
-          onPress={() => router.push("/upgrade" as never)}
-          style={({ pressed }) => [styles.planCard, pressed && { opacity: 0.92 }]}
-        >
-          <View style={styles.planIcon}>
-            <Ionicons
-              name={isPlus ? "star" : "sparkles"}
-              size={22}
-              color={colors.white}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.planTitle}>{isPlus ? s.plusActive : s.plusLo}</Text>
-            <Text style={styles.planSub}>{isPlus ? s.plusActiveSub : s.plusSub}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(247,242,233,0.7)" />
-        </Pressable>
 
         {groups.map((g) => (
           <View key={g.title} style={{ marginTop: 22 }}>
@@ -347,7 +372,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 26,
     backgroundColor: colors.terracotta,
+    overflow: "hidden",
   },
+  pAvatarImg: { height: 72, width: 72, borderRadius: 26 },
+  nudge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  nudgeTitle: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
+  nudgeSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
   pName: { marginTop: 12, fontSize: 22, fontWeight: "700", color: colors.ink },
   pSub: { marginTop: 2, fontSize: 14, color: colors.inkSoft },
   statusChip: {
