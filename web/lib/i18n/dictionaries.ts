@@ -176,6 +176,7 @@ type Dict = {
     google: string;
     noAccount: string;
     downloadApp: string;
+    manageOnWeb: string;
     /** Template — {d} */
     cardTitle: string;
     /** Template — {d} */
@@ -561,6 +562,7 @@ const hinglish: Dict = {
     google: "Google se continue karo",
     noAccount: "Account nahi hai?",
     downloadApp: "App download karo",
+    manageOnWeb: "Web pe manage karo",
     cardTitle: "Dono ko {d} din ka Plus plan free",
     cardSub: "Apna link bhejo. Dost join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din ka Saathi Plus plan.",
     yourCode: "Aapka code",
@@ -941,6 +943,7 @@ const hi: Dict = {
     google: "Google से जारी रखें",
     noAccount: "अकाउंट नहीं है?",
     downloadApp: "ऐप डाउनलोड करें",
+    manageOnWeb: "वेब पर मैनेज करें",
     cardTitle: "दोनों को {d} दिन का प्लस प्लान फ्री",
     cardSub: "अपना लिंक भेजिए। दोस्त जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन का साथी प्लस प्लान।",
     yourCode: "आपका कोड",
@@ -1321,6 +1324,7 @@ const en: Dict = {
     google: "Continue with Google",
     noAccount: "No account yet?",
     downloadApp: "Download the app",
+    manageOnWeb: "Manage on the web",
     cardTitle: "You both get {d} days of the Plus plan",
     cardSub: "Send your link. Your friend joins, adds their first document and chats with Saathi once — you both get {d} days of the Saathi Plus plan.",
     yourCode: "Your code",

@@ -1,18 +1,20 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { Gift, ArrowRight } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useOffers } from "@/lib/useOffers";
 import { tpl } from "@/lib/offers";
+import ReferralModal from "@/components/ReferralModal";
 
 /**
- * Landing ka referral section. Click → `/referral` (login ke peeche).
- * Referral band ho to poora section gayab.
+ * Landing ka referral section. Click → modal popup (offer + conditions +
+ * download). Referral band ho to poora section gayab.
  */
 export default function ReferralSection() {
   const { referral: t } = useT();
   const offers = useOffers();
+  const [modalOpen, setModalOpen] = useState(false);
 
   if (!offers.referralsEnabled) return null;
 
@@ -34,8 +36,9 @@ export default function ReferralSection() {
             {tpl(t.sub, vars)}
           </p>
 
-          <Link
-            href="/referral"
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
             className="group mt-7 inline-flex h-14 items-center justify-center gap-2.5 rounded-2xl bg-terracotta px-7 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark active:scale-[0.98]"
           >
             {t.cta}
@@ -43,7 +46,7 @@ export default function ReferralSection() {
               size={18}
               className="transition-transform group-hover:translate-x-0.5"
             />
-          </Link>
+          </button>
 
           <p className="mt-3.5 text-sm text-ink-soft">{tpl(t.capNote, vars)}</p>
         </div>
@@ -73,6 +76,8 @@ export default function ReferralSection() {
           </li>
         </ol>
       </div>
+
+      <ReferralModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   );
 }
