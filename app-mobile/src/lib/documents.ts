@@ -17,6 +17,8 @@ export type Document = {
   type: string;
   expiry: string | null; // 'YYYY-MM-DD'
   file_uri: string | null;
+  /** Plus expire hone pe 3 se aage ke documents lock ho jaate hain. */
+  is_locked: boolean;
   created_at: string;
 };
 

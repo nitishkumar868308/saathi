@@ -15,6 +15,7 @@ export function DocCard({
   onPress?: () => void;
   onLongPress?: () => void;
 }) {
+  const locked = doc.is_locked;
   const hasExpiry = !!doc.expiry;
   const s = hasExpiry ? statusStyle[expiryStatus(doc.expiry as string)] : neutralStyle;
   const label = hasExpiry ? expiryLabel(doc.expiry as string) : "Expiry set nahi";
@@ -26,21 +27,33 @@ export function DocCard({
       delayLongPress={350}
       style={({ pressed }) => [
         styles.card,
+        locked && styles.lockedCard,
         pressed && (onPress || onLongPress) && styles.pressed,
       ]}
     >
-      <View style={[styles.icon, { backgroundColor: s.bg }]}>
-        <Ionicons name={iconForType(doc.type) as any} size={20} color={s.fg} />
+      <View style={[styles.icon, { backgroundColor: locked ? colors.creamDeep : s.bg }]}>
+        <Ionicons
+          name={(locked ? "lock-closed" : iconForType(doc.type)) as any}
+          size={20}
+          color={locked ? colors.inkSoft : s.fg}
+        />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={[styles.name, locked && styles.lockedText]} numberOfLines={1}>
           {doc.name}
         </Text>
-        <Text style={styles.exp}>{label}</Text>
+        <Text style={styles.exp}>{locked ? "Plus lo — dekhne ke liye" : label}</Text>
       </View>
-      <View style={[styles.badge, { backgroundColor: s.bg }]}>
-        <Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text>
-      </View>
+      {locked ? (
+        <View style={styles.lockBadge}>
+          <Ionicons name="star" size={11} color={colors.white} />
+          <Text style={styles.lockBadgeText}>Plus</Text>
+        </View>
+      ) : (
+        <View style={[styles.badge, { backgroundColor: s.bg }]}>
+          <Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -56,6 +69,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: 14,
   },
+  lockedCard: { backgroundColor: colors.cream, borderStyle: "dashed" },
+  lockedText: { color: colors.inkSoft },
+  lockBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: colors.terracotta,
+  },
+  lockBadgeText: { fontSize: 11.5, fontWeight: "800", color: colors.white },
   pressed: { opacity: 0.7 },
   icon: {
     height: 44,

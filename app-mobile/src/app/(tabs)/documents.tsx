@@ -172,10 +172,12 @@ export default function Documents() {
                 key={doc.id}
                 doc={doc}
                 onPress={() =>
-                  router.push({
-                    pathname: "/document-view",
-                    params: { uri: doc.file_uri ?? "", name: doc.name },
-                  } as never)
+                  doc.is_locked
+                    ? router.push("/upgrade" as never)
+                    : router.push({
+                        pathname: "/document-view",
+                        params: { uri: doc.file_uri ?? "", name: doc.name },
+                      } as never)
                 }
                 onLongPress={() => confirmDelete(doc)}
               />

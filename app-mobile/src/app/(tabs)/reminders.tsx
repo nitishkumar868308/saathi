@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useFocusEffect } from "expo-router";
+import { router, useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import {
@@ -147,25 +147,44 @@ function Section({
         {items.map((r, i) => (
           <Pressable
             key={r.id}
+            onPress={r.is_paused ? () => router.push("/upgrade" as never) : undefined}
             onLongPress={() => onDelete(r)}
             delayLongPress={350}
             style={[styles.row, i < items.length - 1 && styles.rowBorder]}
           >
-            <View style={[styles.rIcon, { opacity: r.is_on ? 1 : 0.4 }]}>
-              <Ionicons name="notifications" size={17} color={colors.terracotta} />
+            <View style={[styles.rIcon, { opacity: r.is_on && !r.is_paused ? 1 : 0.4 }]}>
+              <Ionicons
+                name={r.is_paused ? "lock-closed" : "notifications"}
+                size={17}
+                color={colors.terracotta}
+              />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rTitle, !r.is_on && styles.off]} numberOfLines={2}>
+              <Text
+                style={[styles.rTitle, (!r.is_on || r.is_paused) && styles.off]}
+                numberOfLines={2}
+              >
                 {r.title}
               </Text>
-              {r.time_label ? <Text style={styles.rTime}>{r.time_label}</Text> : null}
+              {r.is_paused ? (
+                <Text style={styles.pausedTag}>Plus khatam — paused. Tap karke Plus lo</Text>
+              ) : r.time_label ? (
+                <Text style={styles.rTime}>{r.time_label}</Text>
+              ) : null}
             </View>
-            <Switch
-              value={r.is_on}
-              onValueChange={() => onToggle(r)}
-              trackColor={{ false: colors.line, true: colors.terracotta }}
-              thumbColor={colors.white}
-            />
+            {r.is_paused ? (
+              <View style={styles.pausedPill}>
+                <Ionicons name="star" size={11} color={colors.white} />
+                <Text style={styles.pausedPillText}>Plus</Text>
+              </View>
+            ) : (
+              <Switch
+                value={r.is_on}
+                onValueChange={() => onToggle(r)}
+                trackColor={{ false: colors.line, true: colors.terracotta }}
+                thumbColor={colors.white}
+              />
+            )}
           </Pressable>
         ))}
       </View>
@@ -233,6 +252,17 @@ const styles = StyleSheet.create({
   rTitle: { fontSize: 15.5, fontWeight: "600", color: colors.ink },
   off: { textDecorationLine: "line-through", color: colors.inkSoft },
   rTime: { marginTop: 2, fontSize: 13, color: colors.inkSoft },
+  pausedTag: { marginTop: 2, fontSize: 12, fontWeight: "600", color: colors.terracotta },
+  pausedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    backgroundColor: colors.terracotta,
+  },
+  pausedPillText: { fontSize: 11.5, fontWeight: "800", color: colors.white },
   hint: {
     textAlign: "center",
     fontSize: 12,
