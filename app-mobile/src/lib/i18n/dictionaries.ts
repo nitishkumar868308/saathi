@@ -107,6 +107,7 @@ export type Dict = {
     addBtn: string;
     longPressHint: string;
     lockedSub: string;
+    expiryNotSet: string;
     deleted: string;
     deleteConfirmTitle: string;
     /** {name} */
@@ -342,6 +343,7 @@ const hinglish: Dict = {
     addBtn: "Document add karo",
     longPressHint: "Delete karne ke liye card ko dabaye rakho",
     lockedSub: "Plus lo — dekhne ke liye",
+    expiryNotSet: "Expiry set nahi",
     deleted: "Document delete ho gaya",
     deleteConfirmTitle: "Delete karein?",
     deleteConfirmBody: "\"{name}\" hata denge?",
@@ -577,6 +579,7 @@ const hi: Dict = {
     addBtn: "डॉक्युमेंट जोड़ें",
     longPressHint: "डिलीट करने के लिए कार्ड को दबाए रखें",
     lockedSub: "प्लस लें — देखने के लिए",
+    expiryNotSet: "एक्सपायरी सेट नहीं",
     deleted: "डॉक्युमेंट डिलीट हो गया",
     deleteConfirmTitle: "डिलीट करें?",
     deleteConfirmBody: "\"{name}\" हटा दें?",
@@ -811,6 +814,7 @@ const en: Dict = {
     addBtn: "Add document",
     longPressHint: "Press and hold a card to delete",
     lockedSub: "Get Plus to view",
+    expiryNotSet: "No expiry set",
     deleted: "Document deleted",
     deleteConfirmTitle: "Delete?",
     deleteConfirmBody: "Remove \"{name}\"?",

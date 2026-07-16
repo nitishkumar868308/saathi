@@ -4,6 +4,7 @@ import { router } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { usePlan } from "@/lib/use-plan";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 /**
  * Chhota "Plus lo" banner — har free-user screen pe dikhta hai (spec item 2, 11).
@@ -18,6 +19,7 @@ export function UpgradeBanner({
   flush?: boolean;
 }) {
   const { isPlus, loading } = usePlan();
+  const { settings: s, common: c } = useT();
   if (loading || isPlus) return null;
 
   return (
@@ -34,13 +36,11 @@ export function UpgradeBanner({
         <Ionicons name="star" size={16} color={colors.white} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.title}>Saathi Plus lo</Text>
-        {!compact && (
-          <Text style={styles.sub}>Unlimited reminders, documents & AI</Text>
-        )}
+        <Text style={styles.title}>{s.plusLo}</Text>
+        {!compact && <Text style={styles.sub}>{s.plusActiveSub}</Text>}
       </View>
       <View style={styles.cta}>
-        <Text style={styles.ctaText}>Upgrade</Text>
+        <Text style={styles.ctaText}>{c.upgrade}</Text>
         <Ionicons name="arrow-forward" size={13} color={colors.white} />
       </View>
     </Pressable>

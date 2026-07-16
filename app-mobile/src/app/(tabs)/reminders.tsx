@@ -23,10 +23,13 @@ import {
 import { scheduleReminder, cancelReminder } from "@/lib/notifications";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 export default function Reminders() {
   const router = useRouter();
   const toast = useToast();
+  const { reminders: r0, common: c } = useT();
   const [items, setItems] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,11 +38,11 @@ export default function Reminders() {
       setLoading(true);
       setItems(await listReminders());
     } catch {
-      toast.show("Reminders load nahi hue", "error");
+      toast.show(r0.title + " ✕", "error");
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, r0.title]);
 
   useFocusEffect(
     useCallback(() => {
@@ -58,25 +61,25 @@ export default function Reminders() {
         await cancelReminder(r.id);
       }
     } catch {
-      toast.show("Update nahi hua", "error");
+      toast.show(r0.title + " ✕", "error");
       load();
     }
   }
 
   function confirmDelete(r: Reminder) {
-    Alert.alert("Delete karein?", `"${r.title}" hata denge?`, [
-      { text: "Nahi", style: "cancel" },
+    Alert.alert(r0.deleteConfirmTitle, tpl(r0.deleteConfirmBody, { title: r.title }), [
+      { text: c.no, style: "cancel" },
       {
-        text: "Delete",
+        text: c.delete,
         style: "destructive",
         onPress: async () => {
           try {
             await deleteReminder(r.id);
             await cancelReminder(r.id);
             setItems((prev) => prev.filter((x) => x.id !== r.id));
-            toast.show("Reminder delete ho gaya", "success");
+            toast.show(c.delete + " ✓", "success");
           } catch {
-            toast.show("Delete nahi hua", "error");
+            toast.show(c.delete + " ✕", "error");
           }
         },
       },
@@ -89,8 +92,8 @@ export default function Reminders() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerWrap}>
-        <Text style={styles.title}>Reminders</Text>
-        <Text style={styles.sub}>Saathi sahi time pe yaad dilayega</Text>
+        <Text style={styles.title}>{r0.title}</Text>
+        <Text style={styles.sub}>{r0.sub}</Text>
       </View>
 
       <UpgradeBanner compact />
@@ -104,16 +107,14 @@ export default function Reminders() {
           <View style={styles.emptyIcon}>
             <Ionicons name="alarm-outline" size={28} color={colors.terracotta} />
           </View>
-          <Text style={styles.emptyTitle}>Abhi koi reminder nahi</Text>
-          <Text style={styles.emptyBody}>
-            Neeche + dabake naya reminder banao — bol ke ya type karke.
-          </Text>
+          <Text style={styles.emptyTitle}>{r0.emptyTitle}</Text>
+          <Text style={styles.emptyBody}>{r0.emptyBody}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Section title="Aaj" items={today} onToggle={toggle} onDelete={confirmDelete} />
-          <Section title="Aane wale" items={upcoming} onToggle={toggle} onDelete={confirmDelete} />
-          <Text style={styles.hint}>Delete karne ke liye card ko dabaye rakho</Text>
+          <Section title={r0.today} items={today} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} />
+          <Section title={r0.upcoming} items={upcoming} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} />
+          <Text style={styles.hint}>{r0.longPressHint}</Text>
         </ScrollView>
       )}
 
@@ -122,7 +123,7 @@ export default function Reminders() {
         style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}
       >
         <Ionicons name="add" size={20} color={colors.white} />
-        <Text style={styles.addText}>Naya reminder</Text>
+        <Text style={styles.addText}>{r0.title}</Text>
       </Pressable>
     </SafeAreaView>
   );
@@ -133,11 +134,13 @@ function Section({
   items,
   onToggle,
   onDelete,
+  pausedTag,
 }: {
   title: string;
   items: Reminder[];
   onToggle: (r: Reminder) => void;
   onDelete: (r: Reminder) => void;
+  pausedTag: string;
 }) {
   if (items.length === 0) return null;
   return (
@@ -167,7 +170,7 @@ function Section({
                 {r.title}
               </Text>
               {r.is_paused ? (
-                <Text style={styles.pausedTag}>Plus khatam — paused. Tap karke Plus lo</Text>
+                <Text style={styles.pausedTag}>{pausedTag}</Text>
               ) : r.time_label ? (
                 <Text style={styles.rTime}>{r.time_label}</Text>
               ) : null}

@@ -19,24 +19,20 @@ import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
 import { askSaathi, type ChatTurn } from "@/lib/ai";
 import { checkReferralQualification } from "@/lib/plan";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 type Msg = { id: string; role: "user" | "saathi"; text: string };
 
-const suggestions = [
-  "Kal 8 baje uthana",
-  "Insurance kab expire hai?",
-  "FASTag recharge yaad dilana",
-  "Aaj kya kaam hai?",
-];
-
 export default function Chat() {
   const name = useUserName();
+  const { chat: ch } = useT();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
       id: "1",
       role: "saathi",
-      text: `Namaste${name ? " " + name : ""}! 🙂 Main aapka Saathi. Kuch bhi bolo ya likho — reminder, document, ya bas baat. Main yaad rakhunga.`,
+      text: tpl(ch.greeting, { name: name ? " " + name : "" }),
     },
   ]);
   const scrollRef = useRef<ScrollView>(null);
@@ -76,7 +72,7 @@ export default function Chat() {
           <Text style={styles.headerTitle}>Saathi</Text>
           <View style={styles.onlineRow}>
             <View style={styles.dot} />
-            <Text style={styles.headerSub}>aapka dost · online</Text>
+            <Text style={styles.headerSub}>{ch.online}</Text>
           </View>
         </View>
       </View>
@@ -131,7 +127,7 @@ export default function Chat() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}
         >
-          {suggestions.map((s) => (
+          {ch.suggestions.map((s) => (
             <Pressable key={s} onPress={() => sendText(s)} style={styles.chip}>
               <Text style={styles.chipText}>{s}</Text>
             </Pressable>
@@ -144,7 +140,7 @@ export default function Chat() {
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Kuch bhi bolo ya likho..."
+            placeholder={ch.inputPlaceholder}
             placeholderTextColor={colors.inkSoft}
             style={styles.input}
             onSubmitEditing={() => sendText(input)}

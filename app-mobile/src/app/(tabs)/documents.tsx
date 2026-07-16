@@ -20,21 +20,25 @@ import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
+import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 
 type Filter = "all" | "soon" | "expired";
-const filters: { key: Filter; label: string }[] = [
-  { key: "all", label: "Sab" },
-  { key: "soon", label: "Jald expire" },
-  { key: "expired", label: "Expired" },
-];
 
 export default function Documents() {
   const router = useRouter();
   const toast = useToast();
+  const { documents: d, common: c } = useT();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+
+  const filters: { key: Filter; label: string }[] = [
+    { key: "all", label: d.filterAll },
+    { key: "soon", label: d.filterSoon },
+    { key: "expired", label: d.filterExpired },
+  ];
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -43,13 +47,13 @@ export default function Documents() {
         const data = await listDocuments();
         setDocs(data);
       } catch (e) {
-        toast.show("Documents load nahi ho paye", "error");
+        toast.show(d.title + " ✕", "error");
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [toast],
+    [toast, d.title],
   );
 
   useFocusEffect(
@@ -59,30 +63,30 @@ export default function Documents() {
   );
 
   function confirmDelete(doc: Document) {
-    Alert.alert("Delete karein?", `"${doc.name}" hata denge?`, [
-      { text: "Nahi", style: "cancel" },
+    Alert.alert(d.deleteConfirmTitle, tpl(d.deleteConfirmBody, { name: doc.name }), [
+      { text: c.no, style: "cancel" },
       {
-        text: "Delete",
+        text: c.delete,
         style: "destructive",
         onPress: async () => {
           try {
             await deleteDocument(doc.id);
             // Warna delete kiye document ki expiry notification aati rehti.
             await cancelDocumentExpiry(doc.id);
-            setDocs((prev) => prev.filter((d) => d.id !== doc.id));
-            toast.show("Document delete ho gaya", "success");
+            setDocs((prev) => prev.filter((x) => x.id !== doc.id));
+            toast.show(d.deleted, "success");
           } catch {
-            toast.show("Delete nahi ho paya", "error");
+            toast.show(d.deleted + " ✕", "error");
           }
         },
       },
     ]);
   }
 
-  const list = docs.filter((d) => {
+  const list = docs.filter((x) => {
     if (filter === "all") return true;
-    if (!d.expiry) return false;
-    const s = expiryStatus(d.expiry);
+    if (!x.expiry) return false;
+    const s = expiryStatus(x.expiry);
     return filter === "soon" ? s === "soon" : s === "expired";
   });
 
@@ -90,8 +94,8 @@ export default function Documents() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerWrap}>
         <View style={styles.header}>
-          <Text style={styles.title}>Documents</Text>
-          <Text style={styles.sub}>{docs.length} saved · expiry auto-tracked</Text>
+          <Text style={styles.title}>{d.title}</Text>
+          <Text style={styles.sub}>{tpl(d.savedSub, { n: docs.length })}</Text>
         </View>
 
         <View style={styles.chips}>
@@ -149,12 +153,10 @@ export default function Documents() {
                 <Ionicons name="document-text-outline" size={28} color={colors.terracotta} />
               </View>
               <Text style={styles.emptyTitle}>
-                {docs.length === 0 ? "Abhi koi document nahi" : "Is category mein kuch nahi"}
+                {docs.length === 0 ? d.emptyTitle : d.emptyInCategory}
               </Text>
               <Text style={styles.emptyBody}>
-                {docs.length === 0
-                  ? "Apna pehla document add karo — Saathi expiry yaad rakhega."
-                  : "Filter badal ke dekho, ya naya document add karo."}
+                {docs.length === 0 ? d.emptyBodyFirst : d.emptyBodyFilter}
               </Text>
               {docs.length === 0 && (
                 <Pressable
@@ -162,7 +164,7 @@ export default function Documents() {
                   style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.9 }]}
                 >
                   <Ionicons name="add" size={18} color={colors.white} />
-                  <Text style={styles.emptyBtnText}>Document add karo</Text>
+                  <Text style={styles.emptyBtnText}>{d.addBtn}</Text>
                 </Pressable>
               )}
             </View>
@@ -183,7 +185,7 @@ export default function Documents() {
               />
             ))
           )}
-          <Text style={styles.hint}>Delete karne ke liye card ko dabaye rakho</Text>
+          <Text style={styles.hint}>{d.longPressHint}</Text>
         </ScrollView>
       )}
 

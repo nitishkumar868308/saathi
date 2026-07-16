@@ -5,6 +5,7 @@ import type { Document } from "@/lib/documents";
 import { expiryStatus, expiryLabel } from "@/utils/expiry";
 import { statusStyle, neutralStyle, iconForType } from "@/theme/status";
 import { colors } from "@/theme/colors";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export function DocCard({
   doc,
@@ -15,10 +16,11 @@ export function DocCard({
   onPress?: () => void;
   onLongPress?: () => void;
 }) {
+  const { documents: d, common: c } = useT();
   const locked = doc.is_locked;
   const hasExpiry = !!doc.expiry;
   const s = hasExpiry ? statusStyle[expiryStatus(doc.expiry as string)] : neutralStyle;
-  const label = hasExpiry ? expiryLabel(doc.expiry as string) : "Expiry set nahi";
+  const label = hasExpiry ? expiryLabel(doc.expiry as string) : d.expiryNotSet;
 
   return (
     <Pressable
@@ -42,12 +44,12 @@ export function DocCard({
         <Text style={[styles.name, locked && styles.lockedText]} numberOfLines={1}>
           {doc.name}
         </Text>
-        <Text style={styles.exp}>{locked ? "Plus lo — dekhne ke liye" : label}</Text>
+        <Text style={styles.exp}>{locked ? d.lockedSub : label}</Text>
       </View>
       {locked ? (
         <View style={styles.lockBadge}>
           <Ionicons name="star" size={11} color={colors.white} />
-          <Text style={styles.lockBadgeText}>Plus</Text>
+          <Text style={styles.lockBadgeText}>{c.plusBadge}</Text>
         </View>
       ) : (
         <View style={[styles.badge, { backgroundColor: s.bg }]}>
