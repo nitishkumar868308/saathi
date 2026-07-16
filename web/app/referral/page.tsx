@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import ReferralClient from "@/components/ReferralClient";
 
 export const metadata: Metadata = {
-  title: "Dost bulao",
+  title: "Refer & Earn",
   description:
-    "Apna referral link share karo — dost join kare aur Saathi use kare to dono ko Saathi Plus free.",
+    "Apna referral link share karo — dost join kare aur Saathi use kare to dono ko Saathi Plus plan free.",
   robots: { index: false, follow: false },
 };
 
