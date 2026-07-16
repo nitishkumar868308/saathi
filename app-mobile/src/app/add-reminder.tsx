@@ -21,7 +21,8 @@ import { colors } from "@/theme/colors";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
-import { parseReminderTime, formatWhen } from "@/utils/parse-time";
+import { parseReminderTime, reminderNeeds, formatWhen } from "@/utils/parse-time";
+import { aiParseReminder } from "@/lib/ai";
 import { VoiceButton } from "@/components/voice-button";
 import { useToast } from "@/components/toast";
 
@@ -41,14 +42,24 @@ export default function AddReminder() {
   const words = { today: c.today, tomorrow: c.tomorrow };
   const fmt = (d: Date) => formatWhen(d, words, locale);
   const [title, setTitle] = useState("");
+  // Jab parser subject na samajh paaye, user yahan alag se batata hai.
+  const [subject, setSubject] = useState("");
+  const [askSubject, setAskSubject] = useState(false);
   const [picked, setPicked] = useState<Date | null>(null);
   const [showIosPicker, setShowIosPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [understanding, setUnderstanding] = useState(false);
 
   const parsed = useMemo(() => parseReminderTime(title), [title]);
+  const needs = reminderNeeds(parsed);
 
   // Effective time: user ne khud chuna ho to wahi, warna text se samjha hua.
   const when = picked ?? parsed?.date ?? null;
+  // Effective subject: clarify-box > parser ka nikala hua.
+  const finalSubject = subject.trim() || parsed?.title?.trim() || "";
+  // Kya-kya abhi bhi missing hai (AI se try karne ke baad screen isse poochti).
+  const missingTitle = !finalSubject;
+  const missingTime = !when;
 
   function openPicker() {
     const base =
@@ -79,33 +90,63 @@ export default function AddReminder() {
   }
 
   async function save() {
-    if (saving) return;
-    const rawTitle = title.trim();
-    if (!rawTitle) return toast.show(a.whatLabel, "info");
-    if (!when) {
+    if (saving || understanding) return;
+    const raw = title.trim();
+    if (!raw && !subject.trim()) return toast.show(a.whatLabel, "info");
+
+    // 1. Local parser jo samajh paaya.
+    let subj = finalSubject;
+    let time = when;
+
+    // 2. Kuch adhoora? Ek baar AI se samajhne ki koshish (best-effort, online+key).
+    if ((!subj || !time) && raw) {
+      setUnderstanding(true);
+      const ai = await aiParseReminder(raw, locale);
+      setUnderstanding(false);
+      if (ai) {
+        if (!subj && ai.title) {
+          subj = ai.title;
+          setSubject(ai.title);
+        }
+        if (!time && ai.remind_at) {
+          const d = new Date(ai.remind_at);
+          if (!isNaN(d.getTime())) {
+            time = d;
+            setPicked(d);
+          }
+        }
+      }
+    }
+
+    // 3. Ab bhi samajh na aaye to user se wapas poochho (title pehle, phir time).
+    if (!subj) {
+      setAskSubject(true);
+      toast.show(a.askWhat, "info");
+      return;
+    }
+    if (!time) {
       toast.show(a.askTime, "info");
       openPicker();
       return;
     }
 
-    const finalTitle = picked ? rawTitle : parsed?.title || rawTitle;
     // Label hamesha locale-aware formatter se — parser ka Hinglish label display
     // ke liye use nahi karte (bhasha follow karni hai).
-    const finalLabel = fmt(when);
+    const finalLabel = fmt(time);
 
     try {
       setSaving(true);
-      const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
+      const bucket = isSameDay(time, new Date()) ? "today" : "upcoming";
       const r = await addReminder({
-        title: finalTitle,
+        title: subj,
         time_label: finalLabel,
-        remind_at: when.toISOString(),
+        remind_at: time.toISOString(),
         bucket,
       });
       const allowed = await ensureNotifPermission();
       // scheduleReminder guzre hue waqt ya OS error pe false deta hai — pehle
       // toast phir bhi "Reminder set ✓" bolta tha, jo jhooth tha.
-      const scheduled = allowed && (await scheduleReminder(r.id, r.title, when));
+      const scheduled = allowed && (await scheduleReminder(r.id, r.title, time));
       toast.show(
         scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
         scheduled ? "success" : "info",
@@ -151,19 +192,53 @@ export default function AddReminder() {
           </View>
           <Text style={styles.hint}>🎤 {a.micHint}</Text>
 
-          {/* Auto-detected time (text se) */}
-          {parsed && !picked && (
+          {/* Saathi kya samajh raha hai — AI se poochte waqt */}
+          {understanding && (
+            <View style={styles.thinking}>
+              <ActivityIndicator size="small" color={colors.terracotta} />
+              <Text style={styles.thinkingText}>{a.understanding}</Text>
+            </View>
+          )}
+
+          {/* Auto-detected: subject + time (text se) */}
+          {parsed?.date && !picked && !understanding && (
             <View style={[styles.detected, styles.detectedActive]}>
               <Ionicons name="sparkles" size={18} color={colors.white} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.detLabel, { color: "rgba(255,255,255,0.8)" }]}>
                   {a.understood} ✨
                 </Text>
-                <Text style={[styles.detTime, { color: colors.white }]}>
+                {finalSubject ? (
+                  <Text style={[styles.detSubject, { color: colors.white }]}>
+                    {finalSubject}
+                  </Text>
+                ) : null}
+                <Text style={[styles.detTime, { color: "rgba(255,255,255,0.9)" }]}>
                   {fmt(parsed.date)}
                 </Text>
               </View>
               <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+            </View>
+          )}
+
+          {/* Subject samajh nahi aaya — user se poochho (text + voice) */}
+          {!understanding && missingTitle && (title.trim().length > 0 || askSubject) && (
+            <View style={styles.clarify}>
+              <Text style={styles.clarifyQ}>🤔 {a.askWhat}</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  value={subject}
+                  onChangeText={setSubject}
+                  placeholder={a.askWhatPlaceholder}
+                  placeholderTextColor={colors.inkSoft}
+                  style={styles.input}
+                  autoFocus={askSubject}
+                  multiline
+                />
+                <VoiceButton
+                  onText={(txt) => setSubject((p) => (p ? p + " " + txt : txt))}
+                />
+              </View>
             </View>
           )}
 
@@ -215,13 +290,13 @@ export default function AddReminder() {
 
       <Pressable
         onPress={save}
-        disabled={saving}
+        disabled={saving || understanding}
         style={({ pressed }) => [
           styles.save,
-          (pressed || saving) && { opacity: 0.85 },
+          (pressed || saving || understanding) && { opacity: 0.85 },
         ]}
       >
-        {saving ? (
+        {saving || understanding ? (
           <ActivityIndicator color={colors.white} />
         ) : (
           <Text style={styles.saveText}>{a.save}</Text>
@@ -289,7 +364,31 @@ const styles = StyleSheet.create({
   },
   detectedActive: { backgroundColor: colors.terracotta },
   detLabel: { fontSize: 12, fontWeight: "600", color: colors.inkSoft },
-  detTime: { fontSize: 16, fontWeight: "700", color: colors.ink, marginTop: 1 },
+  detSubject: { fontSize: 16, fontWeight: "700", color: colors.ink, marginTop: 2 },
+  detTime: { fontSize: 14, fontWeight: "600", color: colors.ink, marginTop: 1 },
+  thinking: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  thinkingText: { fontSize: 14, fontWeight: "600", color: colors.inkSoft },
+  clarify: {
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.amber,
+    backgroundColor: "rgba(224,168,86,0.10)",
+    padding: 14,
+    gap: 10,
+  },
+  clarifyQ: { fontSize: 14.5, fontWeight: "700", color: colors.ink },
   whenRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   whenChip: {
     flex: 1,

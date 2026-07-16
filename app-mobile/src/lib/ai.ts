@@ -24,6 +24,30 @@ type AskOpts = {
   locale?: string;
 };
 
+export type AiReminder = { title: string | null; remind_at: string | null };
+
+/**
+ * Reminder text ko AI se samjhao (edge "reminder" task → Claude).
+ * Best-effort: key/network na ho to `null`. Local parser jo na samajh paaye,
+ * uske gaps ye bhar deta hai; phir bhi kuch missing ho to screen user se poochti.
+ */
+export async function aiParseReminder(
+  text: string,
+  locale?: string,
+): Promise<AiReminder | null> {
+  if (!supabase || !text.trim()) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke("ai", {
+      body: { task: "reminder", text, locale, now: new Date().toISOString() },
+    });
+    if (error || !data) return null;
+    const d = data as { title?: string; remind_at?: string | null };
+    return { title: d.title?.trim() || null, remind_at: d.remind_at ?? null };
+  } catch {
+    return null;
+  }
+}
+
 /** Saathi se jawab lo. Network/config fail ho to bhi kuch na kuch lautata hai. */
 export async function askSaathi(
   message: string,

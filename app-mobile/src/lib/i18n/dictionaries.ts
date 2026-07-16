@@ -218,6 +218,9 @@ export type Dict = {
     savedNoNotif: string;
     savedNeedPerm: string;
     limitReached: string;
+    askWhat: string;
+    askWhatPlaceholder: string;
+    understanding: string;
   };
   chat: {
     online: string;
@@ -576,6 +579,9 @@ const hinglish: Dict = {
     savedNoNotif: "Save ho gaya, par notification set nahi hui",
     savedNeedPerm: "Save ho gaya (notification permission do)",
     limitReached: "Free me 5 active reminders — unlimited ke liye Saathi Plus dekhein",
+    askWhat: "Ye reminder kis cheez ke liye hai?",
+    askWhatPlaceholder: "Jaise: dawai lena, bijli bill bharna",
+    understanding: "Samajh raha hoon…",
   },
   chat: {
     online: "aapka dost · online",
@@ -934,6 +940,9 @@ const hi: Dict = {
     savedNoNotif: "सेव हो गया, पर notification सेट नहीं हुई",
     savedNeedPerm: "सेव हो गया (notification permission दें)",
     limitReached: "फ्री में 5 active रिमाइंडर — अनलिमिटेड के लिए साथी प्लस देखें",
+    askWhat: "यह रिमाइंडर किस चीज़ के लिए है?",
+    askWhatPlaceholder: "जैसे: दवाई लेना, बिजली बिल भरना",
+    understanding: "समझ रहा हूँ…",
   },
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
@@ -1291,6 +1300,9 @@ const en: Dict = {
     savedNoNotif: "Saved, but the notification wasn't set",
     savedNeedPerm: "Saved (please allow notifications)",
     limitReached: "5 active reminders on Free — Saathi Plus for unlimited",
+    askWhat: "What is this reminder for?",
+    askWhatPlaceholder: "e.g. take medicine, pay electricity bill",
+    understanding: "Understanding…",
   },
   chat: {
     online: "your friend · online",

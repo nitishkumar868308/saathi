@@ -18,8 +18,17 @@ async function notifDict() {
   return dictionaries[loc].notif;
 }
 
-/** Android channel id. Trigger me dena ZAROORI hai (neeche dekho). */
-const CHANNEL_ID = "reminders";
+/**
+ * Android channel id.
+ *
+ * ⚠️ VERSION SUFFIX zaroori hai. Android channel ki settings (sound, importance)
+ * SIRF pehli baar create hone pe lagti hain — baad me code badalne se OS use
+ * ignore kar deta hai. Purana "reminders" channel bina sound ke ban chuka tha,
+ * isliye background me sirf silent notification aati thi. Naya id ("reminders-v2")
+ * OS ko force karta hai ki sound + MAX importance ke saath naya channel bane.
+ * Aage kabhi channel settings badlo to ye number bhi badhana.
+ */
+const CHANNEL_ID = "reminders-v2";
 
 /** Document expiry se kitne din pehle yaad dilana hai. 0 = expiry wale din. */
 const EXPIRY_LEAD_DAYS = [14, 3, 0] as const;
@@ -39,10 +48,21 @@ Notifications.setNotificationHandler({
 
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
+  // Purana bina-sound wala channel hata do (warna app list me do channel dikhte).
+  try {
+    await Notifications.deleteNotificationChannelAsync("reminders");
+  } catch {
+    /* pehle se nahi hai — koi baat nahi */
+  }
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: "Reminders",
-    importance: Notifications.AndroidImportance.HIGH,
+    // MAX = heads-up banner + sound, screen band ho tab bhi.
+    importance: Notifications.AndroidImportance.MAX,
     sound: "default",
+    vibrationPattern: [0, 250, 250, 250],
+    enableVibrate: true,
+    bypassDnd: false,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
 }
 
@@ -86,7 +106,16 @@ async function schedule(
       identifier: id,
       // sound iOS pe content se aata hai; Android pe channel se. Dono set.
       // data.kind + data.body se app ka full-screen alert modal bharta hai.
-      content: { title, body, sound: "default", data: { kind, body, title } },
+      content: {
+        title,
+        body,
+        sound: "default",
+        // Heads-up banner (Android) + screen band hone pe bhi turant (iOS).
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        interruptionLevel: "timeSensitive",
+        vibrate: [0, 250, 250, 250],
+        data: { kind, body, title },
+      },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
         date: when,

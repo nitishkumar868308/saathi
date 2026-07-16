@@ -1,7 +1,50 @@
-// Reminder text se time samajhta hai (bina AI, rules se).
+// Reminder text se time AUR subject (title) samajhta hai (bina AI, rules se).
 // "1 minute baad", "2 ghante baad", "kal subah", "aaj raat", "8 baje", "parso"...
+//
+// Naya behaviour: ye ab kabhi poori tarah fail nahi hota — jo samajh aaya wahi
+// lauta deta hai. `date` null = time samajh nahi aaya; `title` "" = subject
+// samajh nahi aaya. Screen inhi dono ke aadhaar pe user se wapas poochta hai.
 
-export type ParsedTime = { date: Date; label: string; title: string };
+export type ParsedTime = {
+  /** null = koi time samajh nahi aaya (user se poochho). */
+  date: Date | null;
+  /** Reminder kis cheez ke liye. "" = samajh nahi aaya (user se poochho). */
+  title: string;
+  /** Jo time-phrase match hui (title cleanup ke liye). */
+  matched: string | null;
+};
+
+/** Kya-kya samajh nahi aaya. Screen isse decide karti hai ki kya poochhna hai. */
+export function reminderNeeds(p: ParsedTime | null): {
+  needsTime: boolean;
+  needsTitle: boolean;
+} {
+  return { needsTime: !p?.date, needsTitle: !p?.title?.trim() };
+}
+
+// Sirf time/filler shabd — inhe title se hata dete hain. Action words (lena,
+// banana, call, dawai...) NAHI hatate, warna subject hi gayab ho jaata.
+const FILLER =
+  /\b(mujhe|muje|please|plz|pls|yaad|dila|dilado|dilana|dilaana|rakhna|reminder|remind|set|kardo|karke|laga|lagado|lagana|ka|ki|ke|ko|liye|par|pe|mein|me|baad|wala|hai|ho|krna|karna|karo|kro|a|an|the|to|for|of|at|on)\b/gi;
+
+/** Title se time-phrase + filler hatao. Kuch bacha to subject, warna "". */
+function cleanTitle(text: string, matched: string | null): string {
+  let title = text;
+  if (matched) {
+    const esc = matched.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    title = title.replace(new RegExp(esc, "i"), " ");
+  }
+  // Din/samay ke akele shabd bhi hatao (jo matched me nahi aaye).
+  title = title
+    .replace(
+      /\b(aaj|aj|kal|cal|parso|subah|morning|shaam|sham|evening|raat|night|dopahar|afternoon|baje|bje|am|pm)\b/gi,
+      " ",
+    )
+    .replace(FILLER, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return title;
+}
 
 function sameDay(a: Date, b: Date): boolean {
   return (
@@ -46,13 +89,13 @@ export function parseReminderTime(
   if (!text) return null;
   const t = text.toLowerCase();
 
-  let found: { date: Date; label: string; matched: string } | null = null;
+  let found: { date: Date; matched: string } | null = null;
 
   // X minute baad ("minut"/"minit" jaisi common spellings bhi)
   const min = t.match(/(\d+)\s*(minutes?|mins?|min[aui]t|मिनट)/);
   if (min) {
     const n = +min[1];
-    found = { date: new Date(now.getTime() + n * 60000), label: `${n} minute baad`, matched: min[0] };
+    found = { date: new Date(now.getTime() + n * 60000), matched: min[0] };
   }
 
   // X ghante baad
@@ -60,7 +103,7 @@ export function parseReminderTime(
     const hr = t.match(/(\d+)\s*(ghante|ghanta|hour|hours|hr|hrs|घंटे|घंटा)/);
     if (hr) {
       const n = +hr[1];
-      found = { date: new Date(now.getTime() + n * 3600000), label: `${n} ghante baad`, matched: hr[0] };
+      found = { date: new Date(now.getTime() + n * 3600000), matched: hr[0] };
     }
   }
 
@@ -72,7 +115,7 @@ export function parseReminderTime(
       const d = new Date(now);
       d.setDate(d.getDate() + n);
       d.setHours(9, 0, 0, 0);
-      found = { date: d, label: `${n} din baad`, matched: dy[0] };
+      found = { date: d, matched: dy[0] };
     }
   }
 
@@ -86,7 +129,7 @@ export function parseReminderTime(
     );
     if (bj) {
       let hour = +bj[2];
-      const min = bj[3] ? Math.min(59, +bj[3]) : 0;
+      const mn = bj[3] ? Math.min(59, +bj[3]) : 0;
       const part = bj[1] || "";
       const ap = bj[4];
       if (ap === "pm" && hour < 12) hour += 12;
@@ -96,45 +139,32 @@ export function parseReminderTime(
       if (/raat|night/.test(part) && hour < 12) hour += 12;
       if (/dopahar|afternoon/.test(part) && hour < 12) hour += 12;
       const d = new Date(now);
-      d.setHours(hour, min, 0, 0);
+      d.setHours(hour, mn, 0, 0);
       if (/\bkal\b|\bcal\b/.test(t)) d.setDate(d.getDate() + 1);
       else if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
-      const hr12 = hour % 12 === 0 ? 12 : hour % 12;
-      const ampm = hour < 12 ? "AM" : "PM";
-      const mm = String(min).padStart(2, "0");
-      found = { date: d, label: `${hr12}:${mm} ${ampm}`, matched: bj[0] };
+      found = { date: d, matched: bj[0] };
     }
   }
 
   // kal subah/shaam/raat, parso, aaj shaam/raat
   if (!found) {
-    const day = (add: number, h: number, label: string, matched: string) => {
+    const day = (add: number, h: number, matched: string) => {
       const d = new Date(now);
       d.setDate(d.getDate() + add);
       d.setHours(h, 0, 0, 0);
       if (add === 0 && d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
-      return { date: d, label, matched };
+      return { date: d, matched };
     };
-    if (/kal\s*(subah|morning)/.test(t)) found = day(1, 8, "Kal subah 8 baje", "kal subah");
-    else if (/kal\s*(shaam|sham|evening)/.test(t)) found = day(1, 18, "Kal shaam 6 baje", "kal shaam");
-    else if (/kal\s*(raat|night)/.test(t)) found = day(1, 21, "Kal raat 9 baje", "kal raat");
-    else if (/parso/.test(t)) found = day(2, 9, "Parso", "parso");
-    else if (/aaj\s*(raat|night)/.test(t)) found = day(0, 21, "Aaj raat 9 baje", "aaj raat");
-    else if (/aaj\s*(shaam|sham|evening)/.test(t)) found = day(0, 18, "Aaj shaam 6 baje", "aaj shaam");
-    else if (/\bkal\b/.test(t)) found = day(1, 9, "Kal subah", "kal");
+    if (/kal\s*(subah|morning)/.test(t)) found = day(1, 8, "kal subah");
+    else if (/kal\s*(shaam|sham|evening)/.test(t)) found = day(1, 18, "kal shaam");
+    else if (/kal\s*(raat|night)/.test(t)) found = day(1, 21, "kal raat");
+    else if (/parso/.test(t)) found = day(2, 9, "parso");
+    else if (/aaj\s*(raat|night)/.test(t)) found = day(0, 21, "aaj raat");
+    else if (/aaj\s*(shaam|sham|evening)/.test(t)) found = day(0, 18, "aaj shaam");
+    else if (/\bkal\b|\bcal\b/.test(t)) found = day(1, 9, "kal");
   }
 
-  if (!found) return null;
-
-  // title se time-phrase aur filler words hatao
-  let title = text;
-  const esc = found.matched.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  title = title.replace(new RegExp(esc, "i"), " ");
-  title = title
-    .replace(/\b(baad|mein|me|ko|par|pe|yaad\s*dila\s*do|yaad\s*dilana|reminder|remind)\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!title) title = text;
-
-  return { date: found.date, label: found.label, title };
+  // Time na mila to bhi title nikaalte hain — screen user se time poochh legi.
+  const title = cleanTitle(text, found?.matched ?? null);
+  return { date: found?.date ?? null, title, matched: found?.matched ?? null };
 }
