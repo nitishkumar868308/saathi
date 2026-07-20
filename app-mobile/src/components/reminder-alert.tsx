@@ -22,8 +22,9 @@ function fromNotification(n: Notifications.Notification): Alert {
 /**
  * Reminder/expiry ka full-screen alert — screen ke beech me ek zaroori message
  * ki tarah (spec #5). Sirf notification tray me chup-chaap nahi rehta:
- *   - App khula ho aur notification aaye  -> turant modal.
- *   - Notification pe tap karke aaye      -> modal.
+ *   - App khula ho aur notification aaye        -> turant modal.
+ *   - Notification pe tap (app pehle se chalu)   -> modal.
+ *   - App poori tarah band tha, tap se khula     -> modal (cold-start).
  * Root me mount hai (_layout), isliye kisi bhi screen pe kaam karta hai.
  */
 export function ReminderAlertHost() {
@@ -31,20 +32,28 @@ export function ReminderAlertHost() {
   const [alert, setAlert] = useState<Alert | null>(null);
   const scale = useRef(new Animated.Value(0.9)).current;
 
+  // ⚠️ Cold-start: app killed tha aur user notification tap karke laaya. Response
+  // listener ye case miss karta hai (wo app chalu hone se pehle fire ho chuka
+  // hota hai). useLastNotificationResponse() us aakhri response ko pakadta hai.
+  const lastResponse = Notifications.useLastNotificationResponse();
+  const handledId = useRef<string | null>(null);
+
   useEffect(() => {
-    // App khula hai aur notification fire hui
-    const recv = Notifications.addNotificationReceivedListener((n) =>
-      setAlert(fromNotification(n)),
+    // Sirf foreground me aayi notification (tap warm/cold dono neeche hook se).
+    const recv = Notifications.addNotificationReceivedListener((notif) =>
+      setAlert(fromNotification(notif)),
     );
-    // Notification pe tap (background se aaya, app pehle se chal raha tha)
-    const resp = Notifications.addNotificationResponseReceivedListener((r) =>
-      setAlert(fromNotification(r.notification)),
-    );
-    return () => {
-      recv.remove();
-      resp.remove();
-    };
+    return () => recv.remove();
   }, []);
+
+  useEffect(() => {
+    if (!lastResponse) return;
+    // Same response dobara process na ho (dismiss ke baad bhi hook wahi rakhta hai).
+    const id = lastResponse.notification.request.identifier;
+    if (handledId.current === id) return;
+    handledId.current = id;
+    setAlert(fromNotification(lastResponse.notification));
+  }, [lastResponse]);
 
   useEffect(() => {
     if (!alert) return;

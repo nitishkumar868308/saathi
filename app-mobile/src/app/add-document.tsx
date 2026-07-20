@@ -145,7 +145,7 @@ export default function AddDocument() {
         if (notifOk) await scheduleDocumentExpiry(doc.id, doc.name, doc.expiry);
       }
 
-      // Referral reward unlock ho sakta hai (document + chat dono hone pe).
+      // Referral reward unlock ho sakta hai (document + reminder dono hone pe).
       checkReferralQualification().catch(() => {});
       toast.show(notifOk ? d.added : d.addedNoNotif, notifOk ? "success" : "info");
       router.back();

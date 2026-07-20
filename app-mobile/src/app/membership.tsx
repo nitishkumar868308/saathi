@@ -141,7 +141,7 @@ export default function Membership() {
             <Row icon="person-add" label={m.referredByCode} value={data.referred_by_code} />
           )}
           {data.referral_days_earned > 0 && (
-            <Row icon="gift" label={m.referralEarned} value={`${data.referral_days_earned} din`} />
+            <Row icon="gift" label={m.referralEarned} value={tpl(m.daysTpl, { n: data.referral_days_earned })} />
           )}
 
           {data.referrals_enabled && (
@@ -228,7 +228,7 @@ function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
   const who = r.name?.trim() || r.email || "—";
 
   const detail = done
-    ? `${fmt(r.rewarded_at)} · +${r.days} din`
+    ? `${fmt(r.rewarded_at)} · +${tpl(m.daysTpl, { n: r.days })}`
     : `${fmt(r.joined_at)} · ${m.pending}`;
 
   return (

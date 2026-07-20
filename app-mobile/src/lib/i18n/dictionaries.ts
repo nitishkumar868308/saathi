@@ -283,6 +283,8 @@ export type Dict = {
     joined: string;
     referredByCode: string;
     referralEarned: string;
+    /** {n} din/days — days ki localized unit */
+    daysTpl: string;
     yourReferrals: string;
     invite: string;
     noReferrals: string;
@@ -655,6 +657,7 @@ const hinglish: Dict = {
     joined: "Saathi se jude",
     referredByCode: "Kis code se aaye",
     referralEarned: "Referral se kamaaye",
+    daysTpl: "{n} din",
     yourReferrals: "Aapke referrals",
     invite: "Invite karo",
     noReferrals: "Abhi kisi ne aapke code se join nahi kiya.",
@@ -1025,6 +1028,7 @@ const hi: Dict = {
     joined: "साथी से जुड़े",
     referredByCode: "किस कोड से आए",
     referralEarned: "रेफ़रल से कमाए",
+    daysTpl: "{n} दिन",
     yourReferrals: "आपके रेफ़रल",
     invite: "इनवाइट करें",
     noReferrals: "अभी किसी ने आपके कोड से जॉइन नहीं किया।",
@@ -1394,6 +1398,7 @@ const en: Dict = {
     joined: "Joined Saathi",
     referredByCode: "Joined with code",
     referralEarned: "Earned from referrals",
+    daysTpl: "{n} days",
     yourReferrals: "Your referrals",
     invite: "Invite",
     noReferrals: "Nobody has joined with your code yet.",

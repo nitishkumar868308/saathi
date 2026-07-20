@@ -13,7 +13,7 @@ import { router } from "expo-router";
 import { colors } from "@/theme/colors";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
-import { getPlan, markProfilePlus, type PlanId } from "@/lib/plan";
+import { getPlan, markProfilePlus, enforcePlanLimits, type PlanId } from "@/lib/plan";
 import {
   purchasesAvailable,
   initPurchases,
@@ -109,6 +109,9 @@ export default function Upgrade() {
       if (result.active) {
         // Asli expiry bhejo — warna plan "hamesha" jaisa reh jaata hai.
         await markProfilePlus(result.expiresAt);
+        // Plus wapas lete hi pehle se locked docs / paused reminders turant
+        // unlock/unpause ho jaayein (warna agle session tak locked rehte the).
+        await enforcePlanLimits();
         await refresh();
         toast.show(u.activated, "success");
       } else {

@@ -73,18 +73,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * chalti hai (sirf signup pe nahi), taaki referral qualify hote hi grant ho.
    */
   const runRewards = useCallback(async (force = false) => {
-    if (!supabase) return;
-    const { data } = await supabase.auth.getUser();
-    const uid = data.user?.id;
-    if (!uid || running.current) return;
-    if (!force && doneFor.current === uid) return;
-
+    // ⚠️ Guard pehle set karo, kisi bhi await se pehle. Cold-start pe ye do baar
+    // call hoti hai (getSession + INITIAL_SESSION); pehle guard `await getUser()`
+    // ke baad tha, isliye dono call pass ho jaati thi aur referral do baar apply
+    // ho sakta tha. Ab synchronous check-and-set race-safe hai.
+    if (!supabase || running.current) return;
     running.current = true;
     try {
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (!uid) return;
+      if (!force && doneFor.current === uid) return;
+
       // Signup pe diya gaya referral code ab apply karo (ek hi baar).
       const pending = await takePendingReferral();
       if (pending) await applyReferralCode(pending).catch(() => "error");
-      // Referral reward — document + chat dono ho chuke hon to grant ho jaye.
+      // Referral reward — document + reminder dono ho chuke hon to grant ho jaye.
       // (Launch offer hata diya gaya — ab koi first-N claim nahi.)
       await checkReferralQualification().catch(() => "error");
       // Plan ke hisaab se access sync — Plus expire hua to extra reminders

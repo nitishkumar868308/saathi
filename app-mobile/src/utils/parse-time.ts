@@ -136,11 +136,18 @@ export function parseReminderTime(
       if (ap === "am" && hour === 12) hour = 0;
       if (/subah|morning/.test(part) && hour === 12) hour = 0;
       if (/shaam|sham|evening/.test(part) && hour < 12) hour += 12;
-      if (/raat|night/.test(part) && hour < 12) hour += 12;
+      // "raat 12 baje" = aadhi raat (0), "raat 9 baje" = 21.
+      if (/raat|night/.test(part)) {
+        if (hour === 12) hour = 0;
+        else if (hour < 12) hour += 12;
+      }
       if (/dopahar|afternoon/.test(part) && hour < 12) hour += 12;
       const d = new Date(now);
       d.setHours(hour, mn, 0, 0);
-      if (/\bkal\b|\bcal\b/.test(t)) d.setDate(d.getDate() + 1);
+      // "parso 6 baje" = +2 din, "kal 6 baje" = +1. Time branch pehle match hota
+      // hai isliye din yahin adjust karo, warna parso/kal miss ho jaata.
+      if (/parso/.test(t)) d.setDate(d.getDate() + 2);
+      else if (/\bkal\b|\bcal\b/.test(t)) d.setDate(d.getDate() + 1);
       else if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
       found = { date: d, matched: bj[0] };
     }
