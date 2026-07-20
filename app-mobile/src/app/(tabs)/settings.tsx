@@ -9,6 +9,7 @@ import {
   Linking,
   Modal,
   Image,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,10 +27,12 @@ import { useOffers } from "@/lib/use-offers";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
+import { openBatteryOptimizationSettings } from "@/lib/reliability";
 
 type RowId =
   | "saathi_name"
   | "notifications"
+  | "reminders_reliable"
   | "language"
   | "privacy"
   | "export"
@@ -46,6 +49,7 @@ export default function Settings() {
   const t = useT();
   const { locale, setLocale } = useLocale();
   const s = t.settings;
+  const rel = t.reliability;
   const meta = session?.user?.user_metadata;
   const name = meta?.full_name || meta?.name || s.account;
   const [isPlus, setIsPlus] = useState(false);
@@ -59,6 +63,16 @@ export default function Settings() {
       rows: [
         { id: "saathi_name", icon: "happy-outline", label: s.saathiName },
         { id: "notifications", icon: "notifications-outline", label: s.notifications },
+        // Sirf Android — battery optimization se reminders reliable banane ke liye.
+        ...(Platform.OS === "android"
+          ? [
+              {
+                id: "reminders_reliable" as RowId,
+                icon: "battery-charging-outline",
+                label: rel.settingsRow,
+              },
+            ]
+          : []),
         {
           id: "language",
           icon: "language-outline",
@@ -153,6 +167,9 @@ export default function Settings() {
         Linking.openSettings().catch(() =>
           toast.show(s.settingsFailed, "error"),
         );
+        return;
+      case "reminders_reliable":
+        openBatteryOptimizationSettings();
         return;
       case "language":
         setLangOpen(true);

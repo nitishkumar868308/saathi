@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +24,11 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { parseReminderTime, reminderNeeds, formatWhen } from "@/utils/parse-time";
 import { aiParseReminder } from "@/lib/ai";
+import {
+  openBatteryOptimizationSettings,
+  batteryPromptShown,
+  markBatteryPromptShown,
+} from "@/lib/reliability";
 import { VoiceButton } from "@/components/voice-button";
 import { useToast } from "@/components/toast";
 
@@ -37,7 +43,7 @@ function isSameDay(a: Date, b: Date) {
 export default function AddReminder() {
   const router = useRouter();
   const toast = useToast();
-  const { addReminder: a, common: c } = useT();
+  const { addReminder: a, common: c, reliability: rel } = useT();
   const { locale } = useLocale();
   const words = { today: c.today, tomorrow: c.tomorrow };
   const fmt = (d: Date) => formatWhen(d, words, locale);
@@ -151,6 +157,22 @@ export default function AddReminder() {
         scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
         scheduled ? "success" : "info",
       );
+      // Pehli baar reminder set hone pe: battery optimization ka ek-time prompt,
+      // taaki app band hone pe bhi reminder + sound reliably aaye (India phones).
+      if (scheduled && Platform.OS === "android" && !(await batteryPromptShown())) {
+        await markBatteryPromptShown();
+        Alert.alert(rel.promptTitle, rel.promptBody, [
+          { text: rel.promptLater, style: "cancel", onPress: () => router.back() },
+          {
+            text: rel.promptButton,
+            onPress: () => {
+              openBatteryOptimizationSettings();
+              router.back();
+            },
+          },
+        ]);
+        return;
+      }
       router.back();
     } catch (e) {
       if (e instanceof ReminderLimitError) {

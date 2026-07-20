@@ -78,6 +78,14 @@ export type Dict = {
     searchPlaceholder: string;
     close: string;
   };
+  reliability: {
+    promptTitle: string;
+    promptBody: string;
+    promptButton: string;
+    promptLater: string;
+    settingsRow: string;
+    settingsRowSub: string;
+  };
   login: {
     welcomeBack: string;
     loginSub: string;
@@ -446,6 +454,15 @@ const hinglish: Dict = {
     searchPlaceholder: "Country ya code search karo",
     close: "Band karo",
   },
+  reliability: {
+    promptTitle: "Reminder time pe aaye — ek chhota step",
+    promptBody:
+      "Kai phone (Xiaomi, Realme, Oppo, Vivo, Samsung) app band hone pe reminders rok dete hain. Battery settings me Saathi ko \"Unrestricted\" kar do — phir app band ho tab bhi reminder + sound aayega.",
+    promptButton: "Battery settings kholo",
+    promptLater: "Baad me",
+    settingsRow: "Reminders reliable banao",
+    settingsRowSub: "Battery optimization off — app band ho tab bhi reminder aaye",
+  },
   login: {
     welcomeBack: "Wapas aa gaye",
     loginSub: "Login karo aur apni life sambhalo",
@@ -808,6 +825,15 @@ const hi: Dict = {
     searchPlaceholder: "देश या कोड search करें",
     close: "बंद करें",
   },
+  reliability: {
+    promptTitle: "रिमाइंडर समय पर आए — एक छोटा स्टेप",
+    promptBody:
+      "कई फ़ोन (Xiaomi, Realme, Oppo, Vivo, Samsung) ऐप बंद होने पर reminders रोक देते हैं। बैटरी सेटिंग्स में साथी को \"Unrestricted\" कर दें — फिर ऐप बंद हो तब भी reminder + आवाज़ आएगी।",
+    promptButton: "बैटरी सेटिंग्स खोलें",
+    promptLater: "बाद में",
+    settingsRow: "रिमाइंडर भरोसेमंद बनाएँ",
+    settingsRowSub: "बैटरी ऑप्टिमाइज़ेशन ऑफ़ — ऐप बंद हो तब भी reminder आए",
+  },
   login: {
     welcomeBack: "वापस आ गए",
     loginSub: "लॉगिन करें और अपनी ज़िंदगी सँभालें",
@@ -1168,6 +1194,15 @@ const en: Dict = {
     placeholder: "Phone number",
     searchPlaceholder: "Search country or code",
     close: "Close",
+  },
+  reliability: {
+    promptTitle: "Get reminders on time — one quick step",
+    promptBody:
+      "Many phones (Xiaomi, Realme, Oppo, Vivo, Samsung) stop reminders when the app is closed. Set Saathi to \"Unrestricted\" in battery settings — then reminders and sound arrive even when the app is closed.",
+    promptButton: "Open battery settings",
+    promptLater: "Later",
+    settingsRow: "Make reminders reliable",
+    settingsRowSub: "Turn off battery optimization so reminders fire even when closed",
   },
   login: {
     welcomeBack: "Welcome back",
