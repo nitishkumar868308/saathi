@@ -284,6 +284,11 @@ export type Dict = {
     /** {price} */
     payBtn: string;
     payNote: string;
+    /** {ip} {profile} */
+    mismatchTitle: string;
+    mismatchBody: string;
+    mismatchUseIp: string;
+    mismatchUseProfile: string;
     freeName: string;
     freePrice: string;
     /** {d} */
@@ -689,8 +694,12 @@ const hinglish: Dict = {
     planName: "Saathi Plus",
     perMonth: "/mahina",
     perYear: "/saal",
-    payBtn: "₹{price} — Securely pay",
+    payBtn: "{price} — Securely pay",
     payNote: "Google Play se secure · UPI, card, netbanking",
+    mismatchTitle: "Aapka desh confirm karo",
+    mismatchBody: "Aap abhi {ip} me lag rahe ho, par aapka profile {profile} ka hai. Kaunse desh ka price dikhaayein?",
+    mismatchUseIp: "{ip} ka price",
+    mismatchUseProfile: "{profile} ka price",
     freeName: "Free",
     freePrice: "₹0 / hamesha",
     referTitle: "Ya {d} din ka Plus plan FREE kamao",
@@ -1093,8 +1102,12 @@ const hi: Dict = {
     planName: "साथी प्लस",
     perMonth: "/महीना",
     perYear: "/साल",
-    payBtn: "₹{price} — सुरक्षित pay करें",
+    payBtn: "{price} — सुरक्षित pay करें",
     payNote: "Google Play से सुरक्षित · UPI, card, netbanking",
+    mismatchTitle: "अपना देश कन्फ़र्म करें",
+    mismatchBody: "आप अभी {ip} में दिख रहे हैं, पर आपकी प्रोफ़ाइल {profile} की है। किस देश का प्राइस दिखाएँ?",
+    mismatchUseIp: "{ip} का प्राइस",
+    mismatchUseProfile: "{profile} का प्राइस",
     freeName: "फ्री",
     freePrice: "₹0 / हमेशा",
     referTitle: "या {d} दिन का प्लस प्लान FREE कमाएँ",
@@ -1496,8 +1509,12 @@ const en: Dict = {
     planName: "Saathi Plus",
     perMonth: "/month",
     perYear: "/year",
-    payBtn: "₹{price} — Pay securely",
+    payBtn: "{price} — Pay securely",
     payNote: "Secure via Google Play · UPI, card, netbanking",
+    mismatchTitle: "Confirm your country",
+    mismatchBody: "You appear to be in {ip}, but your profile is set to {profile}. Which country's price should we show?",
+    mismatchUseIp: "{ip} price",
+    mismatchUseProfile: "{profile} price",
     freeName: "Free",
     freePrice: "₹0 / forever",
     referTitle: "Or earn {d} days of the Plus plan FREE",

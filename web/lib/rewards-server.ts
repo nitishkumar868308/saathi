@@ -252,6 +252,73 @@ export async function getReviews(limit = 500): Promise<AdminReview[]> {
   });
 }
 
+/* --------------------------- country pricing --------------------------- */
+
+export type CountryPricingRow = {
+  country_code: string;
+  country_name: string;
+  currency: string;
+  symbol: string;
+  conversion_rate: number;
+  multiplier: number;
+  enabled: boolean;
+};
+
+/** Saari country pricing rows (admin). */
+export async function getCountryPricing(): Promise<CountryPricingRow[]> {
+  assertConfigured();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/country_pricing?select=country_code,country_name,currency,symbol,conversion_rate,multiplier,enabled&order=country_name.asc`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) await fail("pricing read (supabase/country-pricing.sql run kiya?)", res);
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    country_code: String(r.country_code),
+    country_name: String(r.country_name),
+    currency: String(r.currency),
+    symbol: String(r.symbol),
+    conversion_rate: Number(r.conversion_rate ?? 1),
+    multiplier: Number(r.multiplier ?? 1),
+    enabled: Boolean(r.enabled),
+  }));
+}
+
+/** Rows upsert (country_code pe merge). */
+export async function upsertCountryPricing(rows: CountryPricingRow[]): Promise<void> {
+  assertConfigured();
+  if (!rows.length) return;
+  const payload = rows.map((r) => ({
+    country_code: r.country_code.toUpperCase(),
+    country_name: r.country_name,
+    currency: r.currency,
+    symbol: r.symbol,
+    conversion_rate: r.conversion_rate,
+    multiplier: r.multiplier,
+    enabled: r.enabled,
+    updated_at: new Date().toISOString(),
+  }));
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/country_pricing?on_conflict=country_code`, {
+    method: "POST",
+    headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (!res.ok) await fail("pricing write", res);
+}
+
+/** Ek country hatao (India ke alawa). */
+export async function deleteCountryPricing(code: string): Promise<void> {
+  assertConfigured();
+  const c = code.toUpperCase();
+  if (c === "IN") throw new Error("India base row nahi hataya jaa sakta");
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/country_pricing?country_code=eq.${c}`,
+    { method: "DELETE", headers: headers({ Prefer: "return=minimal" }), cache: "no-store" },
+  );
+  if (!res.ok) await fail("pricing delete", res);
+}
+
 /* ------------------------------- usage ------------------------------- */
 
 export type UsageRow = {

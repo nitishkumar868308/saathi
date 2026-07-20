@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +23,12 @@ import {
 } from "@/lib/purchases";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { useOffers } from "@/lib/use-offers";
+import {
+  detectCountry,
+  getPricingRow,
+  localAmount,
+  type LocalPricing,
+} from "@/lib/pricing";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
@@ -35,6 +42,41 @@ export default function Upgrade() {
   const [isPlus, setIsPlus] = useState(false);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+
+  // Country-wise pricing (#11): IP se country → local price. Profile se mismatch
+  // ho to ek baar modal poochhta hai kaunse desh ka price dikhaayein.
+  const [pricing, setPricing] = useState<LocalPricing | null>(null);
+  const [ipCode, setIpCode] = useState<string | null>(null);
+  const [profileCode, setProfileCode] = useState<string | null>(null);
+  const [showMismatch, setShowMismatch] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const [ip, details] = await Promise.all([
+        detectCountry(),
+        getUserDetails().catch(() => null),
+      ]);
+      if (!alive) return;
+      const prof = details?.phone_country?.toUpperCase() || null;
+      setIpCode(ip);
+      setProfileCode(prof);
+      const useCode = ip || prof || "IN";
+      const row = await getPricingRow(useCode);
+      if (!alive) return;
+      setPricing(row);
+      if (ip && prof && ip !== prof) setShowMismatch(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function chooseCountry(code: string) {
+    setShowMismatch(false);
+    const row = await getPricingRow(code);
+    setPricing(row);
+  }
 
   async function refresh() {
     try {
@@ -58,6 +100,9 @@ export default function Upgrade() {
   // Price aur Free limits admin se (app_config) aate hain.
   const base = yearly ? offers.plusPriceYearly : offers.plusPriceMonthly;
   const period = yearly ? u.perYear : u.perMonth;
+  // Country-wise local price (base × multiplier × conversion). Row na ho to ₹base.
+  const sym = pricing?.symbol ?? "₹";
+  const priceLabel = `${sym}${localAmount(base, pricing).toLocaleString("en-IN")}`;
 
   const FREE_FEATURES = u.freeFeatures.map((f) =>
     tpl(f, { rem: offers.freeReminders, docs: offers.freeDocuments }),
@@ -174,7 +219,7 @@ export default function Upgrade() {
             <View style={styles.plusCard}>
               <Text style={styles.plusName}>{u.planName}</Text>
               <View style={styles.priceRow}>
-                <Text style={styles.price}>₹{base}</Text>
+                <Text style={styles.price}>{priceLabel}</Text>
                 <Text style={styles.period}>{period}</Text>
               </View>
               {/* GST abhi off: <Text style={styles.gst}>+ 18% GST · Total ₹{total}{period}</Text> */}
@@ -204,7 +249,7 @@ export default function Upgrade() {
                 ) : (
                   <>
                     <Ionicons name="lock-closed" size={16} color={colors.white} />
-                    <Text style={styles.payText}>{tpl(u.payBtn, { price: base })}</Text>
+                    <Text style={styles.payText}>{tpl(u.payBtn, { price: priceLabel })}</Text>
                   </>
                 )}
               </Pressable>
@@ -252,6 +297,35 @@ export default function Upgrade() {
           </>
         )}
       </ScrollView>
+
+      {/* IP-country vs profile-country mismatch — kaunse desh ka price? */}
+      <Modal transparent visible={showMismatch} animationType="fade" onRequestClose={() => setShowMismatch(false)}>
+        <View style={styles.mmBackdrop}>
+          <View style={styles.mmCard}>
+            <View style={styles.mmIcon}>
+              <Ionicons name="globe-outline" size={26} color={colors.white} />
+            </View>
+            <Text style={styles.mmTitle}>{u.mismatchTitle}</Text>
+            <Text style={styles.mmBody}>
+              {tpl(u.mismatchBody, { ip: ipCode ?? "", profile: profileCode ?? "" })}
+            </Text>
+            <Pressable
+              onPress={() => chooseCountry(ipCode ?? "IN")}
+              style={({ pressed }) => [styles.mmBtn, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.mmBtnText}>{tpl(u.mismatchUseIp, { ip: ipCode ?? "" })}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => chooseCountry(profileCode ?? "IN")}
+              style={({ pressed }) => [styles.mmBtnAlt, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.mmBtnAltText}>
+                {tpl(u.mismatchUseProfile, { profile: profileCode ?? "" })}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -392,4 +466,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     lineHeight: 22,
   },
+  mmBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(46,40,35,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 26,
+  },
+  mmCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 26,
+    backgroundColor: colors.surface,
+    padding: 24,
+    alignItems: "center",
+  },
+  mmIcon: {
+    height: 58,
+    width: 58,
+    borderRadius: 20,
+    backgroundColor: colors.terracotta,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mmTitle: {
+    marginTop: 14,
+    fontSize: 19,
+    fontWeight: "800",
+    color: colors.ink,
+    textAlign: "center",
+  },
+  mmBody: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.inkSoft,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  mmBtn: {
+    marginTop: 18,
+    alignSelf: "stretch",
+    alignItems: "center",
+    height: 50,
+    justifyContent: "center",
+    borderRadius: 15,
+    backgroundColor: colors.terracotta,
+  },
+  mmBtnText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  mmBtnAlt: {
+    marginTop: 10,
+    alignSelf: "stretch",
+    alignItems: "center",
+    height: 50,
+    justifyContent: "center",
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  mmBtnAltText: { color: colors.ink, fontWeight: "700", fontSize: 15 },
 });

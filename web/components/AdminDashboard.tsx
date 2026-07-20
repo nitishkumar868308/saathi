@@ -17,6 +17,7 @@ import {
   Users,
   Star,
   Activity,
+  Globe,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import Loader from "@/components/Loader";
@@ -24,6 +25,7 @@ import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
 import AdminReviews from "@/components/AdminReviews";
 import AdminUsage from "@/components/AdminUsage";
+import AdminPricing from "@/components/AdminPricing";
 
 type ContactEntry = {
   name: string;
@@ -33,10 +35,11 @@ type ContactEntry = {
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section = "rewards" | "users" | "usage" | "reviews" | "contacts";
+type Section = "rewards" | "pricing" | "users" | "usage" | "reviews" | "contacts";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   { key: "rewards", label: "Rewards", icon: Gift },
+  { key: "pricing", label: "Pricing", icon: Globe },
   { key: "users", label: "Users", icon: Users },
   { key: "usage", label: "Usage", icon: Activity },
   { key: "reviews", label: "Reviews", icon: Star },
@@ -47,6 +50,10 @@ const HEADING: Record<Section, { title: string; sub: string }> = {
   rewards: {
     title: "Rewards & Referrals",
     sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain.",
+  },
+  pricing: {
+    title: "Country pricing",
+    sub: "Base × multiplier × conversion rate. IP se user ko uske desh ka price + currency dikhta hai.",
   },
   users: {
     title: "Users",
@@ -399,6 +406,7 @@ function Dashboard({
 
             <div className="mt-6">
               {section === "rewards" && <AdminRewards />}
+              {section === "pricing" && <AdminPricing />}
               {section === "users" && <AdminUsers />}
               {section === "usage" && <AdminUsage />}
               {section === "reviews" && <AdminReviews />}
