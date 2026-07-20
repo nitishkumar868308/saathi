@@ -200,6 +200,10 @@ type Dict = {
     notConfigured: string;
     /** Template — {d} {link} */
     shareMessage: string;
+    /** Landing popup — reward ke 2 kaam */
+    tasksTitle: string;
+    taskDocument: string;
+    taskReminder: string;
   };
   download: {
     button: string;
@@ -583,6 +587,9 @@ const hinglish: Dict = {
     disabled: "Referral program abhi band hai. Baad me dobara dekhein.",
     notConfigured: "Referral abhi web pe set nahi hai. Tab tak app se share karo.",
     shareMessage: "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din ka Saathi Plus plan FREE:\n{link}",
+    tasksTitle: "Reward ke liye bas 2 chhote kaam",
+    taskDocument: "Ek document upload karo",
+    taskReminder: "Ek reminder set karo",
   },
   download: {
     button: "Play Store se download karo",
@@ -966,6 +973,9 @@ const hi: Dict = {
     disabled: "रेफ़रल प्रोग्राम अभी बंद है। बाद में दोबारा देखें।",
     notConfigured: "रेफ़रल अभी वेब पर सेट नहीं है। तब तक ऐप से शेयर करें।",
     shareMessage: "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्यूमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन का साथी प्लस प्लान फ्री:\n{link}",
+    tasksTitle: "रिवॉर्ड के लिए बस 2 छोटे काम",
+    taskDocument: "एक डॉक्युमेंट अपलोड करें",
+    taskReminder: "एक reminder सेट करें",
   },
   download: {
     button: "Play Store से डाउनलोड करें",
@@ -1349,6 +1359,9 @@ const en: Dict = {
     disabled: "The referral program is paused right now. Please check back soon.",
     notConfigured: "Referrals aren't set up on the web yet. Share from the app for now.",
     shareMessage: "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of the Saathi Plus plan free:\n{link}",
+    tasksTitle: "Just 2 quick things for the reward",
+    taskDocument: "Upload one document",
+    taskReminder: "Set one reminder",
   },
   download: {
     button: "Download on Play Store",

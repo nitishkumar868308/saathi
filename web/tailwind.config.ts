@@ -56,12 +56,27 @@ const config: Config = {
           "0%, 80%, 100%": { transform: "scale(0.5)", opacity: "0.4" },
           "40%": { transform: "scale(1)", opacity: "1" },
         },
+        "pop-in": {
+          "0%": { opacity: "0", transform: "translateY(24px) scale(0.94)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.035)" },
+        },
+        sparkle: {
+          "0%, 100%": { opacity: "0.25", transform: "scale(0.8)" },
+          "50%": { opacity: "1", transform: "scale(1.15)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.7s ease-out both",
         float: "float 6s ease-in-out infinite",
         marquee: "marquee 32s linear infinite",
         "loader-bounce": "loader-bounce 1.4s ease-in-out infinite both",
+        "pop-in": "pop-in 0.5s cubic-bezier(0.22,1,0.36,1) both",
+        "pulse-soft": "pulse-soft 2.2s ease-in-out infinite",
+        sparkle: "sparkle 2.6s ease-in-out infinite",
       },
     },
   },
