@@ -234,6 +234,8 @@ export type Dict = {
     pickDate: string;
     pickTime: string;
     pastError: string;
+    askAmPm: string;
+    otherTime: string;
   };
   chat: {
     online: string;
@@ -611,6 +613,8 @@ const hinglish: Dict = {
     pickDate: "Date chuno",
     pickTime: "Time chuno",
     pastError: "Ye time nikal chuka — aage ka time chuno",
+    askAmPm: "Subah ya shaam?",
+    otherTime: "Koi aur time",
   },
   chat: {
     online: "aapka dost · online",
@@ -987,6 +991,8 @@ const hi: Dict = {
     pickDate: "तारीख़ चुनें",
     pickTime: "समय चुनें",
     pastError: "यह समय निकल चुका — आगे का समय चुनें",
+    askAmPm: "सुबह या शाम?",
+    otherTime: "कोई और समय",
   },
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
@@ -1362,6 +1368,8 @@ const en: Dict = {
     pickDate: "Pick a date",
     pickTime: "Pick a time",
     pastError: "That time has passed — pick a future time",
+    askAmPm: "Morning or evening?",
+    otherTime: "Another time",
   },
   chat: {
     online: "your friend · online",

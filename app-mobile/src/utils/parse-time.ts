@@ -11,6 +11,13 @@ export type ReminderParse = {
   date: Date | null;
   /** Samjha hua time (minutes-of-day, 0-1439) — hasTime true ho to. */
   minutes: number | null;
+  /**
+   * Bare "N baje" jaisa time mila par AM/PM pata nahi (na subah/shaam, na am/pm).
+   * AM interpretation ke minutes-of-day (0-719). Screen do chip dikhaati hai:
+   * "N:MM AM" (= ambiguousMinutes) aur "N:MM PM" (= +720) — assume NAHI karti.
+   * minutes null rehta hai jab tak user chun na le.
+   */
+  ambiguousMinutes: number | null;
   hasDate: boolean;
   hasTime: boolean;
 };
@@ -148,11 +155,12 @@ function parseDate(t: string, now: Date): { date: Date; matched: string[] } | nu
     return { date: d, matched: ["narso"] };
   }
 
-  // kal / cal (reminder = hamesha aage, isliye +1)
-  if (/\b(kal|cal|tomorrow)\b/.test(t)) {
+  // kal / cal / kl / kaal (reminder = hamesha aage, isliye +1)
+  const kalRe = /\b(kal|cal|kl|kaal|tomorrow)\b/;
+  if (kalRe.test(t)) {
     const d = new Date(base);
     d.setDate(d.getDate() + 1);
-    return { date: d, matched: [(t.match(/\b(kal|cal|tomorrow)\b/) as RegExpMatchArray)[0]] };
+    return { date: d, matched: [(t.match(kalRe) as RegExpMatchArray)[0]] };
   }
 
   // Weekday → agla us din (aaj wahi din ho to +7)
@@ -180,8 +188,9 @@ function parseDate(t: string, now: Date): { date: Date; matched: string[] } | nu
   }
 
   // aaj / today
-  if (/\b(aaj|aj|today)\b/.test(t)) {
-    return { date: base, matched: [(t.match(/\b(aaj|aj|today)\b/) as RegExpMatchArray)[0]] };
+  const aajRe = /\b(aaj|aj|aaz|today)\b/;
+  if (aajRe.test(t)) {
+    return { date: base, matched: [(t.match(aajRe) as RegExpMatchArray)[0]] };
   }
 
   return null;
@@ -189,18 +198,34 @@ function parseDate(t: string, now: Date): { date: Date; matched: string[] } | nu
 
 /* ------------------------------- time ------------------------------- */
 
+// Common spelling variants bhi (bina AI, safe shabd). Ye "har galti" fix nahi
+// karega — sirf aam variants. Anokhi galtiyan AI hi handle kar sakta hai.
+const RE_SUBAH = "subah|suba|subha|savere|sawere|morning";
+const RE_DOPAHAR = "dopahar|dopeher|dupahar|afternoon|noon";
+const RE_SHAAM = "shaam|sham|shyam|evening";
+const RE_RAAT = "raat|raata|night";
+
 const PART_DEFAULT: [RegExp, number][] = [
-  [/\b(subah|morning)\b/, 8 * 60],
-  [/\b(dopahar|afternoon|noon)\b/, 13 * 60],
-  [/\b(shaam|sham|evening)\b/, 18 * 60],
-  [/\b(raat|night)\b/, 21 * 60],
+  [new RegExp(`\\b(${RE_SUBAH})\\b`), 8 * 60],
+  [new RegExp(`\\b(${RE_DOPAHAR})\\b`), 13 * 60],
+  [new RegExp(`\\b(${RE_SHAAM})\\b`), 18 * 60],
+  [new RegExp(`\\b(${RE_RAAT})\\b`), 21 * 60],
 ];
 
-/** Time nikaalo → minutes-of-day + matched. */
-function parseTime(t: string): { minutes: number; matched: string[] } | null {
+/**
+ * Time nikaalo. Do tarah ka result:
+ *  - minutes set → time pakka (am/pm ya subah/shaam se).
+ *  - ambiguousHour set (minutes null) → "N baje" mila par AM/PM pata nahi →
+ *    screen poochhegi, assume NAHI karte.
+ */
+function parseTime(
+  t: string,
+): { minutes: number | null; ambiguousMinutes: number | null; matched: string[] } | null {
   // "(subah)? N(:MM)? (baje|am|pm)" — marker (baje/am/pm) ya part-of-day + number.
   const bj = t.match(
-    /(subah|shaam|sham|dopahar|raat|morning|evening|night|afternoon|noon)?\s*(\d{1,2})(?::(\d{2}))?\s*(baje|bje|am|pm|o'clock|बजे)?/,
+    new RegExp(
+      `(${RE_SUBAH}|${RE_DOPAHAR}|${RE_SHAAM}|${RE_RAAT})?\\s*(\\d{1,2})(?::(\\d{2}))?\\s*(baje|bje|bajey|baja|am|a\\.m|pm|p\\.m|o'clock|बजे)?`,
+    ),
   );
   if (bj && (bj[4] || bj[1])) {
     // number-only bina marker aur bina part-of-day ko time NAHI maante (wo date
@@ -209,36 +234,35 @@ function parseTime(t: string): { minutes: number; matched: string[] } | null {
     const min = bj[3] ? Math.min(59, +bj[3]) : 0;
     const part = bj[1] || "";
     const marker = (bj[4] || "").toLowerCase();
-    // ⚠️ "baje" ek marker hai, am/pm NAHI. Sirf am/pm hi din/raat batate hain;
-    // "baje" ke saath hour ambiguous rehta hai (bare jaisa treat karo).
-    const isAm = marker === "am";
-    const isPm = marker === "pm";
+    const isAm = marker === "am" || marker === "a.m";
+    const isPm = marker === "pm" || marker === "p.m";
     if (isPm) {
       if (hour < 12) hour += 12;
     } else if (isAm) {
       if (hour === 12) hour = 0;
-    } else if (/subah|morning/.test(part)) {
+    } else if (new RegExp(RE_SUBAH).test(part)) {
       if (hour === 12) hour = 0;
-    } else if (/dopahar|afternoon|noon/.test(part)) {
+    } else if (new RegExp(RE_DOPAHAR).test(part)) {
       if (hour < 12) hour += 12;
-    } else if (/shaam|sham|evening/.test(part)) {
+    } else if (new RegExp(RE_SHAAM).test(part)) {
       if (hour < 12) hour += 12;
-    } else if (/raat|night/.test(part)) {
+    } else if (new RegExp(RE_RAAT).test(part)) {
       if (hour === 12) hour = 0;
       else if (hour < 12) hour += 12;
-    } else {
-      // Bare "N baje" (na am/pm, na subah/shaam) — 1-7 aksar shaam, 8-11 subah
-      // (India casual). User picker se badal sakta hai.
-      if (hour >= 1 && hour <= 7) hour += 12;
+    } else if (hour >= 1 && hour <= 11) {
+      // ⚠️ Bare "N baje" — AM/PM pata nahi. ASSUME MAT KARO. minutes = null,
+      // ambiguousMinutes = AM interpretation — screen "N:MM AM / N:MM PM"
+      // poochhegi. ("6:30 baje" pe :30 bhi preserve hota hai.)
+      return { minutes: null, ambiguousMinutes: hour * 60 + min, matched: [bj[0].trim()] };
     }
     if (hour > 23) hour = 23;
-    return { minutes: hour * 60 + min, matched: [bj[0].trim()] };
+    return { minutes: hour * 60 + min, ambiguousMinutes: null, matched: [bj[0].trim()] };
   }
 
   // Sirf part-of-day (bina number) → default time.
   for (const [re, mins] of PART_DEFAULT) {
     const w = re.exec(t);
-    if (w) return { minutes: mins, matched: [w[0]] };
+    if (w) return { minutes: mins, ambiguousMinutes: null, matched: [w[0]] };
   }
 
   return null;
@@ -270,7 +294,7 @@ function cleanTitle(text: string, matched: string[]): string {
   }
   title = title
     .replace(
-      /\b(aaj|aj|kal|cal|parso|narso|today|tomorrow|subah|morning|shaam|sham|evening|raat|night|dopahar|afternoon|noon|baje|bje|am|pm|agle)\b/gi,
+      /\b(aaj|aj|aaz|kal|cal|kl|kaal|parso|narso|today|tomorrow|subah|suba|subha|savere|sawere|morning|shaam|sham|shyam|evening|raat|raata|night|dopahar|dopeher|dupahar|afternoon|noon|baje|bje|bajey|baja|am|pm|agle)\b/gi,
       " ",
     )
     .replace(FILLER, " ")
@@ -298,6 +322,7 @@ export function parseReminder(input: string, now: Date = new Date()): ReminderPa
       when: rel.when,
       date: atMidnight(rel.when),
       minutes: rel.when.getHours() * 60 + rel.when.getMinutes(),
+      ambiguousMinutes: null,
       hasDate: true,
       hasTime: true,
     };
@@ -311,15 +336,16 @@ export function parseReminder(input: string, now: Date = new Date()): ReminderPa
 
   const date = dateRes?.date ?? null;
   const minutes = timeRes?.minutes ?? null;
+  const ambiguousMinutes = timeRes?.ambiguousMinutes ?? null;
   const hasDate = !!dateRes;
-  const hasTime = !!timeRes;
+  const hasTime = minutes != null; // ambiguous ko "time mil gaya" nahi maante
 
-  // 3. Combine — dono ho to poora when.
+  // 3. Combine — date + pakka time dono ho to poora when.
   let when: Date | null = null;
   if (date && minutes != null) when = combine(date, minutes);
 
   const title = cleanTitle(text, matched);
-  return { title, when, date, minutes, hasDate, hasTime };
+  return { title, when, date, minutes, ambiguousMinutes, hasDate, hasTime };
 }
 
 /** Kya-kya samajh nahi aaya — screen isse decide karti hai kya poochhna hai. */

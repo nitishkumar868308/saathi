@@ -71,6 +71,7 @@ export default function AddReminder() {
   const finalTitle = subject.trim() || parsed?.title?.trim() || "";
   const finalDate = pickedDate ?? parsed?.date ?? null;
   const finalMinutes = pickedMinutes ?? parsed?.minutes ?? null;
+  const ambiguousMinutes = pickedMinutes == null ? parsed?.ambiguousMinutes ?? null : null;
   const when =
     finalDate && finalMinutes != null ? combine(finalDate, finalMinutes) : null;
   const isPast = !!when && when.getTime() <= Date.now();
@@ -313,12 +314,34 @@ export default function AddReminder() {
                   {!missingTime && (
                     <Text style={styles.slotValue}>{timeLabel(finalMinutes!)}</Text>
                   )}
-                  <Pressable onPress={openTimePicker} style={styles.timeBtn}>
-                    <Ionicons name="time-outline" size={15} color={colors.terracotta} />
-                    <Text style={styles.timeBtnText}>
-                      {missingTime ? a.pickTime : a.change}
-                    </Text>
-                  </Pressable>
+                  {/* Bare "N baje" — AM/PM assume nahi, user se poochho */}
+                  {missingTime && ambiguousMinutes != null ? (
+                    <>
+                      <Text style={styles.slotAsk}>{a.askAmPm}</Text>
+                      <View style={styles.chips}>
+                        {[ambiguousMinutes, ambiguousMinutes + 720].map((mins) => (
+                          <Pressable
+                            key={mins}
+                            onPress={() => setPickedMinutes(mins)}
+                            style={styles.chip}
+                          >
+                            <Text style={styles.chipText}>{timeLabel(mins)}</Text>
+                          </Pressable>
+                        ))}
+                        <Pressable onPress={openTimePicker} style={styles.chip}>
+                          <Ionicons name="time-outline" size={13} color={colors.inkSoft} />
+                          <Text style={styles.chipText}>{a.otherTime}</Text>
+                        </Pressable>
+                      </View>
+                    </>
+                  ) : (
+                    <Pressable onPress={openTimePicker} style={styles.timeBtn}>
+                      <Ionicons name="time-outline" size={15} color={colors.terracotta} />
+                      <Text style={styles.timeBtnText}>
+                        {missingTime ? a.pickTime : a.change}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
 
