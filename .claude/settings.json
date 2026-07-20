@@ -132,7 +132,9 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; ['expo-sharing','expo-file-system','expo-document-picker','expo-notifications','@react-native-firebase/app','expo-image-picker'].forEach\\(k=>console.log\\(k, d[k]||'—'\\)\\);\")",
       "Bash(node -e \"const a=require\\('./app.json'\\); console.log\\('android.package=', a.expo?.android?.package\\); console.log\\('name=', a.expo?.name\\); console.log\\('scheme=', a.expo?.scheme\\)\")",
       "Bash(echo \"APP EXIT $?\")",
-      "Bash(echo \"WEB EXIT $?\")"
+      "Bash(echo \"WEB EXIT $?\")",
+      "Bash(xargs grep -l \"countries\")",
+      "Bash(rm -f web/lib/countries-data.ts)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

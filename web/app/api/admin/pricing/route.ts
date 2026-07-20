@@ -4,6 +4,7 @@ import {
   getCountryPricing,
   upsertCountryPricing,
   deleteCountryPricing,
+  getCountriesList,
   getConfig,
   setConfig,
   RewardsNotConfigured,
@@ -29,9 +30,14 @@ export async function GET() {
   const bad = guard();
   if (bad) return bad;
   try {
-    const [rows, config] = await Promise.all([getCountryPricing(), getConfig()]);
+    const [rows, config, countries] = await Promise.all([
+      getCountryPricing(),
+      getConfig(),
+      getCountriesList().catch(() => []),
+    ]);
     return NextResponse.json({
       rows,
+      countries,
       base: {
         monthly: Number(config.plus_price_monthly ?? 99),
         yearly: Number(config.plus_price_yearly ?? 999),
@@ -66,16 +72,33 @@ export async function PUT(request: Request) {
 
     if (Array.isArray(body.rows)) {
       const rows: CountryPricingRow[] = [];
+      // Saare field MANDATORY — koi khaali/invalid ho to poora save reject.
       for (const raw of body.rows as Record<string, unknown>[]) {
         const code = String(raw.country_code ?? "").toUpperCase();
-        if (!/^[A-Z]{2}$/.test(code)) continue;
+        const name = String(raw.country_name ?? "").trim();
+        const currency = String(raw.currency ?? "").trim().toUpperCase();
+        const symbol = String(raw.symbol ?? "").trim();
+        const rate = Number(raw.conversion_rate);
+        const mult = Number(raw.multiplier);
+        if (!/^[A-Z]{2,3}$/.test(code) || !name || !currency || !symbol) {
+          return NextResponse.json(
+            { error: `${code || "?"}: country, currency, symbol — sab bharo` },
+            { status: 400 },
+          );
+        }
+        if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(mult) || mult <= 0) {
+          return NextResponse.json(
+            { error: `${code}: conversion rate aur multiplier 0 se bade hone chahiye` },
+            { status: 400 },
+          );
+        }
         rows.push({
           country_code: code,
-          country_name: String(raw.country_name ?? code),
-          currency: String(raw.currency ?? "INR"),
-          symbol: String(raw.symbol ?? "₹"),
-          conversion_rate: Math.max(0, Number(raw.conversion_rate ?? 1)) || 1,
-          multiplier: Math.max(0, Number(raw.multiplier ?? 1)) || 1,
+          country_name: name,
+          currency,
+          symbol,
+          conversion_rate: rate,
+          multiplier: mult,
           enabled: Boolean(raw.enabled),
         });
       }

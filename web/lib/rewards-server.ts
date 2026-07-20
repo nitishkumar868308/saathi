@@ -307,6 +307,22 @@ export async function upsertCountryPricing(rows: CountryPricingRow[]): Promise<v
   if (!res.ok) await fail("pricing write", res);
 }
 
+export type CountryOption = { code: string; name: string };
+
+/** DB `countries` table se list (code + naam) — admin pricing picker ke liye. */
+export async function getCountriesList(): Promise<CountryOption[]> {
+  assertConfigured();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/countries?select=code,name&code=not.is.null&order=name.asc`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) await fail("countries read (locations-billing.sql run kiya?)", res);
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows
+    .map((r) => ({ code: String(r.code ?? "").toUpperCase(), name: String(r.name ?? "") }))
+    .filter((c) => /^[A-Z]{2,3}$/.test(c.code) && c.name);
+}
+
 /** Ek country hatao (India ke alawa). */
 export async function deleteCountryPricing(code: string): Promise<void> {
   assertConfigured();

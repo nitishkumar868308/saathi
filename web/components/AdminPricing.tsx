@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, AlertTriangle, Plus, Trash2, Save, Globe, Check } from "lucide-react";
-import { COUNTRIES, COUNTRY_BY_CODE } from "@/lib/countries-data";
 
 type Row = {
   country_code: string;
@@ -14,6 +13,7 @@ type Row = {
   enabled: boolean;
 };
 
+type CountryOption = { code: string; name: string };
 type Base = { monthly: number; yearly: number };
 
 function roundPrice(n: number): number {
@@ -23,6 +23,7 @@ function roundPrice(n: number): number {
 
 export default function AdminPricing() {
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [countries, setCountries] = useState<CountryOption[]>([]);
   const [base, setBase] = useState<Base>({ monthly: 99, yearly: 999 });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -34,9 +35,15 @@ export default function AdminPricing() {
     setError("");
     try {
       const res = await fetch("/api/admin/pricing", { cache: "no-store" });
-      const body = (await res.json()) as { rows?: Row[]; base?: Base; error?: string };
+      const body = (await res.json()) as {
+        rows?: Row[];
+        countries?: CountryOption[];
+        base?: Base;
+        error?: string;
+      };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setRows(body.rows ?? []);
+      setCountries(body.countries ?? []);
       if (body.base) setBase(body.base);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Pricing load nahi hui");
@@ -50,8 +57,8 @@ export default function AdminPricing() {
 
   const available = useMemo(() => {
     const have = new Set((rows ?? []).map((r) => r.country_code));
-    return COUNTRIES.filter((c) => !have.has(c.code));
-  }, [rows]);
+    return countries.filter((c) => !have.has(c.code));
+  }, [rows, countries]);
 
   function patchRow(code: string, patch: Partial<Row>) {
     setSaved(false);
@@ -60,21 +67,23 @@ export default function AdminPricing() {
     );
   }
 
+  function newRow(code: string, name: string, mult: number): Row {
+    // currency/symbol/rate admin bharega — sab mandatory.
+    return {
+      country_code: code,
+      country_name: name,
+      currency: "",
+      symbol: "",
+      conversion_rate: 0,
+      multiplier: code === "IN" ? 1 : mult,
+      enabled: true,
+    };
+  }
+
   function addCountry() {
-    const seed = COUNTRY_BY_CODE.get(addCode);
-    if (!seed || !rows) return;
-    setRows([
-      ...rows,
-      {
-        country_code: seed.code,
-        country_name: seed.name,
-        currency: seed.currency,
-        symbol: seed.symbol,
-        conversion_rate: seed.rate,
-        multiplier: 1,
-        enabled: true,
-      },
-    ]);
+    const c = countries.find((x) => x.code === addCode);
+    if (!c || !rows) return;
+    setRows([...rows, newRow(c.code, c.name, 1)]);
     setAddCode("");
     setSaved(false);
   }
@@ -83,16 +92,9 @@ export default function AdminPricing() {
     if (!rows) return;
     const mult = Math.max(0, Number(bulkMult)) || 1;
     const have = new Set(rows.map((r) => r.country_code));
-    const additions = COUNTRIES.filter((c) => !have.has(c.code)).map((c) => ({
-      country_code: c.code,
-      country_name: c.name,
-      currency: c.currency,
-      symbol: c.symbol,
-      conversion_rate: c.rate,
-      // India ke alawa sabpe bulk multiplier.
-      multiplier: c.code === "IN" ? 1 : mult,
-      enabled: true,
-    }));
+    const additions = countries
+      .filter((c) => !have.has(c.code))
+      .map((c) => newRow(c.code, c.name, mult));
     setRows([...rows, ...additions]);
     setSaved(false);
   }
@@ -115,6 +117,20 @@ export default function AdminPricing() {
 
   async function save() {
     if (!rows || saving) return;
+    // Mandatory: har row me currency, symbol, rate>0, multiplier>0.
+    const bad = rows.find(
+      (r) =>
+        !r.currency.trim() ||
+        !r.symbol.trim() ||
+        !(r.conversion_rate > 0) ||
+        !(r.multiplier > 0),
+    );
+    if (bad) {
+      setError(
+        `${bad.country_code} — currency, symbol, conversion rate aur multiplier sab bharo (0 se bade).`,
+      );
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -190,7 +206,7 @@ export default function AdminPricing() {
               <option value="">Choose…</option>
               {available.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {c.name} ({c.currency})
+                  {c.name} ({c.code})
                 </option>
               ))}
             </select>
@@ -257,6 +273,7 @@ export default function AdminPricing() {
                     <Cell
                       value={r.currency}
                       w="w-16"
+                      invalid={!r.currency.trim()}
                       onChange={(v) => patchRow(r.country_code, { currency: v.toUpperCase() })}
                     />
                   </td>
@@ -264,6 +281,7 @@ export default function AdminPricing() {
                     <Cell
                       value={r.symbol}
                       w="w-14"
+                      invalid={!r.symbol.trim()}
                       onChange={(v) => patchRow(r.country_code, { symbol: v })}
                     />
                   </td>
@@ -271,6 +289,7 @@ export default function AdminPricing() {
                     <NumCell
                       value={r.multiplier}
                       disabled={r.country_code === "IN"}
+                      invalid={!(r.multiplier > 0)}
                       onChange={(v) => patchRow(r.country_code, { multiplier: v })}
                     />
                   </td>
@@ -278,6 +297,7 @@ export default function AdminPricing() {
                     <NumCell
                       value={r.conversion_rate}
                       disabled={r.country_code === "IN"}
+                      invalid={!(r.conversion_rate > 0)}
                       onChange={(v) => patchRow(r.country_code, { conversion_rate: v })}
                     />
                   </td>
@@ -371,16 +391,20 @@ function Cell({
   value,
   onChange,
   w = "w-20",
+  invalid = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   w?: string;
+  invalid?: boolean;
 }) {
   return (
     <input
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`h-9 ${w} rounded-lg border border-line bg-cream px-2 text-sm outline-none focus:border-terracotta`}
+      className={`h-9 ${w} rounded-lg border bg-cream px-2 text-sm outline-none focus:border-terracotta ${
+        invalid ? "border-terracotta" : "border-line"
+      }`}
     />
   );
 }
@@ -389,18 +413,23 @@ function NumCell({
   value,
   onChange,
   disabled = false,
+  invalid = false,
 }: {
   value: number;
   onChange: (v: number) => void;
   disabled?: boolean;
+  invalid?: boolean;
 }) {
   return (
     <input
-      value={value}
+      value={value || ""}
       disabled={disabled}
       inputMode="decimal"
+      placeholder="0"
       onChange={(e) => onChange(Number(e.target.value) || 0)}
-      className="h-9 w-20 rounded-lg border border-line bg-cream px-2 text-sm outline-none focus:border-terracotta disabled:opacity-60"
+      className={`h-9 w-20 rounded-lg border bg-cream px-2 text-sm outline-none focus:border-terracotta disabled:opacity-60 ${
+        invalid && !disabled ? "border-terracotta" : "border-line"
+      }`}
     />
   );
 }

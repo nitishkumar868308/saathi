@@ -3,14 +3,12 @@
 import { useEffect, useState } from "react";
 import { Gift, Loader2, Save, UserPlus, SlidersHorizontal } from "lucide-react";
 
-// Launch offer (first_n_*) hata diya gaya — referral + plan limits + price.
+// Plus ka daam ab Pricing section me (country-wise). Yahan sirf referral + free limits.
 type Config = {
   referrals_enabled: boolean;
   referral_days: number;
   free_reminders: number;
   free_documents: number;
-  plus_price_monthly: number;
-  plus_price_yearly: number;
 };
 
 type Stats = {
@@ -24,8 +22,6 @@ const DEFAULTS: Config = {
   referral_days: 15,
   free_reminders: 5,
   free_documents: 3,
-  plus_price_monthly: 99,
-  plus_price_yearly: 999,
 };
 
 const label = "block text-xs font-semibold uppercase tracking-wide text-ink-soft";
@@ -139,14 +135,14 @@ export default function AdminRewards() {
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-2">
           <SlidersHorizontal size={17} className="text-terracotta" />
-          <h3 className="font-display text-lg font-semibold">Plans & Limits</h3>
+          <h3 className="font-display text-lg font-semibold">Free plan limits</h3>
         </div>
         <p className="mt-1.5 text-sm text-ink-soft">
-          Free plan ki limit aur Plus ka daam yahin se badlo — app aur web dono
-          turant utha lete hain.
+          Free plan ki limit yahin se badlo. Plus ka daam ab{" "}
+          <strong>Pricing</strong> section me (country-wise) hai.
         </p>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
             <label className={label}>Free reminders</label>
             <input
@@ -163,28 +159,6 @@ export default function AdminRewards() {
               className={input}
               value={cfg.free_documents}
               onChange={(e) => setCfg({ ...cfg, free_documents: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className={label}>Plus ₹ / mahina</label>
-            <input
-              type="number"
-              className={input}
-              value={cfg.plus_price_monthly}
-              onChange={(e) =>
-                setCfg({ ...cfg, plus_price_monthly: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div>
-            <label className={label}>Plus ₹ / saal</label>
-            <input
-              type="number"
-              className={input}
-              value={cfg.plus_price_yearly}
-              onChange={(e) =>
-                setCfg({ ...cfg, plus_price_yearly: Number(e.target.value) })
-              }
             />
           </div>
         </div>
