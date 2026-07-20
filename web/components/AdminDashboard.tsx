@@ -16,12 +16,14 @@ import {
   X,
   Users,
   Star,
+  Activity,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import Loader from "@/components/Loader";
 import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
 import AdminReviews from "@/components/AdminReviews";
+import AdminUsage from "@/components/AdminUsage";
 
 type ContactEntry = {
   name: string;
@@ -31,11 +33,12 @@ type ContactEntry = {
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section = "rewards" | "users" | "reviews" | "contacts";
+type Section = "rewards" | "users" | "usage" | "reviews" | "contacts";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   { key: "rewards", label: "Rewards", icon: Gift },
   { key: "users", label: "Users", icon: Users },
+  { key: "usage", label: "Usage", icon: Activity },
   { key: "reviews", label: "Reviews", icon: Star },
   { key: "contacts", label: "Contacts", icon: MessageSquare },
 ];
@@ -48,6 +51,10 @@ const HEADING: Record<Section, { title: string; sub: string }> = {
   users: {
     title: "Users",
     sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai.",
+  },
+  usage: {
+    title: "Usage",
+    sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi.",
   },
   reviews: {
     title: "Reviews & Ratings",
@@ -393,6 +400,7 @@ function Dashboard({
             <div className="mt-6">
               {section === "rewards" && <AdminRewards />}
               {section === "users" && <AdminUsers />}
+              {section === "usage" && <AdminUsage />}
               {section === "reviews" && <AdminReviews />}
               {section === "contacts" && <ContactsView rows={filteredContacts} />}
             </div>

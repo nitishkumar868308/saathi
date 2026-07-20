@@ -252,6 +252,44 @@ export async function getReviews(limit = 500): Promise<AdminReview[]> {
   });
 }
 
+/* ------------------------------- usage ------------------------------- */
+
+export type UsageRow = {
+  id: string;
+  email: string | null;
+  name: string | null;
+  plan: "free" | "plus";
+  joinedAt: string;
+  documents: number;
+  reminders: number;
+  messages: number;
+  lastActive: string | null;
+};
+
+/** Per-user usage (#10) — admin_usage() RPC se. */
+export async function getUsage(): Promise<UsageRow[]> {
+  assertConfigured();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_usage`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({}),
+    cache: "no-store",
+  });
+  if (!res.ok) await fail("usage read (supabase/admin-usage.sql run kiya?)", res);
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    id: String(r.id),
+    email: (r.email as string) ?? null,
+    name: (r.full_name as string) ?? null,
+    plan: (r.plan as "free" | "plus") ?? "free",
+    joinedAt: String(r.created_at),
+    documents: Number(r.documents ?? 0),
+    reminders: Number(r.reminders ?? 0),
+    messages: Number(r.messages ?? 0),
+    lastActive: (r.last_active as string) ?? null,
+  }));
+}
+
 export type RewardStats = {
   totalUsers: number;
   referralsTotal: number;
