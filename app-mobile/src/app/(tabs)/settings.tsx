@@ -35,7 +35,6 @@ type RowId =
   | "reminders_reliable"
   | "language"
   | "privacy"
-  | "export"
   | "delete_all"
   | "help"
   | "about";
@@ -84,7 +83,6 @@ export default function Settings() {
       title: s.groupPrivacy,
       rows: [
         { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
-        { id: "export", icon: "download-outline", label: s.exportData },
         { id: "delete_all", icon: "trash-outline", label: s.deleteAll, tint: "#B23B3B" },
       ],
     },
@@ -156,12 +154,8 @@ export default function Settings() {
   function handleRow(id: RowId) {
     switch (id) {
       case "saathi_name":
-      case "export":
-        // Naam + details (aur export ke liye contact) ek hi jagah.
+        // Naam + details ek hi jagah.
         router.push("/profile-details" as never);
-        if (id === "export") {
-          toast.show(s.exportContact, "info");
-        }
         return;
       case "notifications":
         Linking.openSettings().catch(() =>

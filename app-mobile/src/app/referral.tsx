@@ -142,12 +142,6 @@ export default function Referral() {
                 cta={t.goDo}
                 onPress={() => router.push("/add-reminder")}
               />
-              <Condition
-                done={gate?.profileComplete ?? false}
-                label={t.condProfile}
-                cta={t.goDo}
-                onPress={() => router.push("/profile-details" as never)}
-              />
             </View>
           )}
         </ScrollView>

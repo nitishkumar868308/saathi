@@ -215,9 +215,11 @@ export type ReferralGate = {
 };
 
 /**
- * Referral tabhi khulta hai jab user: 1 document add kare, 1 reminder set kare,
- * aur apni profile complete kare. Tab tak na code na share — sirf conditions.
- * (Fake/khali accounts se referral abuse rokne ke liye.)
+ * Referral tabhi khulta hai jab user: 1 document add kare aur 1 reminder set kare.
+ * Yahi anti-fraud proof kaafi hai (real active user). Profile complete karna
+ * ZAROORI NAHI — warna referral karne se pehle hi log chhoot jaate. Profile ki
+ * zaroorat sirf Plus checkout pe hoti hai (jahan wo natural + expected hai).
+ * Reward condition bhi yahi hai (document + reminder), isliye dono match karte.
  */
 export async function getReferralGate(): Promise<ReferralGate> {
   const [docs, rems, details] = await Promise.all([
@@ -232,7 +234,7 @@ export async function getReferralGate(): Promise<ReferralGate> {
     hasDocument,
     hasReminder,
     profileComplete,
-    unlocked: hasDocument && hasReminder && profileComplete,
+    unlocked: hasDocument && hasReminder,
   };
 }
 
