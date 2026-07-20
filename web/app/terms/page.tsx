@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 const sections = [
   {
     h: "1. Saathi kya hai",
-    p: "Saathi ek personal AI companion hai jo aapke documents, dates aur kaam yaad rakhta hai aur reminders bhejta hai. Ye service abhi early access mein hai.",
+    p: "Saathi ek personal AI companion hai jo aapke documents, dates aur kaam yaad rakhta hai aur reminders bhejta hai. Service Android par uplabdh hai.",
   },
   {
     h: "2. Aapki zimmedari",
@@ -21,7 +21,7 @@ const sections = [
   },
   {
     h: "4. Pricing",
-    p: "Core features free rahenge. Kuch advanced features (jaise family sharing) paid ho sakte hain. Early access users ko launch par special deal milegi. Koi bhi charge pehle saaf bataya jayega.",
+    p: "Core features hamesha free rahenge. Unlimited documents/reminders aur email + WhatsApp reminders ke liye Saathi Plus (paid) hai. Koi bhi charge pehle saaf bataya jayega.",
   },
   {
     h: "5. Data aur privacy",

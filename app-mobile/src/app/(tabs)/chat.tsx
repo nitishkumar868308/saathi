@@ -14,11 +14,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
-import { TypingDots } from "@/components/typing-dots";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
-import { askSaathi, type ChatTurn } from "@/lib/ai";
-import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
+import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
 type Msg = { id: string; role: "user" | "saathi"; text: string };
@@ -26,7 +24,6 @@ type Msg = { id: string; role: "user" | "saathi"; text: string };
 export default function Chat() {
   const name = useUserName();
   const { chat: ch } = useT();
-  const { locale } = useLocale();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
@@ -36,29 +33,20 @@ export default function Chat() {
     },
   ]);
   const scrollRef = useRef<ScrollView>(null);
-  const [sending, setSending] = useState(false);
 
-  async function sendText(text: string) {
+  function sendText(text: string) {
     const t = text.trim();
-    if (!t || sending) return;
+    if (!t) return;
 
-    // Purani baat-cheet AI ko bhejni hai (stub mode me ignore ho jaati hai).
-    const history: ChatTurn[] = messages.map((m) => ({
-      role: m.role === "user" ? "user" : "assistant",
-      content: m.text,
-    }));
-
-    setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
+    // Abhi Saathi bahar ke sawaal nahi leta aur na hi koi AI hit hota hai —
+    // sirf ek fixed, pyaara jawab jo user ko documents/reminders ki taraf le
+    // jaata hai. Smart chat jald aa raha hai.
+    setMessages((m) => [
+      ...m,
+      { id: String(m.length + 1), role: "user", text: t },
+      { id: String(m.length + 2), role: "saathi", text: ch.stubReply },
+    ]);
     setInput("");
-    setSending(true);
-
-    const reply = await askSaathi(t, history, name, {
-      fallback: ch.stubReply,
-      locale,
-    });
-
-    setMessages((m) => [...m, { id: String(m.length + 1), role: "saathi", text: reply }]);
-    setSending(false);
   }
 
   return (
@@ -107,17 +95,6 @@ export default function Chat() {
               </View>
             ),
           )}
-
-          {sending && (
-            <View style={styles.saathiRow}>
-              <View style={styles.miniAvatar}>
-                <SaathiMark size={15} color={colors.white} />
-              </View>
-              <View style={styles.saathiBubble}>
-                <TypingDots />
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         {/* suggestions */}
@@ -149,10 +126,9 @@ export default function Chat() {
           />
           <Pressable
             onPress={() => sendText(input)}
-            disabled={sending}
             style={({ pressed }) => [
               styles.sendBtn,
-              (pressed || sending) && { opacity: 0.85 },
+              pressed && { opacity: 0.85 },
             ]}
           >
             <Ionicons name="arrow-up" size={20} color={colors.white} />

@@ -619,9 +619,9 @@ const hinglish: Dict = {
   chat: {
     online: "aapka dost · online",
     greeting:
-      "Namaste{name}! Main aapka Saathi. Kuch bhi bolo ya likho — reminder, document, ya bas baat. Main yaad rakhunga.",
+      "Namaste{name}! Main aapka Saathi. Apne reminders, tasks aur documents ke baare me pooch lo — main madad kar dunga. 🙂",
     stubReply:
-      "Samajh gaya. Isse yaad rakhne aur karne wala smart AI jald aa raha hai. Tab tak Documents aur Reminders tabs use karo!",
+      "Aap apne reminder, task ya document se judi cheezein pooch sakte ho. 🙂 Abhi main baaki sab kuch nahi bata sakta, par wo bahut jald aa raha hai — tab tak Documents aur Reminders tabs use karo!",
     inputPlaceholder: "Kuch likho…",
     suggestions: ["Kal 8 baje uthana", "Insurance kab expire hai?", "Aaj kya karna hai?"],
   },
@@ -997,9 +997,9 @@ const hi: Dict = {
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
     greeting:
-      "नमस्ते{name}! मैं आपका साथी। कुछ भी बोलें या लिखें — रिमाइंडर, डॉक्युमेंट, या बस बात। मैं याद रखूँगा।",
+      "नमस्ते{name}! मैं आपका साथी। अपने reminders, tasks और documents के बारे में पूछ लें — मैं मदद कर दूँगा। 🙂",
     stubReply:
-      "समझ गया। इसे याद रखने और करने वाला smart AI जल्द आ रहा है। तब तक Documents और Reminders टैब इस्तेमाल करें!",
+      "आप अपने reminder, task या document से जुड़ी चीज़ें पूछ सकते हैं। 🙂 अभी मैं बाकी सब कुछ नहीं बता सकता, पर वो बहुत जल्द आ रहा है — तब तक Documents और Reminders टैब इस्तेमाल करें!",
     inputPlaceholder: "कुछ लिखें…",
     suggestions: ["कल 8 बजे उठाना", "इंश्योरेंस कब एक्सपायर है?", "आज क्या करना है?"],
   },
@@ -1374,9 +1374,9 @@ const en: Dict = {
   chat: {
     online: "your friend · online",
     greeting:
-      "Namaste{name}! I'm your Saathi. Say or type anything — a reminder, a document, or just chat. I'll remember.",
+      "Namaste{name}! I'm your Saathi. Ask me about your reminders, tasks and documents — I'll help. 🙂",
     stubReply:
-      "Got it. A smarter AI that acts on this is coming soon. Until then, use the Documents and Reminders tabs!",
+      "You can ask me about your reminders, tasks or documents. 🙂 I can't answer everything else just yet, but that's coming very soon — until then, use the Documents and Reminders tabs!",
     inputPlaceholder: "Type something…",
     suggestions: ["Wake me at 8am", "When does my insurance expire?", "What's on today?"],
   },

@@ -428,7 +428,7 @@ const hinglish: Dict = {
   },
   testimonials: {
     heading: "Log kya keh rahe hain",
-    sub: "Early access users ki asli baat.",
+    sub: "Asli Saathi users ki asli baat.",
     items: [
       {
         name: "Rohit S.",
@@ -452,7 +452,7 @@ const hinglish: Dict = {
   },
   pricing: {
     heading: "Simple pricing, koi jhanjhat nahi",
-    sub: "Shuruaat free. Early access walon ke liye hamesha best deal.",
+    sub: "Shuruaat bilkul free. Jab chaaho Saathi Plus le lo.",
     billMonthly: "Mahina",
     billYearly: "Saal",
     saveBadge: "2 mahine free",
@@ -521,13 +521,13 @@ const hinglish: Dict = {
       },
       {
         q: "Saathi free hai?",
-        a: "Shuruaat mein free. Early access wale logon ko launch pe sabse pehle aur best deal milegi. Core kaam hamesha free rahega.",
+        a: "Haan, shuruaat bilkul free hai. Core kaam hamesha free rahega — unlimited documents/reminders ke liye Saathi Plus hai.",
       },
     ],
   },
   finalCta: {
-    heading: "Sabse pehle Saathi try karo",
-    sub: "Early access list mein jud jao. Launch hote hi aapko batayenge — koi spam nahi, bas khabar.",
+    heading: "Aaj hi Saathi try karo",
+    sub: "Play Store se free download karo — 2 minute me set, aur Saathi aapke zaroori documents aur kaam yaad rakhega.",
   },
   footer: {
     tagline: "Aapka personal saathi jo kuch nahi bhoolta. Never forget what matters.",
@@ -546,7 +546,7 @@ const hinglish: Dict = {
       terms: "Terms of Service",
     },
     social: "Follow karo",
-    playstore: "Play Store — jald aa raha hai",
+    playstore: "Play Store pe uplabdh",
     rights: "Sabhi adhikaar surakshit.",
     madeIn: "Made with ❤️ for you",
   },
@@ -814,7 +814,7 @@ const hi: Dict = {
   },
   testimonials: {
     heading: "लोग क्या कह रहे हैं",
-    sub: "अर्ली एक्सेस यूज़र्स की असली बात।",
+    sub: "असली साथी यूज़र्स की असली बात।",
     items: [
       {
         name: "रोहित S.",
@@ -838,7 +838,7 @@ const hi: Dict = {
   },
   pricing: {
     heading: "सिंपल प्राइसिंग, कोई झंझट नहीं",
-    sub: "शुरुआत फ्री। अर्ली एक्सेस वालों के लिए हमेशा बेस्ट डील।",
+    sub: "शुरुआत बिलकुल फ्री। जब चाहें साथी प्लस ले लें।",
     billMonthly: "महीना",
     billYearly: "साल",
     saveBadge: "2 महीने फ्री",
@@ -907,13 +907,13 @@ const hi: Dict = {
       },
       {
         q: "साथी फ्री है?",
-        a: "शुरुआत में फ्री। अर्ली एक्सेस वालों को लॉन्च पर सबसे पहले और बेस्ट डील मिलेगी। कोर काम हमेशा फ्री रहेगा।",
+        a: "हाँ, शुरुआत बिलकुल फ्री है। कोर काम हमेशा फ्री रहेगा — अनलिमिटेड डॉक्युमेंट्स/reminders के लिए साथी प्लस है।",
       },
     ],
   },
   finalCta: {
-    heading: "सबसे पहले साथी ट्राई करें",
-    sub: "अर्ली एक्सेस लिस्ट में जुड़ जाइए। लॉन्च होते ही आपको बताएँगे — कोई स्पैम नहीं, बस ख़बर।",
+    heading: "आज ही साथी ट्राई करें",
+    sub: "Play Store से फ्री डाउनलोड करें — 2 मिनट में सेट, और साथी आपके ज़रूरी डॉक्युमेंट्स और काम याद रखेगा।",
   },
   footer: {
     tagline: "आपका पर्सनल साथी जो कुछ नहीं भूलता। Never forget what matters.",
@@ -932,7 +932,7 @@ const hi: Dict = {
       terms: "सेवा की शर्तें",
     },
     social: "फ़ॉलो करें",
-    playstore: "Play Store — जल्द आ रहा है",
+    playstore: "Play Store पर उपलब्ध",
     rights: "सभी अधिकार सुरक्षित।",
     madeIn: "आपके लिए ❤️ से बना",
   },
@@ -1200,7 +1200,7 @@ const en: Dict = {
   },
   testimonials: {
     heading: "What people are saying",
-    sub: "Real words from our early access users.",
+    sub: "Real words from real Saathi users.",
     items: [
       {
         name: "Rohit S.",
@@ -1224,7 +1224,7 @@ const en: Dict = {
   },
   pricing: {
     heading: "Simple pricing, no fuss",
-    sub: "Free to start. Early access users always get the best deal.",
+    sub: "Free to start. Grab Saathi Plus whenever you want.",
     billMonthly: "Monthly",
     billYearly: "Yearly",
     saveBadge: "2 months free",
@@ -1293,13 +1293,13 @@ const en: Dict = {
       },
       {
         q: "Is Saathi free?",
-        a: "Free to start. Early access users get the first and best deal at launch. The core features stay free forever.",
+        a: "Yes, it's free to start. Core features stay free forever — Saathi Plus is there for unlimited documents/reminders.",
       },
     ],
   },
   finalCta: {
-    heading: "Be the first to try Saathi",
-    sub: "Join the early access list. We'll tell you the moment we launch — no spam, just news.",
+    heading: "Try Saathi today",
+    sub: "Download free from the Play Store — set up in 2 minutes, and Saathi keeps track of your important documents and tasks.",
   },
   footer: {
     tagline: "Your personal companion that never forgets. Never forget what matters.",
@@ -1318,7 +1318,7 @@ const en: Dict = {
       terms: "Terms of Service",
     },
     social: "Follow us",
-    playstore: "Play Store — coming soon",
+    playstore: "Available on Play Store",
     rights: "All rights reserved.",
     madeIn: "Made with ❤️ for you",
   },

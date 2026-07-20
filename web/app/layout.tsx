@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     template: "%s · Apka Saathi",
   },
   description:
-    "Apka Saathi ek AI companion hai jo aapke documents ki expiry, zaroori dates aur roz ke kaam bina pooche yaad dilata hai. Passport, insurance, FASTag, EMI — sab yaad. Hindi + English. Early access lo.",
+    "Apka Saathi ek AI companion hai jo aapke documents ki expiry, zaroori dates aur roz ke kaam bina pooche yaad dilata hai. Passport, insurance, FASTag, EMI — sab yaad. Hindi + English. Play Store se free download karo.",
   keywords: [
     "Apka Saathi",
     "AI reminder app",
