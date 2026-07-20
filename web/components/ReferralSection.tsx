@@ -16,23 +16,11 @@ export default function ReferralSection() {
   const offers = useOffers();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Home page khulte hi ek baar referral modal dikhao (marketing) — session me
-  // sirf ek baar, warna har reload pe pop-up annoying lagega.
+  // Home page khulte hi referral landing modal dikhao (marketing). Har baar
+  // jab home load ho — taaki user ko referral offer turant dikhe.
   useEffect(() => {
     if (!offers.referralsEnabled) return;
-    try {
-      if (sessionStorage.getItem("saathi-referral-popup")) return;
-    } catch {
-      return;
-    }
-    const id = setTimeout(() => {
-      setModalOpen(true);
-      try {
-        sessionStorage.setItem("saathi-referral-popup", "1");
-      } catch {
-        /* ignore */
-      }
-    }, 1400);
+    const id = setTimeout(() => setModalOpen(true), 700);
     return () => clearTimeout(id);
   }, [offers.referralsEnabled]);
 
