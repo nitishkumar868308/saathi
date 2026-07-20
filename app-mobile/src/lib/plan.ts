@@ -83,8 +83,8 @@ async function countOwn(table: "documents" | "reminders"): Promise<number> {
 
 /**
  * Free document limit se aage nahi jaa sakta.
- * Limit admin (app_config) se aati hai — FREE_DOC_LIMIT sirf fallback hai.
- * Warna admin 3 -> 10 kar de to bhi app 3 pe hi block karta rehta (server 10 pe).
+ * Limit admin (app_config) se aati hai; getOffers config na mile to default deta
+ * hai. 0 bhi valid (koi free document nahi). Admin 3 -> 10 kare to app bhi 10.
  */
 export async function canAddDocument(): Promise<boolean> {
   const [{ isPlus }, count, offers] = await Promise.all([
@@ -92,7 +92,7 @@ export async function canAddDocument(): Promise<boolean> {
     countDocuments(),
     getOffers(),
   ]);
-  return isPlus || count < (offers.freeDocuments || FREE_DOC_LIMIT);
+  return isPlus || count < offers.freeDocuments;
 }
 
 /** Free reminder limit se aage nahi (admin config se; fallback 5). */
@@ -102,7 +102,7 @@ export async function canAddReminder(): Promise<boolean> {
     countReminders(),
     getOffers(),
   ]);
-  return isPlus || count < (offers.freeReminders || FREE_REMINDER_LIMIT);
+  return isPlus || count < offers.freeReminders;
 }
 
 /**
@@ -185,8 +185,12 @@ export async function getOffers(): Promise<Offers> {
 
     const m = new Map(data.map((r) => [r.key as string, r.value]));
     const num = (k: string, d: number) => {
-      const n = Number(m.get(k));
-      return Number.isFinite(n) && n > 0 ? Math.floor(n) : d;
+      // 0 ek valid value hai (jaise free_documents = 0 → koi free document nahi).
+      // Sirf missing / negative / NaN pe default lo.
+      const raw = m.get(k);
+      if (raw === null || raw === undefined || raw === "") return d;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : d;
     };
     const bool = (k: string, d: boolean) => {
       const v = m.get(k);

@@ -6,8 +6,11 @@
 -- drop karte hain (warna RPC missing column pe fail karti).
 
 /* ------------------------------------------------------------------ */
-/* 1. my_rewards() — first_n fields ke bina                            */
+/* 1. my_rewards() — canonical (first_n aur cap dono ke bina)          */
 /* ------------------------------------------------------------------ */
+-- ⚠️ Ye rewards-referrals.sql wali definition se BILKUL same honi chahiye —
+-- warna jo file baad me run ho wahi jeet jaati hai (drift). Cap fields hata
+-- diye (ab koi referral cap nahi).
 create or replace function public.my_rewards()
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare uid uuid := auth.uid(); res jsonb;
@@ -23,7 +26,6 @@ begin
     'referral_days_earned', p.referral_days_earned,
     'referred_by_code',     (select referral_code from public.profiles where id = p.referred_by),
     'referral_days_now',    public.cfg_int('referral_days', 15),
-    'cap_days',             public.cfg_int('referral_cap_months', 6) * 30,
     'referrals_enabled',    public.cfg_bool('referrals_enabled', true),
     'referrals', coalesce((
       select jsonb_agg(jsonb_build_object(
@@ -33,8 +35,7 @@ begin
         'joined_at',    r.created_at,
         'qualified_at', r.qualified_at,
         'rewarded_at',  r.rewarded_at,
-        'days',         r.referrer_days,
-        'cap_skipped',  r.cap_skipped
+        'days',         r.referrer_days
       ) order by r.created_at desc)
       from public.referrals r
       left join public.profiles rp on rp.id = r.referee_id
@@ -48,8 +49,10 @@ end;
 $$;
 
 /* ------------------------------------------------------------------ */
-/* 2. admin_user_detail() — first_n fields ke bina                     */
+/* 2. admin_user_detail() — canonical (documents ke saath, cap ke bina) */
 /* ------------------------------------------------------------------ */
+-- ⚠️ rewards-referrals.sql wali definition se same. Documents (kaun/kya/kab/
+-- size) shaamil; cap fields nahi.
 create or replace function public.admin_user_detail(p_uid uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare res jsonb;
@@ -68,7 +71,6 @@ begin
       select jsonb_build_object('email', rb.email, 'code', rb.referral_code)
       from public.profiles rb where rb.id = p.referred_by
     ),
-    'cap_days', public.cfg_int('referral_cap_months', 6) * 30,
     'referrals', coalesce((
       select jsonb_agg(jsonb_build_object(
         'id',           r.id,
@@ -77,13 +79,27 @@ begin
         'joined_at',    r.created_at,
         'qualified_at', r.qualified_at,
         'rewarded_at',  r.rewarded_at,
-        'days',         r.referrer_days,
-        'cap_skipped',  r.cap_skipped
+        'days',         r.referrer_days
       ) order by r.created_at desc)
       from public.referrals r
       left join public.profiles rp on rp.id = r.referee_id
       where r.referrer_id = p.id
-    ), '[]'::jsonb)
+    ), '[]'::jsonb),
+    -- Kisne kya/kab/kitna size upload kiya (storage me file bhi hai kya).
+    'documents', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'id',          d.id,
+        'name',        d.name,
+        'type',        d.type,
+        'expiry',      d.expiry,
+        'file_size',   d.file_size,
+        'in_storage',  (d.file_path is not null),
+        'created_at',  d.created_at
+      ) order by d.created_at desc)
+      from public.documents d where d.user_id = p.id
+    ), '[]'::jsonb),
+    'documents_count', (select count(*) from public.documents d where d.user_id = p.id),
+    'storage_bytes',   (select coalesce(sum(d.file_size), 0) from public.documents d where d.user_id = p.id)
   ) into res
   from public.profiles p where p.id = p_uid;
 

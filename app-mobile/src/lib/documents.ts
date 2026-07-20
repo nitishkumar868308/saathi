@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { canAddDocument, FREE_DOC_LIMIT } from "./plan";
-import { uploadFile, signedUrl } from "./storage";
+import { uploadFile } from "./storage";
 
 /** Free-plan document limit cross hone par throw hota hai. */
 export class DocLimitError extends Error {
@@ -51,13 +51,6 @@ export async function uploadDocumentImage(docId: string, localUri: string): Prom
   const path = `${uid}/${docId}.${ext}`;
   const { size } = await uploadFile("documents", path, localUri, mime);
   await setDocumentFile(docId, path, size, mime);
-}
-
-/** Document dekhne ke liye signed URL (private bucket). Na ho to null. */
-export async function getDocumentViewUrl(doc: Document): Promise<string | null> {
-  if (doc.file_uri) return doc.file_uri; // local — fastest
-  if (doc.file_path) return signedUrl("documents", doc.file_path);
-  return null;
 }
 
 function client() {

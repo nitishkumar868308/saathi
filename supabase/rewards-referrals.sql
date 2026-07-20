@@ -112,6 +112,13 @@ begin
            else coalesce(p_source, plan_source, 'reward')
          end
    where id = p_uid;
+
+  -- Plus milte hi paused reminders + locked documents wapas khul jaayein.
+  -- enforce_plan_limits plan-limits.sql me banta hai; plpgsql call runtime pe
+  -- resolve hoti hai, isliye is file ko akele run karne me bhi problem nahi
+  -- (setup me plan-limits.sql zaroor chalta hai). Dono files ki definition ab
+  -- ek jaisi — koi bhi baad me re-run ho, enforce-call kabhi drop nahi hoti.
+  perform public.enforce_plan_limits(p_uid);
 end;
 $$;
 

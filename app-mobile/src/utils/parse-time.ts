@@ -132,6 +132,9 @@ export function parseReminderTime(
       const mn = bj[3] ? Math.min(59, +bj[3]) : 0;
       const part = bj[1] || "";
       const ap = bj[4];
+      const hasDayWord = /parso|\bkal\b|\bcal\b/.test(t);
+      // Bare "N baje" = na am/pm, na subah/shaam/raat.
+      const bare = !ap && !part;
       if (ap === "pm" && hour < 12) hour += 12;
       if (ap === "am" && hour === 12) hour = 0;
       if (/subah|morning/.test(part) && hour === 12) hour = 0;
@@ -142,13 +145,29 @@ export function parseReminderTime(
         else if (hour < 12) hour += 12;
       }
       if (/dopahar|afternoon/.test(part) && hour < 12) hour += 12;
+
       const d = new Date(now);
-      d.setHours(hour, mn, 0, 0);
-      // "parso 6 baje" = +2 din, "kal 6 baje" = +1. Time branch pehle match hota
-      // hai isliye din yahin adjust karo, warna parso/kal miss ho jaata.
-      if (/parso/.test(t)) d.setDate(d.getDate() + 2);
-      else if (/\bkal\b|\bcal\b/.test(t)) d.setDate(d.getDate() + 1);
-      else if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
+      if (bare && !hasDayWord && hour >= 1 && hour <= 11) {
+        // Ambiguous bare "N baje" — arbitrary AM lene ke bajaye sabse jaldi aane
+        // wala N o'clock lo (AM ya PM). Jaise 3 PM ho aur "6 baje" bole → 6 PM;
+        // 8 PM ho aur "6 baje" bole → kal 6 AM.
+        const at = (h: number) => {
+          const x = new Date(now);
+          x.setHours(h, mn, 0, 0);
+          if (x.getTime() <= now.getTime()) x.setDate(x.getDate() + 1);
+          return x;
+        };
+        const am = at(hour);
+        const pm = at(hour + 12);
+        d.setTime((am.getTime() <= pm.getTime() ? am : pm).getTime());
+      } else {
+        d.setHours(hour, mn, 0, 0);
+        // "parso 6 baje" = +2 din, "kal 6 baje" = +1. Time branch pehle match hota
+        // hai isliye din yahin adjust karo, warna parso/kal miss ho jaata.
+        if (/parso/.test(t)) d.setDate(d.getDate() + 2);
+        else if (/\bkal\b|\bcal\b/.test(t)) d.setDate(d.getDate() + 1);
+        else if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
+      }
       found = { date: d, matched: bj[0] };
     }
   }
