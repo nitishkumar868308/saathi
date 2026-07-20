@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,8 @@ import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
-import { parseReminder, formatWhen, combine } from "@/utils/parse-time";
+import { formatWhen, combine } from "@/utils/parse-time";
+import { parseReminderAI } from "@/lib/ai";
 import {
   openBatteryOptimizationSettings,
   batteryPromptShown,
@@ -65,13 +66,49 @@ export default function AddReminder() {
   const [iosTime, setIosTime] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const parsed = useMemo(() => parseReminder(title), [title]);
+  // AI se samjha hua reminder. Ek reminder = ek AI call — user typing rukne ke
+  // 800ms baad ek hi baar hit hota hai (same text dobara hit nahi hota).
+  const [ai, setAi] = useState<{
+    title: string;
+    date: Date | null;
+    minutes: number | null;
+  } | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const lastText = useRef("");
 
-  // Effective slots: user ka override > parser ka samjha hua.
-  const finalTitle = subject.trim() || parsed?.title?.trim() || "";
-  const finalDate = pickedDate ?? parsed?.date ?? null;
-  const finalMinutes = pickedMinutes ?? parsed?.minutes ?? null;
-  const ambiguousMinutes = pickedMinutes == null ? parsed?.ambiguousMinutes ?? null : null;
+  useEffect(() => {
+    const t = title.trim();
+    if (t.length < 3) return;
+    const handle = setTimeout(async () => {
+      if (lastText.current === t) return; // same text — dobara AI hit nahi
+      lastText.current = t;
+      setParsing(true);
+      try {
+        const r = await parseReminderAI(t, locale);
+        if (r) {
+          let date: Date | null = null;
+          let minutes: number | null = null;
+          if (r.remind_at) {
+            const d = new Date(r.remind_at);
+            if (!isNaN(d.getTime())) {
+              date = new Date(d);
+              date.setHours(0, 0, 0, 0);
+              if (!r.needsTime) minutes = d.getHours() * 60 + d.getMinutes();
+            }
+          }
+          setAi({ title: r.title || t, date, minutes });
+        }
+      } finally {
+        setParsing(false);
+      }
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [title, locale]);
+
+  // Effective slots: user ka override > AI ka samjha hua.
+  const finalTitle = subject.trim() || ai?.title?.trim() || "";
+  const finalDate = pickedDate ?? ai?.date ?? null;
+  const finalMinutes = pickedMinutes ?? ai?.minutes ?? null;
   const when =
     finalDate && finalMinutes != null ? combine(finalDate, finalMinutes) : null;
   const isPast = !!when && when.getTime() <= Date.now();
@@ -238,6 +275,13 @@ export default function AddReminder() {
           </View>
           <Text style={styles.hint}>🎤 {a.micHint}</Text>
 
+          {parsing && (
+            <View style={styles.parsingRow}>
+              <ActivityIndicator color={colors.terracotta} size="small" />
+              <Text style={styles.parsingText}>{a.understanding}</Text>
+            </View>
+          )}
+
           {started && (
             <View style={styles.card}>
               {/* --- Kya (title) --- */}
@@ -314,34 +358,12 @@ export default function AddReminder() {
                   {!missingTime && (
                     <Text style={styles.slotValue}>{timeLabel(finalMinutes!)}</Text>
                   )}
-                  {/* Bare "N baje" — AM/PM assume nahi, user se poochho */}
-                  {missingTime && ambiguousMinutes != null ? (
-                    <>
-                      <Text style={styles.slotAsk}>{a.askAmPm}</Text>
-                      <View style={styles.chips}>
-                        {[ambiguousMinutes, ambiguousMinutes + 720].map((mins) => (
-                          <Pressable
-                            key={mins}
-                            onPress={() => setPickedMinutes(mins)}
-                            style={styles.chip}
-                          >
-                            <Text style={styles.chipText}>{timeLabel(mins)}</Text>
-                          </Pressable>
-                        ))}
-                        <Pressable onPress={openTimePicker} style={styles.chip}>
-                          <Ionicons name="time-outline" size={13} color={colors.inkSoft} />
-                          <Text style={styles.chipText}>{a.otherTime}</Text>
-                        </Pressable>
-                      </View>
-                    </>
-                  ) : (
-                    <Pressable onPress={openTimePicker} style={styles.timeBtn}>
-                      <Ionicons name="time-outline" size={15} color={colors.terracotta} />
-                      <Text style={styles.timeBtnText}>
-                        {missingTime ? a.pickTime : a.change}
-                      </Text>
-                    </Pressable>
-                  )}
+                  <Pressable onPress={openTimePicker} style={styles.timeBtn}>
+                    <Ionicons name="time-outline" size={15} color={colors.terracotta} />
+                    <Text style={styles.timeBtnText}>
+                      {missingTime ? a.pickTime : a.change}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
 
@@ -461,6 +483,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   hint: { marginTop: 8, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
+  parsingRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
+  parsingText: { fontSize: 13.5, fontWeight: "600", color: colors.terracotta },
   card: {
     marginTop: 18,
     borderRadius: 20,

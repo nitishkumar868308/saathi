@@ -124,7 +124,11 @@
       "Bash(grep -noE '\"[A-Z][a-z][^\"]{3,50}\"|placeholder=\"[^\"]*\"|>[A-Z][a-z][^<>{}]{3,40}<' src/app/profile-details.tsx)",
       "Bash(grep -noE '\"[A-Za-z][^\"]{3,50}\"|>[A-Z][a-z][^<>{}]{2,40}<' src/app/profile-details.tsx)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(awk '/^  addReminder: \\\\{/{f=1} f{print NR\": \"$0} /^  \\\\};/{if\\(f\\)exit}' src/lib/i18n/dictionaries.ts)"
+      "Bash(awk '/^  addReminder: \\\\{/{f=1} f{print NR\": \"$0} /^  \\\\};/{if\\(f\\)exit}' src/lib/i18n/dictionaries.ts)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('EXPO:', d.get\\('dependencies',{}\\).get\\('expo'\\)\\); [print\\(k, v\\) for k,v in sorted\\(d.get\\('dependencies',{}\\).items\\(\\)\\) if any\\(x in k for x in ['notif','speech','audio','av','notifee','sound']\\)]\")",
+      "Bash(node -e \"console.log\\('expo-speech', require\\('./package.json'\\).dependencies['expo-speech']\\)\")",
+      "Bash(rm -rf \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/c1e1d998-d1e7-4ac5-b81c-ad08639661fe/scratchpad/pt\" \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/c1e1d998-d1e7-4ac5-b81c-ad08639661fe/scratchpad/t2.js\")",
+      "Bash(echo \"EXIT $?\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

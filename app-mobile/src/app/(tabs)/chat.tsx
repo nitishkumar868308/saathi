@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,15 +17,51 @@ import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+import { askSaathi, ChatTurn, ChatContext } from "@/lib/ai";
+import { listReminders } from "@/lib/reminders";
+import { listDocuments } from "@/lib/documents";
 
 type Msg = { id: string; role: "user" | "saathi"; text: string };
+
+/** Chat ko user ka apna data do — taaki app ke sawaalon ka sahi jawab mile. */
+async function loadContext(): Promise<ChatContext> {
+  const [rem, docs] = await Promise.all([
+    listReminders().catch(() => []),
+    listDocuments().catch(() => []),
+  ]);
+  return {
+    today: new Date().toISOString(),
+    reminders: rem
+      .filter((r) => r.is_on && !r.is_paused)
+      .slice(0, 30)
+      .map((r) => ({ title: r.title, when: r.remind_at, on: r.is_on })),
+    documents: docs
+      .slice(0, 30)
+      .map((d) => ({ name: d.name, type: d.type, expiry: d.expiry })),
+  };
+}
+
+function TypingDots() {
+  return (
+    <View style={styles.saathiRow}>
+      <View style={styles.miniAvatar}>
+        <SaathiMark size={15} color={colors.white} />
+      </View>
+      <View style={styles.saathiBubble}>
+        <ActivityIndicator color={colors.terracotta} size="small" />
+      </View>
+    </View>
+  );
+}
 
 export default function Chat() {
   const name = useUserName();
   const { chat: ch } = useT();
+  const { locale } = useLocale();
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
       id: "1",
@@ -34,19 +71,28 @@ export default function Chat() {
   ]);
   const scrollRef = useRef<ScrollView>(null);
 
-  function sendText(text: string) {
+  async function sendText(text: string) {
     const t = text.trim();
-    if (!t) return;
-
-    // Abhi Saathi bahar ke sawaal nahi leta aur na hi koi AI hit hota hai —
-    // sirf ek fixed, pyaara jawab jo user ko documents/reminders ki taraf le
-    // jaata hai. Smart chat jald aa raha hai.
-    setMessages((m) => [
-      ...m,
-      { id: String(m.length + 1), role: "user", text: t },
-      { id: String(m.length + 2), role: "saathi", text: ch.stubReply },
-    ]);
+    if (!t || sending) return;
     setInput("");
+
+    const history: ChatTurn[] = messages
+      .filter((m) => m.id !== "1")
+      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
+
+    setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
+    setSending(true);
+    try {
+      const context = await loadContext();
+      const reply = await askSaathi(t, history, name, {
+        locale,
+        context,
+        fallback: ch.stubReply,
+      });
+      setMessages((m) => [...m, { id: String(m.length + 1), role: "saathi", text: reply }]);
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -95,6 +141,7 @@ export default function Chat() {
               </View>
             ),
           )}
+          {sending && <TypingDots />}
         </ScrollView>
 
         {/* suggestions */}
@@ -126,9 +173,10 @@ export default function Chat() {
           />
           <Pressable
             onPress={() => sendText(input)}
+            disabled={sending}
             style={({ pressed }) => [
               styles.sendBtn,
-              pressed && { opacity: 0.85 },
+              (pressed || sending) && { opacity: 0.85 },
             ]}
           >
             <Ionicons name="arrow-up" size={20} color={colors.white} />

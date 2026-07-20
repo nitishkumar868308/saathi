@@ -21,12 +21,13 @@ import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
+import { scanDocumentAI } from "@/lib/ai";
 import { dateAfterMonths, isValidDate } from "@/utils/expiry";
 import { extractExpiry } from "@/utils/extract-expiry";
 import { detectDocType, guessName } from "@/utils/detect-doc";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
 const quick = [
@@ -53,6 +54,7 @@ export default function AddDocument() {
   const router = useRouter();
   const toast = useToast();
   const { addDocument: d } = useT();
+  const { locale } = useLocale();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [savedUri, setSavedUri] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -89,19 +91,34 @@ export default function AddDocument() {
 
       setScanning(true);
       try {
-        const text = await ocrImage(asset.base64);
-        const det = detectDocType(text);
-        const exp = extractExpiry(text);
-        const nm = det.name !== "Document" ? det.name : guessName(text);
+        let rType = "other";
+        let rName = "";
+        let rExpiry: string | null = null;
 
-        setType(det.type);
-        if (nm) setName(nm);
-        if (exp) setExpiry(exp);
+        // Pehle AI (Gemini vision) — document ko theek se samajhta hai.
+        const ai = await scanDocumentAI(asset.base64, locale);
+        if (ai && (ai.name || ai.expiry || (ai.type && ai.type !== "other"))) {
+          rType = ai.type || "other";
+          rName = ai.name || "";
+          rExpiry = ai.expiry && isValidDate(ai.expiry) ? ai.expiry : null;
+        } else {
+          // Fallback: jab tak GEMINI_API_KEY set nahi / AI fail — local OCR.
+          const text = await ocrImage(asset.base64);
+          const det = detectDocType(text);
+          rType = det.type;
+          rName = det.name !== "Document" ? det.name : guessName(text);
+          const exp = extractExpiry(text);
+          rExpiry = exp || null;
+        }
+
+        setType(rType);
+        if (rName) setName(rName);
+        if (rExpiry) setExpiry(rExpiry);
         setScanned(true);
 
         const bits: string[] = [];
-        if (nm) bits.push(nm);
-        if (exp) bits.push(d.ocrExpiryFound);
+        if (rName) bits.push(rName);
+        if (rExpiry) bits.push(d.ocrExpiryFound);
         toast.show(
           bits.length ? tpl(d.ocrReadTpl, { bits: bits.join(" · ") }) : d.ocrUnclear,
           bits.length ? "success" : "info",
