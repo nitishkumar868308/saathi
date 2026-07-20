@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 
 import { colors } from "@/theme/colors";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { speakReminder, stopSpeaking } from "@/lib/speak";
 
 type Alert = { title: string; body: string; kind: "reminder" | "expiry" };
 
@@ -54,13 +55,22 @@ export function ReminderAlertHost() {
       easing: Easing.out(Easing.back(1.4)),
       useNativeDriver: true,
     }).start();
+    // Reminder/document ka naam + kaam bol ke sunao — user ko dekhna na pade.
+    speakReminder(alert.body);
   }, [alert, scale]);
+
+  // Alert band ho ya component unmount ho to bolna rok do.
+  function dismiss() {
+    stopSpeaking();
+    setAlert(null);
+  }
+  useEffect(() => () => stopSpeaking(), []);
 
   if (!alert) return null;
   const isExpiry = alert.kind === "expiry";
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={() => setAlert(null)}>
+    <Modal transparent animationType="fade" visible onRequestClose={dismiss}>
       <View style={styles.backdrop}>
         <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
           <View style={[styles.iconWrap, isExpiry && styles.iconExpiry]}>
@@ -74,7 +84,7 @@ export function ReminderAlertHost() {
           <Text style={styles.body}>{alert.body}</Text>
 
           <Pressable
-            onPress={() => setAlert(null)}
+            onPress={dismiss}
             style={({ pressed }) => [styles.btn, pressed && { opacity: 0.9 }]}
           >
             <Ionicons name="checkmark" size={18} color={colors.white} />
