@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Instagram, Twitter, Linkedin, Mail, Play } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -70,9 +71,9 @@ export default function Footer() {
                 [t.links.referral, "/referral"],
               ].map(([label, href]) => (
                 <li key={href}>
-                  <a href={href} className={linkCls(href)}>
+                  <Link href={href} className={linkCls(href)}>
                     {label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -90,9 +91,9 @@ export default function Footer() {
                 [t.links.contact, "/contact"],
               ].map(([label, href]) => (
                 <li key={href}>
-                  <a href={href} className={linkCls(href)}>
+                  <Link href={href} className={linkCls(href)}>
                     {label}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
