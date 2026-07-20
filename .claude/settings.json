@@ -129,7 +129,10 @@
       "Bash(node -e \"console.log\\('expo-speech', require\\('./package.json'\\).dependencies['expo-speech']\\)\")",
       "Bash(rm -rf \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/c1e1d998-d1e7-4ac5-b81c-ad08639661fe/scratchpad/pt\" \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/c1e1d998-d1e7-4ac5-b81c-ad08639661fe/scratchpad/t2.js\")",
       "Bash(echo \"EXIT $?\")",
-      "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; ['expo-sharing','expo-file-system','expo-document-picker','expo-notifications','@react-native-firebase/app','expo-image-picker'].forEach\\(k=>console.log\\(k, d[k]||'—'\\)\\);\")"
+      "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; ['expo-sharing','expo-file-system','expo-document-picker','expo-notifications','@react-native-firebase/app','expo-image-picker'].forEach\\(k=>console.log\\(k, d[k]||'—'\\)\\);\")",
+      "Bash(node -e \"const a=require\\('./app.json'\\); console.log\\('android.package=', a.expo?.android?.package\\); console.log\\('name=', a.expo?.name\\); console.log\\('scheme=', a.expo?.scheme\\)\")",
+      "Bash(echo \"APP EXIT $?\")",
+      "Bash(echo \"WEB EXIT $?\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

@@ -15,11 +15,13 @@ import {
   Menu,
   X,
   Users,
+  Star,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import Loader from "@/components/Loader";
 import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
+import AdminReviews from "@/components/AdminReviews";
 
 type ContactEntry = {
   name: string;
@@ -29,11 +31,12 @@ type ContactEntry = {
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section = "rewards" | "users" | "contacts";
+type Section = "rewards" | "users" | "reviews" | "contacts";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   { key: "rewards", label: "Rewards", icon: Gift },
   { key: "users", label: "Users", icon: Users },
+  { key: "reviews", label: "Reviews", icon: Star },
   { key: "contacts", label: "Contacts", icon: MessageSquare },
 ];
 
@@ -45,6 +48,10 @@ const HEADING: Record<Section, { title: string; sub: string }> = {
   users: {
     title: "Users",
     sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai.",
+  },
+  reviews: {
+    title: "Reviews & Ratings",
+    sub: "App me aaye reviews — rating, text, aur website pe dikhane ki anumati.",
   },
   contacts: { title: "Contact messages", sub: "" },
 };
@@ -386,6 +393,7 @@ function Dashboard({
             <div className="mt-6">
               {section === "rewards" && <AdminRewards />}
               {section === "users" && <AdminUsers />}
+              {section === "reviews" && <AdminReviews />}
               {section === "contacts" && <ContactsView rows={filteredContacts} />}
             </div>
           </div>

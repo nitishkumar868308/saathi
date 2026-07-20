@@ -9,6 +9,7 @@ import { ToastProvider } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/components/auth-provider";
 import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ReminderAlertHost } from "@/components/reminder-alert";
+import { ReviewPrompt } from "@/components/review-prompt";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
 
@@ -22,6 +23,8 @@ export default function RootLayout() {
             <RootNavigator />
             {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
             <ReminderAlertHost />
+            {/* 1 hafte baad rating/review popup. */}
+            <ReviewPrompt />
           </ToastProvider>
         </AuthProvider>
       </LanguageProvider>

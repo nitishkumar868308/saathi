@@ -197,6 +197,61 @@ export async function getUserDetail(uid: string): Promise<UserDetail | null> {
   return (await res.json()) as UserDetail | null;
 }
 
+/* ------------------------------ reviews ------------------------------ */
+
+export type AdminReview = {
+  id: string;
+  rating: number;
+  text: string | null;
+  allowDisplay: boolean;
+  createdAt: string;
+  email: string | null;
+  name: string | null;
+};
+
+/** Sab reviews (naye pehle) + user ka email/naam. Admin "Reviews" tab. */
+export async function getReviews(limit = 500): Promise<AdminReview[]> {
+  assertConfigured();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/reviews?select=id,user_id,rating,text,allow_display,created_at&order=created_at.desc&limit=${limit}`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) await fail("reviews read (supabase/reviews.sql run kiya?)", res);
+  const rows = (await res.json()) as Record<string, unknown>[];
+
+  // reviews.user_id -> profiles.id embed FK declared nahi, isliye alag fetch.
+  const ids = Array.from(new Set(rows.map((r) => String(r.user_id)).filter(Boolean)));
+  const profMap = new Map<string, { email: string | null; name: string | null }>();
+  if (ids.length) {
+    const inList = ids.map((id) => `"${id}"`).join(",");
+    const pr = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=id,email,full_name&id=in.(${inList})`,
+      { headers: headers(), cache: "no-store" },
+    );
+    if (pr.ok) {
+      for (const p of (await pr.json()) as Record<string, unknown>[]) {
+        profMap.set(String(p.id), {
+          email: (p.email as string) ?? null,
+          name: (p.full_name as string) ?? null,
+        });
+      }
+    }
+  }
+
+  return rows.map((r) => {
+    const prof = profMap.get(String(r.user_id));
+    return {
+      id: String(r.id),
+      rating: Number(r.rating ?? 0),
+      text: (r.text as string) ?? null,
+      allowDisplay: Boolean(r.allow_display),
+      createdAt: String(r.created_at),
+      email: prof?.email ?? null,
+      name: prof?.name ?? null,
+    };
+  });
+}
+
 export type RewardStats = {
   totalUsers: number;
   referralsTotal: number;

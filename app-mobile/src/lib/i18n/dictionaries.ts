@@ -254,6 +254,17 @@ export type Dict = {
     askAmPm: string;
     otherTime: string;
   };
+  review: {
+    title: string;
+    sub: string;
+    placeholder: string;
+    consent: string;
+    submit: string;
+    later: string;
+    thanksTitle: string;
+    thanksSub: string;
+    rateBtn: string;
+  };
   chat: {
     online: string;
     greeting: string;
@@ -647,6 +658,18 @@ const hinglish: Dict = {
     askAmPm: "Subah ya shaam?",
     otherTime: "Koi aur time",
   },
+  review: {
+    title: "Saathi ko kitne star doge?",
+    sub: "Aapki raay se Saathi aur behtar banega.",
+    placeholder: "Kuch kehna chaho? (optional)",
+    consent: "Main Apka Saathi ko ye review website pe dikhane ki anumati deta hoon",
+    submit: "Bhejo",
+    later: "Abhi nahi",
+    thanksTitle: "Dhanyavaad! ❤️",
+    thanksSub:
+      "Bahut maayne rakhta hai. Ek aakhri baat — Play Store pe ek chhoti rating se aur parivaar Saathi tak pahunchte hain. Bas 10 second. 🙏",
+    rateBtn: "Play Store pe rate karo",
+  },
   chat: {
     online: "aapka dost · online",
     greeting:
@@ -1039,6 +1062,18 @@ const hi: Dict = {
     askAmPm: "सुबह या शाम?",
     otherTime: "कोई और समय",
   },
+  review: {
+    title: "साथी को कितने स्टार दोगे?",
+    sub: "आपकी राय से साथी और बेहतर बनेगा।",
+    placeholder: "कुछ कहना चाहेंगे? (ज़रूरी नहीं)",
+    consent: "मैं Apka Saathi को यह रिव्यू वेबसाइट पर दिखाने की अनुमति देता हूँ",
+    submit: "भेजें",
+    later: "अभी नहीं",
+    thanksTitle: "धन्यवाद! ❤️",
+    thanksSub:
+      "बहुत मायने रखता है। एक आख़िरी बात — Play Store पर एक छोटी रेटिंग से और परिवार साथी तक पहुँचते हैं। बस 10 सेकंड। 🙏",
+    rateBtn: "Play Store पर रेट करें",
+  },
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
     greeting:
@@ -1429,6 +1464,18 @@ const en: Dict = {
     pastError: "That time has passed — pick a future time",
     askAmPm: "Morning or evening?",
     otherTime: "Another time",
+  },
+  review: {
+    title: "How many stars for Saathi?",
+    sub: "Your feedback helps Saathi get better.",
+    placeholder: "Want to say something? (optional)",
+    consent: "I allow Apka Saathi to display this review on its website",
+    submit: "Send",
+    later: "Not now",
+    thanksTitle: "Thank you! ❤️",
+    thanksSub:
+      "It means a lot. One last thing — a quick rating on the Play Store helps other families find Saathi. Takes 10 seconds. 🙏",
+    rateBtn: "Rate on Play Store",
   },
   chat: {
     online: "your friend · online",
