@@ -61,3 +61,13 @@ export function reminderWhatsAppText(title: string, whenLabel: string): string {
     `_Apka Saathi · jo kuch nahi bhoolta_ 🙂`
   );
 }
+
+/** Document expiry ka WhatsApp text — {whenLabel} jaise "aaj" / "3 din me". */
+export function documentWhatsAppText(name: string, whenLabel: string): string {
+  return (
+    `📄 *Apka Saathi* — document reminder\n\n` +
+    `*${name}* ${whenLabel} expire ho raha hai.\n` +
+    `Time pe renew karwa lena. 🙂\n\n` +
+    `_Apka Saathi · jo kuch nahi bhoolta_`
+  );
+}
