@@ -22,6 +22,7 @@ import {
   purchasePlus,
 } from "@/lib/purchases";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
+import { logEvent } from "@/lib/analytics";
 import { useOffers } from "@/lib/use-offers";
 import {
   detectCountry,
@@ -158,6 +159,7 @@ export default function Upgrade() {
         // unlock/unpause ho jaayein (warna agle session tak locked rehte the).
         await enforcePlanLimits();
         await refresh();
+        logEvent("plus_purchased", { plan: yearly ? "yearly" : "monthly" });
         toast.show(u.activated, "success");
       } else {
         toast.show(u.purchaseFailed, "error");

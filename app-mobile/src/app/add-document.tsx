@@ -22,6 +22,7 @@ import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notificatio
 import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
 import { scanDocumentAI } from "@/lib/ai";
+import { logEvent } from "@/lib/analytics";
 import { dateAfterMonths, isValidDate } from "@/utils/expiry";
 import { extractExpiry } from "@/utils/extract-expiry";
 import { detectDocType, guessName } from "@/utils/detect-doc";
@@ -162,6 +163,7 @@ export default function AddDocument() {
         if (notifOk) await scheduleDocumentExpiry(doc.id, doc.name, doc.expiry);
       }
 
+      logEvent("document_added", { type: doc.type });
       // Referral reward unlock ho sakta hai (document + reminder dono hone pe).
       checkReferralQualification().catch(() => {});
       toast.show(notifOk ? d.added : d.addedNoNotif, notifOk ? "success" : "info");

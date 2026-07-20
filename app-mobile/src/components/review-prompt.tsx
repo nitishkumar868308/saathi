@@ -22,6 +22,7 @@ import {
   markFirstOpen,
   PLAY_STORE_URL,
 } from "@/lib/reviews";
+import { logEvent } from "@/lib/analytics";
 
 /**
  * 1 hafte baad ek baar rating/review popup (#9). Root me mount hai. Session ho
@@ -57,6 +58,7 @@ export function ReviewPrompt() {
     setSaving(true);
     try {
       await submitReview({ rating, text, allowDisplay: allow });
+      logEvent("review_submitted", { rating, allow_display: allow });
       await markReviewDone();
       setThanks(true);
     } finally {

@@ -12,6 +12,7 @@ import { ReminderAlertHost } from "@/components/reminder-alert";
 import { ReviewPrompt } from "@/components/review-prompt";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
+import { setAnalyticsUser } from "@/lib/analytics";
 
 export default function RootLayout() {
   return (
@@ -58,6 +59,7 @@ function RootNavigator() {
   const uid = session?.user?.id;
   useEffect(() => {
     if (uid) void syncNotifications();
+    setAnalyticsUser(uid ?? null);
   }, [uid]);
 
   if (loading || !langReady) {

@@ -25,6 +25,7 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { formatWhen, combine } from "@/utils/parse-time";
 import { parseReminderAI } from "@/lib/ai";
+import { logEvent } from "@/lib/analytics";
 import {
   openBatteryOptimizationSettings,
   batteryPromptShown,
@@ -204,6 +205,7 @@ export default function AddReminder() {
         remind_at: when.toISOString(),
         bucket,
       });
+      logEvent("reminder_created");
       // Referral reward: document + reminder dono hone pe unlock (server verify).
       checkReferralQualification().catch(() => {});
       const allowed = await ensureNotifPermission();
