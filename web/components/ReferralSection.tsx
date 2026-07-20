@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Gift, ArrowRight } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useOffers } from "@/lib/useOffers";
@@ -16,14 +16,8 @@ export default function ReferralSection() {
   const offers = useOffers();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Home page khulte hi referral landing modal dikhao (marketing). Har baar
-  // jab home load ho — taaki user ko referral offer turant dikhe.
-  useEffect(() => {
-    if (!offers.referralsEnabled) return;
-    const id = setTimeout(() => setModalOpen(true), 700);
-    return () => clearTimeout(id);
-  }, [offers.referralsEnabled]);
-
+  // Auto-open landing modal ab page ke top-level pe hai (LandingReferralPopup).
+  // Yahan ka modal sirf is section ke CTA button click pe khulta hai.
   if (!offers.referralsEnabled) return null;
 
   const vars = { d: offers.referralDays };

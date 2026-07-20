@@ -139,9 +139,9 @@ export async function applyReferralCode(code: string): Promise<string> {
 }
 
 /**
- * Referral reward check karo — document upload + Saathi se chat dono hone pe
- * dono users ko din milte hain. Best-effort, baar-baar call karna safe hai.
- * Returns: 'rewarded' | 'need_document' | 'need_chat' | 'no_referral' | 'error'
+ * Referral reward check karo — ek document upload + ek reminder set, dono hone
+ * pe dono users ko din milte hain. Best-effort, baar-baar call karna safe hai.
+ * Returns: 'rewarded' | 'need_document' | 'need_reminder' | 'no_referral' | 'error'
  */
 export async function checkReferralQualification(): Promise<string> {
   try {

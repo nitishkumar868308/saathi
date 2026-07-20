@@ -31,6 +31,7 @@ import Pricing from "@/components/Pricing";
 import ReferralSection from "@/components/ReferralSection";
 import Footer from "@/components/Footer";
 import SubHeader from "@/components/SubHeader";
+import LandingReferralPopup from "@/components/LandingReferralPopup";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 const featureIcons = [FileClock, Sunrise, Mic, MessageCircleHeart, Lock];
@@ -63,8 +64,11 @@ export default function Home() {
         <div className="blob bottom-[20%] left-1/4 h-72 w-72 bg-sage/15" />
       </div>
 
-      {/* Nav — poora responsive header (mobile menu + invite button) */}
+      {/* Nav — poora responsive header (mobile menu) */}
       <SubHeader />
+
+      {/* Home khulte hi referral landing popup — hero ke upar, top-level */}
+      <LandingReferralPopup />
 
       <main>
         {/* Hero */}

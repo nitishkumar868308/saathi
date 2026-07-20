@@ -454,7 +454,7 @@ const hinglish: Dict = {
     saveBadge: "2 mahine free",
     gstNote: "+ 18% GST",
     reward: "🎁 Pehle {n} users ko Saathi Plus — poore {m} mahine bilkul FREE!",
-    referralHow: "Refer & Earn: dost aapke code se join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din ka Saathi Plus plan free. Jitne chaaho, koi limit nahi.",
+    referralHow: "Refer & Earn: dost aapke code se join kare, apna pehla document daale aur ek reminder set kare — dono ko {d} din ka Saathi Plus plan free. Jitne chaaho, koi limit nahi.",
     plans: [
       {
         name: "Free",
@@ -553,7 +553,7 @@ const hinglish: Dict = {
     steps: [
       "Apna referral link share karo",
       "Dost app download karke account banaye",
-      "Woh apna pehla document daale aur Saathi se ek baar baat kare",
+      "Woh apna pehla document daale aur ek reminder set kare",
     ],
     cta: "Apna referral link lo",
     capNote: "Har successful referral pe {d} din ka Plus plan — jitne chaaho, koi limit nahi.",
@@ -568,7 +568,7 @@ const hinglish: Dict = {
     downloadApp: "App download karo",
     manageOnWeb: "Web pe manage karo",
     cardTitle: "Dono ko {d} din ka Plus plan free",
-    cardSub: "Apna link bhejo. Dost join kare, apna pehla document daale aur Saathi se ek baar baat kare — dono ko {d} din ka Saathi Plus plan.",
+    cardSub: "Apna link bhejo. Dost join kare, apna pehla document daale aur ek reminder set kare — dono ko {d} din ka Saathi Plus plan.",
     yourCode: "Aapka code",
     copy: "Copy",
     copied: "Copied",
@@ -837,7 +837,7 @@ const hi: Dict = {
     saveBadge: "2 महीने फ्री",
     gstNote: "+ 18% GST",
     reward: "🎁 पहले {n} यूज़र्स को साथी प्लस — पूरे {m} महीने बिल्कुल फ्री!",
-    referralHow: "रेफ़र करें और पाएँ: दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन का साथी प्लस प्लान फ्री। जितने चाहें, कोई सीमा नहीं।",
+    referralHow: "रेफ़र करें और पाएँ: दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्यूमेंट डाले और एक reminder सेट करे — दोनों को {d} दिन का साथी प्लस प्लान फ्री। जितने चाहें, कोई सीमा नहीं।",
     plans: [
       {
         name: "फ्री",
@@ -936,7 +936,7 @@ const hi: Dict = {
     steps: [
       "अपना रेफ़रल लिंक शेयर करें",
       "दोस्त ऐप डाउनलोड करके अकाउंट बनाए",
-      "वो अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे",
+      "वो अपना पहला डॉक्यूमेंट डाले और एक reminder सेट करे",
     ],
     cta: "अपना रेफ़रल लिंक लें",
     capNote: "हर सफल रेफ़रल पर {d} दिन का प्लस प्लान — जितने चाहें, कोई सीमा नहीं।",
@@ -951,7 +951,7 @@ const hi: Dict = {
     downloadApp: "ऐप डाउनलोड करें",
     manageOnWeb: "वेब पर मैनेज करें",
     cardTitle: "दोनों को {d} दिन का प्लस प्लान फ्री",
-    cardSub: "अपना लिंक भेजिए। दोस्त जॉइन करे, अपना पहला डॉक्यूमेंट डाले और साथी से एक बार बात करे — दोनों को {d} दिन का साथी प्लस प्लान।",
+    cardSub: "अपना लिंक भेजिए। दोस्त जॉइन करे, अपना पहला डॉक्यूमेंट डाले और एक reminder सेट करे — दोनों को {d} दिन का साथी प्लस प्लान।",
     yourCode: "आपका कोड",
     copy: "कॉपी",
     copied: "कॉपी हो गया",
@@ -1220,7 +1220,7 @@ const en: Dict = {
     saveBadge: "2 months free",
     gstNote: "+ 18% GST",
     reward: "🎁 First {n} users get Saathi Plus — {m} full months absolutely FREE!",
-    referralHow: "Refer & Earn: your friend joins with your code, adds their first document and chats with Saathi once — you both get {d} days of the Saathi Plus plan free. No limit.",
+    referralHow: "Refer & Earn: your friend joins with your code, adds their first document and sets one reminder — you both get {d} days of the Saathi Plus plan free. No limit.",
     plans: [
       {
         name: "Free",
@@ -1319,7 +1319,7 @@ const en: Dict = {
     steps: [
       "Share your referral link",
       "Your friend downloads the app and creates an account",
-      "They add their first document and chat with Saathi once",
+      "They add their first document and set one reminder",
     ],
     cta: "Get your referral link",
     capNote: "{d} days of the Plus plan for every successful referral — no limit.",
@@ -1334,7 +1334,7 @@ const en: Dict = {
     downloadApp: "Download the app",
     manageOnWeb: "Manage on the web",
     cardTitle: "You both get {d} days of the Plus plan",
-    cardSub: "Send your link. Your friend joins, adds their first document and chats with Saathi once — you both get {d} days of the Saathi Plus plan.",
+    cardSub: "Send your link. Your friend joins, adds their first document and sets one reminder — you both get {d} days of the Saathi Plus plan.",
     yourCode: "Your code",
     copy: "Copy",
     copied: "Copied",

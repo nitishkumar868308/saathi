@@ -4,7 +4,7 @@
 --
 -- Waitlist ki jagah: pehle N signups ko X mahine Plus.
 -- Referral: 1 referral = Y din Plus DONO ko (referrer cap Z mahine),
--- reward tabhi jab naya user document upload + Saathi se chat kare.
+-- reward tabhi jab naya user ek document upload + ek reminder set kare.
 
 /* ------------------------------------------------------------------ */
 /* 1. Config (admin se editable)                                        */
@@ -183,7 +183,7 @@ $$;
 grant execute on function public.apply_referral_code(text) to authenticated;
 
 /* ------------------------------------------------------------------ */
-/* 8. Qualification + reward (document upload + chat, dono)             */
+/* 8. Qualification + reward (document upload + reminder set, dono)     */
 /* ------------------------------------------------------------------ */
 
 create or replace function public.check_referral_qualification()
@@ -197,13 +197,12 @@ begin
    where referee_id = auth.uid() and rewarded_at is null;
   if r is null then return 'no_referral'; end if;
 
-  -- Anti-fraud: naya user ne document upload kiya AUR Saathi se chat kiya
+  -- Anti-fraud: naya user ne ek document upload kiya AUR ek reminder set kiya
   if not exists (select 1 from public.documents where user_id = auth.uid()) then
     return 'need_document';
   end if;
-  if not exists (select 1 from public.messages
-                  where user_id = auth.uid() and role = 'user') then
-    return 'need_chat';
+  if not exists (select 1 from public.reminders where user_id = auth.uid()) then
+    return 'need_reminder';
   end if;
 
   days := public.cfg_int('referral_days', 15);

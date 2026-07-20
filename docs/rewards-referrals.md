@@ -86,7 +86,7 @@ koi deploy nahi chahiye. Offer band karo to uska banner/row poori tarah gayab.
 |---|---|---|
 | `claim_first_n_reward()` | app (login pe) | `granted` / `already` / `not_eligible` / `disabled` |
 | `apply_referral_code(p_code)` | app (pehle SIGNED_IN pe) | `applied` / `invalid_code` / `already_referred` / `self` |
-| `check_referral_qualification()` | app (chat/doc ke baad) | `rewarded` / `need_document` / `need_chat` / `no_referral` |
+| `check_referral_qualification()` | app (doc/reminder ke baad) | `rewarded` / `need_document` / `need_reminder` / `no_referral` |
 | `admin_grant_days(p_email, p_days)` | admin API (service_role) | `granted` / `user_not_found` |
 | `grant_plus_days(uid, days)` | internal helper | — |
 

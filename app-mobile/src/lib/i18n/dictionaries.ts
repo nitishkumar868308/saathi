@@ -478,7 +478,7 @@ const hinglish: Dict = {
     referralOptional: "optional",
     referralPlaceholder: "Dost ka code",
     referralHint:
-      "Reward tab milega jab aap apna pehla document add karo aur Saathi se ek baar baat karo.",
+      "Reward tab milega jab aap apna pehla document add karo aur ek reminder set karo.",
     loginBtn: "Login karo",
     signupBtn: "Account banao",
     or: "ya",
@@ -659,7 +659,7 @@ const hinglish: Dict = {
     invite: "Invite karo",
     noReferrals: "Abhi kisi ne aapke code se join nahi kiya.",
     referNote:
-      "Din tabhi milte hain jab dost apna pehla document daale AUR Saathi se ek baar baat kare.",
+      "Din tabhi milte hain jab dost apna pehla document daale AUR ek reminder set kare.",
     pending: "abhi pending",
     unlimited: "Unlimited",
     sourceReferral: "Referral se",
@@ -671,7 +671,7 @@ const hinglish: Dict = {
     title: "Refer & Earn",
     heroTitle: "Dono ko {d} din ka Plus plan FREE",
     heroSub:
-      "Aapka dost aapke code se join kare, apna pehla document daale aur Saathi se baat kare — dono ko {d} din ka Saathi Plus plan mil jaayega.",
+      "Aapka dost aapke code se join kare, apna pehla document daale aur ek reminder set kare — dono ko {d} din ka Saathi Plus plan mil jaayega.",
     lockedTitle: "Pehle ye poora karo",
     lockedSub: "Uske baad aapka referral code aur share unlock ho jayega.",
     condDocument: "Ek document add karo",
@@ -684,7 +684,7 @@ const hinglish: Dict = {
     statDays: "Plus din kamaaye",
     noLimit:
       "Jitne dost invite karo — har successful referral pe {d} din ka Plus plan. Koi limit nahi.",
-    pending: "{x} dost join to hue, par abhi unhone document add + chat poora nahi kiya.",
+    pending: "{x} dost join to hue, par abhi unhone document add + reminder poora nahi kiya.",
     shareMessage:
       "Main Apka Saathi use karta hoon — documents ki expiry aur zaroori kaam khud yaad dila deta hai. 🙂\n\nMere code se join karo, dono ko {d} din ka Saathi Plus plan FREE:\n{link}",
     loadError: "Referral info load nahi hui",
@@ -849,7 +849,7 @@ const hi: Dict = {
     referralOptional: "optional",
     referralPlaceholder: "दोस्त का कोड",
     referralHint:
-      "रिवॉर्ड तब मिलेगा जब आप अपना पहला डॉक्युमेंट डालें और साथी से एक बार बात करें।",
+      "रिवॉर्ड तब मिलेगा जब आप अपना पहला डॉक्युमेंट डालें और एक reminder सेट करें।",
     loginBtn: "लॉगिन करें",
     signupBtn: "अकाउंट बनाएँ",
     or: "या",
@@ -1029,7 +1029,7 @@ const hi: Dict = {
     invite: "इनवाइट करें",
     noReferrals: "अभी किसी ने आपके कोड से जॉइन नहीं किया।",
     referNote:
-      "दिन तभी मिलते हैं जब दोस्त अपना पहला डॉक्युमेंट डाले और साथी से एक बार बात करे।",
+      "दिन तभी मिलते हैं जब दोस्त अपना पहला डॉक्युमेंट डाले और एक reminder सेट करे।",
     pending: "अभी pending",
     unlimited: "अनलिमिटेड",
     sourceReferral: "रेफ़रल से",
@@ -1041,7 +1041,7 @@ const hi: Dict = {
     title: "Refer & Earn",
     heroTitle: "दोनों को {d} दिन का प्लस प्लान FREE",
     heroSub:
-      "आपका दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्युमेंट डाले और साथी से बात करे — दोनों को {d} दिन का साथी प्लस प्लान मिल जाएगा।",
+      "आपका दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्युमेंट डाले और एक reminder सेट करे — दोनों को {d} दिन का साथी प्लस प्लान मिल जाएगा।",
     lockedTitle: "पहले ये पूरा करें",
     lockedSub: "उसके बाद आपका रेफ़रल कोड और शेयर अनलॉक हो जाएगा।",
     condDocument: "एक डॉक्युमेंट जोड़ें",
@@ -1054,7 +1054,7 @@ const hi: Dict = {
     statDays: "प्लस दिन कमाए",
     noLimit:
       "जितने दोस्त इनवाइट करें — हर सफल रेफ़रल पर {d} दिन का प्लस प्लान। कोई सीमा नहीं।",
-    pending: "{x} दोस्त जॉइन तो हुए, पर अभी उन्होंने डॉक्युमेंट + चैट पूरा नहीं किया।",
+    pending: "{x} दोस्त जॉइन तो हुए, पर अभी उन्होंने डॉक्युमेंट + reminder पूरा नहीं किया।",
     shareMessage:
       "मैं Apka Saathi इस्तेमाल करता हूँ — डॉक्युमेंट्स की एक्सपायरी और ज़रूरी काम खुद याद दिला देता है। 🙂\n\nमेरे कोड से जॉइन करें, दोनों को {d} दिन का साथी प्लस प्लान FREE:\n{link}",
     loadError: "रेफ़रल जानकारी लोड नहीं हुई",
@@ -1219,7 +1219,7 @@ const en: Dict = {
     referralOptional: "optional",
     referralPlaceholder: "Friend's code",
     referralHint:
-      "You'll get the reward once you add your first document and chat with Saathi once.",
+      "You'll get the reward once you add your first document and set one reminder.",
     loginBtn: "Sign in",
     signupBtn: "Create account",
     or: "or",
@@ -1398,7 +1398,7 @@ const en: Dict = {
     invite: "Invite",
     noReferrals: "Nobody has joined with your code yet.",
     referNote:
-      "Days are earned only when your friend adds their first document AND chats with Saathi once.",
+      "Days are earned only when your friend adds their first document AND sets one reminder.",
     pending: "pending",
     unlimited: "Unlimited",
     sourceReferral: "From referral",
@@ -1410,7 +1410,7 @@ const en: Dict = {
     title: "Refer & Earn",
     heroTitle: "You both get {d} days of the Plus plan FREE",
     heroSub:
-      "Your friend joins with your code, adds their first document and chats with Saathi — you both get {d} days of the Saathi Plus plan.",
+      "Your friend joins with your code, adds their first document and sets one reminder — you both get {d} days of the Saathi Plus plan.",
     lockedTitle: "First, finish these",
     lockedSub: "Then your referral code and sharing unlock.",
     condDocument: "Add one document",
@@ -1423,7 +1423,7 @@ const en: Dict = {
     statDays: "Plus days earned",
     noLimit:
       "Invite as many friends as you like — {d} days of the Plus plan per successful referral. No limit.",
-    pending: "{x} friend(s) joined, but haven't added a document and chatted yet.",
+    pending: "{x} friend(s) joined, but haven't added a document and set a reminder yet.",
     shareMessage:
       "I use Apka Saathi — it remembers my document expiries and everything that matters. 🙂\n\nJoin with my code and we both get {d} days of the Saathi Plus plan FREE:\n{link}",
     loadError: "Couldn't load referral info",

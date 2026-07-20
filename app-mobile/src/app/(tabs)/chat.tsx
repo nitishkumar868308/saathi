@@ -18,7 +18,6 @@ import { TypingDots } from "@/components/typing-dots";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
 import { askSaathi, type ChatTurn } from "@/lib/ai";
-import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
@@ -60,9 +59,6 @@ export default function Chat() {
 
     setMessages((m) => [...m, { id: String(m.length + 1), role: "saathi", text: reply }]);
     setSending(false);
-
-    // Referral reward unlock ho sakta hai (document + chat dono hone pe).
-    checkReferralQualification().catch(() => {});
   }
 
   return (

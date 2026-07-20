@@ -20,6 +20,7 @@ import DateTimePicker, {
 
 import { colors } from "@/theme/colors";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
+import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { parseReminderTime, reminderNeeds, formatWhen } from "@/utils/parse-time";
@@ -149,6 +150,8 @@ export default function AddReminder() {
         remind_at: time.toISOString(),
         bucket,
       });
+      // Referral reward: document + reminder dono hone pe unlock (server verify).
+      checkReferralQualification().catch(() => {});
       const allowed = await ensureNotifPermission();
       // scheduleReminder guzre hue waqt ya OS error pe false deta hai — pehle
       // toast phir bhi "Reminder set ✓" bolta tha, jo jhooth tha.
