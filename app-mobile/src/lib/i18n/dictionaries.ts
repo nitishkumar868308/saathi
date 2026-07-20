@@ -229,6 +229,11 @@ export type Dict = {
     askWhat: string;
     askWhatPlaceholder: string;
     understanding: string;
+    askDay: string;
+    dayAfter: string;
+    pickDate: string;
+    pickTime: string;
+    pastError: string;
   };
   chat: {
     online: string;
@@ -601,6 +606,11 @@ const hinglish: Dict = {
     askWhat: "Ye reminder kis cheez ke liye hai?",
     askWhatPlaceholder: "Jaise: dawai lena, bijli bill bharna",
     understanding: "Samajh raha hoon…",
+    askDay: "Kis din yaad dilau?",
+    dayAfter: "Parso",
+    pickDate: "Date chuno",
+    pickTime: "Time chuno",
+    pastError: "Ye time nikal chuka — aage ka time chuno",
   },
   chat: {
     online: "aapka dost · online",
@@ -972,6 +982,11 @@ const hi: Dict = {
     askWhat: "यह रिमाइंडर किस चीज़ के लिए है?",
     askWhatPlaceholder: "जैसे: दवाई लेना, बिजली बिल भरना",
     understanding: "समझ रहा हूँ…",
+    askDay: "किस दिन याद दिलाऊँ?",
+    dayAfter: "परसों",
+    pickDate: "तारीख़ चुनें",
+    pickTime: "समय चुनें",
+    pastError: "यह समय निकल चुका — आगे का समय चुनें",
   },
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
@@ -1342,6 +1357,11 @@ const en: Dict = {
     askWhat: "What is this reminder for?",
     askWhatPlaceholder: "e.g. take medicine, pay electricity bill",
     understanding: "Understanding…",
+    askDay: "Which day should I remind you?",
+    dayAfter: "Day after",
+    pickDate: "Pick a date",
+    pickTime: "Pick a time",
+    pastError: "That time has passed — pick a future time",
   },
   chat: {
     online: "your friend · online",

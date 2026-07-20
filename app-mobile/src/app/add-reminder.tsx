@@ -23,8 +23,7 @@ import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
-import { parseReminderTime, reminderNeeds, formatWhen } from "@/utils/parse-time";
-import { aiParseReminder } from "@/lib/ai";
+import { parseReminder, formatWhen, combine } from "@/utils/parse-time";
 import {
   openBatteryOptimizationSettings,
   batteryPromptShown,
@@ -41,127 +40,141 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
+/** Aaj se `offset` din ka midnight Date. */
+function midnight(offset = 0): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + offset);
+  return d;
+}
+
 export default function AddReminder() {
   const router = useRouter();
   const toast = useToast();
   const { addReminder: a, common: c, reliability: rel } = useT();
   const { locale } = useLocale();
-  const words = { today: c.today, tomorrow: c.tomorrow };
-  const fmt = (d: Date) => formatWhen(d, words, locale);
+  const bcp = locale === "hi" ? "hi-IN" : "en-IN";
+
   const [title, setTitle] = useState("");
   // Jab parser subject na samajh paaye, user yahan alag se batata hai.
   const [subject, setSubject] = useState("");
-  const [askSubject, setAskSubject] = useState(false);
-  const [picked, setPicked] = useState<Date | null>(null);
-  const [showIosPicker, setShowIosPicker] = useState(false);
+  // Din/time user ne khud chuna ho to ye override karte hain.
+  const [pickedDate, setPickedDate] = useState<Date | null>(null);
+  const [pickedMinutes, setPickedMinutes] = useState<number | null>(null);
+  const [iosDate, setIosDate] = useState(false);
+  const [iosTime, setIosTime] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [understanding, setUnderstanding] = useState(false);
 
-  const parsed = useMemo(() => parseReminderTime(title), [title]);
-  const needs = reminderNeeds(parsed);
+  const parsed = useMemo(() => parseReminder(title), [title]);
 
-  // Effective time: user ne khud chuna ho to wahi, warna text se samjha hua.
-  const when = picked ?? parsed?.date ?? null;
-  // Effective subject: clarify-box > parser ka nikala hua.
-  const finalSubject = subject.trim() || parsed?.title?.trim() || "";
-  // Kya-kya abhi bhi missing hai (AI se try karne ke baad screen isse poochti).
-  const missingTitle = !finalSubject;
-  const missingTime = !when;
+  // Effective slots: user ka override > parser ka samjha hua.
+  const finalTitle = subject.trim() || parsed?.title?.trim() || "";
+  const finalDate = pickedDate ?? parsed?.date ?? null;
+  const finalMinutes = pickedMinutes ?? parsed?.minutes ?? null;
+  const when =
+    finalDate && finalMinutes != null ? combine(finalDate, finalMinutes) : null;
+  const isPast = !!when && when.getTime() <= Date.now();
 
-  function openPicker() {
-    const base =
-      when ?? new Date(Date.now() + 60 * 60 * 1000); // default: 1 ghanta baad
+  const missingTitle = !finalTitle;
+  const missingDate = !finalDate;
+  const missingTime = finalMinutes == null;
+  const canSave = !!finalTitle && !!when && !isPast;
+
+  const words = { today: c.today, tomorrow: c.tomorrow };
+  const dayLabel = (d: Date) => {
+    if (isSameDay(d, midnight(0))) return c.today;
+    if (isSameDay(d, midnight(1))) return c.tomorrow;
+    if (isSameDay(d, midnight(2))) return a.dayAfter;
+    return d.toLocaleDateString(bcp, {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  };
+  const timeLabel = (mins: number) => {
+    const d = new Date();
+    d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+    return d.toLocaleTimeString(bcp, {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  function openDatePicker() {
+    const base = finalDate ?? midnight(0);
     if (Platform.OS === "android") {
       DateTimePickerAndroid.open({
         value: base,
         mode: "date",
-        minimumDate: new Date(),
+        minimumDate: midnight(0),
         onChange: (_e, d) => {
-          if (!d) return;
-          DateTimePickerAndroid.open({
-            value: d,
-            mode: "time",
-            is24Hour: false,
-            onChange: (_e2, t) => {
-              if (!t) return;
-              const combined = new Date(d);
-              combined.setHours(t.getHours(), t.getMinutes(), 0, 0);
-              setPicked(combined);
-            },
-          });
+          if (d) {
+            const m = new Date(d);
+            m.setHours(0, 0, 0, 0);
+            setPickedDate(m);
+          }
         },
       });
     } else {
-      setShowIosPicker(true);
+      setIosDate(true);
+    }
+  }
+
+  function openTimePicker() {
+    const base = new Date();
+    if (finalMinutes != null)
+      base.setHours(Math.floor(finalMinutes / 60), finalMinutes % 60, 0, 0);
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: base,
+        mode: "time",
+        is24Hour: false,
+        onChange: (_e, d) => {
+          if (d) setPickedMinutes(d.getHours() * 60 + d.getMinutes());
+        },
+      });
+    } else {
+      setIosTime(true);
     }
   }
 
   async function save() {
-    if (saving || understanding) return;
-    const raw = title.trim();
-    if (!raw && !subject.trim()) return toast.show(a.whatLabel, "info");
-
-    // 1. Local parser jo samajh paaya.
-    let subj = finalSubject;
-    let time = when;
-
-    // 2. Kuch adhoora? Ek baar AI se samajhne ki koshish (best-effort, online+key).
-    if ((!subj || !time) && raw) {
-      setUnderstanding(true);
-      const ai = await aiParseReminder(raw, locale);
-      setUnderstanding(false);
-      if (ai) {
-        if (!subj && ai.title) {
-          subj = ai.title;
-          setSubject(ai.title);
-        }
-        if (!time && ai.remind_at) {
-          const d = new Date(ai.remind_at);
-          if (!isNaN(d.getTime())) {
-            time = d;
-            setPicked(d);
-          }
-        }
-      }
-    }
-
-    // 3. Ab bhi samajh na aaye to user se wapas poochho (title pehle, phir time).
-    if (!subj) {
-      setAskSubject(true);
-      toast.show(a.askWhat, "info");
+    if (saving) return;
+    if (!title.trim() && !subject.trim()) return toast.show(a.whatLabel, "info");
+    if (!finalTitle) return toast.show(a.askWhat, "info");
+    if (!finalDate) return toast.show(a.askDay, "info");
+    if (finalMinutes == null) {
+      toast.show(a.pickTime, "info");
+      openTimePicker();
       return;
     }
-    if (!time) {
-      toast.show(a.askTime, "info");
-      openPicker();
+    if (!when || when.getTime() <= Date.now()) {
+      toast.show(a.pastError, "error");
+      openTimePicker();
       return;
     }
 
-    // Label hamesha locale-aware formatter se — parser ka Hinglish label display
-    // ke liye use nahi karte (bhasha follow karni hai).
-    const finalLabel = fmt(time);
-
+    // Label hamesha locale-aware formatter se (parser ka label nahi).
+    const finalLabel = formatWhen(when, words, locale);
     try {
       setSaving(true);
-      const bucket = isSameDay(time, new Date()) ? "today" : "upcoming";
+      const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
       const r = await addReminder({
-        title: subj,
+        title: finalTitle,
         time_label: finalLabel,
-        remind_at: time.toISOString(),
+        remind_at: when.toISOString(),
         bucket,
       });
       // Referral reward: document + reminder dono hone pe unlock (server verify).
       checkReferralQualification().catch(() => {});
       const allowed = await ensureNotifPermission();
-      // scheduleReminder guzre hue waqt ya OS error pe false deta hai — pehle
-      // toast phir bhi "Reminder set ✓" bolta tha, jo jhooth tha.
-      const scheduled = allowed && (await scheduleReminder(r.id, r.title, time));
+      const scheduled = allowed && (await scheduleReminder(r.id, r.title, when));
       toast.show(
         scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
         scheduled ? "success" : "info",
       );
-      // Pehli baar reminder set hone pe: battery optimization ka ek-time prompt,
-      // taaki app band hone pe bhi reminder + sound reliably aaye (India phones).
+      // Pehli baar reminder set hone pe battery-optimization ka ek-time prompt.
       if (scheduled && Platform.OS === "android" && !(await batteryPromptShown())) {
         await markBatteryPromptShown();
         Alert.alert(rel.promptTitle, rel.promptBody, [
@@ -189,6 +202,8 @@ export default function AddReminder() {
     }
   }
 
+  const started = title.trim().length > 0 || subject.trim().length > 0;
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
@@ -198,11 +213,16 @@ export default function AddReminder() {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
+          {/* Ek hi jagah bolo/likho — Saathi samajh lega */}
           <Text style={styles.label}>{a.whatLabel}</Text>
           <View style={styles.inputRow}>
             <TextInput
@@ -217,111 +237,152 @@ export default function AddReminder() {
           </View>
           <Text style={styles.hint}>🎤 {a.micHint}</Text>
 
-          {/* Saathi kya samajh raha hai — AI se poochte waqt */}
-          {understanding && (
-            <View style={styles.thinking}>
-              <ActivityIndicator size="small" color={colors.terracotta} />
-              <Text style={styles.thinkingText}>{a.understanding}</Text>
-            </View>
-          )}
-
-          {/* Auto-detected: subject + time (text se) */}
-          {parsed?.date && !picked && !understanding && (
-            <View style={[styles.detected, styles.detectedActive]}>
-              <Ionicons name="sparkles" size={18} color={colors.white} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.detLabel, { color: "rgba(255,255,255,0.8)" }]}>
-                  {a.understood} ✨
-                </Text>
-                {finalSubject ? (
-                  <Text style={[styles.detSubject, { color: colors.white }]}>
-                    {finalSubject}
+          {started && (
+            <View style={styles.card}>
+              {/* --- Kya (title) --- */}
+              <View style={styles.slot}>
+                <View style={styles.slotIcon}>
+                  <Ionicons name="create-outline" size={17} color={colors.terracotta} />
+                </View>
+                {finalTitle ? (
+                  <Text style={styles.slotValue} numberOfLines={2}>
+                    {finalTitle}
                   </Text>
-                ) : null}
-                <Text style={[styles.detTime, { color: "rgba(255,255,255,0.9)" }]}>
-                  {fmt(parsed.date)}
-                </Text>
+                ) : (
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.slotAsk}>{a.askWhat}</Text>
+                    <View style={styles.inputRow}>
+                      <TextInput
+                        value={subject}
+                        onChangeText={setSubject}
+                        placeholder={a.askWhatPlaceholder}
+                        placeholderTextColor={colors.inkSoft}
+                        style={styles.subInput}
+                        autoFocus
+                      />
+                      <VoiceButton
+                        onText={(txt) => setSubject((p) => (p ? p + " " + txt : txt))}
+                      />
+                    </View>
+                  </View>
+                )}
               </View>
-              <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-            </View>
-          )}
 
-          {/* Subject samajh nahi aaya — user se poochho (text + voice) */}
-          {!understanding && missingTitle && (title.trim().length > 0 || askSubject) && (
-            <View style={styles.clarify}>
-              <Text style={styles.clarifyQ}>🤔 {a.askWhat}</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  value={subject}
-                  onChangeText={setSubject}
-                  placeholder={a.askWhatPlaceholder}
-                  placeholderTextColor={colors.inkSoft}
-                  style={styles.input}
-                  autoFocus={askSubject}
-                  multiline
-                />
-                <VoiceButton
-                  onText={(txt) => setSubject((p) => (p ? p + " " + txt : txt))}
-                />
+              {/* --- Kis din (date) --- */}
+              <View style={styles.slot}>
+                <View style={styles.slotIcon}>
+                  <Ionicons name="calendar-outline" size={17} color={colors.terracotta} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={missingDate ? styles.slotAsk : styles.slotValue}>
+                    {missingDate ? a.askDay : dayLabel(finalDate!)}
+                  </Text>
+                  <View style={styles.chips}>
+                    {[
+                      { label: c.today, d: midnight(0) },
+                      { label: c.tomorrow, d: midnight(1) },
+                      { label: a.dayAfter, d: midnight(2) },
+                    ].map((opt) => {
+                      const active = finalDate && isSameDay(finalDate, opt.d);
+                      return (
+                        <Pressable
+                          key={opt.label}
+                          onPress={() => setPickedDate(opt.d)}
+                          style={[styles.chip, active && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                            {opt.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable onPress={openDatePicker} style={styles.chip}>
+                      <Ionicons name="calendar" size={13} color={colors.inkSoft} />
+                      <Text style={styles.chipText}>{a.pickDate}</Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
-            </View>
-          )}
 
-          {/* Kab? — time na mile to yahan se chuno */}
-          <Text style={styles.label}>{a.whenLabel}</Text>
-
-          {when ? (
-            <View style={styles.whenRow}>
-              <View style={styles.whenChip}>
-                <Ionicons name="alarm" size={18} color={colors.terracotta} />
-                <Text style={styles.whenText}>{fmt(when)}</Text>
+              {/* --- Kis time --- */}
+              <View style={styles.slot}>
+                <View style={styles.slotIcon}>
+                  <Ionicons name="alarm-outline" size={17} color={colors.terracotta} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  {!missingTime && (
+                    <Text style={styles.slotValue}>{timeLabel(finalMinutes!)}</Text>
+                  )}
+                  <Pressable onPress={openTimePicker} style={styles.timeBtn}>
+                    <Ionicons name="time-outline" size={15} color={colors.terracotta} />
+                    <Text style={styles.timeBtnText}>
+                      {missingTime ? a.pickTime : a.change}
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
-              <Pressable onPress={openPicker} style={styles.changeBtn}>
-                <Ionicons name="create-outline" size={16} color={colors.terracotta} />
-                <Text style={styles.changeText}>{a.change}</Text>
-              </Pressable>
+
+              {isPast && !missingTime && (
+                <Text style={styles.err}>{a.pastError}</Text>
+              )}
+
+              {/* iOS inline pickers */}
+              {iosDate && Platform.OS === "ios" && (
+                <View style={styles.iosPicker}>
+                  <DateTimePicker
+                    value={finalDate ?? midnight(0)}
+                    mode="date"
+                    display="spinner"
+                    minimumDate={midnight(0)}
+                    onChange={(_e, d) => {
+                      if (d) {
+                        const m = new Date(d);
+                        m.setHours(0, 0, 0, 0);
+                        setPickedDate(m);
+                      }
+                    }}
+                  />
+                  <Pressable onPress={() => setIosDate(false)} style={styles.iosDone}>
+                    <Text style={styles.iosDoneText}>{c.done}</Text>
+                  </Pressable>
+                </View>
+              )}
+              {iosTime && Platform.OS === "ios" && (
+                <View style={styles.iosPicker}>
+                  <DateTimePicker
+                    value={(() => {
+                      const d = new Date();
+                      if (finalMinutes != null)
+                        d.setHours(Math.floor(finalMinutes / 60), finalMinutes % 60, 0, 0);
+                      return d;
+                    })()}
+                    mode="time"
+                    display="spinner"
+                    onChange={(_e, d) => {
+                      if (d) setPickedMinutes(d.getHours() * 60 + d.getMinutes());
+                    }}
+                  />
+                  <Pressable onPress={() => setIosTime(false)} style={styles.iosDone}>
+                    <Text style={styles.iosDoneText}>{c.done}</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
-          ) : (
-            <Pressable onPress={openPicker} style={styles.pickBtn}>
-              <Ionicons name="calendar-outline" size={18} color={colors.white} />
-              <Text style={styles.pickText}>{a.pickDateTime}</Text>
-            </Pressable>
           )}
 
-          {!when && <Text style={styles.hint}>{a.noTimeHint}</Text>}
-
-          {/* iOS inline picker */}
-          {showIosPicker && Platform.OS === "ios" && (
-            <View style={styles.iosPicker}>
-              <DateTimePicker
-                value={when ?? new Date(Date.now() + 60 * 60 * 1000)}
-                mode="datetime"
-                display="spinner"
-                minimumDate={new Date()}
-                onChange={(_e, d) => {
-                  if (d) setPicked(d);
-                }}
-              />
-              <Pressable
-                onPress={() => setShowIosPicker(false)}
-                style={styles.iosDone}
-              >
-                <Text style={styles.iosDoneText}>{c.done}</Text>
-              </Pressable>
-            </View>
-          )}
+          <View style={{ height: 20 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 
       <Pressable
         onPress={save}
-        disabled={saving || understanding}
+        disabled={saving || !canSave}
         style={({ pressed }) => [
           styles.save,
-          (pressed || saving || understanding) && { opacity: 0.85 },
+          (pressed || saving || !canSave) && { opacity: 0.55 },
         ]}
       >
-        {saving || understanding ? (
+        {saving ? (
           <ActivityIndicator color={colors.white} />
         ) : (
           <Text style={styles.saveText}>{a.save}</Text>
@@ -357,7 +418,7 @@ const styles = StyleSheet.create({
   },
   content: { padding: 20, ...CONTENT },
   label: {
-    marginTop: 18,
+    marginTop: 12,
     marginBottom: 12,
     fontSize: 15,
     fontWeight: "700",
@@ -377,84 +438,86 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   hint: { marginTop: 8, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
-  detected: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.terracotta,
-    padding: 14,
-  },
-  detectedActive: { backgroundColor: colors.terracotta },
-  detLabel: { fontSize: 12, fontWeight: "600", color: colors.inkSoft },
-  detSubject: { fontSize: 16, fontWeight: "700", color: colors.ink, marginTop: 2 },
-  detTime: { fontSize: 14, fontWeight: "600", color: colors.ink, marginTop: 1 },
-  thinking: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginTop: 16,
-    borderRadius: 16,
+  card: {
+    marginTop: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    padding: 6,
   },
-  thinkingText: { fontSize: 14, fontWeight: "600", color: colors.inkSoft },
-  clarify: {
-    marginTop: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.amber,
-    backgroundColor: "rgba(224,168,86,0.10)",
-    padding: 14,
-    gap: 10,
+  slot: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  clarifyQ: { fontSize: 14.5, fontWeight: "700", color: colors.ink },
-  whenRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  whenChip: {
+  slotIcon: {
+    height: 34,
+    width: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: "rgba(194,90,55,0.10)",
+    marginTop: 1,
+  },
+  slotValue: { flex: 1, fontSize: 15.5, fontWeight: "700", color: colors.ink, paddingTop: 6 },
+  slotAsk: { fontSize: 14, fontWeight: "600", color: colors.inkSoft, marginBottom: 8, paddingTop: 4 },
+  subInput: {
     flex: 1,
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.cream,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: colors.ink,
+    fontSize: 15,
+  },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  chip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    borderRadius: 16,
+    gap: 5,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.sage,
-    backgroundColor: "rgba(124,138,107,0.08)",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: colors.line,
+    backgroundColor: colors.cream,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
   },
-  whenText: { fontSize: 16, fontWeight: "700", color: colors.ink },
-  changeBtn: {
+  chipActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
+  chipText: { fontSize: 13, fontWeight: "600", color: colors.inkSoft },
+  chipTextActive: { color: colors.white },
+  timeBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: 16,
+    alignSelf: "flex-start",
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.terracotta,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    marginTop: 4,
   },
-  changeText: { fontSize: 14, fontWeight: "700", color: colors.terracotta },
-  pickBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 16,
-    backgroundColor: colors.terracotta,
-    paddingVertical: 15,
+  timeBtnText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
+  err: {
+    marginHorizontal: 12,
+    marginBottom: 8,
+    fontSize: 13,
+    color: colors.terracotta,
+    fontWeight: "600",
   },
-  pickText: { fontSize: 15, fontWeight: "700", color: colors.white },
   iosPicker: {
-    marginTop: 12,
+    marginHorizontal: 8,
+    marginBottom: 8,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.line,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.cream,
     padding: 8,
   },
   iosDone: {
