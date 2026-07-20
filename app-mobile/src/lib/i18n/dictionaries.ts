@@ -162,6 +162,16 @@ export type Dict = {
     /** {n} */
     expiryInDaysLabel: string;
     noFileSaved: string;
+    share: string;
+    viewAction: string;
+    shareFailed: string;
+    /** {n} */
+    sharedN: string;
+    selectAll: string;
+    /** {n} */
+    selectCount: string;
+    /** {n} */
+    shareSelected: string;
     deleted: string;
     deleteConfirmTitle: string;
     /** {name} */
@@ -544,6 +554,13 @@ const hinglish: Dict = {
     expiryTomorrowLabel: "Kal expire",
     expiryInDaysLabel: "{n} din mein expire",
     noFileSaved: "Is document ki file save nahi hai.",
+    share: "Share",
+    viewAction: "Dekho",
+    shareFailed: "Share nahi ho paaya",
+    sharedN: "{n} document share hue",
+    selectAll: "Sabhi chuno",
+    selectCount: "{n} chune",
+    shareSelected: "Share ({n})",
     deleted: "Document delete ho gaya",
     deleteConfirmTitle: "Delete karein?",
     deleteConfirmBody: "\"{name}\" hata denge?",
@@ -922,6 +939,13 @@ const hi: Dict = {
     expiryTomorrowLabel: "कल एक्सपायर",
     expiryInDaysLabel: "{n} दिन में एक्सपायर",
     noFileSaved: "इस डॉक्युमेंट की फ़ाइल सेव नहीं है।",
+    share: "शेयर",
+    viewAction: "देखें",
+    shareFailed: "शेयर नहीं हो पाया",
+    sharedN: "{n} डॉक्युमेंट शेयर हुए",
+    selectAll: "सभी चुनें",
+    selectCount: "{n} चुने",
+    shareSelected: "शेयर ({n})",
     deleted: "डॉक्युमेंट डिलीट हो गया",
     deleteConfirmTitle: "डिलीट करें?",
     deleteConfirmBody: "\"{name}\" हटा दें?",
@@ -1299,6 +1323,13 @@ const en: Dict = {
     expiryTomorrowLabel: "Expires tomorrow",
     expiryInDaysLabel: "Expires in {n} days",
     noFileSaved: "No file saved for this document.",
+    share: "Share",
+    viewAction: "View",
+    shareFailed: "Couldn't share",
+    sharedN: "{n} document(s) shared",
+    selectAll: "Select all",
+    selectCount: "{n} selected",
+    shareSelected: "Share ({n})",
     deleted: "Document deleted",
     deleteConfirmTitle: "Delete?",
     deleteConfirmBody: "Remove \"{name}\"?",

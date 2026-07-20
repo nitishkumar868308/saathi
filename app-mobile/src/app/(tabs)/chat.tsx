@@ -17,30 +17,34 @@ import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
+import { useRouter } from "expo-router";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { askSaathi, ChatTurn, ChatContext } from "@/lib/ai";
 import { listReminders } from "@/lib/reminders";
-import { listDocuments } from "@/lib/documents";
+import { listDocuments, type Document } from "@/lib/documents";
 
-type Msg = { id: string; role: "user" | "saathi"; text: string };
+/** Chat ki ek line — saathi ki line ke saath tappable document chips ho sakti hain. */
+type DocRef = { id: string; name: string; uri: string; path: string };
+type Msg = {
+  id: string;
+  role: "user" | "saathi";
+  text: string;
+  docs?: DocRef[];
+};
 
-/** Chat ko user ka apna data do — taaki app ke sawaalon ka sahi jawab mile. */
-async function loadContext(): Promise<ChatContext> {
-  const [rem, docs] = await Promise.all([
-    listReminders().catch(() => []),
-    listDocuments().catch(() => []),
-  ]);
-  return {
-    today: new Date().toISOString(),
-    reminders: rem
-      .filter((r) => r.is_on && !r.is_paused)
-      .slice(0, 30)
-      .map((r) => ({ title: r.title, when: r.remind_at, on: r.is_on })),
-    documents: docs
-      .slice(0, 30)
-      .map((d) => ({ name: d.name, type: d.type, expiry: d.expiry })),
-  };
+/** Reply/sawaal me jin documents ka naam aata hai unke chips niche dikhate hain. */
+function matchDocs(text: string, docs: Document[]): DocRef[] {
+  const low = text.toLowerCase();
+  return docs
+    .filter((d) => d.name && low.includes(d.name.toLowerCase()) && !d.is_locked)
+    .slice(0, 4)
+    .map((d) => ({
+      id: d.id,
+      name: d.name,
+      uri: d.file_uri ?? "",
+      path: d.file_path ?? "",
+    }));
 }
 
 function TypingDots() {
@@ -57,6 +61,7 @@ function TypingDots() {
 }
 
 export default function Chat() {
+  const router = useRouter();
   const name = useUserName();
   const { chat: ch } = useT();
   const { locale } = useLocale();
@@ -83,13 +88,33 @@ export default function Chat() {
     setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
     setSending(true);
     try {
-      const context = await loadContext();
+      const [rem, docs] = await Promise.all([
+        listReminders().catch(() => []),
+        listDocuments().catch(() => []),
+      ]);
+      const context: ChatContext = {
+        today: new Date().toISOString(),
+        reminders: rem
+          .filter((r) => r.is_on && !r.is_paused)
+          .slice(0, 30)
+          .map((r) => ({ title: r.title, when: r.remind_at, on: r.is_on })),
+        documents: docs.slice(0, 30).map((dd) => ({
+          name: dd.name,
+          type: dd.type,
+          expiry: dd.expiry,
+        })),
+      };
       const reply = await askSaathi(t, history, name, {
         locale,
         context,
         fallback: ch.stubReply,
       });
-      setMessages((m) => [...m, { id: String(m.length + 1), role: "saathi", text: reply }]);
+      // Reply ya sawaal me jis document ka naam aaya, uska tappable chip dikhao.
+      const refs = matchDocs(reply + " " + t, docs);
+      setMessages((m) => [
+        ...m,
+        { id: String(m.length + 1), role: "saathi", text: reply, docs: refs },
+      ]);
     } finally {
       setSending(false);
     }
@@ -133,6 +158,27 @@ export default function Chat() {
                 </View>
                 <View style={styles.saathiBubble}>
                   <Text style={styles.saathiText}>{m.text}</Text>
+                  {m.docs && m.docs.length > 0 && (
+                    <View style={styles.docChips}>
+                      {m.docs.map((doc) => (
+                        <Pressable
+                          key={doc.id}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/document-view",
+                              params: { uri: doc.uri, path: doc.path, name: doc.name },
+                            } as never)
+                          }
+                          style={styles.docChip}
+                        >
+                          <Ionicons name="document-text-outline" size={14} color={colors.terracotta} />
+                          <Text style={styles.docChipText} numberOfLines={1}>
+                            {doc.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
                 </View>
               </View>
             ) : (
@@ -233,6 +279,20 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   saathiText: { color: colors.ink, fontSize: 15, lineHeight: 22 },
+  docChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  docChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    maxWidth: 200,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.cream,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  docChipText: { fontSize: 12.5, fontWeight: "600", color: colors.terracotta },
   userBubble: {
     alignSelf: "flex-end",
     maxWidth: "82%",

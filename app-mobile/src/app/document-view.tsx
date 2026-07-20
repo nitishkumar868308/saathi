@@ -13,16 +13,37 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { colors } from "@/theme/colors";
 import { signedUrl } from "@/lib/storage";
+import { shareDocument } from "@/lib/share";
+import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function DocumentView() {
   const { documents: d } = useT();
+  const toast = useToast();
   const { uri, path, name } = useLocalSearchParams<{
     uri?: string;
     path?: string;
     name?: string;
   }>();
   const { width, height } = Dimensions.get("window");
+  const [sharing, setSharing] = useState(false);
+
+  async function onShare() {
+    if (sharing) return;
+    setSharing(true);
+    try {
+      const ok = await shareDocument({
+        name: name || "Document",
+        file_uri: uri || null,
+        file_path: path || null,
+      });
+      if (!ok) toast.show(d.shareFailed, "error");
+    } catch {
+      toast.show(d.shareFailed, "error");
+    } finally {
+      setSharing(false);
+    }
+  }
 
   // Local uri sabse fast; na ho to private storage se signed URL.
   const [resolved, setResolved] = useState<string | null>(uri || null);
@@ -49,7 +70,13 @@ export default function DocumentView() {
         <Text style={styles.title} numberOfLines={1}>
           {name || "Document"}
         </Text>
-        <View style={{ width: 22 }} />
+        <Pressable onPress={onShare} hitSlop={10} style={styles.back} disabled={sharing}>
+          {sharing ? (
+            <ActivityIndicator color={colors.terracotta} size="small" />
+          ) : (
+            <Ionicons name="share-outline" size={21} color={colors.ink} />
+          )}
+        </Pressable>
       </View>
       <View style={styles.body}>
         {loading ? (

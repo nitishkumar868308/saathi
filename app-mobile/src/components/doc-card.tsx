@@ -11,10 +11,15 @@ export function DocCard({
   doc,
   onPress,
   onLongPress,
+  selectMode = false,
+  selected = false,
 }: {
   doc: Document;
   onPress?: () => void;
   onLongPress?: () => void;
+  /** Multi-select mode on hai — checkbox dikhega. */
+  selectMode?: boolean;
+  selected?: boolean;
 }) {
   const { documents: d, common: c } = useT();
   const locked = doc.is_locked;
@@ -37,9 +42,15 @@ export function DocCard({
       style={({ pressed }) => [
         styles.card,
         locked && styles.lockedCard,
+        selected && styles.selectedCard,
         pressed && (onPress || onLongPress) && styles.pressed,
       ]}
     >
+      {selectMode && (
+        <View style={[styles.check, selected && styles.checkOn]}>
+          {selected && <Ionicons name="checkmark" size={14} color={colors.white} />}
+        </View>
+      )}
       <View style={[styles.icon, { backgroundColor: locked ? colors.creamDeep : s.bg }]}>
         <Ionicons
           name={(locked ? "lock-closed" : iconForType(doc.type)) as any}
@@ -79,6 +90,17 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   lockedCard: { backgroundColor: colors.cream, borderStyle: "dashed" },
+  selectedCard: { borderColor: colors.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
+  check: {
+    height: 22,
+    width: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkOn: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
   lockedText: { color: colors.inkSoft },
   lockBadge: {
     flexDirection: "row",

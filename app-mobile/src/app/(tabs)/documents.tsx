@@ -16,6 +16,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { colors } from "@/theme/colors";
 import { listDocuments, deleteDocument, type Document } from "@/lib/documents";
 import { cancelDocumentExpiry } from "@/lib/notifications";
+import { shareDocument, shareDocuments } from "@/lib/share";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { UpgradeBanner } from "@/components/upgrade-banner";
@@ -33,6 +34,8 @@ export default function Documents() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const filters: { key: Filter; label: string }[] = [
     { key: "all", label: d.filterAll },
@@ -83,6 +86,41 @@ export default function Documents() {
     ]);
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function exitSelect() {
+    setSelectMode(false);
+    setSelected(new Set());
+  }
+
+  async function onShareOne(doc: Document) {
+    const ok = await shareDocument(doc).catch(() => false);
+    if (!ok) toast.show(d.shareFailed, "error");
+  }
+
+  async function onShareSelected() {
+    const chosen = docs.filter((x) => selected.has(x.id) && !x.is_locked);
+    if (chosen.length === 0) return;
+    const n = await shareDocuments(chosen).catch(() => 0);
+    toast.show(n > 0 ? tpl(d.sharedN, { n }) : d.shareFailed, n > 0 ? "success" : "error");
+    exitSelect();
+  }
+
+  function docActions(doc: Document) {
+    Alert.alert(doc.name, undefined, [
+      { text: d.share, onPress: () => onShareOne(doc) },
+      { text: c.delete, style: "destructive", onPress: () => confirmDelete(doc) },
+      { text: c.no, style: "cancel" },
+    ]);
+  }
+
   const list = docs.filter((x) => {
     if (filter === "all") return true;
     if (!x.expiry) return false;
@@ -94,8 +132,22 @@ export default function Documents() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerWrap}>
         <View style={styles.header}>
-          <Text style={styles.title}>{d.title}</Text>
-          <Text style={styles.sub}>{tpl(d.savedSub, { n: docs.length })}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{d.title}</Text>
+            <Text style={styles.sub}>
+              {selectMode ? tpl(d.selectCount, { n: selected.size }) : tpl(d.savedSub, { n: docs.length })}
+            </Text>
+          </View>
+          {docs.length > 0 &&
+            (selectMode ? (
+              <Pressable onPress={exitSelect} hitSlop={8} style={styles.selBtn}>
+                <Ionicons name="close" size={20} color={colors.ink} />
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => setSelectMode(true)} hitSlop={8} style={styles.selBtn}>
+                <Ionicons name="checkmark-done-outline" size={20} color={colors.ink} />
+              </Pressable>
+            ))}
         </View>
 
         <View style={styles.chips}>
@@ -173,19 +225,30 @@ export default function Documents() {
               <DocCard
                 key={doc.id}
                 doc={doc}
-                onPress={() =>
-                  doc.is_locked
-                    ? router.push("/upgrade" as never)
-                    : router.push({
-                        pathname: "/document-view",
-                        params: {
-                          uri: doc.file_uri ?? "",
-                          path: doc.file_path ?? "",
-                          name: doc.name,
-                        },
-                      } as never)
-                }
-                onLongPress={() => confirmDelete(doc)}
+                selectMode={selectMode}
+                selected={selected.has(doc.id)}
+                onPress={() => {
+                  if (selectMode) {
+                    if (!doc.is_locked) toggleSelect(doc.id);
+                    return;
+                  }
+                  if (doc.is_locked) {
+                    router.push("/upgrade" as never);
+                    return;
+                  }
+                  router.push({
+                    pathname: "/document-view",
+                    params: {
+                      uri: doc.file_uri ?? "",
+                      path: doc.file_path ?? "",
+                      name: doc.name,
+                    },
+                  } as never);
+                }}
+                onLongPress={() => {
+                  if (selectMode || doc.is_locked) return;
+                  docActions(doc);
+                }}
               />
             ))
           )}
@@ -193,12 +256,28 @@ export default function Documents() {
         </ScrollView>
       )}
 
-      <Pressable
-        onPress={() => router.push("/add-document")}
-        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
-      >
-        <Ionicons name="add" size={28} color={colors.white} />
-      </Pressable>
+      {selectMode ? (
+        <View style={styles.shareBar}>
+          <Pressable
+            onPress={onShareSelected}
+            disabled={selected.size === 0}
+            style={({ pressed }) => [
+              styles.shareBtn,
+              (pressed || selected.size === 0) && { opacity: 0.55 },
+            ]}
+          >
+            <Ionicons name="share-outline" size={18} color={colors.white} />
+            <Text style={styles.shareBtnText}>{tpl(d.shareSelected, { n: selected.size })}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          onPress={() => router.push("/add-document")}
+          style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
+        >
+          <Ionicons name="add" size={28} color={colors.white} />
+        </Pressable>
+      )}
     </SafeAreaView>
   );
 }
@@ -208,7 +287,17 @@ const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.cream },
   headerWrap: { ...CONTENT },
-  header: { paddingHorizontal: 20, paddingTop: 16 },
+  header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 16 },
+  selBtn: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
   title: { fontSize: 26, fontWeight: "700", color: colors.ink },
   sub: { marginTop: 4, fontSize: 14, color: colors.inkSoft },
   chips: { flexDirection: "row", gap: 8, paddingHorizontal: 20, paddingTop: 16 },
@@ -275,6 +364,27 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     opacity: 0.7,
   },
+  shareBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    ...CONTENT,
+  },
+  shareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: colors.terracotta,
+  },
+  shareBtnText: { color: colors.white, fontWeight: "700", fontSize: 15.5 },
   fab: {
     position: "absolute",
     right: 20,

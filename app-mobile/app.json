@@ -59,7 +59,8 @@
           "icon": "./assets/images/adaptive-foreground.png",
           "color": "#C25A37"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
