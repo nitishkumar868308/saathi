@@ -490,7 +490,7 @@ const hinglish: Dict = {
         gst: true,
       },
     ],
-    note: "Refer & Earn — dono ko {d} din ka Saathi Plus plan free. Subscription kabhi bhi cancel karo.",
+    note: "Refer & Earn — dono ko {d} din ka Saathi Plus plan free. ",
   },
   faq: {
     heading: "Sawaal hain? Bilkul natural hai.",

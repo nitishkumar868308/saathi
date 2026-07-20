@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gift, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import SaathiMark from "@/components/SaathiMark";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { useOffers } from "@/lib/useOffers";
 
 /**
  * Poori site ka shared header — home aur baaki pages dono.
@@ -22,7 +21,6 @@ import { useOffers } from "@/lib/useOffers";
  */
 export default function SubHeader() {
   const t = useT();
-  const offers = useOffers();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -63,15 +61,6 @@ export default function SubHeader() {
               </Link>
             ))}
           </nav>
-          {offers.referralsEnabled && (
-            <Link
-              href="/referral"
-              className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-terracotta px-4 py-2 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark active:scale-[0.98]"
-            >
-              <Gift size={15} />
-              {t.nav.invite}
-            </Link>
-          )}
           <LanguageSwitcher />
         </div>
 
@@ -107,15 +96,6 @@ export default function SubHeader() {
                 {l.label}
               </Link>
             ))}
-            {offers.referralsEnabled && (
-              <Link
-                href="/referral"
-                className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-terracotta px-4 py-3.5 text-[15px] font-semibold text-white shadow-warm transition active:scale-[0.99]"
-              >
-                <Gift size={17} />
-                {t.nav.invite}
-              </Link>
-            )}
           </nav>
         </div>
       )}
