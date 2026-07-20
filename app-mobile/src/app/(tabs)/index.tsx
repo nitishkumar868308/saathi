@@ -16,6 +16,8 @@ import { colors } from "@/theme/colors";
 import SaathiMark from "@/components/saathi-mark";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
+import { listReminders, setReminderOn, type Reminder } from "@/lib/reminders";
+import { cancelReminder } from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { useToast } from "@/components/toast";
@@ -24,6 +26,17 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useOffers } from "@/lib/use-offers";
 
+function isToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const toast = useToast();
@@ -31,6 +44,7 @@ export default function Home() {
   const { home: h } = useT();
   const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
+  const [today, setToday] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,7 +52,9 @@ export default function Home() {
     async (isRefresh = false) => {
       try {
         if (!isRefresh) setLoading(true);
-        setDocs(await listDocuments());
+        const [d, r] = await Promise.all([listDocuments(), listReminders()]);
+        setDocs(d);
+        setToday(r.filter((x) => x.is_on && !x.is_paused && isToday(x.remind_at)));
       } catch {
         toast.show(h.loadFailed, "error");
       } finally {
@@ -48,6 +64,17 @@ export default function Home() {
     },
     [toast],
   );
+
+  async function markDone(r: Reminder) {
+    setToday((prev) => prev.filter((x) => x.id !== r.id));
+    try {
+      await setReminderOn(r.id, false);
+      await cancelReminder(r.id);
+      toast.show(h.doneToast, "success");
+    } catch {
+      /* best-effort; list already updated */
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -109,6 +136,33 @@ export default function Home() {
                   : tpl(h.briefAllSet, { name: firstName ? " " + firstName : "" }) + " 🌿"}
           </Text>
         </View>
+
+        {/* Aaj ke reminders — kaam + kitne time ke liye set + "kiya?" */}
+        {!loading && today.length > 0 && (
+          <View style={styles.todayCard}>
+            <View style={styles.todayHead}>
+              <Ionicons name="alarm" size={16} color={colors.terracotta} />
+              <Text style={styles.todayTitle}>{h.todayTitle}</Text>
+            </View>
+            {today.map((r) => (
+              <View key={r.id} style={styles.todayRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.todayTask} numberOfLines={1}>
+                    {r.title}
+                  </Text>
+                  {!!r.time_label && <Text style={styles.todayTime}>🕒 {r.time_label}</Text>}
+                </View>
+                <Pressable
+                  onPress={() => markDone(r)}
+                  style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <Ionicons name="checkmark" size={15} color={colors.white} />
+                  <Text style={styles.doneText}>{h.markDone}</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Quick actions */}
         <View style={styles.actions}>
@@ -255,6 +309,36 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: "rgba(247,242,233,0.9)",
   },
+  todayCard: {
+    marginTop: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    padding: 16,
+  },
+  todayHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
+  todayTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
+  todayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 9,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  todayTask: { fontSize: 15, fontWeight: "600", color: colors.ink },
+  todayTime: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
+  doneBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    backgroundColor: colors.sage,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  doneText: { fontSize: 12.5, fontWeight: "700", color: colors.white },
   actions: { flexDirection: "row", gap: 12, marginTop: 16 },
   action: {
     flex: 1,

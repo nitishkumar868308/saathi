@@ -65,6 +65,9 @@ export type Dict = {
     alertReminder: string;
     alertExpiry: string;
     alertOk: string;
+    alertDid: string;
+    alertDone: string;
+    alertLater: string;
   };
   voice: {
     /** BCP-47 tag for speech recognition, e.g. "en-IN" / "hi-IN" */
@@ -136,6 +139,10 @@ export type Dict = {
     attention: string;
     seeAll: string;
     nothingUrgent: string;
+    todayTitle: string;
+    todayNone: string;
+    markDone: string;
+    doneToast: string;
     /** {d} */
     referCard: string;
     referCardSub: string;
@@ -461,6 +468,9 @@ const hinglish: Dict = {
     alertReminder: "Reminder",
     alertExpiry: "Document expiry",
     alertOk: "Theek hai, samajh gaya",
+    alertDid: "Kya aapne yeh kar liya?",
+    alertDone: "Haan, ho gaya",
+    alertLater: "Abhi nahi",
   },
   voice: {
     recogLang: "en-IN",
@@ -531,6 +541,10 @@ const hinglish: Dict = {
     attention: "Dhyan dena hai",
     seeAll: "Sab dekho",
     nothingUrgent: "Abhi kuch urgent nahi",
+    todayTitle: "Aaj ke reminders",
+    todayNone: "Aaj koi reminder nahi 🌿",
+    markDone: "Kiya",
+    doneToast: "Shabaash! ✓",
     referCard: "Refer & Earn — dono ko {d} din Plus free",
     referCardSub: "Dost ko invite karo, dono ko Saathi Plus plan",
     loadFailed: "Data load nahi ho paya",
@@ -847,6 +861,9 @@ const hi: Dict = {
     alertReminder: "रिमाइंडर",
     alertExpiry: "डॉक्युमेंट एक्सपायरी",
     alertOk: "ठीक है, समझ गया",
+    alertDid: "क्या आपने यह कर लिया?",
+    alertDone: "हाँ, हो गया",
+    alertLater: "अभी नहीं",
   },
   voice: {
     recogLang: "hi-IN",
@@ -916,6 +933,10 @@ const hi: Dict = {
     attention: "ध्यान देना है",
     seeAll: "सब देखें",
     nothingUrgent: "अभी कुछ ज़रूरी नहीं",
+    todayTitle: "आज के रिमाइंडर",
+    todayNone: "आज कोई रिमाइंडर नहीं 🌿",
+    markDone: "हो गया",
+    doneToast: "शाबाश! ✓",
     referCard: "Refer & Earn — दोनों को {d} दिन प्लस फ्री",
     referCardSub: "दोस्त को इनवाइट करें, दोनों को साथी प्लस प्लान",
     loadFailed: "डेटा लोड नहीं हो पाया",
@@ -1232,6 +1253,9 @@ const en: Dict = {
     alertReminder: "Reminder",
     alertExpiry: "Document expiry",
     alertOk: "Okay, got it",
+    alertDid: "Did you do this?",
+    alertDone: "Yes, done",
+    alertLater: "Not yet",
   },
   voice: {
     recogLang: "en-IN",
@@ -1300,6 +1324,10 @@ const en: Dict = {
     attention: "Needs attention",
     seeAll: "See all",
     nothingUrgent: "Nothing urgent right now",
+    todayTitle: "Today's reminders",
+    todayNone: "No reminders today 🌿",
+    markDone: "Done",
+    doneToast: "Well done! ✓",
     referCard: "Refer & Earn — you both get {d} days of Plus free",
     referCardSub: "Invite a friend, you both get the Saathi Plus plan",
     loadFailed: "Couldn't load your data",

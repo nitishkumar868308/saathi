@@ -6,17 +6,28 @@ import * as Notifications from "expo-notifications";
 import { colors } from "@/theme/colors";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { speakReminder, stopSpeaking } from "@/lib/speak";
+import { setReminderOn } from "@/lib/reminders";
+import { cancelReminder } from "@/lib/notifications";
+import { acknowledgeDocument } from "@/lib/doc-ack";
 
-type Alert = { title: string; body: string; kind: "reminder" | "expiry" };
+type Alert = { id: string; title: string; body: string; kind: "reminder" | "expiry" };
 
 function fromNotification(n: Notifications.Notification): Alert {
   const c = n.request.content;
-  const data = (c.data ?? {}) as { kind?: string; body?: string };
+  const data = (c.data ?? {}) as { kind?: string; body?: string; id?: string };
   return {
+    // Reminder schedule me identifier = reminder id; expiry me "doc:<id>:<lead>".
+    id: (data.id as string) ?? n.request.identifier ?? "",
     title: c.title ?? "Saathi",
     body: c.body ?? (data.body as string) ?? "",
     kind: data.kind === "expiry" ? "expiry" : "reminder",
   };
+}
+
+/** "doc:<uuid>:<lead>" se document id nikaalo (expiry ack ke liye). */
+function docIdFrom(identifier: string): string | null {
+  const m = identifier.match(/^doc:(.+):\d+$/);
+  return m ? m[1] : null;
 }
 
 /**
@@ -73,6 +84,24 @@ export function ReminderAlertHost() {
     stopSpeaking();
     setAlert(null);
   }
+
+  // Reminder "ho gaya" — off karo + notification cancel.
+  function onDone() {
+    if (alert?.kind === "reminder" && alert.id) {
+      setReminderOn(alert.id, false).catch(() => {});
+      cancelReminder(alert.id).catch(() => {});
+    }
+    dismiss();
+  }
+
+  // Expiry "OK/dekh liya" — server pe ack (WhatsApp follow-up skip, #8).
+  function onOk() {
+    if (alert?.kind === "expiry") {
+      const docId = docIdFrom(alert.id);
+      if (docId) acknowledgeDocument(docId);
+    }
+    dismiss();
+  }
   useEffect(() => () => stopSpeaking(), []);
 
   if (!alert) return null;
@@ -92,13 +121,34 @@ export function ReminderAlertHost() {
           <Text style={styles.kicker}>{isExpiry ? n.alertExpiry : n.alertReminder}</Text>
           <Text style={styles.body}>{alert.body}</Text>
 
-          <Pressable
-            onPress={dismiss}
-            style={({ pressed }) => [styles.btn, pressed && { opacity: 0.9 }]}
-          >
-            <Ionicons name="checkmark" size={18} color={colors.white} />
-            <Text style={styles.btnText}>{n.alertOk}</Text>
-          </Pressable>
+          {isExpiry ? (
+            <Pressable
+              onPress={onOk}
+              style={({ pressed }) => [styles.btn, pressed && { opacity: 0.9 }]}
+            >
+              <Ionicons name="checkmark" size={18} color={colors.white} />
+              <Text style={styles.btnText}>{n.alertOk}</Text>
+            </Pressable>
+          ) : (
+            <>
+              <Text style={styles.didText}>{n.alertDid}</Text>
+              <View style={styles.btnRow}>
+                <Pressable
+                  onPress={dismiss}
+                  style={({ pressed }) => [styles.btnAlt, pressed && { opacity: 0.9 }]}
+                >
+                  <Text style={styles.btnAltText}>{n.alertLater}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={onDone}
+                  style={({ pressed }) => [styles.btn, { flex: 1, marginTop: 0 }, pressed && { opacity: 0.9 }]}
+                >
+                  <Ionicons name="checkmark" size={18} color={colors.white} />
+                  <Text style={styles.btnText}>{n.alertDone}</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
         </Animated.View>
       </View>
     </Modal>
@@ -152,6 +202,14 @@ const styles = StyleSheet.create({
     color: colors.ink,
     textAlign: "center",
   },
+  didText: {
+    marginTop: 18,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.inkSoft,
+    textAlign: "center",
+  },
+  btnRow: { flexDirection: "row", gap: 10, alignSelf: "stretch", marginTop: 12 },
   btn: {
     marginTop: 24,
     flexDirection: "row",
@@ -164,4 +222,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.terracotta,
   },
   btnText: { fontSize: 16, fontWeight: "800", color: colors.white },
+  btnAlt: {
+    alignItems: "center",
+    justifyContent: "center",
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 18,
+  },
+  btnAltText: { fontSize: 15, fontWeight: "700", color: colors.inkSoft },
 });
