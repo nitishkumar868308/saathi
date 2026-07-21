@@ -375,13 +375,30 @@ function LabeledInput({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const [text, setText] = useState(() => (value ? String(value) : ""));
+
+  useEffect(() => {
+    const n = Number(text);
+    const inSync = text.trim() !== "" && Number.isFinite(n) && n === value;
+    if (!inSync) setText(value ? String(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  function handle(raw: string) {
+    if (!/^\d*\.?\d*$/.test(raw)) return;
+    setText(raw);
+    const n = Number(raw);
+    onChange(raw.trim() === "" || !Number.isFinite(n) ? 0 : n);
+  }
+
   return (
     <label className="block">
       <span className="text-xs font-semibold text-ink-soft">{label}</span>
       <input
-        value={value}
-        inputMode="numeric"
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        value={text}
+        inputMode="decimal"
+        placeholder="0"
+        onChange={(e) => handle(e.target.value)}
         className="mt-1.5 h-10 w-full rounded-xl border border-line bg-cream px-3 text-sm outline-none focus:border-terracotta"
       />
     </label>
@@ -410,25 +427,51 @@ function Cell({
   );
 }
 
+/**
+ * Number input jo type karte waqt raw text rakhta hai — warna "0", "0." ya
+ * "0.01" jaisi value beech me hi reset ho jaati thi (0.012 daali hi nahi
+ * ja sakti thi). Calculation ke liye number bahar bhejta hai.
+ */
 function NumCell({
   value,
   onChange,
   disabled = false,
   invalid = false,
+  width = "w-24",
 }: {
   value: number;
   onChange: (v: number) => void;
   disabled?: boolean;
   invalid?: boolean;
+  width?: string;
 }) {
+  const [text, setText] = useState(() => (value ? String(value) : ""));
+
+  // Bahar se value badle (load / "Apply to all" / save) to text sync karo.
+  // Jab user type kar raha ho (text ka number wahi hai) tab chhedo mat.
+  useEffect(() => {
+    const n = Number(text);
+    const inSync = text.trim() !== "" && Number.isFinite(n) && n === value;
+    if (!inSync) setText(value ? String(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  function handle(raw: string) {
+    // khaali, "0", "0.", ".5", "0.012" — sab allowed. Aur kuch nahi.
+    if (!/^\d*\.?\d*$/.test(raw)) return;
+    setText(raw);
+    const n = Number(raw);
+    onChange(raw.trim() === "" || !Number.isFinite(n) ? 0 : n);
+  }
+
   return (
     <input
-      value={value || ""}
+      value={text}
       disabled={disabled}
       inputMode="decimal"
-      placeholder="0"
-      onChange={(e) => onChange(Number(e.target.value) || 0)}
-      className={`h-9 w-20 rounded-lg border bg-cream px-2 text-sm outline-none focus:border-terracotta disabled:opacity-60 ${
+      placeholder="0.00"
+      onChange={(e) => handle(e.target.value)}
+      className={`h-9 ${width} rounded-lg border bg-cream px-2 text-sm outline-none focus:border-terracotta disabled:opacity-60 ${
         invalid && !disabled ? "border-terracotta" : "border-line"
       }`}
     />
