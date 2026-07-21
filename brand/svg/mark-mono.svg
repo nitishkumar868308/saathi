@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g transform="translate(256 256) scale(0.9) translate(-248 -266)"
+     fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 380 L160 210 C174 148 222 148 236 210 L292 380" stroke="#2E2823" stroke-width="58"/>
+    <path d="M148 308 L248 308" stroke="#2E2823" stroke-width="48"/>
+    <g transform="rotate(-4 320 260)">
+      <path d="M374 198 C374 166 344 150 316 154 C288 158 264 178 268 206
+               C280 232 306 244 332 254 C362 265 388 283 388 315
+               C388 351 356 372 322 368" stroke="#2E2823" stroke-width="52"/>
+    </g>
+  </g></svg>

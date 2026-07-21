@@ -307,20 +307,52 @@ export async function upsertCountryPricing(rows: CountryPricingRow[]): Promise<v
   if (!res.ok) await fail("pricing write", res);
 }
 
-export type CountryOption = { code: string; name: string };
+export type CountryOption = {
+  /** Hamesha ISO2 — IP-country isi se match hota hai. */
+  code: string;
+  name: string;
+  currency?: string;
+  symbol?: string;
+};
 
-/** DB `countries` table se list (code + naam) — admin pricing picker ke liye. */
+/**
+ * DB `countries` table se list — admin pricing picker ke liye.
+ * `add-country-currency.sql` chal chuka ho to currency/symbol/iso2 bhi aate hain
+ * (tab pricing form apne aap bhar jaata hai). Na chala ho to sirf code + naam.
+ */
 export async function getCountriesList(): Promise<CountryOption[]> {
   assertConfigured();
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/countries?select=code,name&code=not.is.null&order=name.asc`,
-    { headers: headers(), cache: "no-store" },
-  );
-  if (!res.ok) await fail("countries read (locations-billing.sql run kiya?)", res);
-  const rows = (await res.json()) as Record<string, unknown>[];
+  const base = `${SUPABASE_URL}/rest/v1/countries`;
+  let rows: Record<string, unknown>[];
+
+  const full = await fetch(`${base}?select=code,iso2,name,currency,currency_symbol&order=name.asc`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (full.ok) {
+    rows = (await full.json()) as Record<string, unknown>[];
+  } else {
+    const basic = await fetch(`${base}?select=code,name&order=name.asc`, {
+      headers: headers(),
+      cache: "no-store",
+    });
+    if (!basic.ok) await fail("countries read (locations-billing.sql run kiya?)", basic);
+    rows = (await basic.json()) as Record<string, unknown>[];
+  }
+
   return rows
-    .map((r) => ({ code: String(r.code ?? "").toUpperCase(), name: String(r.name ?? "") }))
-    .filter((c) => /^[A-Z]{2,3}$/.test(c.code) && c.name);
+    .map((r) => {
+      const iso2 = String(r.iso2 ?? "").toUpperCase();
+      const code = String(r.code ?? "").toUpperCase();
+      return {
+        code: /^[A-Z]{2}$/.test(iso2) ? iso2 : code,
+        name: String(r.name ?? ""),
+        currency: r.currency ? String(r.currency).toUpperCase() : undefined,
+        symbol: r.currency_symbol ? String(r.currency_symbol) : undefined,
+      };
+    })
+    // Sirf ISO2 — 3-letter code pricing me daala to IP se kabhi match nahi hoga.
+    .filter((c) => /^[A-Z]{2}$/.test(c.code) && c.name);
 }
 
 /** Ek country hatao (India ke alawa). */

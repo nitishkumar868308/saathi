@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apka Saathi — logo &amp; app icon</title>
+<style>
+  :root{
+    --cream:#F7F2E9; --surface:#FFFCF6; --ink:#2E2823; --ink-soft:#6B5F54;
+    --line:#E5DBC9; --terracotta:#C25A37; --amber:#E0A458;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;line-height:1.55}
+  .wrap{max-width:900px;margin:0 auto;padding:52px 22px 80px}
+  .eyebrow{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--terracotta)}
+  h1{font-size:34px;font-weight:800;margin:8px 0 0;letter-spacing:-.5px}
+  .lead{color:var(--ink-soft);max-width:60ch;margin:14px 0 0;font-size:16px}
+  .lead b{color:var(--ink)}
+  h2{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--ink-soft);margin:52px 0 16px;display:flex;align-items:center;gap:12px}
+  h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:30px}
+  .center{display:flex;gap:38px;align-items:flex-end;justify-content:center;flex-wrap:wrap}
+  .item{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .lbl{font-size:12px;font-weight:700;color:var(--ink-soft)}
+  img{display:block}
+  .hero{width:216px;height:216px;border-radius:48px;box-shadow:0 18px 40px -18px rgba(70,35,20,.5)}
+  .i192{width:192px;height:192px;border-radius:43px}
+  .i96{width:96px;height:96px;border-radius:21px}
+  .i48{width:48px;height:48px;border-radius:11px}
+  .i192,.i96,.i48{box-shadow:0 8px 18px -10px rgba(70,35,20,.45)}
+  .mk{width:170px;height:170px}
+  .lock{width:100%;max-width:760px;border-radius:16px;border:1px solid var(--line)}
+  .sw{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px}
+  .chip{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+  .chip .c{height:58px}
+  .chip .m{padding:9px 11px}
+  .chip .n{font-size:12.5px;font-weight:800}
+  .chip .h{font-size:11.5px;color:var(--ink-soft)}
+  .idea{display:grid;gap:14px;grid-template-columns:1fr}
+  @media(min-width:640px){.idea{grid-template-columns:1fr 1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:15px}
+  .card p{margin:0;color:var(--ink-soft);font-size:14px}
+  code{background:#EFE7D6;padding:2px 7px;border-radius:6px;font-size:12.5px}
+  footer{margin-top:52px;padding-top:22px;border-top:1px solid var(--line);
+    color:var(--ink-soft);font-size:14px}
+  ul{padding-left:20px} li{margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Local preview</div>
+  <h1>Apka Saathi — logo &amp; app icon</h1>
+  <p class="lead">
+    Mark ek <b>AS monogram</b> hai — par do alag rang, do alag shakal:
+    <b>A</b> chaudi aur sthir (aap), <b>S</b> thodi jhuki hui jo A ke
+    <b>kandhe pe se</b> guzarti hai (Saathi ka haath). Dono alag padhte hain,
+    milte sirf ek jagah — wahi dosti hai.
+  </p>
+
+  <h2>App icon</h2>
+  <div class="panel center">
+    <div class="item">
+      <img class="hero" src="./png/app-icon-512.png" alt="Apka Saathi app icon">
+      <span class="lbl">512 px</span>
+    </div>
+  </div>
+
+  <h2>Asli size pe (yahi sabse bada test hai)</h2>
+  <div class="panel center">
+    <div class="item"><img class="i192" src="./png/app-icon-192.png" alt=""><span class="lbl">192 px</span></div>
+    <div class="item"><img class="i96" src="./png/app-icon-96.png" alt=""><span class="lbl">96 px</span></div>
+    <div class="item"><img class="i48" src="./png/app-icon-48.png" alt=""><span class="lbl">48 px · home screen</span></div>
+  </div>
+
+  <h2>Mark — alag alag background pe</h2>
+  <div class="panel center">
+    <div class="item"><img class="mk" src="./png/mark-light-bg-800.png" alt=""><span class="lbl">Halke background pe</span></div>
+    <div class="item"><img class="mk" src="./png/badge-512.png" alt="" style="border-radius:38px"><span class="lbl">Cream tile (alt icon)</span></div>
+    <div class="item"><img class="mk" src="./png/mark-mono-800.png" alt=""><span class="lbl">Ek rang (stamp/print)</span></div>
+  </div>
+
+  <h2>Naam ke saath</h2>
+  <div class="panel" style="display:grid;gap:16px;justify-items:center">
+    <img class="lock" src="./png/lockup-light-1500.png" alt="Apka Saathi lockup light">
+    <img class="lock" src="./png/lockup-dark-1500.png" alt="Apka Saathi lockup dark">
+  </div>
+
+  <h2>Kya soch ke banaya</h2>
+  <div class="idea">
+    <div class="card"><h3>Do rang = do log</h3><p>Cream A aur gold S — ek saath, par alag pehchaan. Ek hi rang me hota to sirf letters lagte.</p></div>
+    <div class="card"><h3>Kandhe pe haath</h3><p>S ka upar wala hissa A ke kandhe pe se aage se guzarta hai — chhoona hi caring hai, koi dil ya emoji ki zaroorat nahi.</p></div>
+    <div class="card"><h3>Gol aur chaudi shakal</h3><p>A ka sira nukeela nahi, gumbad jaisa gol. Round caps. Isi se naram/dostana lagta hai, corporate nahi.</p></div>
+    <div class="card"><h3>48px pe zinda</h3><p>Sirf 3 stroke. Koi patli line, koi chhoti detail nahi — isliye home screen pe bhi "AS" saaf padhta hai.</p></div>
+  </div>
+
+  <h2>Palette</h2>
+  <div class="sw">
+    <div class="chip"><div class="c" style="background:#C25A37"></div><div class="m"><div class="n">Terracotta</div><div class="h">#C25A37</div></div></div>
+    <div class="chip"><div class="c" style="background:#A8492B"></div><div class="m"><div class="n">Terracotta deep</div><div class="h">#A8492B</div></div></div>
+    <div class="chip"><div class="c" style="background:#F2B45E"></div><div class="m"><div class="n">Gold</div><div class="h">#F2B45E</div></div></div>
+    <div class="chip"><div class="c" style="background:#E0A458"></div><div class="m"><div class="n">Amber</div><div class="h">#E0A458</div></div></div>
+    <div class="chip"><div class="c" style="background:#F7F2E9"></div><div class="m"><div class="n">Cream</div><div class="h">#F7F2E9</div></div></div>
+    <div class="chip"><div class="c" style="background:#2E2823"></div><div class="m"><div class="n">Ink</div><div class="h">#2E2823</div></div></div>
+  </div>
+
+  <footer>
+    <p><b>Files</b> — <code>brand/svg/</code> me vector (asli kaam ke liye), <code>brand/png/</code> me PNG/JPG (dekhne/bhejne ke liye).</p>
+    <ul>
+      <li><code>app-icon-1024/512/192/96/48.png</code> — Play Store + launcher</li>
+      <li><code>mark-light-bg / mark-dark-bg / mark-mono</code> — mark akela</li>
+      <li><code>lockup-light / lockup-dark</code> — naam ke saath (PNG + JPG)</li>
+    </ul>
+    <p>Kuch badalna ho — rang, jhukav, S ka overlap, tagline — <code>brand/build-logo.js</code> me value badal ke
+      <code>node brand/build-logo.js</code> chala do, sab dobara ban jayega.</p>
+  </footer>
+</div>
+</body>
+</html>

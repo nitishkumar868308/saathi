@@ -1,0 +1,251 @@
+iso2,iso3,name,currency,currency_symbol
+AF,AFG,Afghanistan,AFN,؋
+AX,ALA,Aland Islands,EUR,€
+AL,ALB,Albania,ALL,L
+DZ,DZA,Algeria,DZD,د.ج
+AS,ASM,American Samoa,USD,$
+AD,AND,Andorra,EUR,€
+AO,AGO,Angola,AOA,Kz
+AI,AIA,Anguilla,XCD,$
+AQ,ATA,Antarctica,USD,$
+AG,ATG,Antigua and Barbuda,XCD,$
+AR,ARG,Argentina,ARS,$
+AM,ARM,Armenia,AMD,֏
+AW,ABW,Aruba,AWG,ƒ
+AU,AUS,Australia,AUD,$
+AT,AUT,Austria,EUR,€
+AZ,AZE,Azerbaijan,AZN,₼
+BH,BHR,Bahrain,BHD,د.ب
+BD,BGD,Bangladesh,BDT,৳
+BB,BRB,Barbados,BBD,$
+BY,BLR,Belarus,BYN,Br
+BE,BEL,Belgium,EUR,€
+BZ,BLZ,Belize,BZD,$
+BJ,BEN,Benin,XOF,CFA
+BM,BMU,Bermuda,BMD,$
+BT,BTN,Bhutan,BTN,Nu.
+BO,BOL,Bolivia,BOB,Bs.
+BQ,BES,"Bonaire, Sint Eustatius and Saba",USD,$
+BA,BIH,Bosnia and Herzegovina,BAM,KM
+BW,BWA,Botswana,BWP,P
+BV,BVT,Bouvet Island,NOK,kr
+BR,BRA,Brazil,BRL,R$
+IO,IOT,British Indian Ocean Territory,USD,$
+BN,BRN,Brunei,BND,$
+BG,BGR,Bulgaria,BGN,лв
+BF,BFA,Burkina Faso,XOF,CFA
+BI,BDI,Burundi,BIF,FBu
+KH,KHM,Cambodia,KHR,៛
+CM,CMR,Cameroon,XAF,FCFA
+CA,CAN,Canada,CAD,$
+CV,CPV,Cape Verde,CVE,$
+KY,CYM,Cayman Islands,KYD,$
+CF,CAF,Central African Republic,XAF,FCFA
+TD,TCD,Chad,XAF,FCFA
+CL,CHL,Chile,CLP,$
+CN,CHN,China,CNY,¥
+CX,CXR,Christmas Island,AUD,$
+CC,CCK,Cocos (Keeling) Islands,AUD,$
+CO,COL,Colombia,COP,$
+KM,COM,Comoros,KMF,CF
+CG,COG,Congo,CDF,FC
+CK,COK,Cook Islands,NZD,$
+CR,CRI,Costa Rica,CRC,₡
+HR,HRV,Croatia,EUR,€
+CU,CUB,Cuba,CUP,$
+CW,CUW,Curacao,ANG,ƒ
+CY,CYP,Cyprus,EUR,€
+CZ,CZE,Czech Republic,CZK,Kč
+CD,COD,Democratic Republic of the Congo,CDF,FC
+DK,DNK,Denmark,DKK,kr
+DJ,DJI,Djibouti,DJF,Fdj
+DM,DMA,Dominica,XCD,$
+DO,DOM,Dominican Republic,DOP,$
+EC,ECU,Ecuador,USD,$
+EG,EGY,Egypt,EGP,ج.م
+SV,SLV,El Salvador,USD,$
+GQ,GNQ,Equatorial Guinea,XAF,FCFA
+ER,ERI,Eritrea,ERN,Nfk
+EE,EST,Estonia,EUR,€
+SZ,SWZ,Eswatini,SZL,E
+ET,ETH,Ethiopia,ETB,Br
+FK,FLK,Falkland Islands,FKP,£
+FO,FRO,Faroe Islands,DKK,kr
+FJ,FJI,Fiji Islands,FJD,$
+FI,FIN,Finland,EUR,€
+FR,FRA,France,EUR,€
+GF,GUF,French Guiana,EUR,€
+PF,PYF,French Polynesia,XPF,₣
+TF,ATF,French Southern Territories,EUR,€
+GA,GAB,Gabon,XAF,FCFA
+GE,GEO,Georgia,GEL,₾
+DE,DEU,Germany,EUR,€
+GH,GHA,Ghana,GHS,₵
+GI,GIB,Gibraltar,GIP,£
+GR,GRC,Greece,EUR,€
+GL,GRL,Greenland,DKK,kr
+GD,GRD,Grenada,XCD,$
+GP,GLP,Guadeloupe,EUR,€
+GU,GUM,Guam,USD,$
+GT,GTM,Guatemala,GTQ,Q
+GG,GGY,Guernsey,GBP,£
+GN,GIN,Guinea,GNF,FG
+GW,GNB,Guinea-Bissau,XOF,CFA
+GY,GUY,Guyana,GYD,$
+HT,HTI,Haiti,HTG,G
+HM,HMD,Heard Island and McDonald Islands,AUD,$
+HN,HND,Honduras,HNL,L
+HK,HKG,Hong Kong S.A.R.,HKD,$
+HU,HUN,Hungary,HUF,Ft
+IS,ISL,Iceland,ISK,kr
+IN,IND,India,INR,₹
+ID,IDN,Indonesia,IDR,Rp
+IR,IRN,Iran,IRR,﷼
+IQ,IRQ,Iraq,IQD,ع.د
+IE,IRL,Ireland,EUR,€
+IL,ISR,Israel,ILS,₪
+IT,ITA,Italy,EUR,€
+CI,CIV,Ivory Coast,XOF,CFA
+JM,JAM,Jamaica,JMD,J$
+JP,JPN,Japan,JPY,¥
+JE,JEY,Jersey,GBP,£
+JO,JOR,Jordan,JOD,د.ا
+KZ,KAZ,Kazakhstan,KZT,₸
+KE,KEN,Kenya,KES,KSh
+KI,KIR,Kiribati,AUD,$
+XK,XKX,Kosovo,EUR,€
+KW,KWT,Kuwait,KWD,د.ك
+KG,KGZ,Kyrgyzstan,KGS,лв
+LA,LAO,Laos,LAK,₭
+LV,LVA,Latvia,EUR,€
+LB,LBN,Lebanon,LBP,ل.ل
+LS,LSO,Lesotho,LSL,L
+LR,LBR,Liberia,LRD,$
+LY,LBY,Libya,LYD,ل.د
+LI,LIE,Liechtenstein,CHF,CHF
+LT,LTU,Lithuania,EUR,€
+LU,LUX,Luxembourg,EUR,€
+MO,MAC,Macau S.A.R.,MOP,MOP$
+MG,MDG,Madagascar,MGA,Ar
+MW,MWI,Malawi,MWK,MK
+MY,MYS,Malaysia,MYR,RM
+MV,MDV,Maldives,MVR,Rf
+ML,MLI,Mali,XOF,CFA
+MT,MLT,Malta,EUR,€
+IM,IMN,Man (Isle of),GBP,£
+MH,MHL,Marshall Islands,USD,$
+MQ,MTQ,Martinique,EUR,€
+MR,MRT,Mauritania,MRU,UM
+MU,MUS,Mauritius,MUR,₨
+YT,MYT,Mayotte,EUR,€
+MX,MEX,Mexico,MXN,$
+FM,FSM,Micronesia,USD,$
+MD,MDA,Moldova,MDL,L
+MC,MCO,Monaco,EUR,€
+MN,MNG,Mongolia,MNT,₮
+ME,MNE,Montenegro,EUR,€
+MS,MSR,Montserrat,XCD,$
+MA,MAR,Morocco,MAD,د.م.
+MZ,MOZ,Mozambique,MZN,MT
+MM,MMR,Myanmar,MMK,K
+NA,NAM,Namibia,NAD,$
+NR,NRU,Nauru,AUD,$
+NP,NPL,Nepal,NPR,₨
+NL,NLD,Netherlands,EUR,€
+NC,NCL,New Caledonia,XPF,₣
+NZ,NZL,New Zealand,NZD,$
+NI,NIC,Nicaragua,NIO,C$
+NE,NER,Niger,XOF,CFA
+NG,NGA,Nigeria,NGN,₦
+NU,NIU,Niue,NZD,$
+NF,NFK,Norfolk Island,AUD,$
+KP,PRK,North Korea,KPW,₩
+MK,MKD,North Macedonia,MKD,ден
+MP,MNP,Northern Mariana Islands,USD,$
+NO,NOR,Norway,NOK,kr
+OM,OMN,Oman,OMR,﷼
+PK,PAK,Pakistan,PKR,₨
+PW,PLW,Palau,USD,$
+PS,PSE,Palestinian Territory Occupied,ILS,₪
+PA,PAN,Panama,PAB,B/.
+PG,PNG,Papua New Guinea,PGK,K
+PY,PRY,Paraguay,PYG,₲
+PE,PER,Peru,PEN,S/
+PH,PHL,Philippines,PHP,₱
+PN,PCN,Pitcairn Island,NZD,$
+PL,POL,Poland,PLN,zł
+PT,PRT,Portugal,EUR,€
+PR,PRI,Puerto Rico,USD,$
+QA,QAT,Qatar,QAR,﷼
+RE,REU,Reunion,EUR,€
+RO,ROU,Romania,RON,lei
+RU,RUS,Russia,RUB,₽
+RW,RWA,Rwanda,RWF,FRw
+SH,SHN,Saint Helena,SHP,£
+KN,KNA,Saint Kitts and Nevis,XCD,$
+LC,LCA,Saint Lucia,XCD,$
+PM,SPM,Saint Pierre and Miquelon,EUR,€
+VC,VCT,Saint Vincent and the Grenadines,XCD,$
+BL,BLM,Saint-Barthelemy,EUR,€
+MF,MAF,Saint-Martin (French part),EUR,€
+WS,WSM,Samoa,WST,WS$
+SM,SMR,San Marino,EUR,€
+ST,STP,Sao Tome and Principe,STN,Db
+SA,SAU,Saudi Arabia,SAR,﷼
+SN,SEN,Senegal,XOF,CFA
+RS,SRB,Serbia,RSD,дин
+SC,SYC,Seychelles,SCR,₨
+SL,SLE,Sierra Leone,SLL,Le
+SG,SGP,Singapore,SGD,$
+SX,SXM,Sint Maarten (Dutch part),ANG,ƒ
+SK,SVK,Slovakia,EUR,€
+SI,SVN,Slovenia,EUR,€
+SB,SLB,Solomon Islands,SBD,$
+SO,SOM,Somalia,SOS,Sh
+ZA,ZAF,South Africa,ZAR,R
+GS,SGS,South Georgia,GBP,£
+KR,KOR,South Korea,KRW,₩
+SS,SSD,South Sudan,SSP,£
+ES,ESP,Spain,EUR,€
+LK,LKA,Sri Lanka,LKR,₨
+SD,SDN,Sudan,SDG,ج.س
+SR,SUR,Suriname,SRD,$
+SJ,SJM,Svalbard and Jan Mayen Islands,NOK,kr
+SE,SWE,Sweden,SEK,kr
+CH,CHE,Switzerland,CHF,CHF
+SY,SYR,Syria,SYP,£
+TW,TWN,Taiwan,TWD,NT$
+TJ,TJK,Tajikistan,TJS,SM
+TZ,TZA,Tanzania,TZS,TSh
+TH,THA,Thailand,THB,฿
+BS,BHS,The Bahamas,BSD,$
+GM,GMB,The Gambia,GMD,D
+TL,TLS,Timor-Leste,USD,$
+TG,TGO,Togo,XOF,CFA
+TK,TKL,Tokelau,NZD,$
+TO,TON,Tonga,TOP,T$
+TT,TTO,Trinidad and Tobago,TTD,$
+TN,TUN,Tunisia,TND,د.ت
+TR,TUR,Turkey,TRY,₺
+TM,TKM,Turkmenistan,TMT,m
+TC,TCA,Turks and Caicos Islands,USD,$
+TV,TUV,Tuvalu,AUD,$
+UG,UGA,Uganda,UGX,USh
+UA,UKR,Ukraine,UAH,₴
+AE,ARE,United Arab Emirates,AED,د.إ
+GB,GBR,United Kingdom,GBP,£
+US,USA,United States,USD,$
+UM,UMI,United States Minor Outlying Islands,USD,$
+UY,URY,Uruguay,UYU,$
+UZ,UZB,Uzbekistan,UZS,лв
+VU,VUT,Vanuatu,VUV,VT
+VA,VAT,Vatican City State (Holy See),EUR,€
+VE,VEN,Venezuela,VES,Bs
+VN,VNM,Vietnam,VND,₫
+VG,VGB,Virgin Islands (British),USD,$
+VI,VIR,Virgin Islands (US),USD,$
+WF,WLF,Wallis and Futuna Islands,XPF,₣
+EH,ESH,Western Sahara,MAD,د.م.
+YE,YEM,Yemen,YER,﷼
+ZM,ZMB,Zambia,ZMW,ZK
+ZW,ZWE,Zimbabwe,ZWL,$

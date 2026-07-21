@@ -13,7 +13,7 @@ type Row = {
   enabled: boolean;
 };
 
-type CountryOption = { code: string; name: string };
+type CountryOption = { code: string; name: string; currency?: string; symbol?: string };
 type Base = { monthly: number; yearly: number };
 
 function roundPrice(n: number): number {
@@ -67,15 +67,18 @@ export default function AdminPricing() {
     );
   }
 
-  function newRow(code: string, name: string, mult: number): Row {
-    // currency/symbol/rate admin bharega — sab mandatory.
+  /**
+   * Currency/symbol DB (countries table) se apne aap bhar jaate hain —
+   * conversion rate admin bharega. Sab mandatory hain.
+   */
+  function newRow(c: CountryOption, mult: number): Row {
     return {
-      country_code: code,
-      country_name: name,
-      currency: "",
-      symbol: "",
-      conversion_rate: 0,
-      multiplier: code === "IN" ? 1 : mult,
+      country_code: c.code,
+      country_name: c.name,
+      currency: c.currency ?? "",
+      symbol: c.symbol ?? "",
+      conversion_rate: c.code === "IN" ? 1 : 0,
+      multiplier: c.code === "IN" ? 1 : mult,
       enabled: true,
     };
   }
@@ -83,7 +86,7 @@ export default function AdminPricing() {
   function addCountry() {
     const c = countries.find((x) => x.code === addCode);
     if (!c || !rows) return;
-    setRows([...rows, newRow(c.code, c.name, 1)]);
+    setRows([...rows, newRow(c, 1)]);
     setAddCode("");
     setSaved(false);
   }
@@ -92,9 +95,7 @@ export default function AdminPricing() {
     if (!rows) return;
     const mult = Math.max(0, Number(bulkMult)) || 1;
     const have = new Set(rows.map((r) => r.country_code));
-    const additions = countries
-      .filter((c) => !have.has(c.code))
-      .map((c) => newRow(c.code, c.name, mult));
+    const additions = countries.filter((c) => !have.has(c.code)).map((c) => newRow(c, mult));
     setRows([...rows, ...additions]);
     setSaved(false);
   }
