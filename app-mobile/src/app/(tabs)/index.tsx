@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
+import { SkeletonList } from "@/components/loader";
 import SaathiMark from "@/components/saathi-mark";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
@@ -196,9 +197,7 @@ export default function Home() {
         </View>
 
         {loading ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={colors.terracotta} />
-          </View>
+          <SkeletonList count={2} />
         ) : attention.length === 0 ? (
           <View style={styles.emptyBox}>
             <Ionicons name="checkmark-circle" size={22} color={colors.sage} />

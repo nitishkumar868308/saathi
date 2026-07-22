@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
 import { getPlan, markProfilePlus, enforcePlanLimits, type PlanId } from "@/lib/plan";
@@ -186,7 +187,9 @@ export default function Upgrade() {
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <ActivityIndicator color={colors.terracotta} style={{ marginTop: 40 }} />
+          <View style={{ marginTop: 40 }}>
+            <Loader />
+          </View>
         ) : isPlus ? (
           <View style={styles.plusActive}>
             <View style={styles.plusBadge}>
@@ -247,7 +250,7 @@ export default function Upgrade() {
                 ]}
               >
                 {paying ? (
-                  <ActivityIndicator color={colors.white} />
+                  <Loader size={30} color={colors.white} />
                 ) : (
                   <>
                     <Ionicons name="lock-closed" size={16} color={colors.white} />

@@ -18,6 +18,7 @@ import {
   Star,
   Activity,
   Globe,
+  Bug,
 } from "lucide-react";
 import SaathiMark from "@/components/SaathiMark";
 import Loader from "@/components/Loader";
@@ -26,6 +27,7 @@ import AdminUsers from "@/components/AdminUsers";
 import AdminReviews from "@/components/AdminReviews";
 import AdminUsage from "@/components/AdminUsage";
 import AdminPricing from "@/components/AdminPricing";
+import AdminLogs from "@/components/AdminLogs";
 
 type ContactEntry = {
   name: string;
@@ -35,7 +37,7 @@ type ContactEntry = {
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section = "rewards" | "pricing" | "users" | "usage" | "reviews" | "contacts";
+type Section = "rewards" | "pricing" | "users" | "usage" | "reviews" | "logs" | "contacts";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   { key: "rewards", label: "Rewards", icon: Gift },
@@ -43,6 +45,7 @@ const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
   { key: "users", label: "Users", icon: Users },
   { key: "usage", label: "Usage", icon: Activity },
   { key: "reviews", label: "Reviews", icon: Star },
+  { key: "logs", label: "Logs", icon: Bug },
   { key: "contacts", label: "Contacts", icon: MessageSquare },
 ];
 
@@ -66,6 +69,10 @@ const HEADING: Record<Section, { title: string; sub: string }> = {
   reviews: {
     title: "Reviews & Ratings",
     sub: "App me aaye reviews — rating, text, aur website pe dikhane ki anumati.",
+  },
+  logs: {
+    title: "Logs & Issues",
+    sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain.",
   },
   contacts: { title: "Contact messages", sub: "" },
 };
@@ -410,6 +417,7 @@ function Dashboard({
               {section === "users" && <AdminUsers />}
               {section === "usage" && <AdminUsage />}
               {section === "reviews" && <AdminReviews />}
+              {section === "logs" && <AdminLogs />}
               {section === "contacts" && <ContactsView rows={filteredContacts} />}
             </div>
           </div>

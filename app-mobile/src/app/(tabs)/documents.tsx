@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
+import { SkeletonList } from "@/components/loader";
 import { listDocuments, deleteDocument, type Document } from "@/lib/documents";
 import { cancelDocumentExpiry } from "@/lib/notifications";
 import { shareDocument, shareDocuments } from "@/lib/share";
@@ -173,15 +174,7 @@ export default function Documents() {
       {loading ? (
         // Spinner ki jagah skeleton — content ka shape dikhta hai, jump nahi hota
         <View style={styles.list}>
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.skeleton}>
-              <View style={styles.skelIcon} />
-              <View style={{ flex: 1, gap: 8 }}>
-                <View style={[styles.skelLine, { width: "62%" }]} />
-                <View style={[styles.skelLine, { width: "38%", height: 10 }]} />
-              </View>
-            </View>
-          ))}
+          <SkeletonList count={4} />
         </View>
       ) : (
         <ScrollView

@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import SaathiMark from "@/components/saathi-mark";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
@@ -54,7 +55,7 @@ function TypingDots() {
         <SaathiMark size={15} color={colors.white} />
       </View>
       <View style={styles.saathiBubble}>
-        <ActivityIndicator color={colors.terracotta} size="small" />
+        <Loader size={26} />
       </View>
     </View>
   );

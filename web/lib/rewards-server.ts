@@ -381,13 +381,13 @@ export type UsageRow = {
   lastActive: string | null;
 };
 
-/** Per-user usage (#10) — admin_usage() RPC se. */
-export async function getUsage(): Promise<UsageRow[]> {
+/** Per-user usage (#10) — admin_usage() RPC se. Date range optional. */
+export async function getUsage(range: { from?: string; to?: string } = {}): Promise<UsageRow[]> {
   assertConfigured();
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_usage`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({}),
+    body: JSON.stringify({ p_from: range.from ?? null, p_to: range.to ?? null }),
     cache: "no-store",
   });
   if (!res.ok) await fail("usage read (supabase/admin-usage.sql run kiya?)", res);
@@ -402,6 +402,53 @@ export async function getUsage(): Promise<UsageRow[]> {
     reminders: Number(r.reminders ?? 0),
     messages: Number(r.messages ?? 0),
     lastActive: (r.last_active as string) ?? null,
+  }));
+}
+
+export type ActivityRow = {
+  kind: "document" | "reminder" | "chat";
+  itemId: string;
+  title: string;
+  detail: string | null;
+  userId: string | null;
+  email: string | null;
+  name: string | null;
+  at: string;
+};
+
+/**
+ * Kaun sa document/reminder/chat, kab — asli items (naya pehle).
+ * uid do to sirf us user ka, warna poore app ki activity feed.
+ */
+export async function getActivity(opts: {
+  uid?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+} = {}): Promise<ActivityRow[]> {
+  assertConfigured();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_activity`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      p_uid: opts.uid ?? null,
+      p_from: opts.from ?? null,
+      p_to: opts.to ?? null,
+      p_limit: opts.limit ?? 300,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) await fail("activity read (supabase/admin-usage-detail.sql run kiya?)", res);
+  const rows = (await res.json()) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    kind: (r.kind as ActivityRow["kind"]) ?? "document",
+    itemId: String(r.item_id),
+    title: String(r.title ?? ""),
+    detail: (r.detail as string) ?? null,
+    userId: (r.user_id as string) ?? null,
+    email: (r.email as string) ?? null,
+    name: (r.full_name as string) ?? null,
+    at: String(r.at),
   }));
 }
 

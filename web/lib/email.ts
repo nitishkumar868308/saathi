@@ -1,32 +1,53 @@
 import nodemailer from "nodemailer";
 
 /**
- * Reusable email layer.
+ * Reusable email layer — Hostinger SMTP se (info@apkasaathi.com).
  *
- * Gmail se email bhejne ke liye (2-step verification + App Password wala tareeka).
- *   .env.local:
- *     GMAIL_USER=tumhara@gmail.com
- *     GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   (Google Account > Security > App passwords)
- *     CONTACT_TO=jahan-contact-aaye@gmail.com  (optional, default GMAIL_USER)
+ *   .env.local / Vercel env:
+ *     SMTP_HOST=smtp.hostinger.com
+ *     SMTP_PORT=465
+ *     SMTP_USER=info@apkasaathi.com
+ *     SMTP_PASS=********
+ *     CONTACT_TO=...              (optional — contact form kahan aaye)
+ *     ERROR_ALERT_TO=...          (optional — app errors kahan aayein)
  *
  * Kahin bhi email bhejna ho:
  *   import { sendMail, renderEmail, emailButton } from "@/lib/email";
  *   await sendMail({ to, subject, html: renderEmail("Title", "<p>...</p>") });
  *
  * Env set nahi hai to sendMail silently skip karta hai (caller fail nahi hota).
+ * Purana GMAIL_* env ab bhi fallback ke taur pe chalta hai.
  */
 
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = Number(process.env.SMTP_PORT ?? 465);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+
+// Purana Gmail setup — agar SMTP env na ho to isse chal jaata hai.
 const GMAIL_USER = process.env.GMAIL_USER;
-// App passwords Gmail spaces ke saath dikhata hai — spaces hata do.
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, "");
-const CONTACT_TO = process.env.CONTACT_TO ?? GMAIL_USER;
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+
+/** Jis address se sab email jaate hain. */
+export const FROM_EMAIL = SMTP_USER ?? GMAIL_USER ?? "info@apkasaathi.com";
+const CONTACT_TO = process.env.CONTACT_TO ?? FROM_EMAIL;
+/** App/web ke errors yahan aate hain. */
+export const ERROR_ALERT_TO = process.env.ERROR_ALERT_TO ?? "saathi8683@gmail.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
 
 export function emailConfigured(): boolean {
-  return Boolean(GMAIL_USER && GMAIL_APP_PASSWORD);
+  return Boolean((SMTP_HOST && SMTP_USER && SMTP_PASS) || (GMAIL_USER && GMAIL_APP_PASSWORD));
 }
 
 function getTransporter() {
+  if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+    return nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // 465 = implicit TLS, 587 = STARTTLS
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  }
   return nodemailer.createTransport({
     service: "gmail",
     auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
@@ -50,11 +71,11 @@ export async function sendMail(
   opts: MailOptions,
 ): Promise<{ sent: boolean; skipped?: boolean }> {
   if (!emailConfigured()) {
-    console.warn("[email] GMAIL env not set — email skipped");
+    console.warn("[email] SMTP env not set — email skipped");
     return { sent: false, skipped: true };
   }
   await getTransporter().sendMail({
-    from: `"${opts.fromName ?? "Saathi"}" <${GMAIL_USER}>`,
+    from: `"${opts.fromName ?? "Apka Saathi"}" <${FROM_EMAIL}>`,
     to: opts.to,
     replyTo: opts.replyTo,
     subject: opts.subject,

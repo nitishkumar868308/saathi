@@ -7,11 +7,11 @@ import {
   Modal,
   TextInput,
   Linking,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -137,7 +137,7 @@ export function ReviewPrompt() {
                 ]}
               >
                 {saving ? (
-                  <ActivityIndicator color={colors.white} />
+                  <Loader size={30} color={colors.white} />
                 ) : (
                   <Text style={styles.primaryText}>{r.submit}</Text>
                 )}

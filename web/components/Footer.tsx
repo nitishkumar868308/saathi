@@ -11,7 +11,7 @@ const SOCIALS = [
   { icon: Instagram, label: "Instagram", href: "https://instagram.com/" },
   { icon: Twitter, label: "X (Twitter)", href: "https://x.com/" },
   { icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/" },
-  { icon: Mail, label: "Email", href: "mailto:hello@apkasaathi.com" },
+  { icon: Mail, label: "Email", href: "mailto:info@apkasaathi.com" },
 ];
 
 export default function Footer() {

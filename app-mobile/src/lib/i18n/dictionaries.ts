@@ -265,6 +265,11 @@ export type Dict = {
     thanksSub: string;
     rateBtn: string;
   };
+  network: {
+    offline: string;
+    slow: string;
+    retry: string;
+  };
   chat: {
     online: string;
     greeting: string;
@@ -675,6 +680,11 @@ const hinglish: Dict = {
       "Bahut maayne rakhta hai. Ek aakhri baat — Play Store pe ek chhoti rating se aur parivaar Saathi tak pahunchte hain. Bas 10 second. 🙏",
     rateBtn: "Play Store pe rate karo",
   },
+  network: {
+    offline: "Internet nahi hai — kaam offline save ho raha hai",
+    slow: "Internet dheema hai…",
+    retry: "Dobara try karo",
+  },
   chat: {
     online: "aapka dost · online",
     greeting:
@@ -1083,6 +1093,11 @@ const hi: Dict = {
       "बहुत मायने रखता है। एक आख़िरी बात — Play Store पर एक छोटी रेटिंग से और परिवार साथी तक पहुँचते हैं। बस 10 सेकंड। 🙏",
     rateBtn: "Play Store पर रेट करें",
   },
+  network: {
+    offline: "इंटरनेट नहीं है — काम ऑफ़लाइन सेव हो रहा है",
+    slow: "इंटरनेट धीमा है…",
+    retry: "दोबारा कोशिश करें",
+  },
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
     greeting:
@@ -1489,6 +1504,11 @@ const en: Dict = {
     thanksSub:
       "It means a lot. One last thing — a quick rating on the Play Store helps other families find Saathi. Takes 10 seconds. 🙏",
     rateBtn: "Rate on Play Store",
+  },
+  network: {
+    offline: "No internet — your work is saved offline",
+    slow: "Slow internet…",
+    retry: "Try again",
   },
   chat: {
     online: "your friend · online",

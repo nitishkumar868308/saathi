@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SkeletonRows } from "@/components/Loader";
 import { Star, Loader2, AlertTriangle, Globe, Download, MessageSquare } from "lucide-react";
 
 type AdminReview = {
@@ -109,9 +110,7 @@ export default function AdminReviews() {
 
   if (!reviews) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-terracotta" size={26} />
-      </div>
+      <SkeletonRows rows={6} />
     );
   }
 

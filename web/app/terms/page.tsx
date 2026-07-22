@@ -33,7 +33,7 @@ const sections = [
   },
   {
     h: "7. Sampark",
-    p: "Koi sawaal ya shikayat? hello@apkasaathi.com par likho.",
+    p: "Koi sawaal ya shikayat? info@apkasaathi.com par likho.",
   },
 ];
 

@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -19,6 +18,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
@@ -279,7 +279,7 @@ export default function AddReminder() {
 
           {parsing && (
             <View style={styles.parsingRow}>
-              <ActivityIndicator color={colors.terracotta} size="small" />
+              <Loader size={26} />
               <Text style={styles.parsingText}>{a.understanding}</Text>
             </View>
           )}
@@ -430,7 +430,7 @@ export default function AddReminder() {
         ]}
       >
         {saving ? (
-          <ActivityIndicator color={colors.white} />
+          <Loader size={30} color={colors.white} />
         ) : (
           <Text style={styles.saveText}>{a.save}</Text>
         )}

@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
+import { SkeletonList } from "@/components/loader";
 import {
   listReminders,
   setReminderOn,
@@ -106,8 +106,8 @@ export default function Reminders() {
       <UpgradeBanner compact />
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.terracotta} size="large" />
+        <View style={{ padding: 20 }}>
+          <SkeletonList count={4} />
         </View>
       ) : items.length === 0 ? (
         <View style={styles.center}>

@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import SaathiMark from "@/components/saathi-mark";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
@@ -196,7 +197,7 @@ export default function Login() {
             style={({ pressed }) => [styles.btn, (pressed || loading) && { opacity: 0.85 }]}
           >
             {loading ? (
-              <ActivityIndicator color={colors.white} />
+              <Loader size={30} color={colors.white} />
             ) : (
               <Text style={styles.btnText}>{mode === "login" ? l.loginBtn : l.signupBtn}</Text>
             )}
@@ -216,7 +217,7 @@ export default function Login() {
             style={({ pressed }) => [styles.googleBtn, (pressed || googleLoading) && { opacity: 0.85 }]}
           >
             {googleLoading ? (
-              <ActivityIndicator color={colors.ink} />
+              <Loader size={30} color={colors.ink} />
             ) : (
               <>
                 <Ionicons name="logo-google" size={19} color="#DB4437" />

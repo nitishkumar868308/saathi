@@ -10,9 +10,14 @@ import { AuthProvider, useAuth } from "@/components/auth-provider";
 import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ReminderAlertHost } from "@/components/reminder-alert";
 import { ReviewPrompt } from "@/components/review-prompt";
+import { NetworkBanner } from "@/components/network-banner";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
 import { setAnalyticsUser } from "@/lib/analytics";
+import { installGlobalErrorHandler } from "@/lib/report-error";
+
+// App start hote hi uncaught errors pakadna shuru.
+installGlobalErrorHandler();
 
 export default function RootLayout() {
   return (
@@ -22,6 +27,8 @@ export default function RootLayout() {
           <ToastProvider>
             <StatusBar style="dark" />
             <RootNavigator />
+            {/* Internet nahi/dheema — sabse upar patli patti. */}
+            <NetworkBanner />
             {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
             <ReminderAlertHost />
             {/* 1 hafte baad rating/review popup. */}

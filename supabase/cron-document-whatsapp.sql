@@ -12,7 +12,7 @@ select cron.schedule(
   '0 * * * *',
   $$
   select net.http_post(
-    url := 'https://apkasaathi.com/api/cron/document-whatsapp',
+    url := 'https://www.apkasaathi.com/api/cron/document-whatsapp',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <CRON_SECRET>'

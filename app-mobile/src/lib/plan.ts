@@ -14,7 +14,7 @@ import { getUserDetails, isDetailsComplete } from "./user-details";
 export const FREE_DOC_LIMIT = 3;
 export const FREE_REMINDER_LIMIT = 5;
 
-export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://apkasaathi.com";
+export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://www.apkasaathi.com";
 
 export type PlanId = "plus_monthly" | "plus_yearly";
 

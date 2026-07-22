@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
@@ -203,7 +204,7 @@ export default function AddDocument() {
 
             {scanning ? (
               <View style={styles.scanningRow}>
-                <ActivityIndicator color={colors.terracotta} />
+                <Loader size={32} />
                 <Text style={styles.scanningText}>{d.scanning}</Text>
               </View>
             ) : (
@@ -289,7 +290,7 @@ export default function AddDocument() {
         style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
       >
         {saving ? (
-          <ActivityIndicator color={colors.white} />
+          <Loader size={30} color={colors.white} />
         ) : (
           <Text style={styles.saveText}>{d.save}</Text>
         )}

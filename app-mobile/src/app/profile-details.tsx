@@ -21,6 +21,7 @@ import {
 } from "libphonenumber-js";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -206,7 +207,9 @@ export default function ProfileDetails() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.terracotta} style={{ marginTop: 40 }} />
+        <View style={{ marginTop: 40 }}>
+            <Loader />
+          </View>
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <ScrollView
@@ -223,7 +226,7 @@ export default function ProfileDetails() {
                 )}
                 <View style={styles.avatarBadge}>
                   {uploadingAvatar ? (
-                    <ActivityIndicator size="small" color={colors.white} />
+                    <Loader size={26} color={colors.white} />
                   ) : (
                     <Ionicons name="camera" size={15} color={colors.white} />
                   )}
@@ -337,7 +340,7 @@ export default function ProfileDetails() {
             ]}
           >
             {saving ? (
-              <ActivityIndicator color={colors.white} />
+              <Loader size={30} color={colors.white} />
             ) : (
               <Text style={styles.saveText}>{t.save}</Text>
             )}

@@ -155,7 +155,11 @@
       "Bash(sed 's|kq.html|strip.html|; s|qa-keyed.png|qa-strip.png|; s|width: 760|width: 1160|; s|height: 400|height: 720|' kq.mjs)",
       "Bash(node strip.mjs)",
       "Bash(sed -i 's|strip/t\\\\${t}.png|strip/t${t.toFixed\\(1\\)}.png|' strip.html)",
-      "Bash(git commit -q -m 'feat\\(#11\\): countries table me currency/symbol/iso2 + admin auto-fill *)"
+      "Bash(git commit -q -m 'feat\\(#11\\): countries table me currency/symbol/iso2 + admin auto-fill *)",
+      "Bash(node -e \"const d={...require\\('./package.json'\\).dependencies}; ['expo-network','@react-native-community/netinfo','react-native-reanimated','expo-haptics'].forEach\\(k=>console.log\\(k.padEnd\\(38\\), d[k]||'—'\\)\\)\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/c1e1d998-d1e7-4ac5-b81c-ad08639661fe/scratchpad/swap-loader.js\")",
+      "Bash(npx --prefix web tsc --noEmit -p web)",
+      "Bash(node -e \"const d=require\\('./web/package.json'\\).dependencies;console.log\\('nodemailer:',d.nodemailer||'—','resend:',d.resend||'—'\\)\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

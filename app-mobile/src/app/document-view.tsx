@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { signedUrl } from "@/lib/storage";
 import { shareDocument } from "@/lib/share";
 import { useToast } from "@/components/toast";
@@ -72,7 +73,7 @@ export default function DocumentView() {
         </Text>
         <Pressable onPress={onShare} hitSlop={10} style={styles.back} disabled={sharing}>
           {sharing ? (
-            <ActivityIndicator color={colors.terracotta} size="small" />
+            <Loader size={26} />
           ) : (
             <Ionicons name="share-outline" size={21} color={colors.ink} />
           )}
@@ -80,7 +81,7 @@ export default function DocumentView() {
       </View>
       <View style={styles.body}>
         {loading ? (
-          <ActivityIndicator color={colors.terracotta} />
+          <Loader size={32} />
         ) : resolved ? (
           <Image
             source={{ uri: resolved }}

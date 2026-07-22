@@ -13,7 +13,7 @@ select cron.schedule(
   '* * * * *',
   $$
   select net.http_post(
-    url := 'https://apkasaathi.com/api/cron/send-reminders',
+    url := 'https://www.apkasaathi.com/api/cron/send-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <CRON_SECRET>'
