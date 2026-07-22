@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendWhatsApp, reminderWhatsAppText } from "@/lib/twilio";
+import { sendReminderWhatsApp } from "@/lib/twilio";
 import { sendReminderEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
 
       if (phone) {
         try {
-          const res = await sendWhatsApp(phone, reminderWhatsAppText(r.title, label));
+          const res = await sendReminderWhatsApp(phone, r.title, label);
           if (res.sent) wa++;
         } catch (e) {
           errors.push(`wa ${r.id}: ${String(e)}`);

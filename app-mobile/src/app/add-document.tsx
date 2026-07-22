@@ -18,6 +18,7 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
 import { Loader } from "@/components/loader";
+import { reportError } from "@/lib/report-error";
 import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
@@ -174,6 +175,7 @@ export default function AddDocument() {
         toast.show(d.limitReached, "info");
         router.push("/upgrade" as never);
       } else {
+        reportError(e, { screen: "add-document", action: "save" });
         toast.show(d.saveFailed, "error");
       }
     } finally {

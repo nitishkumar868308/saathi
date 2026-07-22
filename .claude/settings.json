@@ -159,7 +159,12 @@
       "Bash(node -e \"const d={...require\\('./package.json'\\).dependencies}; ['expo-network','@react-native-community/netinfo','react-native-reanimated','expo-haptics'].forEach\\(k=>console.log\\(k.padEnd\\(38\\), d[k]||'—'\\)\\)\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/c1e1d998-d1e7-4ac5-b81c-ad08639661fe/scratchpad/swap-loader.js\")",
       "Bash(npx --prefix web tsc --noEmit -p web)",
-      "Bash(node -e \"const d=require\\('./web/package.json'\\).dependencies;console.log\\('nodemailer:',d.nodemailer||'—','resend:',d.resend||'—'\\)\")"
+      "Bash(node -e \"const d=require\\('./web/package.json'\\).dependencies;console.log\\('nodemailer:',d.nodemailer||'—','resend:',d.resend||'—'\\)\")",
+      "Bash(sed -i 's|import { sendWhatsApp, reminderWhatsAppText } from \"@/lib/twilio\";|import { sendReminderWhatsApp } from \"@/lib/twilio\";|' app/api/cron/send-reminders/route.ts)",
+      "Bash(sed -i 's|const res = await sendWhatsApp\\(phone, reminderWhatsAppText\\(r.title, label\\)\\);|const res = await sendReminderWhatsApp\\(phone, r.title, label\\);|' app/api/cron/send-reminders/route.ts)",
+      "Bash(sed -i 's|import { sendWhatsApp, documentWhatsAppText } from \"@/lib/twilio\";|import { sendDocumentWhatsApp } from \"@/lib/twilio\";|' app/api/cron/document-whatsapp/route.ts)",
+      "Bash(sed -i 's|const res = await sendWhatsApp\\(phone, documentWhatsAppText\\(doc.name, whenLabel\\(hit.lead\\)\\)\\);|const res = await sendDocumentWhatsApp\\(phone, doc.name, whenLabel\\(hit.lead\\)\\);|' app/api/cron/document-whatsapp/route.ts)",
+      "Bash(grep -B1 \"ignore\\\\|/\\\\* \")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

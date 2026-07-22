@@ -15,6 +15,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { SkeletonList } from "@/components/loader";
+import { reportError } from "@/lib/report-error";
+import { timed } from "@/lib/network";
 import { listDocuments, deleteDocument, type Document } from "@/lib/documents";
 import { cancelDocumentExpiry } from "@/lib/notifications";
 import { shareDocument, shareDocuments } from "@/lib/share";
@@ -48,9 +50,10 @@ export default function Documents() {
     async (isRefresh = false) => {
       try {
         if (!isRefresh) setLoading(true);
-        const data = await listDocuments();
+        const data = await timed(listDocuments());
         setDocs(data);
       } catch (e) {
+        reportError(e, { screen: "documents", action: "load" });
         toast.show(d.title + " ✕", "error");
       } finally {
         setLoading(false);

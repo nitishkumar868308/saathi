@@ -14,6 +14,8 @@ import { useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { SkeletonList } from "@/components/loader";
+import { reportError } from "@/lib/report-error";
+import { timed } from "@/lib/network";
 import SaathiMark from "@/components/saathi-mark";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
@@ -53,10 +55,11 @@ export default function Home() {
     async (isRefresh = false) => {
       try {
         if (!isRefresh) setLoading(true);
-        const [d, r] = await Promise.all([listDocuments(), listReminders()]);
+        const [d, r] = await timed(Promise.all([listDocuments(), listReminders()]));
         setDocs(d);
         setToday(r.filter((x) => x.is_on && !x.is_paused && isToday(x.remind_at)));
-      } catch {
+      } catch (e) {
+        reportError(e, { screen: "home", action: "load" });
         toast.show(h.loadFailed, "error");
       } finally {
         setLoading(false);

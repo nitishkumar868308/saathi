@@ -19,6 +19,7 @@ import DateTimePicker, {
 
 import { colors } from "@/theme/colors";
 import { Loader } from "@/components/loader";
+import { reportError } from "@/lib/report-error";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
@@ -235,6 +236,7 @@ export default function AddReminder() {
         toast.show(a.limitReached, "info");
         router.replace("/upgrade" as never);
       } else {
+        reportError(e, { screen: "add-reminder", action: "save" });
         toast.show(a.title + " ✕", "error");
       }
     } finally {

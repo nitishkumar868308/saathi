@@ -13,24 +13,42 @@ const SID = process.env.TWILIO_ACCOUNT_SID;
 const TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const FROM = process.env.TWILIO_WHATSAPP_FROM;
 
+/** Meta se approved template SIDs (production ke liye). Sandbox me khaali. */
+const TEMPLATE_REMINDER = process.env.TWILIO_TEMPLATE_REMINDER_SID;
+const TEMPLATE_DOCUMENT = process.env.TWILIO_TEMPLATE_DOCUMENT_SID;
+
 export function twilioConfigured(): boolean {
   return Boolean(SID && TOKEN && FROM);
 }
 
 /**
- * WhatsApp message bhejo. `to` = E.164 number (jaise +919876543210).
- * Returns { sent } / { skipped } / throw on hard error.
+ * WhatsApp message bhejo. `to` = E.164 (jaise +919876543210).
+ *
+ * ⚠️ WhatsApp ka niyam: business khud se (24h window ke bahar) SIRF approved
+ * TEMPLATE bhej sakta hai — free-form text reject ho jaata hai. Isliye:
+ *   - templateSid diya ho  -> Content API se template bhejta hai (production)
+ *   - nahi diya            -> plain Body (Twilio Sandbox / testing)
+ *
+ * Env na ho to chup-chaap skip — caller kabhi fail nahi hota.
  */
 export async function sendWhatsApp(
   to: string,
   body: string,
+  opts: { templateSid?: string; variables?: Record<string, string> } = {},
 ): Promise<{ sent: boolean; skipped?: boolean }> {
   if (!twilioConfigured()) {
     console.warn("[twilio] env not set — WhatsApp skipped");
     return { sent: false, skipped: true };
   }
   const toWa = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
-  const form = new URLSearchParams({ From: FROM as string, To: toWa, Body: body });
+  const form = new URLSearchParams({ From: FROM as string, To: toWa });
+
+  if (opts.templateSid) {
+    form.set("ContentSid", opts.templateSid);
+    if (opts.variables) form.set("ContentVariables", JSON.stringify(opts.variables));
+  } else {
+    form.set("Body", body);
+  }
 
   const res = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`,
@@ -50,6 +68,22 @@ export async function sendWhatsApp(
     throw new Error(`twilio send failed: ${res.status} ${txt}`);
   }
   return { sent: true };
+}
+
+/** Reminder bhejo — template ho to template se, warna plain text. */
+export function sendReminderWhatsApp(to: string, title: string, whenLabel: string) {
+  return sendWhatsApp(to, reminderWhatsAppText(title, whenLabel), {
+    templateSid: TEMPLATE_REMINDER,
+    variables: { "1": title, "2": whenLabel },
+  });
+}
+
+/** Document expiry bhejo — template ho to template se, warna plain text. */
+export function sendDocumentWhatsApp(to: string, name: string, whenLabel: string) {
+  return sendWhatsApp(to, documentWhatsAppText(name, whenLabel), {
+    templateSid: TEMPLATE_DOCUMENT,
+    variables: { "1": name, "2": whenLabel },
+  });
 }
 
 /** Branded WhatsApp reminder text (logo emoji + brand). */

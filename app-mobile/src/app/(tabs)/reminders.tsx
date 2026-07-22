@@ -14,6 +14,8 @@ import { router, useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { SkeletonList } from "@/components/loader";
+import { reportError } from "@/lib/report-error";
+import { timed } from "@/lib/network";
 import {
   listReminders,
   setReminderOn,
@@ -39,8 +41,9 @@ export default function Reminders() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      setItems(await listReminders());
-    } catch {
+      setItems(await timed(listReminders()));
+    } catch (e) {
+      reportError(e, { screen: "reminders", action: "load" });
       toast.show(r0.title + " ✕", "error");
     } finally {
       setLoading(false);

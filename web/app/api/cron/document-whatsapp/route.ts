@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendWhatsApp, documentWhatsAppText } from "@/lib/twilio";
+import { sendDocumentWhatsApp } from "@/lib/twilio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
     if (!phone) continue;
 
     try {
-      const res = await sendWhatsApp(phone, documentWhatsAppText(doc.name, whenLabel(hit.lead)));
+      const res = await sendDocumentWhatsApp(phone, doc.name, whenLabel(hit.lead));
       if (res.sent) sent++;
     } catch (e) {
       errors.push(`wa ${doc.id}: ${String(e)}`);
