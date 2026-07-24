@@ -22,6 +22,7 @@ import { cancelDocumentExpiry } from "@/lib/notifications";
 import { shareDocument, shareDocuments } from "@/lib/share";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
+import { Pagination, usePaged } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -132,6 +133,9 @@ export default function Documents() {
     return filter === "soon" ? s === "soon" : s === "expired";
   });
 
+  // 10 per page — filter badle to page 1 pe wapas.
+  const { page, setPage, pageCount, pageItems } = usePaged(list, 10, filter);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerWrap}>
@@ -217,36 +221,39 @@ export default function Documents() {
               )}
             </View>
           ) : (
-            list.map((doc) => (
-              <DocCard
-                key={doc.id}
-                doc={doc}
-                selectMode={selectMode}
-                selected={selected.has(doc.id)}
-                onPress={() => {
-                  if (selectMode) {
-                    if (!doc.is_locked) toggleSelect(doc.id);
-                    return;
-                  }
-                  if (doc.is_locked) {
-                    router.push("/upgrade" as never);
-                    return;
-                  }
-                  router.push({
-                    pathname: "/document-view",
-                    params: {
-                      uri: doc.file_uri ?? "",
-                      path: doc.file_path ?? "",
-                      name: doc.name,
-                    },
-                  } as never);
-                }}
-                onLongPress={() => {
-                  if (selectMode || doc.is_locked) return;
-                  docActions(doc);
-                }}
-              />
-            ))
+            <>
+              {pageItems.map((doc) => (
+                <DocCard
+                  key={doc.id}
+                  doc={doc}
+                  selectMode={selectMode}
+                  selected={selected.has(doc.id)}
+                  onPress={() => {
+                    if (selectMode) {
+                      if (!doc.is_locked) toggleSelect(doc.id);
+                      return;
+                    }
+                    if (doc.is_locked) {
+                      router.push("/upgrade" as never);
+                      return;
+                    }
+                    router.push({
+                      pathname: "/document-view",
+                      params: {
+                        uri: doc.file_uri ?? "",
+                        path: doc.file_path ?? "",
+                        name: doc.name,
+                      },
+                    } as never);
+                  }}
+                  onLongPress={() => {
+                    if (selectMode || doc.is_locked) return;
+                    docActions(doc);
+                  }}
+                />
+              ))}
+              <Pagination page={page} pageCount={pageCount} onPage={setPage} />
+            </>
           )}
           <Text style={styles.hint}>{d.longPressHint}</Text>
         </ScrollView>

@@ -194,10 +194,11 @@ Deno.serve(async (req) => {
         ? `\n\nUser ka abhi ka data (isi se jawab do, aur kuch mat maano):\n${JSON.stringify(payload.context)}`
         : "";
       const scope =
-        ` TUM SIRF is app ke baare me madad karte ho: user ke reminders, tasks, documents, unki expiry/dates, aur app kaise use karein.` +
+        ` TUM SIRF is app "Apka Saathi" ke baare me madad karte ho: (a) user ke reminders, tasks, documents aur unki expiry/dates, (b) app kaise use karein,` +
+        ` (c) app khud kya hai — kya-kya kar sakta hai, features, aur Saathi Plus plan.` +
         ` Agar user in se HATKE kuch pooche (general knowledge, duniya, news, math, coding, gossip, kuch bhi bahar ka), to us sawaal ka jawab BILKUL mat do —` +
         ` politely mana karo aur bilkul yahi bhaav do: "${declineLine(payload.locale)}".` +
-        ` App ke data ke sawaal ka seedha, chhota, sateek jawab do.`;
+        ` App/data ke sawaal ka seedha, chhota, sateek jawab do.`;
 
       const userMsg = payload.message ?? "";
       const history: GeminiContent[] = (payload.history ?? []).map((h: any) => ({

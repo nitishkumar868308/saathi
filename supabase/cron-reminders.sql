@@ -7,6 +7,12 @@
 --   3. URL apna domain se badlo agar alag ho.
 --
 -- Run karne se pehle <CRON_SECRET> replace karna mat bhoolna.
+--
+-- "schema \"cron\" does not exist" aaye to pg_cron enable nahi hai — neeche wali
+-- do lines wahi kaam kar deti hain (Dashboard toggle ki bhi zaroorat nahi).
+
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
 
 select cron.schedule(
   'send-reminders-every-minute',

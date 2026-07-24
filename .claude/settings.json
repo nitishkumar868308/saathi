@@ -164,7 +164,14 @@
       "Bash(sed -i 's|const res = await sendWhatsApp\\(phone, reminderWhatsAppText\\(r.title, label\\)\\);|const res = await sendReminderWhatsApp\\(phone, r.title, label\\);|' app/api/cron/send-reminders/route.ts)",
       "Bash(sed -i 's|import { sendWhatsApp, documentWhatsAppText } from \"@/lib/twilio\";|import { sendDocumentWhatsApp } from \"@/lib/twilio\";|' app/api/cron/document-whatsapp/route.ts)",
       "Bash(sed -i 's|const res = await sendWhatsApp\\(phone, documentWhatsAppText\\(doc.name, whenLabel\\(hit.lead\\)\\)\\);|const res = await sendDocumentWhatsApp\\(phone, doc.name, whenLabel\\(hit.lead\\)\\);|' app/api/cron/document-whatsapp/route.ts)",
-      "Bash(grep -B1 \"ignore\\\\|/\\\\* \")"
+      "Bash(grep -B1 \"ignore\\\\|/\\\\* \")",
+      "Bash(node scripts/gen-icons.mjs)",
+      "Bash(node scripts/brand-logo.mjs preview)",
+      "Bash(node scripts/brand-logo.mjs)",
+      "Bash(node -e \"const sharp=require\\('sharp'\\); sharp\\('public/svg48.png'\\).metadata\\(\\).then\\(m=>console.log\\('svg48',m.width+'x'+m.height,'channels',m.channels,'alpha',m.hasAlpha\\)\\); sharp\\('public/svg48.png'\\).trim\\(\\).toBuffer\\({resolveWithObject:true}\\).then\\(\\({info}\\)=>console.log\\('trimmed',info.width+'x'+info.height\\)\\)\")",
+      "Bash(node scripts/app-icons.mjs)",
+      "Bash(node -e \"const s=require\\('sharp'\\); \\(async\\(\\)=>{ await s\\('public/mainlogo.png'\\).resize\\(400,400,{fit:'cover'}\\).png\\(\\).toFile\\('public/logo.png'\\); await s\\('public/mainlogo.png'\\).resize\\(128,128,{fit:'cover'}\\).png\\(\\).toFile\\('public/logo-128.png'\\); console.log\\('web logo = mainlogo \\(400 + 128\\)'\\); }\\)\\(\\)\")",
+      "Bash(node scripts/web-logo.mjs)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

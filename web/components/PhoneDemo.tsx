@@ -10,7 +10,7 @@ import {
   AnimatePresence,
 } from "framer-motion";
 import { Mic, FileClock, Check } from "lucide-react";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiLogo from "@/components/SaathiLogo";
 
 type Msg = {
   role: "user" | "saathi";
@@ -93,9 +93,7 @@ export default function PhoneDemo() {
         <div className="relative overflow-hidden rounded-[2.25rem] bg-cream">
           {/* status bar / header */}
           <div className="flex items-center gap-2.5 border-b border-line bg-surface px-4 py-3.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white">
-              <SaathiMark size={20} className="text-white" />
-            </span>
+            <SaathiLogo size={42} className="rounded-2xl" />
             <div className="leading-tight">
               <p className="font-display text-base font-semibold">Saathi</p>
               <p className="text-[11px] text-sage">online · yaad rakh raha hai</p>

@@ -34,11 +34,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const range = rangeOf(url.searchParams.get("range") ?? "all");
   const uid = url.searchParams.get("uid") ?? undefined;
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 300, 1), 1000);
+  // Ek user ka detail chahiye (See all modal) — usage table dobara laane ki zaroorat nahi.
+  const activityOnly = url.searchParams.get("activityOnly") === "1";
 
   try {
     const [usage, activity] = await Promise.all([
-      getUsage(range),
-      getActivity({ ...range, uid, limit: 300 }).catch(() => []),
+      activityOnly ? Promise.resolve([]) : getUsage(range),
+      getActivity({ ...range, uid, limit }).catch(() => []),
     ]);
     return NextResponse.json({ usage, activity });
   } catch (err) {

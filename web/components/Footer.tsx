@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Instagram, Twitter, Linkedin, Mail, Play } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiWordmark from "@/components/SaathiWordmark";
 
 // 👉 Apne asli social handles yahan daal dena jab pages ban jaayein.
 const SOCIALS = [
@@ -32,11 +32,8 @@ export default function Footer() {
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-                <SaathiMark size={20} className="text-white" />
-              </span>
-              <span className="font-display text-xl font-semibold">Apka Saathi</span>
+            <div className="flex items-center">
+              <SaathiWordmark className="h-12" />
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-soft">
               {t.tagline}

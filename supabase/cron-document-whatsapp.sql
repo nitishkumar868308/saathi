@@ -6,6 +6,12 @@
 --   3. Twilio env set (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN / TWILIO_WHATSAPP_FROM)
 --      — na ho to route chalega par WhatsApp skip karega.
 --   4. supabase/document-notify.sql run kiya ho.
+--
+-- "schema \"cron\" does not exist" aaye to pg_cron enable nahi hai — neeche wali
+-- do lines wahi enable kar deti hain.
+
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
 
 select cron.schedule(
   'document-whatsapp-hourly',

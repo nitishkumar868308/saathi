@@ -16,7 +16,7 @@ import * as Linking from "expo-linking";
 
 import { colors } from "@/theme/colors";
 import { Loader } from "@/components/loader";
-import SaathiMark from "@/components/saathi-mark";
+import SaathiLogo from "@/components/saathi-logo";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 import { savePendingReferral } from "@/lib/referral-pending";
@@ -124,7 +124,7 @@ export default function Login() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.logo}>
-            <SaathiMark size={36} color={colors.white} />
+            <SaathiLogo size={72} radius={24} />
           </View>
           <Text style={styles.title}>
             {mode === "login" ? `${l.welcomeBack} 🙂` : l.signupTitle}

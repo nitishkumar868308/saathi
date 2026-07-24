@@ -65,6 +65,8 @@ export default function AddDocument() {
   const [type, setType] = useState("other");
   const [name, setName] = useState("");
   const [expiry, setExpiry] = useState("");
+  /** AI scan ka poora samajh — DB me save hota hai. */
+  const [summary, setSummary] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function pickImage(source: "camera" | "gallery") {
@@ -104,6 +106,8 @@ export default function AddDocument() {
           rType = ai.type || "other";
           rName = ai.name || "";
           rExpiry = ai.expiry && isValidDate(ai.expiry) ? ai.expiry : null;
+          // AI ka poora samajh save karo (DB me jaayega).
+          if (ai.summary) setSummary(ai.summary);
         } else {
           // Fallback: jab tak GEMINI_API_KEY set nahi / AI fail — local OCR.
           const text = await ocrImage(asset.base64);
@@ -148,6 +152,7 @@ export default function AddDocument() {
         name: name.trim(),
         type,
         expiry: expiry || null,
+        summary: summary.trim() || null,
         file_uri: savedUri,
       });
 

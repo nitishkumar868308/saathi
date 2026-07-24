@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bug, ChevronDown, RefreshCw, Smartphone, Globe } from "lucide-react";
 import { SkeletonRows } from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 
 type AppError = {
   id: string;
@@ -81,6 +82,8 @@ export default function AdminLogs() {
     );
   }, [errors]);
 
+  const pager = usePagination(groups, 10, `${days}|${source}`);
+
   if (!errors) return <SkeletonRows rows={6} />;
 
   return (
@@ -145,7 +148,7 @@ export default function AdminLogs() {
         </div>
       ) : (
         <div className="space-y-3">
-          {groups.map(({ sample, count }) => {
+          {pager.pageItems.map(({ sample, count }) => {
             const open = openId === sample.id;
             return (
               <div key={sample.id} className="rounded-3xl border border-line bg-surface shadow-soft">
@@ -210,6 +213,15 @@ export default function AdminLogs() {
               </div>
             );
           })}
+          <Pagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            onPage={pager.setPage}
+            label="errors"
+          />
         </div>
       )}
 

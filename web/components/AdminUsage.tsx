@@ -9,9 +9,12 @@ import {
   MessageSquare,
   Activity,
   Search,
-  X,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { SkeletonRows } from "@/components/Loader";
+import Modal from "@/components/admin/Modal";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 
 type UsageRow = {
   id: string;
@@ -106,14 +109,13 @@ export default function AdminUsage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [range, setRange] = useState<RangeKey>("7");
   const [query, setQuery] = useState("");
-  /** Kisi ek user pe zoom — uski hi activity dikhegi. */
-  const [focus, setFocus] = useState<UsageRow | null>(null);
+  /** "See all" — ek user ka poora activity modal me. */
+  const [detail, setDetail] = useState<UsageRow | null>(null);
 
   const load = useCallback(async () => {
     setError("");
     try {
       const qs = new URLSearchParams({ range });
-      if (focus) qs.set("uid", focus.id);
       const res = await fetch(`/api/admin/usage?${qs}`, { cache: "no-store" });
       const body = (await res.json()) as {
         usage?: UsageRow[];
@@ -127,7 +129,7 @@ export default function AdminUsage() {
       setError(e instanceof Error ? e.message : "Usage load nahi hua");
       setUsage([]);
     }
-  }, [range, focus]);
+  }, [range]);
 
   useEffect(() => {
     load();
@@ -156,6 +158,8 @@ export default function AdminUsage() {
       active: list.filter((u) => !isDormant(u)).length,
     };
   }, [usage]);
+
+  const pager = usePagination(rows, 10, `${query}|${filter}|${range}`);
 
   function exportCsv() {
     download(
@@ -202,15 +206,6 @@ export default function AdminUsage() {
             </button>
           ))}
         </div>
-        {focus && (
-          <button
-            onClick={() => setFocus(null)}
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-terracotta px-3 text-xs font-bold text-white"
-          >
-            {focus.name || focus.email || "user"}
-            <X size={13} />
-          </button>
-        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
@@ -223,9 +218,7 @@ export default function AdminUsage() {
       {/* Activity feed — kaun sa item, kab */}
       <div className="rounded-3xl border border-line bg-surface shadow-soft">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h3 className="font-display text-base font-semibold">
-            {focus ? `${focus.name || focus.email} ne kya kiya` : "Kya-kya hua"}
-          </h3>
+          <h3 className="font-display text-base font-semibold">Kya-kya hua</h3>
           <span className="text-xs font-semibold text-ink-soft">{activity.length} items</span>
         </div>
         {!activity.length ? (
@@ -249,7 +242,7 @@ export default function AdminUsage() {
                     <p className="truncate text-xs text-ink-soft">
                       {k.label}
                       {a.detail ? ` · ${a.detail}` : ""}
-                      {!focus && (a.name || a.email) ? ` · ${a.name || a.email}` : ""}
+                      {a.name || a.email ? ` · ${a.name || a.email}` : ""}
                     </p>
                   </div>
                   <span className="shrink-0 text-xs text-ink-soft">{fmtTime(a.at)}</span>
@@ -307,47 +300,204 @@ export default function AdminUsage() {
           <p className="text-sm text-ink-soft">Is filter me koi user nahi.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border border-line bg-surface shadow-soft">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
-              <tr>
-                <th className="px-4 py-3 font-semibold">User</th>
-                <th className="px-4 py-3 text-center font-semibold">Docs</th>
-                <th className="px-4 py-3 text-center font-semibold">Reminders</th>
-                <th className="px-4 py-3 text-center font-semibold">Chats</th>
-                <th className="px-4 py-3 font-semibold">Last active</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((u) => (
-                <tr
-                  key={u.id}
-                  onClick={() => setFocus(u)}
-                  className="cursor-pointer border-b border-line/60 transition hover:bg-cream-deep/20"
-                >
-                  <td className="px-4 py-3.5">
-                    <p className="font-semibold text-ink">{u.name || "—"}</p>
-                    <p className="text-xs text-ink-soft">{u.email ?? "—"}</p>
-                  </td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-ink">{u.documents}</td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-ink">{u.reminders}</td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-ink">{u.messages}</td>
-                  <td className="px-4 py-3.5 text-ink-soft">{fmtDate(u.lastActive)}</td>
-                  <td className="px-4 py-3.5">
-                    <StatusBadge u={u} />
-                  </td>
+        <>
+          <div className="overflow-x-auto rounded-3xl border border-line bg-surface shadow-soft">
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">User</th>
+                  <th className="px-4 py-3 text-center font-semibold">Docs</th>
+                  <th className="px-4 py-3 text-center font-semibold">Reminders</th>
+                  <th className="px-4 py-3 text-center font-semibold">Chats</th>
+                  <th className="px-4 py-3 font-semibold">Last active</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 text-right font-semibold">Detail</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pager.pageItems.map((u) => (
+                  <tr
+                    key={u.id}
+                    onClick={() => setDetail(u)}
+                    className="cursor-pointer border-b border-line/60 transition hover:bg-cream-deep/20"
+                  >
+                    <td className="px-4 py-3.5">
+                      <p className="font-semibold text-ink">{u.name || "—"}</p>
+                      <p className="text-xs text-ink-soft">{u.email ?? "—"}</p>
+                    </td>
+                    <td className="px-4 py-3.5 text-center font-semibold text-ink">{u.documents}</td>
+                    <td className="px-4 py-3.5 text-center font-semibold text-ink">{u.reminders}</td>
+                    <td className="px-4 py-3.5 text-center font-semibold text-ink">{u.messages}</td>
+                    <td className="px-4 py-3.5 text-ink-soft">{fmtDate(u.lastActive)}</td>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge u={u} />
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetail(u);
+                        }}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-semibold text-ink-soft transition hover:text-terracotta"
+                      >
+                        <Eye size={14} />
+                        See all
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            onPage={pager.setPage}
+            label="users"
+          />
+        </>
       )}
 
       <p className="text-xs text-ink-soft">
-        Ginti chuni hui date range ki hai. Kisi user pe click karo — sirf uski activity dikhegi.
+        Ginti chuni hui date range ki hai. Kisi user pe click karo (ya "See all") — uska poora
+        detail modal me khulega.
       </p>
+
+      <UsageDetailModal user={detail} onClose={() => setDetail(null)} />
     </div>
+  );
+}
+
+/* --------------------------- See all: user detail --------------------------- */
+
+const ACT_FILTERS = [
+  { key: "all", label: "Sab" },
+  { key: "document", label: "Documents" },
+  { key: "reminder", label: "Reminders" },
+  { key: "chat", label: "Chats" },
+] as const;
+type ActFilter = (typeof ACT_FILTERS)[number]["key"];
+
+function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: () => void }) {
+  const [items, setItems] = useState<ActivityRow[] | null>(null);
+  const [error, setError] = useState("");
+  const [actFilter, setActFilter] = useState<ActFilter>("all");
+
+  useEffect(() => {
+    setItems(null);
+    setError("");
+    setActFilter("all");
+    if (!user) return;
+    let alive = true;
+    const qs = new URLSearchParams({
+      range: "all",
+      uid: user.id,
+      limit: "1000",
+      activityOnly: "1",
+    });
+    fetch(`/api/admin/usage?${qs}`, { cache: "no-store" })
+      .then(async (r) => {
+        const b = (await r.json()) as { activity?: ActivityRow[]; error?: string };
+        if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`);
+        if (alive) setItems(b.activity ?? []);
+      })
+      .catch((e) => {
+        if (alive) {
+          setError(e instanceof Error ? e.message : "load fail");
+          setItems([]);
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  const filtered = useMemo(
+    () => (items ?? []).filter((a) => actFilter === "all" || a.kind === actFilter),
+    [items, actFilter],
+  );
+  const pager = usePagination(filtered, 10, actFilter);
+
+  if (!user) return null;
+
+  return (
+    <Modal
+      open={!!user}
+      onClose={onClose}
+      title={user.name || user.email || "User"}
+      subtitle={`${user.documents} docs · ${user.reminders} reminders · ${user.messages} chats`}
+      size="lg"
+      footer={
+        items ? (
+          <Pagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            onPage={pager.setPage}
+            label="activity"
+          />
+        ) : undefined
+      }
+    >
+      <div className="space-y-3">
+        <div className="flex rounded-2xl border border-line bg-surface p-1">
+          {ACT_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setActFilter(f.key)}
+              className={`h-9 flex-1 rounded-xl px-2 text-xs font-semibold transition ${
+                actFilter === f.key ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {!items ? (
+          <div className="flex items-center justify-center gap-2 py-14 text-ink-soft">
+            <Loader2 size={18} className="animate-spin" />
+            <span className="text-sm">Poora detail la rahe hain...</span>
+          </div>
+        ) : error ? (
+          <div className="flex items-center gap-2 rounded-2xl border border-terracotta/30 bg-terracotta/10 p-4">
+            <AlertTriangle size={16} className="text-terracotta-dark" />
+            <p className="text-sm text-terracotta-dark">{error}</p>
+          </div>
+        ) : !filtered.length ? (
+          <p className="py-12 text-center text-sm text-ink-soft">Is filter me kuch nahi.</p>
+        ) : (
+          <ul className="divide-y divide-line/60">
+            {pager.pageItems.map((a) => {
+              const k = KIND[a.kind];
+              const Icon = k.icon;
+              return (
+                <li key={`${a.kind}-${a.itemId}`} className="flex items-start gap-3 py-3">
+                  <span
+                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${k.cls}`}
+                  >
+                    <Icon size={14} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-ink">{a.title || "—"}</p>
+                    <p className="text-xs text-ink-soft">
+                      {k.label}
+                      {a.detail ? ` · ${a.detail}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-xs text-ink-soft">{fmtTime(a.at)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </Modal>
   );
 }
 

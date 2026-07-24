@@ -18,7 +18,7 @@
     "android": {
       "package": "com.saathi.app",
       "adaptiveIcon": {
-        "backgroundColor": "#C25A37",
+        "backgroundColor": "#125156",
         "foregroundImage": "./assets/images/adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false,

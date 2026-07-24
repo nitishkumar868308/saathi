@@ -24,6 +24,7 @@ import {
 } from "@/lib/reminders";
 import { scheduleReminder, cancelReminder } from "@/lib/notifications";
 import { formatWhen } from "@/utils/parse-time";
+import { Pagination, usePaged } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
@@ -95,6 +96,9 @@ export default function Reminders() {
   const today = items.filter((r) => r.bucket === "today");
   const upcoming = items.filter((r) => r.bucket !== "today");
 
+  // Upcoming list lambi ho sakti hai — 10 per page. (Today hamesha poora dikhta.)
+  const up = usePaged(upcoming, 10);
+
   // Card pe time hamesha current bhasha me — stored label ki jagah remind_at se.
   const timeOf = (r: Reminder): string | null =>
     r.remind_at ? formatWhen(new Date(r.remind_at), words, locale) : r.time_label ?? null;
@@ -123,7 +127,8 @@ export default function Reminders() {
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Section title={r0.today} items={today} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
-          <Section title={r0.upcoming} items={upcoming} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
+          <Section title={r0.upcoming} items={up.pageItems} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
+          <Pagination page={up.page} pageCount={up.pageCount} onPage={up.setPage} />
           <Text style={styles.hint}>{r0.longPressHint}</Text>
         </ScrollView>
       )}

@@ -17,6 +17,8 @@ export type Document = {
   name: string;
   type: string;
   expiry: string | null; // 'YYYY-MM-DD'
+  /** AI scan ka poora samajh — kya document hai, kaunse fields mile. */
+  summary: string | null;
   file_uri: string | null; // local device path (fast offline view)
   file_path: string | null; // Supabase Storage path (cloud backup)
   file_size: number | null; // bytes
@@ -83,6 +85,7 @@ export async function addDocument(input: {
   name: string;
   type: string;
   expiry: string | null;
+  summary?: string | null;
   file_uri?: string | null;
 }): Promise<Document> {
   // Free plan limit check
@@ -97,6 +100,7 @@ export async function addDocument(input: {
       name: input.name,
       type: input.type,
       expiry: input.expiry,
+      summary: input.summary ?? null,
       file_uri: input.file_uri ?? null,
       user_id: u.user?.id ?? null,
     })

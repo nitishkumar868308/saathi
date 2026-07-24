@@ -4,7 +4,7 @@ import { useState } from "react";
 import Script from "next/script";
 import { useSearchParams } from "next/navigation";
 import { ShieldCheck, Loader2, CheckCircle2, Lock } from "lucide-react";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiLogo from "@/components/SaathiLogo";
 
 type PlanId = "plus_monthly" | "plus_yearly";
 
@@ -88,9 +88,7 @@ export default function CheckoutClient() {
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       <div className="w-full max-w-md rounded-4xl border border-line bg-surface p-7 shadow-warm sm:p-8">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-            <SaathiMark size={22} className="text-white" />
-          </span>
+          <SaathiLogo size={46} className="rounded-2xl shadow-warm" />
           <span className="font-display text-xl font-semibold">Saathi</span>
         </div>
 

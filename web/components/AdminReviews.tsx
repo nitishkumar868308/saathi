@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SkeletonRows } from "@/components/Loader";
-import { Star, Loader2, AlertTriangle, Globe, Download, MessageSquare } from "lucide-react";
+import { Star, AlertTriangle, Globe, Download, MessageSquare } from "lucide-react";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 
 type AdminReview = {
   id: string;
@@ -78,6 +79,8 @@ export default function AdminReviews() {
     const list = reviews ?? [];
     return filter === "display" ? list.filter((r) => r.allowDisplay) : list;
   }, [reviews, filter]);
+
+  const pager = usePagination(rows, 10, filter);
 
   const stats = useMemo(() => {
     const list = reviews ?? [];
@@ -164,7 +167,7 @@ export default function AdminReviews() {
         </div>
       ) : (
         <div className="space-y-3">
-          {rows.map((r) => (
+          {pager.pageItems.map((r) => (
             <div
               key={r.id}
               className="rounded-3xl border border-line bg-surface p-5 shadow-soft"
@@ -194,6 +197,15 @@ export default function AdminReviews() {
               )}
             </div>
           ))}
+          <Pagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            onPage={pager.setPage}
+            label="reviews"
+          />
         </div>
       )}
     </div>

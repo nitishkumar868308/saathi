@@ -19,13 +19,16 @@ import {
   Activity,
   Globe,
   Bug,
+  FileText,
 } from "lucide-react";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
 import AdminReviews from "@/components/AdminReviews";
 import AdminUsage from "@/components/AdminUsage";
+import AdminDocuments from "@/components/AdminDocuments";
 import AdminPricing from "@/components/AdminPricing";
 import AdminLogs from "@/components/AdminLogs";
 
@@ -37,16 +40,25 @@ type ContactEntry = {
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section = "rewards" | "pricing" | "users" | "usage" | "reviews" | "logs" | "contacts";
+type Section =
+  | "rewards"
+  | "pricing"
+  | "users"
+  | "usage"
+  | "documents"
+  | "reviews"
+  | "logs"
+  | "contacts";
 
 const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
-  { key: "rewards", label: "Rewards", icon: Gift },
-  { key: "pricing", label: "Pricing", icon: Globe },
   { key: "users", label: "Users", icon: Users },
   { key: "usage", label: "Usage", icon: Activity },
+  { key: "documents", label: "Documents", icon: FileText },
   { key: "reviews", label: "Reviews", icon: Star },
   { key: "logs", label: "Logs", icon: Bug },
   { key: "contacts", label: "Contacts", icon: MessageSquare },
+  { key: "pricing", label: "Pricing", icon: Globe },
+  { key: "rewards", label: "Rewards", icon: Gift },
 ];
 
 const HEADING: Record<Section, { title: string; sub: string }> = {
@@ -65,6 +77,10 @@ const HEADING: Record<Section, { title: string; sub: string }> = {
   usage: {
     title: "Usage",
     sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi.",
+  },
+  documents: {
+    title: "Documents",
+    sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho.",
   },
   reviews: {
     title: "Reviews & Ratings",
@@ -244,7 +260,7 @@ function Dashboard({
   onRefresh: () => void;
   onLogout: () => void;
 }) {
-  const [section, setSection] = useState<Section>("rewards");
+  const [section, setSection] = useState<Section>("users");
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -416,6 +432,7 @@ function Dashboard({
               {section === "pricing" && <AdminPricing />}
               {section === "users" && <AdminUsers />}
               {section === "usage" && <AdminUsage />}
+              {section === "documents" && <AdminDocuments />}
               {section === "reviews" && <AdminReviews />}
               {section === "logs" && <AdminLogs />}
               {section === "contacts" && <ContactsView rows={filteredContacts} />}
@@ -430,13 +447,8 @@ function Dashboard({
 function Brand() {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-        <SaathiMark size={20} className="text-white" />
-      </span>
-      <div className="leading-tight">
-        <p className="font-display text-base font-semibold">Apka Saathi</p>
-        <p className="text-xs text-ink-soft">Admin</p>
-      </div>
+      <SaathiLogo size={52} className="rounded-2xl shadow-warm" />
+      <p className="text-sm font-semibold text-ink-soft">Admin</p>
     </div>
   );
 }
@@ -456,10 +468,11 @@ function LogoutBtn({ onLogout, className = "" }: { onLogout: () => void; classNa
 /* ------------------------------ Contacts ----------------------------- */
 
 function ContactsView({ rows }: { rows: ContactEntry[] }) {
+  const pager = usePagination(rows, 10, rows);
   if (!rows.length) return <Empty label="Abhi koi message nahi." />;
   return (
     <div className="space-y-3">
-      {rows.map((r, i) => (
+      {pager.pageItems.map((r, i) => (
         <div
           key={r.email + i}
           className="rounded-3xl border border-line bg-surface p-5 shadow-soft transition hover:shadow-warm"
@@ -500,6 +513,15 @@ function ContactsView({ rows }: { rows: ContactEntry[] }) {
           </div>
         </div>
       ))}
+      <Pagination
+        page={pager.page}
+        pageCount={pager.pageCount}
+        total={pager.total}
+        from={pager.from}
+        to={pager.to}
+        onPage={pager.setPage}
+        label="messages"
+      />
     </div>
   );
 }

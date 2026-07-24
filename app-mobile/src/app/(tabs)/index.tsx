@@ -16,7 +16,7 @@ import { colors } from "@/theme/colors";
 import { SkeletonList } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
-import SaathiMark from "@/components/saathi-mark";
+import SaathiLogo from "@/components/saathi-logo";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
 import { listReminders, setReminderOn, type Reminder } from "@/lib/reminders";
@@ -115,7 +115,7 @@ export default function Home() {
             <Text style={styles.sub}>{h.briefLabel}</Text>
           </View>
           <View style={styles.avatar}>
-            <SaathiMark size={24} color={colors.white} />
+            <SaathiLogo size={46} radius={16} />
           </View>
         </View>
 

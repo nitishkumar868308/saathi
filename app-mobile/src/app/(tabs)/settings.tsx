@@ -17,7 +17,7 @@ import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 
 import { colors } from "@/theme/colors";
-import SaathiMark from "@/components/saathi-mark";
+import SaathiLogo from "@/components/saathi-logo";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
@@ -195,7 +195,7 @@ export default function Settings() {
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.pAvatarImg} />
             ) : (
-              <SaathiMark size={32} color={colors.white} />
+              <SaathiLogo size={72} radius={26} />
             )}
           </View>
           <Text style={styles.pName}>{name}</Text>

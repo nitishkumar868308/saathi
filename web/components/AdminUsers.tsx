@@ -14,6 +14,7 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 
 type AdminUser = {
   id: string;
@@ -174,6 +175,8 @@ export default function AdminUsers() {
     };
   }, [users]);
 
+  const pager = usePagination(rows, 10, `${query}|${filter}`);
+
   function exportCsv() {
     download(
       "apka-saathi-users.csv",
@@ -284,7 +287,7 @@ export default function AdminUsers() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((u) => {
+                {pager.pageItems.map((u) => {
                   const st = statusOf(u);
                   const open = openId === u.id;
                   return (
@@ -340,7 +343,7 @@ export default function AdminUsers() {
 
           {/* Mobile cards */}
           <div className="space-y-3 lg:hidden">
-            {rows.map((u) => {
+            {pager.pageItems.map((u) => {
               const st = statusOf(u);
               const open = openId === u.id;
               return (
@@ -382,6 +385,16 @@ export default function AdminUsers() {
               );
             })}
           </div>
+
+          <Pagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            onPage={pager.setPage}
+            label="users"
+          />
 
           <p className="text-xs text-ink-soft">
             {users.length} me se {rows.length} users dikh rahe hain. (Zyada se zyada 500 latest.)

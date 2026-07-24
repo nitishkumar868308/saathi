@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiLogo from "@/components/SaathiLogo";
 
 /**
  * Pyaara full-screen loader — screen ke beech mein, backdrop blur ke saath.
@@ -47,13 +47,13 @@ export default function LoadingOverlay({ label }: { label?: string }) {
               />
             ))}
           <motion.span
-            className="relative flex h-16 w-16 items-center justify-center rounded-3xl bg-terracotta text-white shadow-warm"
+            className="relative flex h-16 w-16 items-center justify-center rounded-3xl shadow-warm"
             animate={
               reduce ? undefined : { scale: [1, 1.12, 1] }
             }
             transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
           >
-            <SaathiMark size={34} className="text-white" />
+            <SaathiLogo size={64} className="rounded-3xl" />
           </motion.span>
         </div>
 

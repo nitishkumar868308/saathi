@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { colors } from "@/theme/colors";
-import SaathiMark from "@/components/saathi-mark";
+import SaathiLogo from "@/components/saathi-logo";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 const pointIcons = ["documents-outline", "sunny-outline", "lock-closed-outline"];
@@ -20,7 +20,7 @@ export default function Onboarding() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.content}>
         <View style={styles.logo}>
-          <SaathiMark size={40} color={colors.white} />
+          <SaathiLogo size={76} radius={26} />
         </View>
 
         <Text style={styles.title}>{o.title} 🙂</Text>

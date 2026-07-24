@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
 import { Loader } from "@/components/loader";
-import SaathiMark from "@/components/saathi-mark";
+import SaathiLogo from "@/components/saathi-logo";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName } from "@/components/auth-provider";
@@ -52,7 +52,7 @@ function TypingDots() {
   return (
     <View style={styles.saathiRow}>
       <View style={styles.miniAvatar}>
-        <SaathiMark size={15} color={colors.white} />
+        <SaathiLogo size={26} radius={10} />
       </View>
       <View style={styles.saathiBubble}>
         <Loader size={26} />
@@ -126,7 +126,7 @@ export default function Chat() {
       {/* header */}
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <SaathiMark size={22} color={colors.white} />
+          <SaathiLogo size={42} radius={16} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Saathi</Text>
@@ -155,7 +155,7 @@ export default function Chat() {
             m.role === "saathi" ? (
               <View key={m.id} style={styles.saathiRow}>
                 <View style={styles.miniAvatar}>
-                  <SaathiMark size={15} color={colors.white} />
+                  <SaathiLogo size={26} radius={10} />
                 </View>
                 <View style={styles.saathiBubble}>
                   <Text style={styles.saathiText}>{m.text}</Text>

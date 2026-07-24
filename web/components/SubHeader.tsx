@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiWordmark from "@/components/SaathiWordmark";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 /**
@@ -43,13 +43,8 @@ export default function SubHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-cream/80 backdrop-blur-md">
       <div className="container-page flex items-center justify-between gap-2 py-3 sm:py-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm sm:h-10 sm:w-10">
-            <SaathiMark size={22} className="text-white" />
-          </span>
-          <span className="font-display text-lg font-semibold tracking-tight sm:text-2xl">
-            Apka Saathi
-          </span>
+        <Link href="/" className="flex shrink-0 items-center" aria-label="Apka Saathi">
+          <SaathiWordmark className="h-10 sm:h-11" />
         </Link>
 
         {/* Desktop nav */}

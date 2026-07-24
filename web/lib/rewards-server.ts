@@ -452,6 +452,92 @@ export async function getActivity(opts: {
   }));
 }
 
+/* ------------------------------ documents ------------------------------ */
+
+export type AdminDocument = {
+  id: string;
+  name: string;
+  type: string;
+  expiry: string | null;
+  summary: string | null;
+  fileSize: number | null;
+  filePath: string | null;
+  mimeType: string | null;
+  inStorage: boolean;
+  createdAt: string;
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+};
+
+/**
+ * Saare users ke documents (admin "Documents" tab) — kaun, kya, kab, kitna, path.
+ * admin_documents() RPC se. Date range optional.
+ */
+export async function getDocuments(
+  range: { from?: string; to?: string } = {},
+  limit = 500,
+): Promise<{ total: number; rows: AdminDocument[] }> {
+  assertConfigured();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_documents`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      p_from: range.from ?? null,
+      p_to: range.to ?? null,
+      p_limit: limit,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) await fail("documents read (supabase/admin-documents.sql run kiya?)", res);
+  const body = (await res.json()) as {
+    total?: number;
+    rows?: Record<string, unknown>[];
+  };
+  const rows = (body.rows ?? []).map((r) => ({
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    type: String(r.type ?? ""),
+    expiry: (r.expiry as string) ?? null,
+    summary: (r.summary as string) ?? null,
+    fileSize: r.file_size == null ? null : Number(r.file_size),
+    filePath: (r.file_path as string) ?? null,
+    mimeType: (r.mime_type as string) ?? null,
+    inStorage: Boolean(r.in_storage),
+    createdAt: String(r.created_at),
+    userId: (r.user_id as string) ?? null,
+    userEmail: (r.user_email as string) ?? null,
+    userName: (r.user_name as string) ?? null,
+  }));
+  return { total: Number(body.total ?? rows.length), rows };
+}
+
+/**
+ * Private `documents` bucket ke file_path ka short-lived signed URL (preview ke liye).
+ * Sirf server (service_role). expiresIn seconds me.
+ */
+export async function getDocumentSignedUrl(
+  filePath: string,
+  expiresIn = 120,
+): Promise<string | null> {
+  assertConfigured();
+  const clean = filePath.replace(/^\/+/, "");
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/sign/documents/${encodeURI(clean)}`,
+    {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ expiresIn }),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) return null;
+  const body = (await res.json()) as { signedURL?: string };
+  if (!body.signedURL) return null;
+  // signedURL relative hota hai (e.g. /object/sign/documents/...) — full bana do.
+  return `${SUPABASE_URL}/storage/v1${body.signedURL}`;
+}
+
 export type RewardStats = {
   totalUsers: number;
   referralsTotal: number;

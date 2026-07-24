@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Gift, Smartphone } from "lucide-react";
-import SaathiMark from "@/components/SaathiMark";
+import SaathiLogo from "@/components/SaathiLogo";
 import { PLAY_STORE_URL } from "@/lib/links";
 import { getOffers } from "@/lib/offers";
 
@@ -22,9 +22,7 @@ export default async function ReferralInvite({ params }: { params: { code: strin
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream px-5 py-10">
       <div className="w-full max-w-md rounded-4xl border border-line bg-surface p-7 text-center shadow-warm sm:p-9">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
-          <SaathiMark size={28} className="text-white" />
-        </div>
+        <SaathiLogo size={68} className="mx-auto block rounded-2xl shadow-warm" />
 
         <div className="mx-auto mt-6 flex h-14 w-14 items-center justify-center rounded-3xl bg-terracotta/10 text-terracotta">
           <Gift size={26} />
