@@ -181,7 +181,20 @@
       "Bash(echo \"=== ?key= \\(jo code use karta hai\\) ===\")",
       "Bash(curl -s -m 25 https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w -H 'content-type: application/json' -d '{\"contents\":[{\"parts\":[{\"text\":\"say hi\"}]}]}')",
       "Bash(curl -s -m 25 'https://generativelanguage.googleapis.com/v1beta/models?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w&pageSize=100')",
-      "Bash(curl -s -m 30 https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w -H 'content-type: application/json' -d '{\"system_instruction\":{\"parts\":[{\"text\":\"Sirf JSON do: {\\\\\"title\\\\\":string,\\\\\"needsTime\\\\\":boolean}\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"kal subah 8 baje paani ka bill bharna hai\"}]}],\"generationConfig\":{\"temperature\":0.4,\"maxOutputTokens\":300,\"responseMimeType\":\"application/json\"}}')"
+      "Bash(curl -s -m 30 https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w -H 'content-type: application/json' -d '{\"system_instruction\":{\"parts\":[{\"text\":\"Sirf JSON do: {\\\\\"title\\\\\":string,\\\\\"needsTime\\\\\":boolean}\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"kal subah 8 baje paani ka bill bharna hai\"}]}],\"generationConfig\":{\"temperature\":0.4,\"maxOutputTokens\":300,\"responseMimeType\":\"application/json\"}}')",
+      "Bash(npx expo-doctor *)",
+      "Bash(node -e \"const p=require\\('./node_modules/expo-speech-recognition/package.json'\\);console.log\\('expo-speech-recognition',p.version,JSON.stringify\\(p.peerDependencies\\)\\);const r=require\\('./node_modules/react-native-purchases/package.json'\\);console.log\\('react-native-purchases',r.version,JSON.stringify\\(r.peerDependencies||{}\\)\\)\")",
+      "PowerShell(git -C d:/my-app diff --no-color -- app-mobile/src/lib/plan.ts app-mobile/src/lib/network.ts)",
+      "Bash(npm view *)",
+      "Bash(git --no-pager log --oneline -8)",
+      "Bash(git --no-pager show --stat --oneline HEAD)",
+      "Bash(git --no-pager reflog -6)",
+      "Bash(awk -F= '/^[A-Z]/{print $1\" => len=\"length\\($2\\)}' .env)",
+      "Bash(npx eas-cli@latest env:list --environment production)",
+      "Bash(npx eas-cli *)",
+      "Bash(rm -f app-mobile/eslint.config.js)",
+      "Bash(npx --yes supabase@latest secrets list)",
+      "Bash(npx --yes supabase@latest functions list)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"
