@@ -138,6 +138,24 @@ export async function applyReferralCode(code: string): Promise<string> {
   }
 }
 
+/** Kya user pehle se kisi ke referral se juda hai (referred_by set hai)? */
+export async function hasBeenReferred(): Promise<boolean> {
+  try {
+    const sb = client();
+    const { data: u } = await sb.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return false;
+    const { data } = await sb
+      .from("profiles")
+      .select("referred_by")
+      .eq("id", uid)
+      .maybeSingle();
+    return Boolean((data as { referred_by?: string } | null)?.referred_by);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Referral reward check karo — ek document upload + ek reminder set, dono hone
  * pe dono users ko din milte hain. Best-effort, baar-baar call karna safe hai.

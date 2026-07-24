@@ -18,6 +18,7 @@ import * as WebBrowser from "expo-web-browser";
 
 import { colors } from "@/theme/colors";
 import SaathiLogo from "@/components/saathi-logo";
+import { ReferralCodeModal } from "@/components/referral-code-modal";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
@@ -53,6 +54,7 @@ export default function Settings() {
   const name = meta?.full_name || meta?.name || s.account;
   const [isPlus, setIsPlus] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [refModal, setRefModal] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [profileComplete, setProfileComplete] = useState(true);
 
@@ -113,6 +115,8 @@ export default function Settings() {
   async function logout() {
     try {
       await signOut();
+      // Logout ke baad language select screen — waha se login pe jaayega.
+      router.replace("/language" as never);
     } catch {
       toast.show(s.logout + " ✕", "error");
     }
@@ -169,16 +173,16 @@ export default function Settings() {
         setLangOpen(true);
         return;
       case "privacy":
-        openUrl("/privacy");
+        router.push("/privacy" as never);
         return;
       case "delete_all":
         deleteAllData();
         return;
       case "help":
-        openUrl("/contact");
+        router.push("/help" as never);
         return;
       case "about":
-        openUrl("/about");
+        router.push("/about" as never);
         return;
     }
   }
@@ -263,16 +267,6 @@ export default function Settings() {
           <Ionicons name="chevron-forward" size={18} color={colors.line} />
         </Pressable>
 
-        {/* Meri details */}
-        <Pressable
-          onPress={() => router.push("/profile-details" as never)}
-          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
-        >
-          <Ionicons name="person-outline" size={20} color={colors.terracotta} />
-          <Text style={styles.detailsText}>{s.myDetails}</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.line} />
-        </Pressable>
-
         {/* Refer & Earn — referral (band ho to row hi nahi) */}
         {offers.referralsEnabled && (
           <Pressable
@@ -283,6 +277,18 @@ export default function Settings() {
             <Text style={styles.detailsText}>
               {tpl(s.referRow, { d: offers.referralDays })}
             </Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.line} />
+          </Pressable>
+        )}
+
+        {/* Kisi ka referral code baad me daalne ke liye */}
+        {offers.referralsEnabled && (
+          <Pressable
+            onPress={() => setRefModal(true)}
+            style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
+          >
+            <Ionicons name="pricetag-outline" size={20} color={colors.terracotta} />
+            <Text style={styles.detailsText}>Referral code daalein</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.line} />
           </Pressable>
         )}
@@ -326,6 +332,8 @@ export default function Settings() {
 
         <Text style={styles.version}>{s.version} ❤️</Text>
       </ScrollView>
+
+      <ReferralCodeModal visible={refModal} onClose={() => setRefModal(false)} />
 
       {/* Bhasha picker */}
       <Modal

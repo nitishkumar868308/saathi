@@ -241,7 +241,7 @@ function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
         />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.refWho} numberOfLines={1}>
+        <Text style={styles.refWho} numberOfLines={2}>
           {who}
         </Text>
         <Text style={styles.refDetail}>{detail}</Text>

@@ -73,11 +73,12 @@ export async function POST(request: Request) {
 
   const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
 
-  // 3. Bhejo + welcomed_at set karo (email fail bhi ho to dobara try ho sake,
-  //    isliye set tabhi karte hain jab bhej gaya ho ya skip hua ho).
+  // 3. Bhejo + welcomed_at SIRF tabhi set karo jab email SACH ME bhej gaya ho.
+  //    (Pehle skip hone pe bhi set ho jaata tha — SMTP env na hone par welcomed_at
+  //     stamp ho jaata aur user ko kabhi welcome nahi milta. Ab skip pe retry hoga.)
   const result = await sendWelcomeEmail(email, name, locale);
 
-  if (result.sent || result.skipped) {
+  if (result.sent) {
     await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}`, {
       method: "PATCH",
       headers: { ...svcHeaders, Prefer: "return=minimal" },

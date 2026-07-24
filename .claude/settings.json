@@ -171,7 +171,17 @@
       "Bash(node -e \"const sharp=require\\('sharp'\\); sharp\\('public/svg48.png'\\).metadata\\(\\).then\\(m=>console.log\\('svg48',m.width+'x'+m.height,'channels',m.channels,'alpha',m.hasAlpha\\)\\); sharp\\('public/svg48.png'\\).trim\\(\\).toBuffer\\({resolveWithObject:true}\\).then\\(\\({info}\\)=>console.log\\('trimmed',info.width+'x'+info.height\\)\\)\")",
       "Bash(node scripts/app-icons.mjs)",
       "Bash(node -e \"const s=require\\('sharp'\\); \\(async\\(\\)=>{ await s\\('public/mainlogo.png'\\).resize\\(400,400,{fit:'cover'}\\).png\\(\\).toFile\\('public/logo.png'\\); await s\\('public/mainlogo.png'\\).resize\\(128,128,{fit:'cover'}\\).png\\(\\).toFile\\('public/logo-128.png'\\); console.log\\('web logo = mainlogo \\(400 + 128\\)'\\); }\\)\\(\\)\")",
-      "Bash(node scripts/web-logo.mjs)"
+      "Bash(node scripts/web-logo.mjs)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "WebFetch(domain:www.apkasaathi.com)",
+      "Bash(curl -s -m 25 \"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=AQ.Ab8RN6L2AqI4QpkfnL5NTarZbfrmDbzHT_Kxi7AW9seJcfkVfw\" -H \"content-type: application/json\" -d '{\"contents\":[{\"parts\":[{\"text\":\"say hi\"}]}]}')",
+      "Bash(echo \"---EXIT $?---\")",
+      "Bash(curl -s -m 25 https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent -H 'content-type: application/json' -H 'Authorization: Bearer AQ.Ab8RN6L2AqI4QpkfnL5NTarZbfrmDbzHT_Kxi7AW9seJcfkVfw' -d '{\"contents\":[{\"parts\":[{\"text\":\"say hi\"}]}]}')",
+      "Bash(echo \"=== ?key= \\(jo code use karta hai\\) ===\")",
+      "Bash(curl -s -m 25 https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w -H 'content-type: application/json' -d '{\"contents\":[{\"parts\":[{\"text\":\"say hi\"}]}]}')",
+      "Bash(curl -s -m 25 'https://generativelanguage.googleapis.com/v1beta/models?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w&pageSize=100')",
+      "Bash(curl -s -m 30 https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=AQ.Ab8RN6IxLYIEMnnvPStqLXbMZB0YKL4ZtYT9sflRmRIsS0YU0w -H 'content-type: application/json' -d '{\"system_instruction\":{\"parts\":[{\"text\":\"Sirf JSON do: {\\\\\"title\\\\\":string,\\\\\"needsTime\\\\\":boolean}\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"kal subah 8 baje paani ka bill bharna hai\"}]}],\"generationConfig\":{\"temperature\":0.4,\"maxOutputTokens\":300,\"responseMimeType\":\"application/json\"}}')"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

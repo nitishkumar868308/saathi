@@ -54,6 +54,7 @@ export type NetStatus = { offline: boolean; slow: boolean };
 export function useNetworkStatus(): NetStatus {
   const net = Network.useNetworkState();
   const [slow, setSlow] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     const update = () => setSlow(Date.now() < slowUntil);
@@ -66,9 +67,21 @@ export function useNetworkStatus(): NetStatus {
     };
   }, []);
 
+  // Raw offline: device connected hi nahi, YA internet reach nahi kar raha.
   // isInternetReachable undefined ho sakta hai (abhi pata nahi) — tab offline mat kaho.
-  const offline =
-    net.isConnected === false || net.isInternetReachable === false;
+  const rawOffline = net.isConnected === false || net.isInternetReachable === false;
+
+  // ⚠️ expo-network shuruaat me kuch pal ke liye galat `false` de deta hai (net on hone
+  //    par bhi) — isliye offline turant mat dikhao. 3s tak lagataar offline rahe tabhi
+  //    banner dikhao. Wapas online hote hi turant hata do.
+  useEffect(() => {
+    if (!rawOffline) {
+      setOffline(false);
+      return;
+    }
+    const t = setTimeout(() => setOffline(true), 3000);
+    return () => clearTimeout(t);
+  }, [rawOffline]);
 
   return { offline, slow: slow && !offline };
 }

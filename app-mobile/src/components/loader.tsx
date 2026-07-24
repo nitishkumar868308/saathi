@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { View, Text, Animated, Easing, StyleSheet, type ViewStyle } from "react-native";
 
 import { colors } from "@/theme/colors";
+import SaathiLogo from "@/components/saathi-logo";
 
 /**
  * Loader system.
@@ -83,11 +84,80 @@ export function Loader({
   );
 }
 
-/** Poori screen ka loader (center me). */
+/**
+ * Logo loader — Saathi ka apna logo dhadakta hua (heartbeat jaisa), peeche
+ * ek naram halka ring phailta hai. Warm, zinda, "yaad rakhne wala saathi" feel.
+ */
+export function LogoLoader({ size = 76, label }: { size?: number; label?: string }) {
+  const beat = useRef(new Animated.Value(0)).current;
+  const ring = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const b = Animated.loop(
+      Animated.sequence([
+        Animated.timing(beat, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(beat, {
+          toValue: 0,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const r = Animated.loop(
+      Animated.timing(ring, {
+        toValue: 1,
+        duration: 1700,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    );
+    b.start();
+    r.start();
+    return () => {
+      b.stop();
+      r.stop();
+    };
+  }, [beat, ring]);
+
+  const radius = Math.round(size * 0.3);
+  const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] });
+  const ringScale = ring.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.9] });
+  const ringOpacity = ring.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.28, 0] });
+
+  return (
+    <View style={styles.wrap}>
+      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+        <Animated.View
+          style={{
+            position: "absolute",
+            width: size,
+            height: size,
+            borderRadius: radius,
+            backgroundColor: colors.terracotta,
+            opacity: ringOpacity,
+            transform: [{ scale: ringScale }],
+          }}
+        />
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <SaathiLogo size={size} radius={radius} />
+        </Animated.View>
+      </View>
+      {label ? <Text style={styles.label}>{label}</Text> : null}
+    </View>
+  );
+}
+
+/** Poori screen ka loader (center me) — ab logo wala. */
 export function ScreenLoader({ label }: { label?: string }) {
   return (
     <View style={styles.screen}>
-      <Loader size={46} label={label} />
+      <LogoLoader size={78} label={label} />
     </View>
   );
 }

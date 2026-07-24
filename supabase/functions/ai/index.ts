@@ -10,8 +10,12 @@
 //   brief    → aaj ke data se chhota morning brief
 
 const KEY = Deno.env.get("GEMINI_API_KEY");
-const MODEL = "gemini-2.5-flash-lite"; // chat, reminder, brief — sasta
-const VISION_MODEL = "gemini-2.5-flash"; // document reading — accurate
+// ⚠️ Fixed model naam (gemini-2.5-flash / -flash-lite) naye users ke liye band ho
+//    gaye the → 404 "no longer available to new users" → AI fail hoke static
+//    fallback pe chala jaata tha. Ab "-latest" alias use karte hain, jo hamesha
+//    current model pe point karta hai — aage bhi nahi tootega.
+const MODEL = "gemini-flash-lite-latest"; // chat, reminder, brief — sasta/fast
+const VISION_MODEL = "gemini-flash-latest"; // document reading — accurate
 
 // Supabase auto-injects ye edge functions me.
 const SB_URL = Deno.env.get("SUPABASE_URL");

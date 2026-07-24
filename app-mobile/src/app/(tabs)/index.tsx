@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -20,6 +21,8 @@ import SaathiLogo from "@/components/saathi-logo";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
 import { listReminders, setReminderOn, type Reminder } from "@/lib/reminders";
+import { hasBeenReferred } from "@/lib/plan";
+import { ReferralCodeModal } from "@/components/referral-code-modal";
 import { cancelReminder } from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
@@ -50,6 +53,34 @@ export default function Home() {
   const [today, setToday] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refModal, setRefModal] = useState(false);
+
+  // Referral code ek baar poochho — jinhone signup pe code nahi daala + pehle
+  // se referred nahi. Dismiss/apply ke baad dobara nahi.
+  useEffect(() => {
+    if (!offers.referralsEnabled) return;
+    let alive = true;
+    (async () => {
+      try {
+        if (await AsyncStorage.getItem("referral_prompt_seen")) return;
+        if (await hasBeenReferred()) {
+          await AsyncStorage.setItem("referral_prompt_seen", "1");
+          return;
+        }
+        if (alive) setRefModal(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [offers.referralsEnabled]);
+
+  const closeRefModal = useCallback(() => {
+    setRefModal(false);
+    AsyncStorage.setItem("referral_prompt_seen", "1").catch(() => {});
+  }, []);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -246,6 +277,8 @@ export default function Home() {
           </Pressable>
         )}
       </ScrollView>
+
+      <ReferralCodeModal visible={refModal} onClose={closeRefModal} />
     </SafeAreaView>
   );
 }
