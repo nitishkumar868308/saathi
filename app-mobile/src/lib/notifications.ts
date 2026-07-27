@@ -1,12 +1,40 @@
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import notifee, {
+  AndroidImportance,
+  AndroidVisibility,
+  AndroidCategory,
+  AuthorizationStatus,
+  TriggerType,
+  type TimestampTrigger,
+} from "@notifee/react-native";
 
 import { listReminders } from "./reminders";
 import { listDocuments } from "./documents";
 import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionaries";
 
-/** Notification text user ki chuni bhasha me — AsyncStorage se locale padhke. */
+/**
+ * Notifications — ab @notifee/react-native se.
+ *
+ * Kyun notifee: reminder ke waqt LOCK SCREEN par alarm-jaisa FULL-SCREEN popup
+ * chahiye tha (item 7). expo-notifications `setFullScreenIntent` support nahi
+ * karta; notifee `android.fullScreenAction` se karta hai. Screen band/locked ho
+ * tab bhi app khul ke poora alert dikhata hai (MainActivity par showWhenLocked +
+ * turnScreenOn flags config-plugin se lagte hain).
+ *
+ * Text user ki chuni bhasha me (AsyncStorage "saathi-locale").
+ *
+ * ⚠️ Native module — Expo Go me nahi chalta. Dev/prod build (EAS) chahiye.
+ */
+
+// Background event handler — notifee ise chahta hai (warna warning). Full-screen
+// alert OS khud dikhata hai; press par app khulta hai aur getInitialNotification /
+// foreground event modal dikha deta hai, isliye yahan kuch karne ki zaroorat nahi.
+if (Platform.OS !== "web") {
+  notifee.onBackgroundEvent(async () => {});
+}
+
+/** Notification text user ki chuni bhasha me. */
 async function notifDict() {
   let loc: Locale = DEFAULT_LOCALE;
   try {
@@ -18,79 +46,42 @@ async function notifDict() {
   return dictionaries[loc].notif;
 }
 
-/**
- * Android channel id.
- *
- * ⚠️ VERSION SUFFIX zaroori hai. Android channel ki settings (sound, importance)
- * SIRF pehli baar create hone pe lagti hain — baad me code badalne se OS use
- * ignore kar deta hai. Purana "reminders" channel bina sound ke ban chuka tha,
- * isliye background me sirf silent notification aati thi. Naya id ("reminders-v2")
- * OS ko force karta hai ki sound + MAX importance ke saath naya channel bane.
- * Aage kabhi channel settings badlo to ye number bhi badhana.
- */
-const CHANNEL_ID = "reminders-v2";
-
-/** Document expiry se kitne din pehle yaad dilana hai. 0 = expiry wale din. */
+const CHANNEL_ID = "reminders-fs"; // full-screen wala naya channel
 const EXPIRY_LEAD_DAYS = [14, 3, 0] as const;
-
-/** Expiry notification kis waqt jaaye (local time). */
 const NOTIFY_HOUR = 9;
 
-// Foreground mein bhi notification dikhe
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
+/** Reminders channel (HIGH importance + sound + public). */
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
-  // Purana bina-sound wala channel hata do (warna app list me do channel dikhte).
-  try {
-    await Notifications.deleteNotificationChannelAsync("reminders");
-  } catch {
-    /* pehle se nahi hai — koi baat nahi */
-  }
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+  await notifee.createChannel({
+    id: CHANNEL_ID,
     name: "Reminders",
-    // MAX = heads-up banner + sound, screen band ho tab bhi.
-    importance: Notifications.AndroidImportance.MAX,
+    importance: AndroidImportance.HIGH,
     sound: "default",
-    vibrationPattern: [0, 250, 250, 250],
-    enableVibrate: true,
-    bypassDnd: false,
-    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    vibration: true,
+    vibrationPattern: [300, 500],
+    visibility: AndroidVisibility.PUBLIC,
   });
 }
 
 export async function ensureNotifPermission(): Promise<boolean> {
-  // Android 13+ pe permission prompt channel banne ke baad hi theek se aata hai.
   await ensureChannel();
-  const current = await Notifications.getPermissionsAsync();
-  if (current.granted) return true;
-  const req = await Notifications.requestPermissionsAsync();
-  return req.granted;
+  const settings = await notifee.requestPermission();
+  return settings.authorizationStatus >= AuthorizationStatus.AUTHORIZED;
 }
 
-/** Permission maange bina sirf status batao (background sync ke liye). */
 export async function hasNotifPermission(): Promise<boolean> {
-  const { granted } = await Notifications.getPermissionsAsync();
-  return granted;
+  const settings = await notifee.getNotificationSettings();
+  return (
+    settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+    settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
+  );
 }
 
 /**
- * Ek notification schedule karo.
- *
- * ⚠️ Android pe `channelId` TRIGGER me jaata hai, content me nahi. Bina iske
- * expo apne fallback "Miscellaneous" channel me daal deta hai — default
- * importance, na heads-up banner na sound. Isliye humara HIGH-importance
- * channel banta to tha, par use kabhi hota hi nahi tha.
- *
- * Same `identifier` dobara dene se purani schedule replace ho jaati hai, isliye
- * sync baar-baar chalana safe hai — duplicate notifications nahi aayengi.
+ * Ek notification schedule karo (timestamp trigger).
+ * Android: fullScreenAction = lock screen par poora alert. Same `id` dobara dene
+ * se purani schedule replace ho jaati hai (duplicate nahi).
  */
 async function schedule(
   id: string,
@@ -102,26 +93,34 @@ async function schedule(
   if (when.getTime() <= Date.now()) return false;
   try {
     await ensureChannel();
-    await Notifications.scheduleNotificationAsync({
-      identifier: id,
-      // sound iOS pe content se aata hai; Android pe channel se. Dono set.
-      // data.kind + data.body se app ka full-screen alert modal bharta hai.
-      content: {
+    const trigger: TimestampTrigger = {
+      type: TriggerType.TIMESTAMP,
+      timestamp: when.getTime(),
+      alarmManager: { allowWhileIdle: true }, // exact — SCHEDULE_EXACT_ALARM app.json me hai
+    };
+    await notifee.createTriggerNotification(
+      {
+        id,
         title,
         body,
-        sound: "default",
-        // Heads-up banner (Android) + screen band hone pe bhi turant (iOS).
-        priority: Notifications.AndroidNotificationPriority.MAX,
-        interruptionLevel: "timeSensitive",
-        vibrate: [0, 250, 250, 250],
-        data: { kind, body, title },
+        data: { kind, body, title, id },
+        android: {
+          channelId: CHANNEL_ID,
+          importance: AndroidImportance.HIGH,
+          category: AndroidCategory.ALARM,
+          // Lock screen par alarm-jaisa poora popup:
+          fullScreenAction: { id: "default" },
+          pressAction: { id: "default" },
+          sound: "default",
+          autoCancel: true,
+        },
+        ios: {
+          sound: "default",
+          interruptionLevel: "timeSensitive",
+        },
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: when,
-        channelId: CHANNEL_ID,
-      },
-    });
+      trigger,
+    );
     return true;
   } catch {
     return false;
@@ -130,9 +129,10 @@ async function schedule(
 
 async function cancel(id: string): Promise<void> {
   try {
-    await Notifications.cancelScheduledNotificationAsync(id);
+    await notifee.cancelTriggerNotification(id);
+    await notifee.cancelNotification(id);
   } catch {
-    // already gone — koi baat nahi
+    /* already gone */
   }
 }
 
@@ -155,24 +155,14 @@ export async function cancelReminder(id: string): Promise<void> {
 
 const docNotifId = (docId: string, lead: number) => `doc:${docId}:${lead}`;
 
-/** 'YYYY-MM-DD' → us din subah NOTIFY_HOUR baje ka local Date (minus lead). */
 function expiryDate(expiry: string, minusDays: number): Date | null {
   const [y, m, d] = expiry.split("-").map(Number);
   if (!y || !m || !d) return null;
-  // Numeric constructor zaroori hai — `new Date("2026-07-08")` UTC midnight deta
-  // hai, jo IST me pichhle din 5:30 AM ban jaata.
   const dt = new Date(y, m - 1, d, NOTIFY_HOUR, 0, 0, 0);
   dt.setDate(dt.getDate() - minusDays);
   return dt;
 }
 
-/**
- * Document expiry ke liye teen reminder: 14 din pehle, 3 din pehle, aur expiry
- * wale din subah 9 baje. Jo waqt nikal chuka hai wo apne aap skip ho jaata hai.
- *
- * ⚠️ Pehle ye kahin schedule hota hi nahi tha — expiry sirf home screen ke card
- * me dikhti thi, notification kabhi nahi jaati thi.
- */
 export async function scheduleDocumentExpiry(
   docId: string,
   name: string,
@@ -186,9 +176,7 @@ export async function scheduleDocumentExpiry(
     const when = expiryDate(expiry, lead);
     if (!when) continue;
     const body =
-      lead === 0
-        ? tpl(n.expiryToday, { name })
-        : tpl(n.expiryInDays, { name, n: lead });
+      lead === 0 ? tpl(n.expiryToday, { name }) : tpl(n.expiryInDays, { name, n: lead });
     await schedule(docNotifId(docId, lead), n.expiryTitle, body, when, "expiry");
   }
 }
@@ -199,17 +187,6 @@ export async function cancelDocumentExpiry(docId: string): Promise<void> {
 
 /* -------------------------------- sync -------------------------------- */
 
-/**
- * Sab reminders + document expiries dobara schedule karo.
- *
- * Kyu zaroori hai: OS ki scheduled notifications app reinstall ke baad, aur
- * doosre device pe bane data ke liye, exist hi nahi karti. Pehle sirf "add" ke
- * waqt schedule hota tha — matlab naye phone pe login karne wale ko ek bhi
- * notification nahi milti thi.
- *
- * Permission maangta nahi — granted ho tabhi kaam karta hai. Identifier reuse
- * hota hai, isliye duplicate nahi bante.
- */
 export async function syncNotifications(): Promise<void> {
   try {
     if (!(await hasNotifPermission())) return;
@@ -217,7 +194,6 @@ export async function syncNotifications(): Promise<void> {
     const [reminders, documents] = await Promise.all([listReminders(), listDocuments()]);
 
     for (const r of reminders) {
-      // Paused reminder (Plus expire hone pe 5 se aage wale) notification nahi bhejte.
       if (r.is_on && !r.is_paused && r.remind_at)
         await scheduleReminder(r.id, r.title, new Date(r.remind_at));
       else await cancelReminder(r.id);
@@ -226,6 +202,6 @@ export async function syncNotifications(): Promise<void> {
       await scheduleDocumentExpiry(d.id, d.name, d.expiry);
     }
   } catch {
-    // best-effort — sync fail hone se app na ruke
+    /* best-effort */
   }
 }

@@ -17,7 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { Loader, HandsLoader } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
@@ -25,20 +25,13 @@ import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
 import { scanDocumentAI } from "@/lib/ai";
 import { logEvent } from "@/lib/analytics";
-import { dateAfterMonths, isValidDate } from "@/utils/expiry";
+import { isValidDate } from "@/utils/expiry";
 import { extractExpiry } from "@/utils/extract-expiry";
 import { detectDocType, guessName } from "@/utils/detect-doc";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
-
-const quick = [
-  { label: "+6 mahine", months: 6 },
-  { label: "+1 saal", months: 12 },
-  { label: "+2 saal", months: 24 },
-  { label: "+3 saal", months: 36 },
-];
 
 async function persistImage(cacheUri: string): Promise<string> {
   const dir = FileSystem.documentDirectory + "documents/";
@@ -211,7 +204,7 @@ export default function AddDocument() {
 
             {scanning ? (
               <View style={styles.scanningRow}>
-                <Loader size={32} />
+                <HandsLoader size={40} />
                 <Text style={styles.scanningText}>{d.scanning}</Text>
               </View>
             ) : (
@@ -255,6 +248,17 @@ export default function AddDocument() {
             </View>
           )}
 
+          {/* Saathi ne document se jo samjha — poora dynamic (jo bhi mila). */}
+          {scanned && !!summary.trim() && (
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryHead}>
+                <Ionicons name="sparkles" size={14} color={colors.terracotta} />
+                <Text style={styles.summaryHeadText}>{d.summaryLabel}</Text>
+              </View>
+              <Text style={styles.summaryText}>{summary.trim()}</Text>
+            </View>
+          )}
+
           {/* Name (editable) */}
           <Text style={styles.label}>
             {d.name} {scanned && <Text style={styles.editHint}>{d.editHint}</Text>}
@@ -277,17 +281,6 @@ export default function AddDocument() {
             style={[styles.input, scanned && expiry ? styles.inputFilled : null]}
             keyboardType="numbers-and-punctuation"
           />
-          <View style={styles.quickRow}>
-            {quick.map((q) => (
-              <Pressable
-                key={q.label}
-                onPress={() => setExpiry(dateAfterMonths(q.months))}
-                style={styles.quickChip}
-              >
-                <Text style={styles.quickText}>{q.label}</Text>
-              </Pressable>
-            ))}
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -411,6 +404,23 @@ const styles = StyleSheet.create({
   },
   detLabel: { fontSize: 12, color: colors.inkSoft, fontWeight: "600" },
   detType: { fontSize: 16, fontWeight: "700", color: colors.ink, marginTop: 1 },
+  summaryCard: {
+    marginTop: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    padding: 16,
+  },
+  summaryHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  summaryHeadText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: colors.terracotta,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  summaryText: { fontSize: 14.5, lineHeight: 21, color: colors.ink },
   label: {
     marginTop: 22,
     marginBottom: 10,
@@ -430,16 +440,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   inputFilled: { borderColor: colors.sage, backgroundColor: "rgba(124,138,107,0.08)" },
-  quickRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  quickChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  quickText: { fontSize: 13, fontWeight: "600", color: colors.terracotta },
   save: {
     margin: 20,
     marginTop: 8,

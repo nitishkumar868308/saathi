@@ -46,7 +46,7 @@ positioned in the middle-lower safe band (never below y=1440).
 MUSIC: Solo piano, soft, melancholic turning hopeful. Keep 24dB below the voice.
 
 END CARD (3s): Deep teal #125156 background, Apka Saathi logo, wordmark, tagline
-"Never Forget What Matters" in #C25A37, then a "Download Now" pill in #C25A37.
+"Never Forget What Matters" in #C25A37, then a "Download Apka Saathi" pill in #C25A37.
 ```
 
 ### SCENE TABLE
@@ -55,9 +55,9 @@ END CARD (3s): Deep teal #125156 background, Apka Saathi logo, wordmark, tagline
 | 1 | 0.0–3.5 | **Avatar** (Rahul, office bg) close-up, phone at ear, face falls | "Beta… license expire ho gaya." *(V-ELDER, muffled phone filter)* | — |
 | 2 | 3.5–7.0 | Stock/AI: elderly Indian man at home holding a licence card, window light | "Papa ki awaaz thodi dheemi thi." | — |
 | 3 | 7.0–12.0 | Stock/AI: young man at desk, stops typing, stares at nothing | "Jinhone humari har date yaad rakhi… unki ek date main bhool gaya." | `Unki ek date.` |
-| 4 | 12.0–16.0 | **Your screen recording**: Apka Saathi opens, "Add Document" → Driving Licence | "Us raat maine Apka Saathi kholi. Papa ke saare documents — ek jagah." | `Sab documents. Ek jagah.` |
+| 4 | 12.0–16.0 | **Your screen recording**: Apka Saathi opens, "Add Document" → Driving Licence | "Us raat maine Apka Saathi khola. Papa ke saare documents — ek jagah." | `Sab documents. Ek jagah.` |
 | 5 | 16.0–19.5 | Screen recording: notification `🔔 Driving Licence expires in 30 days` | "Har expiry ka reminder, waqt se pehle." | `30 din pehle reminder` |
-| 6 | 19.5–22.0 | Stock/AI: father & son on a balcony, warm, quiet smile | "Ab Papa ko phone karna nahi padta." | — |
+| 6 | 19.5–22.0 | Stock/AI: father & son on a balcony, warm, quiet smile | "Ab Papa ko yaad rakhne ki zarurat nahi padti. Apka Saathi yaad rakhta hai." | — |
 | 7 | 22.0–25.0 | **END CARD** | "Apka Saathi." | Locked end-card |
 
 ### SCRIPT — HI (paste into HeyGen)
@@ -72,7 +72,7 @@ Us raat maine Apka Saathi kholi. Papa ke saare documents — ek jagah.
 
 Har expiry ka reminder, waqt se pehle.
 
-Ab Papa ko phone karna nahi padta.
+Ab Papa ko yaad rakhne ki zarurat nahi padti. Apka Saathi yaad rakhta hai.
 
 Apka Saathi.
 ```

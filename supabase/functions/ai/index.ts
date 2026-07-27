@@ -186,41 +186,74 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 1. CHAT — sirf app ke sawaal (reminders/tasks/documents). Bahar ka nahi.
+    // 1. CHAT — app ke sawaal + AGENTIC reminder banana. Bahar ka nahi.
     if (task === "chat") {
       const nameNote = payload.name
         ? ` User ka naam "${payload.name}" hai — kabhi-kabhi naam se bulao, natural.`
         : "";
-      // App user ka apna data bhejti hai (reminders + documents ka chhota snapshot),
-      // taaki "mere reminders kaun se hain?", "kya expire ho raha hai?" jaise
-      // sawaal ka sahi jawab mile.
+      // RAG-lite: app user ka apna data bhejti hai (reminders + documents snapshot),
+      // taaki jawab usi data par grounded ho (kuch mat maano).
       const ctx = payload.context
         ? `\n\nUser ka abhi ka data (isi se jawab do, aur kuch mat maano):\n${JSON.stringify(payload.context)}`
         : "";
+      // Abhi ka LOCAL time (app naive-local ISO bhejti hai) — remind_at isse nikaalo.
+      const now = payload.now ?? payload.context?.today ?? new Date().toISOString();
       const scope =
         ` TUM SIRF is app "Apka Saathi" ke baare me madad karte ho: (a) user ke reminders, tasks, documents aur unki expiry/dates, (b) app kaise use karein,` +
-        ` (c) app khud kya hai — kya-kya kar sakta hai, features, aur Saathi Plus plan.` +
-        ` Agar user in se HATKE kuch pooche (general knowledge, duniya, news, math, coding, gossip, kuch bhi bahar ka), to us sawaal ka jawab BILKUL mat do —` +
-        ` politely mana karo aur bilkul yahi bhaav do: "${declineLine(payload.locale)}".` +
-        ` App/data ke sawaal ka seedha, chhota, sateek jawab do.`;
+        ` (c) app khud kya hai — features aur Saathi Plus plan.` +
+        ` Agar user in se HATKE kuch pooche (general knowledge, duniya, news, math, coding, gossip, kuch bhi bahar ka), to jawab BILKUL mat do —` +
+        ` politely mana karo aur yahi bhaav do: "${declineLine(payload.locale)}".`;
+
+      // AGENTIC: chat se hi reminder ban jaaye — zaroori detail pucho, phir action do.
+      const agentic =
+        `\n\nAGENTIC REMINDER: Agar user kuch yaad dilane / reminder / alarm set karne ko kahe:` +
+        ` 3 cheezein chahiye — (1) kaam kya (title), (2) kaunsa din, (3) kaun sa time.` +
+        ` Jo missing ho wo pyaar se pucho (reply me, ek-do sawaal). Jab tak title AUR poora date+time na mile, action null rakho.` +
+        ` Sab clear hote hi action bharo: {"type":"create_reminder","title":"<saaf kaam, bina time-phrase>","remind_at":"<naive local ISO jaise 2026-07-27T20:00:00, bina Z ya offset>"}.` +
+        ` Abhi ka local time: ${now}. Isi se remind_at nikaalo — "kal"=agla din, "subah 8"=08:00, "shaam 6"/"6 baje shaam"=18:00, "raat 9"=21:00, "dopahar 2"=14:00, "N minute/ghante baad"=abhi se aage.` +
+        ` reply me short confirm karo (jaise "Theek hai, laga diya ⏰").` +
+        `\nDOCUMENT: Document add karne ko kahe to chat se nahi banta — reply me batao "photo se add hota hai" aur action {"type":"navigate","to":"add_document"} do.` +
+        `\n\nOUTPUT: SIRF strict JSON do, aur kuch nahi: {"reply":"<chat message, user ki bhasha me>","action": null | {create_reminder|navigate}}. reply HAMESHA bharo, chhota rakho.`;
 
       const userMsg = payload.message ?? "";
-      const history: GeminiContent[] = (payload.history ?? []).map((h: any) => ({
-        role: h.role === "user" ? "user" : "model",
-        parts: [{ text: String(h.content ?? "") }],
-      }));
-      const reply = await gemini({
+      // Trimming: sirf aakhri 10 turns bhejo (token + cost kam, prompt cache friendly).
+      const history: GeminiContent[] = (payload.history ?? [])
+        .slice(-10)
+        .map((h: any) => ({
+          role: h.role === "user" ? "user" : "model",
+          parts: [{ text: String(h.content ?? "") }],
+        }));
+
+      const raw = await gemini({
         model: MODEL,
-        system: SAATHI_SYSTEM + langNote(payload.locale) + scope + nameNote + ctx,
+        system: SAATHI_SYSTEM + langNote(payload.locale) + scope + agentic + nameNote + ctx,
         contents: [...history, { role: "user", parts: [{ text: userMsg }] }],
-        maxTokens: 800,
+        json: true,
+        maxTokens: 700,
       });
 
-      // Server-side record (referral qualification "first chat" isi se verify hota hai).
+      const parsed = parseJson(raw) ?? {};
+      const reply =
+        typeof parsed.reply === "string" && parsed.reply.trim()
+          ? parsed.reply.trim()
+          : declineLine(payload.locale);
+
+      // Action sanitize — sirf allowed shapes.
+      let action: unknown = null;
+      const a = parsed.action;
+      if (a && typeof a === "object") {
+        if (a.type === "create_reminder" && typeof a.title === "string" && typeof a.remind_at === "string") {
+          action = { type: "create_reminder", title: a.title.trim(), remind_at: a.remind_at };
+        } else if (a.type === "navigate" && a.to === "add_document") {
+          action = { type: "navigate", to: "add_document" };
+        }
+      }
+
+      // Server-side record (referral "first chat" isi se verify hota hai).
       const uid = await getUserId(req);
       if (uid && userMsg.trim()) await recordChat(uid, userMsg, reply);
 
-      return json({ reply: reply || declineLine(payload.locale) });
+      return json({ reply, action });
     }
 
     // 2. DOCUMENT SCAN (vision) — base64 image se {type, name, expiry, summary}

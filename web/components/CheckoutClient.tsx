@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Script from "next/script";
 import { useSearchParams } from "next/navigation";
-import { ShieldCheck, Loader2, CheckCircle2, Lock } from "lucide-react";
+import { ShieldCheck, CheckCircle2, Lock } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
+import Loader from "@/components/Loader";
 
 type PlanId = "plus_monthly" | "plus_yearly";
 
@@ -138,7 +139,7 @@ export default function CheckoutClient() {
               className="mt-6 inline-flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-70"
             >
               {status === "loading" ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader size={20} />
               ) : (
                 <>
                   <Lock size={16} />

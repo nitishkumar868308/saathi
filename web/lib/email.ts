@@ -1,4 +1,6 @@
 import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
 
 /**
  * Reusable email layer — Hostinger SMTP se (info@apkasaathi.com).
@@ -34,6 +36,22 @@ const CONTACT_TO = process.env.CONTACT_TO ?? FROM_EMAIL;
 /** App/web ke errors yahan aate hain. */
 export const ERROR_ALERT_TO = process.env.ERROR_ALERT_TO ?? "saathi8683@gmail.com";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
+
+/**
+ * Logo ko email ke saath hi bhejo (CID inline attachment) — remote URL slow
+ * load hota tha / mail clients block kar dete the. Ek baar module load pe padh
+ * lo. Na padh paaye (kuch hosts) to remote URL par gir jao.
+ */
+const LOGO_CID = "saathilogo";
+let LOGO_BUFFER: Buffer | null = null;
+try {
+  LOGO_BUFFER = fs.readFileSync(path.join(process.cwd(), "public", "logo.png"));
+} catch {
+  LOGO_BUFFER = null;
+}
+function logoSrc(): string {
+  return LOGO_BUFFER ? `cid:${LOGO_CID}` : `${SITE_URL}/logo.png`;
+}
 
 export function emailConfigured(): boolean {
   return Boolean((SMTP_HOST && SMTP_USER && SMTP_PASS) || (GMAIL_USER && GMAIL_APP_PASSWORD));
@@ -74,12 +92,18 @@ export async function sendMail(
     console.warn("[email] SMTP env not set — email skipped");
     return { sent: false, skipped: true };
   }
+  // Logo inline (CID) — tabhi jab html usse reference karta ho aur buffer mila ho.
+  const attachments =
+    LOGO_BUFFER && opts.html.includes(`cid:${LOGO_CID}`)
+      ? [{ filename: "logo.png", content: LOGO_BUFFER, cid: LOGO_CID, contentType: "image/png" }]
+      : undefined;
   await getTransporter().sendMail({
     from: `"${opts.fromName ?? "Apka Saathi"}" <${FROM_EMAIL}>`,
     to: opts.to,
     replyTo: opts.replyTo,
     subject: opts.subject,
     html: opts.html,
+    attachments,
   });
   return { sent: true };
 }
@@ -143,7 +167,7 @@ export function renderEmail(title: string, inner: string, preheader = ""): strin
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td style="vertical-align:middle;">
-                      <img src="${SITE_URL}/logo.png" width="42" height="42" alt="Apka Saathi"
+                      <img src="${logoSrc()}" width="42" height="42" alt="Apka Saathi"
                            style="display:block;width:42px;height:42px;border:0;border-radius:13px;background:${BRAND};"/>
                     </td>
                     <td class="es-wordmark" style="vertical-align:middle;padding-left:11px;font-size:21px;font-weight:700;color:${INK};letter-spacing:-0.4px;">Apka Saathi</td>
@@ -201,30 +225,51 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Reminder email — due reminder pe user ko (branded). */
+type ReminderCopy = { subject: (t: string) => string; heading: string; intro: string; outro: string };
+
+const REMINDER: Record<"hinglish" | "hi" | "en", ReminderCopy> = {
+  hinglish: {
+    subject: (t) => `🔔 Reminder: ${t}`,
+    heading: "Aapka reminder ⏰",
+    intro: "Bas yaad dila raha hoon 🙂 — aapne ye set kiya tha:",
+    outro: "Ho gaya to badhiya — warna abhi kar lo. Main yahin hoon. 🤍",
+  },
+  hi: {
+    subject: (t) => `🔔 रिमाइंडर: ${t}`,
+    heading: "आपका रिमाइंडर ⏰",
+    intro: "बस याद दिला रहा हूँ 🙂 — आपने यह सेट किया था:",
+    outro: "हो गया तो बढ़िया — वरना अभी कर लो। मैं यहीं हूँ। 🤍",
+  },
+  en: {
+    subject: (t) => `🔔 Reminder: ${t}`,
+    heading: "Your reminder ⏰",
+    intro: "Just a gentle nudge 🙂 — you had set this:",
+    outro: "Done already? Great — if not, do it now. I'm right here. 🤍",
+  },
+};
+
+/** Reminder email — due reminder pe user ko, uski chuni bhasha me. */
 export async function sendReminderEmail(
   to: string,
   title: string,
   whenLabel: string,
+  locale: "hinglish" | "hi" | "en" = "hinglish",
 ): Promise<{ sent: boolean; skipped?: boolean }> {
+  const r = REMINDER[locale] ?? REMINDER.hinglish;
   const inner =
-    emailParagraph("Bas yaad dila raha hoon 🙂 — aapne ye set kiya tha:") +
+    emailParagraph(r.intro) +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
        <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${BRAND};border-radius:14px;background:${CREAM};">
          <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(title)}</div>
          <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${escapeHtml(whenLabel)}</div>
        </td></tr>
      </table>` +
-    emailParagraph("Ho gaya to badhiya — warna abhi kar lo. Main yahin hoon. 🤍");
+    emailParagraph(r.outro);
 
   return sendMail({
     to,
-    subject: `🔔 Reminder: ${title}`,
-    html: renderEmail(
-      "Aapka reminder ⏰",
-      inner,
-      `${title} · ${whenLabel}`, // inbox preview
-    ),
+    subject: r.subject(title),
+    html: renderEmail(r.heading, inner, `${title} · ${whenLabel}`),
     fromName: "Apka Saathi",
   });
 }
@@ -280,7 +325,7 @@ const WELCOME: Record<"hinglish" | "hi" | "en", WelcomeCopy> = {
     title: "You're in! Let's get started 🎉",
     preheader: "No more remembering things yourself — Saathi's got it.",
     intro:
-      "Namaste{name}! I'm your <b>Saathi</b> — no more stressing over document expiries, important dates and everyday tasks. Just tell me, and I'll handle the rest. 🤍",
+      "Hello{name}! I'm your <b>Saathi</b> — no more stressing over document expiries, important dates and everyday tasks. Just tell me, and I'll handle the rest. 🤍",
     featuresLabel: "Here's what you can do:",
     features: [
       ["📄", "Add a photo of a document — I'll remember its expiry"],

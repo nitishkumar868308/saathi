@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -13,17 +14,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { HandsLoader } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
-import { useUserName } from "@/components/auth-provider";
+import { useUserName, useAuth } from "@/components/auth-provider";
 import { useRouter } from "expo-router";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
-import { askSaathi, ChatTurn, ChatContext } from "@/lib/ai";
-import { listReminders } from "@/lib/reminders";
+import { askSaathi, ChatTurn, ChatContext, type SaathiAction } from "@/lib/ai";
+import { listReminders, addReminder, ReminderLimitError } from "@/lib/reminders";
 import { listDocuments, type Document } from "@/lib/documents";
+import { scheduleReminder, ensureNotifPermission } from "@/lib/notifications";
+import { formatWhen } from "@/utils/parse-time";
 
 /** Chat ki ek line — saathi ki line ke saath tappable document chips ho sakti hain. */
 type DocRef = { id: string; name: string; uri: string; path: string };
@@ -55,16 +58,31 @@ function TypingDots() {
         <SaathiLogo size={26} radius={10} />
       </View>
       <View style={styles.saathiBubble}>
-        <Loader size={26} />
+        <HandsLoader size={30} />
       </View>
     </View>
+  );
+}
+
+/** Har user ki chat alag key me — device par local (AsyncStorage). */
+const CHAT_KEY_PREFIX = "saathi-chat:";
+const MAX_STORED = 60;
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
   );
 }
 
 export default function Chat() {
   const router = useRouter();
   const name = useUserName();
-  const { chat: ch } = useT();
+  const { session } = useAuth();
+  const t = useT();
+  const ch = t.chat;
+  const c = t.common;
   const { locale } = useLocale();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -76,6 +94,36 @@ export default function Chat() {
     },
   ]);
   const scrollRef = useRef<ScrollView>(null);
+
+  // Chat ko device par save/restore karo — app band karke kholne par gayab na ho.
+  const storeKey = CHAT_KEY_PREFIX + (session?.user?.id ?? "guest");
+  const hydrated = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    hydrated.current = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(storeKey);
+        if (alive && raw) {
+          const saved = JSON.parse(raw) as Msg[];
+          if (Array.isArray(saved) && saved.length > 0) setMessages(saved);
+        }
+      } catch {
+        // corrupt/purana data — chhod do, greeting hi dikhega.
+      } finally {
+        if (alive) hydrated.current = true;
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [storeKey]);
+
+  useEffect(() => {
+    if (!hydrated.current) return; // load hone se pehle overwrite mat karo
+    AsyncStorage.setItem(storeKey, JSON.stringify(messages.slice(-MAX_STORED))).catch(() => {});
+  }, [messages, storeKey]);
 
   async function sendText(text: string) {
     const t = text.trim();
@@ -105,7 +153,7 @@ export default function Chat() {
           expiry: dd.expiry,
         })),
       };
-      const reply = await askSaathi(t, history, name, {
+      const { reply, action } = await askSaathi(t, history, name, {
         locale,
         context,
         fallback: ch.stubReply,
@@ -116,8 +164,38 @@ export default function Chat() {
         ...m,
         { id: String(m.length + 1), role: "saathi", text: reply, docs: refs },
       ]);
+      if (action) await runAction(action);
     } finally {
       setSending(false);
+    }
+  }
+
+  /** Saathi ka action client par chalao — limits + notifications reuse hote hain. */
+  async function runAction(action: SaathiAction) {
+    if (action.type === "navigate" && action.to === "add_document") {
+      router.push("/add-document");
+      return;
+    }
+    if (action.type === "create_reminder") {
+      const when = new Date(action.remind_at);
+      // Galat/past time — reply already samhaal chuka hai, chup-chaap chhod do.
+      if (isNaN(when.getTime()) || when.getTime() <= Date.now()) return;
+      try {
+        const label = formatWhen(when, { today: c.today, tomorrow: c.tomorrow }, locale);
+        const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
+        const r = await addReminder({
+          title: action.title,
+          time_label: label,
+          remind_at: when.toISOString(),
+          bucket,
+        });
+        const allowed = await ensureNotifPermission();
+        if (allowed) await scheduleReminder(r.id, r.title, when);
+      } catch (e) {
+        if (e instanceof ReminderLimitError) {
+          router.push("/upgrade" as never);
+        }
+      }
     }
   }
 

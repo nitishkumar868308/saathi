@@ -17,7 +17,7 @@ import { colors } from "@/theme/colors";
 import { SkeletonList } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
-import SaathiLogo from "@/components/saathi-logo";
+import { UserAvatar } from "@/components/user-avatar";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
 import { listReminders, setReminderOn, type Reminder } from "@/lib/reminders";
@@ -27,7 +27,8 @@ import { cancelReminder } from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { useToast } from "@/components/toast";
-import { useUserName } from "@/components/auth-provider";
+import { useUserName, useAuth } from "@/components/auth-provider";
+import { getUserDetails } from "@/lib/user-details";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useOffers } from "@/lib/use-offers";
@@ -47,6 +48,9 @@ export default function Home() {
   const router = useRouter();
   const toast = useToast();
   const firstName = useUserName();
+  const { session } = useAuth();
+  const meta = session?.user?.user_metadata;
+  const fullName = (meta?.full_name || meta?.name || firstName || "") as string;
   const { home: h } = useT();
   const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
@@ -54,6 +58,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refModal, setRefModal] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Avatar load karo (best-effort) — header me user ka apna avatar dikhe.
+  useEffect(() => {
+    let alive = true;
+    getUserDetails()
+      .then((d) => alive && setAvatarUrl(d?.avatar_url ?? null))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [session?.user?.id]);
 
   // Referral code ek baar poochho — jinhone signup pe code nahi daala + pehle
   // se referred nahi. Dismiss/apply ke baad dobara nahi.
@@ -141,13 +157,19 @@ export default function Home() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greeting}>
-              {tpl(h.greeting, { name: firstName ? ` ${firstName}` : "" })} 👋
+              {tpl(h.greeting, { name: firstName ? ` ${firstName}` : "" })}
             </Text>
             <Text style={styles.sub}>{h.briefLabel}</Text>
           </View>
-          <View style={styles.avatar}>
-            <SaathiLogo size={46} radius={16} />
-          </View>
+          <Pressable onPress={() => router.push("/profile-details" as never)}>
+            <UserAvatar
+              uri={avatarUrl}
+              name={fullName}
+              seed={session?.user?.id}
+              size={46}
+              radius={16}
+            />
+          </Pressable>
         </View>
 
         <UpgradeBanner flush />

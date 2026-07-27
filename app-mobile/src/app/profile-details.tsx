@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +27,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { PhoneField } from "@/components/phone-field";
 import { SearchSelect } from "@/components/search-select";
 import { pickAndUploadAvatar, AvatarTooLargeError } from "@/lib/avatar";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   getCountries,
   getStates,
@@ -219,11 +219,7 @@ export default function ProfileDetails() {
             {/* Profile photo — max 2 MB */}
             <View style={styles.avatarWrap}>
               <Pressable onPress={changePhoto} disabled={uploadingAvatar} style={styles.avatar}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
-                ) : (
-                  <Ionicons name="person" size={38} color={colors.inkSoft} />
-                )}
+                <UserAvatar uri={avatarUrl} name={fullName} size={92} radius={46} />
                 <View style={styles.avatarBadge}>
                   {uploadingAvatar ? (
                     <Loader size={26} color={colors.white} />

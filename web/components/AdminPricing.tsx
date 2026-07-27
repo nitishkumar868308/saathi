@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, AlertTriangle, Plus, Trash2, Save, Globe, Check } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Save, Globe, Check } from "lucide-react";
+import Loader from "@/components/Loader";
 
 type Row = {
   country_code: string;
@@ -154,7 +155,7 @@ export default function AdminPricing() {
   if (!rows) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-terracotta" size={26} />
+        <Loader size={52} />
       </div>
     );
   }
@@ -348,7 +349,7 @@ export default function AdminPricing() {
           disabled={saving}
           className="inline-flex h-11 items-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-70"
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {saving ? <Loader size={18} /> : <Save size={16} />}
           Save
         </button>
         {saved && (

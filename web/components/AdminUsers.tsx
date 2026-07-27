@@ -5,7 +5,6 @@ import {
   Users as UsersIcon,
   Search,
   Download,
-  Loader2,
   AlertTriangle,
   Crown,
   Infinity as InfinityIcon,
@@ -15,6 +14,7 @@ import {
   FileText,
 } from "lucide-react";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import Loader from "@/components/Loader";
 
 type AdminUser = {
   id: string;
@@ -204,7 +204,7 @@ export default function AdminUsers() {
   if (!users) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-terracotta" size={26} />
+        <Loader size={52} />
       </div>
     );
   }
@@ -434,7 +434,7 @@ function Detail({ id }: { id: string }) {
   if (!detail) {
     return (
       <div className="flex justify-center py-6">
-        <Loader2 className="animate-spin text-terracotta" size={20} />
+        <Loader size={40} />
       </div>
     );
   }

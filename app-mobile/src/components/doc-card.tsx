@@ -11,12 +11,15 @@ export function DocCard({
   doc,
   onPress,
   onLongPress,
+  onDelete,
   selectMode = false,
   selected = false,
 }: {
   doc: Document;
   onPress?: () => void;
   onLongPress?: () => void;
+  /** Card par saaf-saaf delete icon — long-press ke bina. */
+  onDelete?: () => void;
   /** Multi-select mode on hai — checkbox dikhega. */
   selectMode?: boolean;
   selected?: boolean;
@@ -69,9 +72,31 @@ export function DocCard({
           <Ionicons name="star" size={11} color={colors.white} />
           <Text style={styles.lockBadgeText}>{c.plusBadge}</Text>
         </View>
-      ) : (
+      ) : selectMode ? (
         <View style={[styles.badge, { backgroundColor: s.bg }]}>
           <Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text>
+        </View>
+      ) : (
+        <View style={styles.right}>
+          <View style={[styles.badge, { backgroundColor: s.bg }]}>
+            <Text style={[styles.badgeText, { color: s.fg }]}>{s.label}</Text>
+          </View>
+          <View style={styles.actions}>
+            <Pressable
+              onPress={onPress}
+              hitSlop={8}
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.iconPressed]}
+            >
+              <Ionicons name="eye-outline" size={18} color={colors.inkSoft} />
+            </Pressable>
+            <Pressable
+              onPress={onDelete}
+              hitSlop={8}
+              style={({ pressed }) => [styles.iconBtn, styles.iconDanger, pressed && styles.iconPressed]}
+            >
+              <Ionicons name="trash-outline" size={17} color="#B23B3B" />
+            </Pressable>
+          </View>
         </View>
       )}
     </Pressable>
@@ -124,4 +149,18 @@ const styles = StyleSheet.create({
   exp: { marginTop: 2, fontSize: 13, color: colors.inkSoft },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontSize: 12, fontWeight: "700" },
+  right: { alignItems: "flex-end", gap: 8 },
+  actions: { flexDirection: "row", gap: 8 },
+  iconBtn: {
+    height: 34,
+    width: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.cream,
+  },
+  iconDanger: { borderColor: "rgba(178,59,59,0.25)", backgroundColor: "rgba(178,59,59,0.06)" },
+  iconPressed: { opacity: 0.6 },
 });

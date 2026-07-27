@@ -13,15 +13,71 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/theme/colors";
 import { applyReferralCode } from "@/lib/plan";
 import { useToast } from "@/components/toast";
+import { useLocale } from "@/lib/i18n/LanguageProvider";
+import type { Locale } from "@/lib/i18n/dictionaries";
 
-const MSG: Record<string, string> = {
-  applied: "Referral code lag gaya! 🎉 Ek document + ek reminder add karo — dono ko free Plus din milenge.",
-  invalid_code: "Ye code sahi nahi lag raha — dobara check karo.",
-  already_referred: "Aap pehle se referred ho — referral ek hi baar lagta hai.",
-  self: "Apna hi code nahi laga sakte 🙂",
-  disabled: "Referral abhi band hai.",
-  no_auth: "Pehle login karo.",
-  error: "Kuch gadbad ho gayi — thodi der baad try karo.",
+type RefCopy = {
+  title: string;
+  sub: string;
+  placeholder: string;
+  apply: string;
+  notNow: string;
+  needCode: string;
+  msg: Record<string, string>;
+};
+
+const COPY: Record<Locale, RefCopy> = {
+  hinglish: {
+    title: "Referral code hai?",
+    sub: "Kisi dost ne bheja hai? Yahan daalo — dono ko free Saathi Plus din milenge.",
+    placeholder: "CODE",
+    apply: "Apply karo",
+    notNow: "Abhi nahi",
+    needCode: "Poora code daalo",
+    msg: {
+      applied: "Referral code lag gaya! 🎉 Ek document + ek reminder add karo — dono ko free Plus din milenge.",
+      invalid_code: "Ye code sahi nahi lag raha — dobara check karo.",
+      already_referred: "Aap pehle se referred ho — referral ek hi baar lagta hai.",
+      self: "Apna hi code nahi laga sakte 🙂",
+      disabled: "Referral abhi band hai.",
+      no_auth: "Pehle login karo.",
+      error: "Kuch gadbad ho gayi — thodi der baad try karo.",
+    },
+  },
+  hi: {
+    title: "रेफरल कोड है?",
+    sub: "किसी दोस्त ने भेजा है? यहाँ डालें — दोनों को फ्री Saathi Plus दिन मिलेंगे।",
+    placeholder: "CODE",
+    apply: "अप्लाई करें",
+    notNow: "अभी नहीं",
+    needCode: "पूरा कोड डालें",
+    msg: {
+      applied: "रेफरल कोड लग गया! 🎉 एक डॉक्युमेंट + एक रिमाइंडर जोड़ें — दोनों को फ्री Plus दिन मिलेंगे।",
+      invalid_code: "ये कोड सही नहीं लग रहा — दोबारा चेक करें।",
+      already_referred: "आप पहले से रेफर्ड हैं — रेफरल एक ही बार लगता है।",
+      self: "अपना ही कोड नहीं लगा सकते 🙂",
+      disabled: "रेफरल अभी बंद है।",
+      no_auth: "पहले लॉगिन करें।",
+      error: "कुछ गड़बड़ हो गई — थोड़ी देर बाद ट्राई करें।",
+    },
+  },
+  en: {
+    title: "Have a referral code?",
+    sub: "A friend sent you one? Enter it here — you both get free Saathi Plus days.",
+    placeholder: "CODE",
+    apply: "Apply",
+    notNow: "Not now",
+    needCode: "Enter the full code",
+    msg: {
+      applied: "Referral code applied! 🎉 Add one document + one reminder — you both get free Plus days.",
+      invalid_code: "That code doesn't look right — please check again.",
+      already_referred: "You're already referred — a referral applies only once.",
+      self: "You can't use your own code 🙂",
+      disabled: "Referrals are off right now.",
+      no_auth: "Please log in first.",
+      error: "Something went wrong — try again in a bit.",
+    },
+  },
 };
 
 /** Referral code daalne ka modal — dashboard (auto) aur profile (manual) dono me. */
@@ -33,16 +89,18 @@ export function ReferralCodeModal({
   onClose: () => void;
 }) {
   const toast = useToast();
+  const { locale } = useLocale();
+  const copy = COPY[locale] ?? COPY.hinglish;
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function apply() {
     const c = code.trim().toUpperCase();
-    if (c.length < 4) return toast.show("Poora code daalo", "info");
+    if (c.length < 4) return toast.show(copy.needCode, "info");
     setLoading(true);
     const res = await applyReferralCode(c);
     setLoading(false);
-    toast.show(MSG[res] ?? MSG.error, res === "applied" ? "success" : "info");
+    toast.show(copy.msg[res] ?? copy.msg.error, res === "applied" ? "success" : "info");
     // In cases me modal band kar do (dobara try karne layak nahi).
     if (res === "applied" || res === "already_referred" || res === "self") {
       setCode("");
@@ -57,14 +115,12 @@ export function ReferralCodeModal({
           <View style={styles.iconWrap}>
             <Ionicons name="gift" size={26} color={colors.terracotta} />
           </View>
-          <Text style={styles.title}>Referral code hai?</Text>
-          <Text style={styles.sub}>
-            Kisi dost ne bheja hai? Yahan daalo — dono ko free Saathi Plus din milenge.
-          </Text>
+          <Text style={styles.title}>{copy.title}</Text>
+          <Text style={styles.sub}>{copy.sub}</Text>
           <TextInput
             value={code}
             onChangeText={(t) => setCode(t.toUpperCase())}
-            placeholder="CODE"
+            placeholder={copy.placeholder}
             autoCapitalize="characters"
             autoCorrect={false}
             placeholderTextColor={colors.inkSoft}
@@ -78,11 +134,11 @@ export function ReferralCodeModal({
             {loading ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.applyText}>Apply karo</Text>
+              <Text style={styles.applyText}>{copy.apply}</Text>
             )}
           </Pressable>
           <Pressable onPress={onClose} hitSlop={8} style={styles.close}>
-            <Text style={styles.closeText}>Abhi nahi</Text>
+            <Text style={styles.closeText}>{copy.notNow}</Text>
           </Pressable>
         </View>
       </View>

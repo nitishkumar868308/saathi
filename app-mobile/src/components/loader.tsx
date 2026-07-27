@@ -1,170 +1,148 @@
 import { useEffect, useRef } from "react";
 import { View, Text, Animated, Easing, StyleSheet, type ViewStyle } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
 import SaathiLogo from "@/components/saathi-logo";
 
 /**
- * Loader system.
+ * Loader system — poore app me EK HI loader (BrandLoader).
  *
- * Soch: ghoomta hua spinner hamesha "dheema" lagta hai. Isliye:
- *   - Loader        -> teen dots ki tez lehar (~0.9s cycle). Chhota, chust.
- *   - Skeleton      -> content ka dhaancha. List/card ke liye SABSE fast lagta
- *                      hai kyunki page ka shape turant dikh jaata hai.
- *   - TopProgress   -> upar patli patti, background kaam ke liye.
+ * Saathi ka apna logo halke se saans leta hai, peeche se naram teal ripple-ring
+ * phailti hai, aur beech-beech me ek dil upar tairta hai. Warm, zinda, "yaad
+ * rakhne wala saathi" feel. Web + admin me bilkul yahi loader hai
+ * (web/components/Loader.tsx).
  *
- * Rule: content aa raha ho -> Skeleton. Button/inline -> Loader. Poori screen
- * -> ScreenLoader.
+ * `Loader`, `LogoLoader`, `ScreenLoader`, `HandsLoader` sab isi BrandLoader ko
+ * dikhate hain — purane naam sirf compatibility ke liye.
+ *
+ * Chhote size (button) par sirf saans-leta logo; bade par ring + dil bhi (halo).
+ * Content aa raha ho -> Skeleton. Background kaam -> TopProgress.
  */
 
-const DOTS = [0, 1, 2];
+const TEAL = "#125156";
 
-export function Loader({
-  size = 44,
+function BrandLoader({
+  size = 72,
   label,
-  color = colors.terracotta,
+  halo = false,
 }: {
   size?: number;
   label?: string;
-  color?: string;
+  halo?: boolean;
 }) {
-  const dot = size * 0.2;
-  const gap = size * 0.14;
-  const lift = size * 0.26;
-
-  // Har dot ka apna value — stagger se lehar banti hai.
-  const vals = useRef(DOTS.map(() => new Animated.Value(0))).current;
-
-  useEffect(() => {
-    const anims = vals.map((v, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * 110),
-          Animated.timing(v, {
-            toValue: 1,
-            duration: 280,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(v, {
-            toValue: 0,
-            duration: 280,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.delay(220 - i * 110),
-        ]),
-      ),
-    );
-    anims.forEach((a) => a.start());
-    return () => anims.forEach((a) => a.stop());
-  }, [vals]);
-
-  return (
-    <View style={styles.wrap}>
-      <View style={[styles.dots, { gap }]}>
-        {vals.map((v, i) => (
-          <Animated.View
-            key={i}
-            style={{
-              width: dot,
-              height: dot,
-              borderRadius: dot / 2,
-              backgroundColor: color,
-              opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }),
-              transform: [
-                { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, -lift] }) },
-              ],
-            }}
-          />
-        ))}
-      </View>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-    </View>
-  );
-}
-
-/**
- * Logo loader — Saathi ka apna logo dhadakta hua (heartbeat jaisa), peeche
- * ek naram halka ring phailta hai. Warm, zinda, "yaad rakhne wala saathi" feel.
- */
-export function LogoLoader({ size = 76, label }: { size?: number; label?: string }) {
   const beat = useRef(new Animated.Value(0)).current;
-  const ring = useRef(new Animated.Value(0)).current;
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+  const heart = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const b = Animated.loop(
       Animated.sequence([
-        Animated.timing(beat, {
-          toValue: 1,
-          duration: 850,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(beat, {
-          toValue: 0,
-          duration: 850,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        Animated.timing(beat, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(beat, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ]),
     );
-    const r = Animated.loop(
-      Animated.timing(ring, {
-        toValue: 1,
-        duration: 1700,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    );
     b.start();
-    r.start();
+
+    let r1: Animated.CompositeAnimation | undefined;
+    let r2: Animated.CompositeAnimation | undefined;
+    let h: Animated.CompositeAnimation | undefined;
+    if (halo) {
+      const mkRing = (v: Animated.Value, delay: number) =>
+        Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.timing(v, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+            Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
+          ]),
+        );
+      r1 = mkRing(ring1, 0);
+      r2 = mkRing(ring2, 900);
+      h = Animated.loop(
+        Animated.sequence([
+          Animated.timing(heart, { toValue: 1, duration: 1500, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.delay(500),
+          Animated.timing(heart, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ]),
+      );
+      r1.start();
+      r2.start();
+      h.start();
+    }
     return () => {
       b.stop();
-      r.stop();
+      r1?.stop();
+      r2?.stop();
+      h?.stop();
     };
-  }, [beat, ring]);
+  }, [beat, ring1, ring2, heart, halo]);
 
   const radius = Math.round(size * 0.3);
-  const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] });
-  const ringScale = ring.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.9] });
-  const ringOpacity = ring.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.28, 0] });
+  const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+
+  const ringStyle = (v: Animated.Value): Animated.WithAnimatedObject<ViewStyle> => ({
+    position: "absolute",
+    width: size,
+    height: size,
+    borderRadius: radius,
+    backgroundColor: TEAL,
+    opacity: v.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 0.22, 0] }),
+    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.85] }) }],
+  });
+
+  const heartOpacity = heart.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [0, 1, 1, 0] });
+  const heartY = heart.interpolate({ inputRange: [0, 1], outputRange: [size * 0.1, -size * 0.55] });
+  const heartScale = heart.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1, 0.7] });
 
   return (
     <View style={styles.wrap}>
       <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-        <Animated.View
-          style={{
-            position: "absolute",
-            width: size,
-            height: size,
-            borderRadius: radius,
-            backgroundColor: colors.terracotta,
-            opacity: ringOpacity,
-            transform: [{ scale: ringScale }],
-          }}
-        />
+        {halo && <Animated.View style={ringStyle(ring1)} />}
+        {halo && <Animated.View style={ringStyle(ring2)} />}
         <Animated.View style={{ transform: [{ scale }] }}>
           <SaathiLogo size={size} radius={radius} />
         </Animated.View>
+        {halo && (
+          <Animated.View
+            style={{ position: "absolute", opacity: heartOpacity, transform: [{ translateY: heartY }, { scale: heartScale }] }}
+          >
+            <Ionicons name="heart" size={Math.round(size * 0.26)} color={colors.terracotta} />
+          </Animated.View>
+        )}
       </View>
       {label ? <Text style={styles.label}>{label}</Text> : null}
     </View>
   );
 }
 
-/** Poori screen ka loader (center me) — ab logo wala. */
+/** Inline/button loader. Chhota — sirf saans-leta logo. */
+export function Loader({ size = 40, label }: { size?: number; label?: string; color?: string }) {
+  return <BrandLoader size={size} label={label} halo={size >= 44} />;
+}
+
+/** Bada logo loader (halo ke saath). */
+export function LogoLoader({ size = 76, label }: { size?: number; label?: string }) {
+  return <BrandLoader size={size} label={label} halo />;
+}
+
+/** AI padh raha / kuch post ho raha — wahi ek loader. */
+export function HandsLoader({ size = 60, label }: { size?: number; label?: string }) {
+  return <BrandLoader size={size} label={label} halo />;
+}
+
+/** Poori screen ka loader — naram bg ke saath. */
 export function ScreenLoader({ label }: { label?: string }) {
   return (
     <View style={styles.screen}>
-      <LogoLoader size={78} label={label} />
+      <View style={styles.screenGlow} />
+      <BrandLoader size={84} label={label} halo />
     </View>
   );
 }
 
 /* ------------------------------ skeleton ------------------------------ */
 
-/** Halka dhadakta placeholder block. Content ka shape turant dikhata hai. */
 export function Skeleton({
   width = "100%",
   height = 14,
@@ -181,18 +159,8 @@ export function Skeleton({
   useEffect(() => {
     const a = Animated.loop(
       Animated.sequence([
-        Animated.timing(v, {
-          toValue: 1,
-          duration: 620,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(v, {
-          toValue: 0,
-          duration: 620,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
+        Animated.timing(v, { toValue: 1, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(v, { toValue: 0, duration: 620, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]),
     );
     a.start();
@@ -215,7 +183,6 @@ export function Skeleton({
   );
 }
 
-/** Ek list-card ka dhaancha (icon + do lines + badge). */
 export function SkeletonCard() {
   return (
     <View style={styles.card}>
@@ -229,7 +196,6 @@ export function SkeletonCard() {
   );
 }
 
-/** n cards ka dhaancha — list load hote waqt. */
 export function SkeletonList({ count = 3 }: { count?: number }) {
   return (
     <View style={{ gap: 10 }}>
@@ -242,11 +208,6 @@ export function SkeletonList({ count = 3 }: { count?: number }) {
 
 /* ---------------------------- top progress ---------------------------- */
 
-/**
- * Upar ki patli patti — background kaam (sync, refresh) ke liye.
- * Ek chhota segment left se right daudta hai; ye "chal raha hai" ka ehsaas
- * deta hai bina screen block kiye.
- */
 export function TopProgress({ visible }: { visible: boolean }) {
   const v = useRef(new Animated.Value(0)).current;
 
@@ -254,12 +215,7 @@ export function TopProgress({ visible }: { visible: boolean }) {
     if (!visible) return;
     v.setValue(0);
     const a = Animated.loop(
-      Animated.timing(v, {
-        toValue: 1,
-        duration: 900,
-        easing: Easing.inOut(Easing.quad),
-        useNativeDriver: true,
-      }),
+      Animated.timing(v, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
     );
     a.start();
     return () => a.stop();
@@ -272,16 +228,7 @@ export function TopProgress({ visible }: { visible: boolean }) {
       <Animated.View
         style={[
           styles.progressBar,
-          {
-            transform: [
-              {
-                translateX: v.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-120, 400],
-                }),
-              },
-            ],
-          },
+          { transform: [{ translateX: v.interpolate({ inputRange: [0, 1], outputRange: [-120, 400] }) }] },
         ]}
       />
     </View>
@@ -290,13 +237,19 @@ export function TopProgress({ visible }: { visible: boolean }) {
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", justifyContent: "center", gap: 12 },
-  dots: { flexDirection: "row", alignItems: "center" },
   label: { fontSize: 14, color: colors.inkSoft, fontWeight: "600" },
   screen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.cream,
+  },
+  screenGlow: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(18,81,86,0.07)",
   },
   card: {
     flexDirection: "row",

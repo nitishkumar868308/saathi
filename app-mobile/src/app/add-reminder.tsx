@@ -18,7 +18,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { Loader, HandsLoader } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
@@ -59,8 +59,10 @@ export default function AddReminder() {
   const bcp = locale === "hi" ? "hi-IN" : "en-IN";
 
   const [title, setTitle] = useState("");
-  // Jab parser subject na samajh paaye, user yahan alag se batata hai.
+  // Saaf title (AI se bharta hai, user badal sakta hai).
   const [subject, setSubject] = useState("");
+  // User ne title khud chhua? Tab AI usse overwrite na kare.
+  const titleTouched = useRef(false);
   // Din/time user ne khud chuna ho to ye override karte hain.
   const [pickedDate, setPickedDate] = useState<Date | null>(null);
   const [pickedMinutes, setPickedMinutes] = useState<number | null>(null);
@@ -99,6 +101,8 @@ export default function AddReminder() {
             }
           }
           setAi({ title: r.title || t, date, minutes });
+          // AI ka title editable field me bhar do — jab tak user ne khud na badla ho.
+          if (!titleTouched.current) setSubject((r.title || t).trim());
         }
       } finally {
         setParsing(false);
@@ -281,40 +285,41 @@ export default function AddReminder() {
 
           {parsing && (
             <View style={styles.parsingRow}>
-              <Loader size={26} />
+              <HandsLoader size={36} />
               <Text style={styles.parsingText}>{a.understanding}</Text>
             </View>
           )}
 
           {started && (
             <View style={styles.card}>
-              {/* --- Kya (title) --- */}
+              {/* --- Kya (title) — hamesha editable --- */}
               <View style={styles.slot}>
                 <View style={styles.slotIcon}>
                   <Ionicons name="create-outline" size={17} color={colors.terracotta} />
                 </View>
-                {finalTitle ? (
-                  <Text style={styles.slotValue} numberOfLines={2}>
-                    {finalTitle}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.slotLabel}>
+                    {a.titleLabel} <Text style={styles.editHintText}>{a.titleEditHint}</Text>
                   </Text>
-                ) : (
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.slotAsk}>{a.askWhat}</Text>
-                    <View style={styles.inputRow}>
-                      <TextInput
-                        value={subject}
-                        onChangeText={setSubject}
-                        placeholder={a.askWhatPlaceholder}
-                        placeholderTextColor={colors.inkSoft}
-                        style={styles.subInput}
-                        autoFocus
-                      />
-                      <VoiceButton
-                        onText={(txt) => setSubject((p) => (p ? p + " " + txt : txt))}
-                      />
-                    </View>
+                  <View style={styles.inputRow}>
+                    <TextInput
+                      value={subject}
+                      onChangeText={(v) => {
+                        titleTouched.current = true;
+                        setSubject(v);
+                      }}
+                      placeholder={a.askWhatPlaceholder}
+                      placeholderTextColor={colors.inkSoft}
+                      style={styles.subInput}
+                    />
+                    <VoiceButton
+                      onText={(txt) => {
+                        titleTouched.current = true;
+                        setSubject((p) => (p ? p + " " + txt : txt));
+                      }}
+                    />
                   </View>
-                )}
+                </View>
               </View>
 
               {/* --- Kis din (date) --- */}
@@ -515,6 +520,8 @@ const styles = StyleSheet.create({
   },
   slotValue: { flex: 1, fontSize: 15.5, fontWeight: "700", color: colors.ink, paddingTop: 6 },
   slotAsk: { fontSize: 14, fontWeight: "600", color: colors.inkSoft, marginBottom: 8, paddingTop: 4 },
+  slotLabel: { fontSize: 13, fontWeight: "700", color: colors.ink, marginBottom: 6, paddingTop: 2 },
+  editHintText: { fontSize: 12, fontWeight: "500", color: colors.inkSoft },
   subInput: {
     flex: 1,
     minHeight: 46,

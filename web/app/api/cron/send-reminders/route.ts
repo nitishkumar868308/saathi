@@ -75,17 +75,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "fetch failed" }, { status: 500 });
   }
 
-  // Per-user email/phone cache (N+1 avoid).
-  const emailCache = new Map<string, string | null>();
+  // Per-user profile (email + bhasha) cache (N+1 avoid).
+  type Loc = "hinglish" | "hi" | "en";
+  const profileCache = new Map<string, { email: string | null; language: Loc }>();
   const phoneCache = new Map<string, string | null>();
 
-  async function getEmail(uid: string): Promise<string | null> {
-    if (emailCache.has(uid)) return emailCache.get(uid) ?? null;
-    const rows = await sbGet<{ email: string | null }>(
-      `profiles?id=eq.${uid}&select=email`,
+  async function getProfile(uid: string): Promise<{ email: string | null; language: Loc }> {
+    const cached = profileCache.get(uid);
+    if (cached) return cached;
+    const rows = await sbGet<{ email: string | null; language: string | null }>(
+      `profiles?id=eq.${uid}&select=email,language`,
     ).catch(() => []);
-    const v = rows[0]?.email ?? null;
-    emailCache.set(uid, v);
+    const lang = rows[0]?.language;
+    const v = {
+      email: rows[0]?.email ?? null,
+      language: (lang === "hi" || lang === "en" || lang === "hinglish" ? lang : "hinglish") as Loc,
+    };
+    profileCache.set(uid, v);
     return v;
   }
   async function getPhone(uid: string): Promise<string | null> {
@@ -106,8 +112,8 @@ export async function POST(request: Request) {
     const label = whenLabel(r);
 
     if (r.user_id) {
-      const [email, phone] = await Promise.all([
-        getEmail(r.user_id),
+      const [profile, phone] = await Promise.all([
+        getProfile(r.user_id),
         getPhone(r.user_id),
       ]);
 
@@ -119,9 +125,9 @@ export async function POST(request: Request) {
           errors.push(`wa ${r.id}: ${String(e)}`);
         }
       }
-      if (email) {
+      if (profile.email) {
         try {
-          const res = await sendReminderEmail(email, r.title, label);
+          const res = await sendReminderEmail(profile.email, r.title, label, profile.language);
           if (res.sent) mail++;
         } catch (e) {
           errors.push(`mail ${r.id}: ${String(e)}`);

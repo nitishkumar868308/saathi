@@ -8,7 +8,6 @@ import {
   Alert,
   Linking,
   Modal,
-  Image,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,7 +16,7 @@ import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 
 import { colors } from "@/theme/colors";
-import SaathiLogo from "@/components/saathi-logo";
+import { UserAvatar } from "@/components/user-avatar";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
@@ -85,7 +84,8 @@ export default function Settings() {
       title: s.groupPrivacy,
       rows: [
         { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
-        { id: "delete_all", icon: "trash-outline", label: s.deleteAll, tint: "#B23B3B" },
+        // Delete-all-data abhi band — baad me chahiye to yeh row wapas enable karo.
+        // { id: "delete_all", icon: "trash-outline", label: s.deleteAll, tint: "#B23B3B" },
       ],
     },
     {
@@ -196,35 +196,16 @@ export default function Settings() {
         {/* Profile card */}
         <View style={styles.profile}>
           <View style={styles.pAvatar}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.pAvatarImg} />
-            ) : (
-              <SaathiLogo size={72} radius={26} />
-            )}
+            <UserAvatar
+              uri={avatarUrl}
+              name={name}
+              seed={session?.user?.id}
+              size={72}
+              radius={26}
+            />
           </View>
           <Text style={styles.pName}>{name}</Text>
           <Text style={styles.pSub}>{session?.user?.email ?? ""}</Text>
-          <View
-            style={[
-              styles.statusChip,
-              { backgroundColor: isSupabaseConfigured ? "rgba(124,138,107,0.15)" : "rgba(194,90,55,0.12)" },
-            ]}
-          >
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: isSupabaseConfigured ? colors.sage : colors.terracotta },
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusText,
-                { color: isSupabaseConfigured ? colors.sage : colors.terracotta },
-              ]}
-            >
-              {isSupabaseConfigured ? s.backendOk : s.backendMissing}
-            </Text>
-          </View>
         </View>
 
         {/* Plan / Saathi Plus — sabse upar */}
@@ -288,7 +269,7 @@ export default function Settings() {
             style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
           >
             <Ionicons name="pricetag-outline" size={20} color={colors.terracotta} />
-            <Text style={styles.detailsText}>Referral code daalein</Text>
+            <Text style={styles.detailsText}>{s.referralCodeRow}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.line} />
           </Pressable>
         )}

@@ -10,9 +10,8 @@ import {
   Activity,
   Search,
   Eye,
-  Loader2,
 } from "lucide-react";
-import { SkeletonRows } from "@/components/Loader";
+import Loader, { SkeletonRows } from "@/components/Loader";
 import Modal from "@/components/admin/Modal";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 
@@ -461,7 +460,7 @@ function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: (
 
         {!items ? (
           <div className="flex items-center justify-center gap-2 py-14 text-ink-soft">
-            <Loader2 size={18} className="animate-spin" />
+            <Loader size={40} />
             <span className="text-sm">Poora detail la rahe hain...</span>
           </div>
         ) : error ? (

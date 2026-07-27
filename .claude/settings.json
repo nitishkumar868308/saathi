@@ -194,7 +194,18 @@
       "Bash(npx eas-cli *)",
       "Bash(rm -f app-mobile/eslint.config.js)",
       "Bash(npx --yes supabase@latest secrets list)",
-      "Bash(npx --yes supabase@latest functions list)"
+      "Bash(npx --yes supabase@latest functions list)",
+      "Bash(xargs grep -l \"<html\\\\|<table\\\\|<!DOCTYPE\\\\|email\")",
+      "Bash(grep -iv '\\\\.sql$')",
+      "Bash(grep -iv '\\\\.csv$')",
+      "Bash(grep -iv '\\\\.js$')",
+      "Bash(grep -iv '\\\\.mjs$')",
+      "Bash(node_modules/.bin/tsc --version)",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/eee4ea83-4ef7-4270-9ae7-39ddeba474bc/scratchpad/serve-loader.js\")",
+      "Bash(curl -s -o /dev/null -w \"HTML:%{http_code} \" http://localhost:4599/)",
+      "Bash(curl -s -o /dev/null -w \"LOGO:%{http_code}\\\\n\" http://localhost:4599/logo.png)",
+      "Bash(curl -s -o /dev/null -w \"HTML:%{http_code} LOGO:\" http://localhost:4599/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4599/logo.png)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel"

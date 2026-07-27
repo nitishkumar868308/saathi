@@ -9,11 +9,10 @@ import {
   HardDrive,
   Users,
   Download,
-  Loader2,
   ExternalLink,
   FolderOpen,
 } from "lucide-react";
-import { SkeletonRows } from "@/components/Loader";
+import Loader, { SkeletonRows } from "@/components/Loader";
 import Modal from "@/components/admin/Modal";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 
@@ -442,7 +441,7 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
           </div>
         ) : state === "loading" ? (
           <div className="flex items-center justify-center gap-2 py-16 text-ink-soft">
-            <Loader2 size={18} className="animate-spin" />
+            <Loader size={40} />
             <span className="text-sm">Preview la rahe hain...</span>
           </div>
         ) : state === "error" ? (

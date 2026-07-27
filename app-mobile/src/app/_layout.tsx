@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Stack } from "expo-router/js-stack";
 import { useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -45,19 +45,32 @@ function RootNavigator() {
   const { ready: langReady, chosen: langChosen } = useLocale();
   const segments = useSegments();
   const router = useRouter();
+  // Pichhli baar session tha ya nahi — logout (tha→null) ko fresh launch se alag
+  // karne ke liye. Logout ke baad language-select; fresh launch pe login.
+  const prevSession = useRef(false);
 
   useEffect(() => {
     if (loading || !langReady) return;
     // `language` naya typed-route hai — string compare ke liye cast (codebase idiom).
     const first = segments[0] as string | undefined;
-    // Pehli baar: bhasha choose karne se pehle kuch aur mat dikhao.
+    const hasSession = !!session;
+
+    // Pehli baar (bhasha choose nahi ki): sabse pehle language select.
     if (!langChosen) {
       if (first !== "language") router.replace("/language" as never);
+      prevSession.current = hasSession;
       return;
     }
+
     const inAuthFlow = first === "login" || first === "auth";
-    if (!session && !inAuthFlow && first !== "language") router.replace("/login");
-    else if (session && (first === "login" || first === "language")) router.replace("/");
+    if (!hasSession && !inAuthFlow && first !== "language") {
+      // Abhi-abhi logout hua (pehle session tha) -> language select.
+      // App pehle se hai par logged out (fresh launch) -> login.
+      router.replace(prevSession.current ? ("/language" as never) : "/login");
+    } else if (hasSession && (first === "login" || first === "language")) {
+      router.replace("/");
+    }
+    prevSession.current = hasSession;
   }, [session, loading, langReady, langChosen, segments, router]);
 
   // Reminders + document expiries OS me dobara schedule karo. Zaroori hai kyunki

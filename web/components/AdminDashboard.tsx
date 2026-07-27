@@ -8,7 +8,6 @@ import {
   Search,
   Download,
   RefreshCw,
-  Loader2,
   Mail,
   Inbox,
   Gift,
@@ -20,14 +19,18 @@ import {
   Globe,
   Bug,
   FileText,
+  Megaphone,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useAdminT, atpl, type AdminDict } from "@/lib/i18n/admin";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
 import AdminReviews from "@/components/AdminReviews";
 import AdminUsage from "@/components/AdminUsage";
+import AdminBroadcast from "@/components/AdminBroadcast";
 import AdminDocuments from "@/components/AdminDocuments";
 import AdminPricing from "@/components/AdminPricing";
 import AdminLogs from "@/components/AdminLogs";
@@ -48,50 +51,20 @@ type Section =
   | "documents"
   | "reviews"
   | "logs"
-  | "contacts";
+  | "contacts"
+  | "message";
 
-const NAV: { key: Section; label: string; icon: typeof Gift }[] = [
-  { key: "users", label: "Users", icon: Users },
-  { key: "usage", label: "Usage", icon: Activity },
-  { key: "documents", label: "Documents", icon: FileText },
-  { key: "reviews", label: "Reviews", icon: Star },
-  { key: "logs", label: "Logs", icon: Bug },
-  { key: "contacts", label: "Contacts", icon: MessageSquare },
-  { key: "pricing", label: "Pricing", icon: Globe },
-  { key: "rewards", label: "Rewards", icon: Gift },
+const NAV: { key: Section; icon: typeof Gift }[] = [
+  { key: "users", icon: Users },
+  { key: "message", icon: Megaphone },
+  { key: "usage", icon: Activity },
+  { key: "documents", icon: FileText },
+  { key: "reviews", icon: Star },
+  { key: "logs", icon: Bug },
+  { key: "contacts", icon: MessageSquare },
+  { key: "pricing", icon: Globe },
+  { key: "rewards", icon: Gift },
 ];
-
-const HEADING: Record<Section, { title: string; sub: string }> = {
-  rewards: {
-    title: "Rewards & Referrals",
-    sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain.",
-  },
-  pricing: {
-    title: "Country pricing",
-    sub: "Base × multiplier × conversion rate. IP se user ko uske desh ka price + currency dikhta hai.",
-  },
-  users: {
-    title: "Users",
-    sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai.",
-  },
-  usage: {
-    title: "Usage",
-    sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi.",
-  },
-  documents: {
-    title: "Documents",
-    sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho.",
-  },
-  reviews: {
-    title: "Reviews & Ratings",
-    sub: "App me aaye reviews — rating, text, aur website pe dikhane ki anumati.",
-  },
-  logs: {
-    title: "Logs & Issues",
-    sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain.",
-  },
-  contacts: { title: "Contact messages", sub: "" },
-};
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -107,15 +80,15 @@ function fmt(iso: string): string {
   });
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, tt: AdminDict["time"]): string {
   const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (secs < 60) return "abhi";
+  if (secs < 60) return tt.now;
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m pehle`;
+  if (mins < 60) return `${mins}${tt.m}`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h pehle`;
+  if (hrs < 24) return `${hrs}${tt.h}`;
   const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d pehle`;
+  if (days < 30) return `${days}${tt.d}`;
   return fmt(iso);
 }
 
@@ -184,6 +157,7 @@ export default function AdminDashboard() {
 /* ------------------------------- Login ------------------------------- */
 
 function LoginGate({ onSuccess }: { onSuccess: () => void }) {
+  const t = useAdminT();
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading">("idle");
   const [error, setError] = useState("");
@@ -200,13 +174,13 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         body: JSON.stringify({ password }),
       });
       if (!res.ok) {
-        setError("Galat password 🙈");
+        setError(t.login.wrong);
         setStatus("idle");
         return;
       }
       onSuccess();
     } catch {
-      setError("Kuch gadbad ho gayi.");
+      setError(t.login.error);
       setStatus("idle");
     }
   }
@@ -224,12 +198,12 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-terracotta text-white shadow-warm">
           <Lock size={22} />
         </span>
-        <h1 className="mt-5 font-display text-2xl font-semibold">Admin dashboard</h1>
-        <p className="mt-1 text-sm text-ink-soft">Password daalo dashboard dekhne ke liye.</p>
+        <h1 className="mt-5 font-display text-2xl font-semibold">{t.login.title}</h1>
+        <p className="mt-1 text-sm text-ink-soft">{t.login.sub}</p>
         <input
           type="password"
           autoFocus
-          placeholder="Admin password"
+          placeholder={t.login.placeholder}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="mt-5 h-12 w-full rounded-2xl border border-line bg-cream px-4 text-base outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
@@ -240,7 +214,7 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
           disabled={status === "loading"}
           className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-terracotta px-6 text-base font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-70"
         >
-          {status === "loading" ? <Loader2 size={18} className="animate-spin" /> : "Login"}
+          {status === "loading" ? <Loader size={22} /> : t.login.button}
         </button>
       </form>
     </div>
@@ -260,6 +234,7 @@ function Dashboard({
   onRefresh: () => void;
   onLogout: () => void;
 }) {
+  const t = useAdminT();
   const [section, setSection] = useState<Section>("users");
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -294,7 +269,7 @@ function Dashboard({
 
   const nav = (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ key, label, icon: Icon }) => {
+      {NAV.map(({ key, icon: Icon }) => {
         const active = section === key;
         return (
           <button
@@ -307,7 +282,7 @@ function Dashboard({
             }`}
           >
             <Icon size={18} />
-            {label}
+            {t.nav[key]}
             {key === "contacts" && contacts.length > 0 && (
               <span
                 className={`ml-auto rounded-full px-2 py-0.5 text-xs font-bold ${
@@ -334,14 +309,17 @@ function Dashboard({
         >
           <Menu size={18} />
         </button>
-        <span className="font-display text-lg font-semibold">Admin</span>
-        <button
-          onClick={onRefresh}
-          aria-label="Refresh"
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft"
-        >
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-        </button>
+        <span className="font-display text-lg font-semibold">{t.common.admin}</span>
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <button
+            onClick={onRefresh}
+            aria-label={t.common.refresh}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink-soft"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
       </header>
 
       {/* Mobile drawer */}
@@ -356,7 +334,7 @@ function Dashboard({
               <Brand />
               <button
                 onClick={() => setNavOpen(false)}
-                aria-label="Band karo"
+                aria-label={t.common.close}
                 className="flex h-9 w-9 items-center justify-center rounded-xl border border-line text-ink-soft"
               >
                 <X size={16} />
@@ -382,22 +360,23 @@ function Dashboard({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {HEADING[section].title}
+                  {t.headings[section].title}
                 </h1>
                 <p className="mt-1 text-sm text-ink-soft">
                   {section === "contacts"
-                    ? `${contacts.length} message`
-                    : HEADING[section].sub}
+                    ? atpl(t.contacts.countMsg, { n: contacts.length })
+                    : t.headings[section].sub}
                 </p>
               </div>
 
               <div className="hidden items-center gap-2 lg:flex">
+                <LanguageSwitcher />
                 <button
                   onClick={onRefresh}
                   className="inline-flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
                 >
                   <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-                  Refresh
+                  {t.common.refresh}
                 </button>
               </div>
             </div>
@@ -412,7 +391,7 @@ function Dashboard({
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Naam, email ya message search karo..."
+                    placeholder={t.contacts.searchPh}
                     className="h-11 w-full rounded-2xl border border-line bg-surface pl-10 pr-4 text-sm outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
                   />
                 </div>
@@ -431,6 +410,7 @@ function Dashboard({
               {section === "rewards" && <AdminRewards />}
               {section === "pricing" && <AdminPricing />}
               {section === "users" && <AdminUsers />}
+              {section === "message" && <AdminBroadcast />}
               {section === "usage" && <AdminUsage />}
               {section === "documents" && <AdminDocuments />}
               {section === "reviews" && <AdminReviews />}
@@ -445,22 +425,24 @@ function Dashboard({
 }
 
 function Brand() {
+  const t = useAdminT();
   return (
     <div className="flex items-center gap-2.5">
       <SaathiLogo size={52} className="rounded-2xl shadow-warm" />
-      <p className="text-sm font-semibold text-ink-soft">Admin</p>
+      <p className="text-sm font-semibold text-ink-soft">{t.common.admin}</p>
     </div>
   );
 }
 
 function LogoutBtn({ onLogout, className = "" }: { onLogout: () => void; className?: string }) {
+  const t = useAdminT();
   return (
     <button
       onClick={onLogout}
       className={`inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-ink px-4 text-sm font-semibold text-cream transition hover:opacity-90 ${className}`}
     >
       <LogOut size={15} />
-      Logout
+      {t.common.logout}
     </button>
   );
 }
@@ -468,8 +450,9 @@ function LogoutBtn({ onLogout, className = "" }: { onLogout: () => void; classNa
 /* ------------------------------ Contacts ----------------------------- */
 
 function ContactsView({ rows }: { rows: ContactEntry[] }) {
+  const t = useAdminT();
   const pager = usePagination(rows, 10, rows);
-  if (!rows.length) return <Empty label="Abhi koi message nahi." />;
+  if (!rows.length) return <Empty label={t.contacts.empty} />;
   return (
     <div className="space-y-3">
       {pager.pageItems.map((r, i) => (
@@ -496,7 +479,7 @@ function ContactsView({ rows }: { rows: ContactEntry[] }) {
               </div>
             </div>
             <span className="shrink-0 text-xs font-medium text-ink-soft">
-              {timeAgo(r.createdAt)}
+              {timeAgo(r.createdAt, t.time)}
             </span>
           </div>
           <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-cream-deep/30 p-4 text-sm leading-relaxed text-ink">
@@ -508,7 +491,7 @@ function ContactsView({ rows }: { rows: ContactEntry[] }) {
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:underline"
             >
               <Mail size={14} />
-              Reply
+              {t.contacts.reply}
             </a>
           </div>
         </div>

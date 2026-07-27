@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Saathi Loader — Final (local)</title>
+  <style>
+    :root{ --terracotta:#C25A37; --teal:#125156; --cream:#F7F2E9; --surface:#FFFCF6; --ink:#2E2823; --ink-soft:#6B5F54; --line:#E5DBC9; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--cream); color:var(--ink); -webkit-font-smoothing:antialiased; }
+    header{ padding:30px 20px 6px; text-align:center; }
+    header h1{ margin:0; font-size:22px; font-weight:800; }
+    header p{ margin:6px 0 0; color:var(--ink-soft); font-size:14px; }
+    .badge{ display:inline-block; margin-top:10px; font-size:12px; font-weight:700; color:var(--teal); background:rgba(18,81,86,.10); padding:5px 12px; border-radius:999px; }
+    .grid{ max-width:900px; margin:24px auto; padding:0 20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px; }
+    .tile{ border-radius:24px; border:1px solid var(--line); background:var(--surface); padding:30px 20px; display:flex; flex-direction:column; align-items:center; gap:14px; min-height:220px; justify-content:center; position:relative; overflow:hidden; }
+    .tile.dark{ background:var(--ink); border-color:#3a332c; }
+    .tile .cap{ font-size:12.5px; font-weight:700; color:var(--ink-soft); }
+    .tile.dark .cap{ color:rgba(255,255,255,.75); }
+    .softbg{ position:absolute; width:240px; height:240px; border-radius:50%; background:rgba(18,81,86,.06); }
+
+    /* ---- The ONE Saathi loader ---- */
+    .load{ position:relative; display:inline-flex; align-items:center; justify-content:center; }
+    .load img{ position:relative; z-index:2; display:block; animation:breathe 1.8s ease-in-out infinite; }
+    .ring{ position:absolute; inset:0; margin:auto; background:var(--teal); z-index:0; animation:ripple 1.8s ease-out infinite; }
+    .ring.b{ animation-delay:.9s; }
+    .fheart{ position:absolute; left:50%; top:50%; z-index:3; color:var(--terracotta); animation:floaty 2.4s ease-in-out infinite; }
+    @keyframes breathe{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.06);} }
+    @keyframes ripple{ 0%{ transform:scale(.95); opacity:.22;} 100%{ transform:scale(1.85); opacity:0;} }
+    @keyframes floaty{
+      0%,32%{ opacity:0; transform:translate(-50%,-50%) scale(.4);}
+      46%,60%{ opacity:1; transform:translate(-50%,calc(-50% - var(--up))) scale(1);}
+      82%,100%{ opacity:0; transform:translate(-50%,calc(-50% - var(--up) - 8px)) scale(.6);}
+    }
+    @media (prefers-reduced-motion:reduce){ .load img,.ring,.fheart{ animation:none;} .ring{opacity:0;} }
+    footer{ text-align:center; color:var(--ink-soft); font-size:12.5px; padding:8px 20px 44px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Saathi Loader — final</h1>
+    <p>Aapka logo saans leta hai, peeche naram teal ripple, beech-beech ek dil upar tairta hai. Yahi ek loader — app, web aur admin sab me.</p>
+    <div class="badge">100% local · kuch bhi Claude server/memory par nahi</div>
+  </header>
+
+  <div class="grid" id="grid"></div>
+  <footer>Refresh: F5 · Band: terminal me Ctrl+C · Ye page sirf aapke computer par (localhost).</footer>
+
+  <script>
+    function loader(size, halo){
+      var radius = Math.round(size*0.3);
+      var heart = Math.round(size*0.28);
+      var up = Math.round(size*0.55) + "px";
+      var wrap = document.createElement("span");
+      wrap.className = "load";
+      wrap.style.width = size+"px"; wrap.style.height = size+"px";
+      if(halo){
+        [ "ring", "ring b" ].forEach(function(c){
+          var r=document.createElement("span"); r.className=c;
+          r.style.borderRadius=radius+"px"; wrap.appendChild(r);
+        });
+      }
+      var img=document.createElement("img");
+      img.src="/logo.png"; img.width=size; img.height=size;
+      img.style.width=size+"px"; img.style.height=size+"px"; img.style.borderRadius=radius+"px";
+      wrap.appendChild(img);
+      if(halo){
+        var h=document.createElement("span"); h.className="fheart";
+        h.style.width=heart+"px"; h.style.height=heart+"px"; h.style.marginLeft=(-heart/2)+"px"; h.style.marginTop=(-heart/2)+"px";
+        h.style.setProperty("--up", up);
+        h.innerHTML='<svg viewBox="0 0 24 24" width="'+heart+'" height="'+heart+'" fill="currentColor"><path d="M12 21s-7.5-4.9-10-9.4C.4 8.2 2 5 5.2 5c2 0 3.3 1.2 3.8 2.2C9.5 6.2 10.8 5 12.8 5 16 5 17.6 8.2 16 11.6 13.5 16.1 12 21 12 21z"/></svg>';
+        wrap.appendChild(h);
+      }
+      return wrap;
+    }
+    function tile(cap, size, halo, dark){
+      var t=document.createElement("div"); t.className="tile"+(dark?" dark":"");
+      if(halo){ var bg=document.createElement("span"); bg.className="softbg"; t.appendChild(bg); }
+      t.appendChild(loader(size, halo));
+      var c=document.createElement("div"); c.className="cap"; c.textContent=cap; t.appendChild(c);
+      return t;
+    }
+    var g=document.getElementById("grid");
+    g.appendChild(tile("Button · 40 (sirf logo)", 40, false, false));
+    g.appendChild(tile("Medium · 84 (full)", 84, true, false));
+    g.appendChild(tile("Full screen · 120", 120, true, false));
+    g.appendChild(tile("On dark · 96", 96, true, true));
+  </script>
+</body>
+</html>

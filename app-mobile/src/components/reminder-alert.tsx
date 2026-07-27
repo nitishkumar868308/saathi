@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Notifications from "expo-notifications";
+import notifee, { EventType, type Notification } from "@notifee/react-native";
 
 import { colors } from "@/theme/colors";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -12,14 +12,14 @@ import { acknowledgeDocument } from "@/lib/doc-ack";
 
 type Alert = { id: string; title: string; body: string; kind: "reminder" | "expiry" };
 
-function fromNotification(n: Notifications.Notification): Alert {
-  const c = n.request.content;
-  const data = (c.data ?? {}) as { kind?: string; body?: string; id?: string };
+function fromNotification(n?: Notification | null): Alert | null {
+  if (!n) return null;
+  const data = (n.data ?? {}) as { kind?: string; body?: string; id?: string };
   return {
-    // Reminder schedule me identifier = reminder id; expiry me "doc:<id>:<lead>".
-    id: (data.id as string) ?? n.request.identifier ?? "",
-    title: c.title ?? "Saathi",
-    body: c.body ?? (data.body as string) ?? "",
+    // Reminder me id = reminder id; expiry me "doc:<id>:<lead>".
+    id: (data.id as string) ?? n.id ?? "",
+    title: n.title ?? "Saathi",
+    body: n.body ?? (data.body as string) ?? "",
     kind: data.kind === "expiry" ? "expiry" : "reminder",
   };
 }
@@ -42,29 +42,33 @@ export function ReminderAlertHost() {
   const { notif: n } = useT();
   const [alert, setAlert] = useState<Alert | null>(null);
   const scale = useRef(new Animated.Value(0.9)).current;
-
-  // ⚠️ Cold-start: app killed tha aur user notification tap karke laaya. Response
-  // listener ye case miss karta hai (wo app chalu hone se pehle fire ho chuka
-  // hota hai). useLastNotificationResponse() us aakhri response ko pakadta hai.
-  const lastResponse = Notifications.useLastNotificationResponse();
   const handledId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Sirf foreground me aayi notification (tap warm/cold dono neeche hook se).
-    const recv = Notifications.addNotificationReceivedListener((notif) =>
-      setAlert(fromNotification(notif)),
-    );
-    return () => recv.remove();
-  }, []);
+    let alive = true;
+    const show = (notif?: Notification | null) => {
+      const a = fromNotification(notif);
+      if (!a || !alive) return;
+      if (handledId.current === a.id) return; // dobara na dikhe
+      handledId.current = a.id;
+      setAlert(a);
+    };
 
-  useEffect(() => {
-    if (!lastResponse) return;
-    // Same response dobara process na ho (dismiss ke baad bhi hook wahi rakhta hai).
-    const id = lastResponse.notification.request.identifier;
-    if (handledId.current === id) return;
-    handledId.current = id;
-    setAlert(fromNotification(lastResponse.notification));
-  }, [lastResponse]);
+    // Foreground: notification aaye (DELIVERED) ya tap ho (PRESS) -> modal.
+    const unsub = notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.DELIVERED || type === EventType.PRESS) {
+        show(detail.notification);
+      }
+    });
+
+    // Cold-start: app band tha, notification/full-screen se khula.
+    notifee.getInitialNotification().then((initial) => show(initial?.notification));
+
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     if (!alert) return;

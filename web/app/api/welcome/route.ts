@@ -58,16 +58,25 @@ export async function POST(request: Request) {
     "Content-Type": "application/json",
   };
 
-  // 2. Pehle se welcome bhej chuke? (idempotent)
+  // 2. Pehle se welcome bhej chuke? (idempotent) + DB me saved bhasha lo.
   const profRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=welcomed_at,full_name`,
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=welcomed_at,full_name,language`,
     { headers: svcHeaders, cache: "no-store" },
   );
   if (profRes.ok) {
-    const rows = (await profRes.json()) as { welcomed_at: string | null; full_name: string | null }[];
+    const rows = (await profRes.json()) as {
+      welcomed_at: string | null;
+      full_name: string | null;
+      language: string | null;
+    }[];
     const prof = rows[0];
     if (prof?.welcomed_at) {
       return NextResponse.json({ ok: true, already: true });
+    }
+    // DB ki bhasha source-of-truth — client ne na bheji ho to yahi use karo.
+    const dbLang = prof?.language;
+    if (dbLang === "hi" || dbLang === "en" || dbLang === "hinglish") {
+      locale = dbLang;
     }
   }
 

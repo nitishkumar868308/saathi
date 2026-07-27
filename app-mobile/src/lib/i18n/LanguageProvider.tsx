@@ -9,6 +9,7 @@ import {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { supabase } from "@/lib/supabase";
 import {
   DEFAULT_LOCALE,
   LOCALES,
@@ -18,6 +19,40 @@ import {
 } from "./dictionaries";
 
 const STORAGE_KEY = "saathi-locale";
+
+const isLocale = (v: unknown): v is Locale =>
+  typeof v === "string" && (LOCALES as readonly string[]).includes(v);
+
+/** DB me user ki bhasha padho (cross-device source of truth). */
+async function readDbLocale(): Promise<Locale | null> {
+  if (!supabase) return null;
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return null;
+    const { data } = await supabase
+      .from("profiles")
+      .select("language")
+      .eq("id", uid)
+      .maybeSingle();
+    return isLocale(data?.language) ? (data!.language as Locale) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** DB me user ki bhasha likho (best-effort). */
+async function writeDbLocale(l: Locale): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!uid) return;
+    await supabase.from("profiles").update({ language: l }).eq("id", uid);
+  } catch {
+    /* best-effort — local to save ho hi chuka hai */
+  }
+}
 
 type Ctx = {
   locale: Locale;
@@ -36,13 +71,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [chosen, setChosen] = useState(false);
 
+  // 1) Pehle local (turant) — splash isi tak rukta hai.
   useEffect(() => {
     let alive = true;
     AsyncStorage.getItem(STORAGE_KEY)
       .then((saved) => {
         if (!alive) return;
-        if (saved && (LOCALES as readonly string[]).includes(saved)) {
-          setLocaleState(saved as Locale);
+        if (isLocale(saved)) {
+          setLocaleState(saved);
           setChosen(true);
         }
       })
@@ -53,10 +89,41 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // 2) DB source-of-truth: login hote hi user ki saved bhasha laao (doosre
+  //    device par chuni ho to wahi lage). DB khaali ho par local chuni ho to
+  //    local ko DB me push kar do.
+  useEffect(() => {
+    if (!supabase) return;
+    let alive = true;
+
+    const sync = async () => {
+      const dbLoc = await readDbLocale();
+      if (!alive) return;
+      if (dbLoc) {
+        setLocaleState(dbLoc);
+        setChosen(true);
+        AsyncStorage.setItem(STORAGE_KEY, dbLoc).catch(() => {});
+      } else {
+        const saved = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+        if (isLocale(saved)) writeDbLocale(saved);
+      }
+    };
+
+    sync();
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") sync();
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
   const setLocale = useCallback((l: Locale) => {
     setLocaleState(l);
     setChosen(true);
     AsyncStorage.setItem(STORAGE_KEY, l).catch(() => {});
+    writeDbLocale(l); // cross-device + emails
   }, []);
 
   const value = useMemo<Ctx>(

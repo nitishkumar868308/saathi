@@ -25,7 +25,8 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_FULL_SCREEN_INTENT"
       ]
     },
     "web": {
@@ -60,7 +61,8 @@
           "color": "#C25A37"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "./plugins/with-fullscreen-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

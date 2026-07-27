@@ -192,6 +192,7 @@ export type Dict = {
     doneTitle: string;
     doneSub: string;
     detectedLabel: string;
+    summaryLabel: string;
     editHint: string;
     camera: string;
     gallery: string;
@@ -245,6 +246,8 @@ export type Dict = {
     limitReached: string;
     askWhat: string;
     askWhatPlaceholder: string;
+    titleLabel: string;
+    titleEditHint: string;
     understanding: string;
     askDay: string;
     dayAfter: string;
@@ -412,6 +415,7 @@ export type Dict = {
     completeSub: string;
     /** {d} */
     referRow: string;
+    referralCodeRow: string;
     plusActive: string;
     plusLo: string;
     plusActiveSub: string;
@@ -480,12 +484,12 @@ const hinglish: Dict = {
     nameLabel: "Aap Saathi ko kya bulaoge?",
     namePlaceholder: "Saathi",
   },
-  tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Alerts", you: "You" },
+  tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Reminders", you: "You" },
   notif: {
-    reminderTitle: "Saathi 🔔",
-    expiryTitle: "Saathi 📄",
-    expiryToday: "{name} aaj expire ho raha hai.",
-    expiryInDays: "{name} {n} din me expire ho raha hai.",
+    reminderTitle: "🔔 Saathi ka reminder",
+    expiryTitle: "📄 Saathi ka alert",
+    expiryToday: "{name} aaj expire ho raha hai — abhi dekh lo. 🙂",
+    expiryInDays: "{name} {n} din me expire ho raha hai. Main yaad dila raha hoon 🙂",
     alertReminder: "Reminder",
     alertExpiry: "Document expiry",
     alertOk: "Theek hai, samajh gaya",
@@ -608,6 +612,7 @@ const hinglish: Dict = {
     doneTitle: "Ho gaya! Neeche check karo ✨",
     doneSub: "Saathi ne document khud samajh liya",
     detectedLabel: "Saathi ke hisaab se",
+    summaryLabel: "Saathi ne yeh padha",
     editHint: "(theek kar sakte ho)",
     camera: "Camera",
     gallery: "Gallery",
@@ -659,6 +664,8 @@ const hinglish: Dict = {
     limitReached: "Free me 5 active reminders — unlimited ke liye Saathi Plus dekhein",
     askWhat: "Ye reminder kis cheez ke liye hai?",
     askWhatPlaceholder: "Jaise: dawai lena, bijli bill bharna",
+    titleLabel: "Title",
+    titleEditHint: "(edit kar sakte ho)",
     understanding: "Samajh raha hoon…",
     askDay: "Kis din yaad dilau?",
     dayAfter: "Parso",
@@ -825,6 +832,7 @@ const hinglish: Dict = {
     completeTitle: "Profile poori karein",
     completeSub: "Naam, phone, address — referral aur Plus ke liye zaroori",
     referRow: "Refer & Earn — dono ko {d} din ka Plus plan free",
+    referralCodeRow: "Referral code daalein",
     plusActive: "Saathi Plus — active",
     plusLo: "Saathi Plus",
     plusActiveSub: "Unlimited reminders, documents aur AI",
@@ -839,7 +847,7 @@ const hinglish: Dict = {
     exportData: "Mera data export karo",
     deleteAll: "Sab data delete",
     help: "Help & support",
-    about: "About Apka Saathi",
+    about: "About Us",
     logout: "Logout",
     version: "Apka Saathi · v0.1.0 · Made in India",
     langAlertTitle: "Bhasha",
@@ -894,12 +902,12 @@ const hi: Dict = {
     nameLabel: "साथी को क्या बुलाएँगे?",
     namePlaceholder: "साथी",
   },
-  tabs: { home: "होम", saathi: "साथी", docs: "डॉक्स", alerts: "अलर्ट", you: "आप" },
+  tabs: { home: "होम", saathi: "साथी", docs: "डॉक्स", alerts: "रिमाइंडर", you: "आप" },
   notif: {
-    reminderTitle: "साथी 🔔",
-    expiryTitle: "साथी 📄",
-    expiryToday: "{name} आज एक्सपायर हो रहा है।",
-    expiryInDays: "{name} {n} दिन में एक्सपायर हो रहा है।",
+    reminderTitle: "🔔 साथी का रिमाइंडर",
+    expiryTitle: "📄 साथी का अलर्ट",
+    expiryToday: "{name} आज एक्सपायर हो रहा है — अभी देख लो। 🙂",
+    expiryInDays: "{name} {n} दिन में एक्सपायर हो रहा है। मैं याद दिला रहा हूँ 🙂",
     alertReminder: "रिमाइंडर",
     alertExpiry: "डॉक्युमेंट एक्सपायरी",
     alertOk: "ठीक है, समझ गया",
@@ -1021,6 +1029,7 @@ const hi: Dict = {
     doneTitle: "हो गया! नीचे देखें ✨",
     doneSub: "साथी ने डॉक्युमेंट खुद समझ लिया",
     detectedLabel: "साथी के हिसाब से",
+    summaryLabel: "साथी ने यह पढ़ा",
     editHint: "(ठीक कर सकते हैं)",
     camera: "कैमरा",
     gallery: "गैलरी",
@@ -1072,6 +1081,8 @@ const hi: Dict = {
     limitReached: "फ्री में 5 active रिमाइंडर — अनलिमिटेड के लिए साथी प्लस देखें",
     askWhat: "यह रिमाइंडर किस चीज़ के लिए है?",
     askWhatPlaceholder: "जैसे: दवाई लेना, बिजली बिल भरना",
+    titleLabel: "टाइटल",
+    titleEditHint: "(बदल सकते हैं)",
     understanding: "समझ रहा हूँ…",
     askDay: "किस दिन याद दिलाऊँ?",
     dayAfter: "परसों",
@@ -1238,6 +1249,7 @@ const hi: Dict = {
     completeTitle: "प्रोफ़ाइल पूरी करें",
     completeSub: "नाम, फ़ोन, पता — रेफ़रल और प्लस के लिए ज़रूरी",
     referRow: "Refer & Earn — दोनों को {d} दिन का प्लस प्लान फ्री",
+    referralCodeRow: "रेफरल कोड डालें",
     plusActive: "साथी प्लस — active",
     plusLo: "साथी प्लस",
     plusActiveSub: "अनलिमिटेड रिमाइंडर, डॉक्युमेंट और AI",
@@ -1252,7 +1264,7 @@ const hi: Dict = {
     exportData: "मेरा डेटा export करें",
     deleteAll: "सब डेटा डिलीट",
     help: "हेल्प & support",
-    about: "About Apka Saathi",
+    about: "About Us",
     logout: "लॉगआउट",
     version: "Apka Saathi · v0.1.0 · Made in India",
     langAlertTitle: "भाषा",
@@ -1307,12 +1319,12 @@ const en: Dict = {
     nameLabel: "What will you call your Saathi?",
     namePlaceholder: "Saathi",
   },
-  tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Alerts", you: "You" },
+  tabs: { home: "Home", saathi: "Saathi", docs: "Docs", alerts: "Reminders", you: "You" },
   notif: {
-    reminderTitle: "Saathi 🔔",
-    expiryTitle: "Saathi 📄",
-    expiryToday: "{name} expires today.",
-    expiryInDays: "{name} expires in {n} days.",
+    reminderTitle: "🔔 Reminder from Saathi",
+    expiryTitle: "📄 Alert from Saathi",
+    expiryToday: "{name} expires today — take a look now. 🙂",
+    expiryInDays: "{name} expires in {n} days. Just a heads-up 🙂",
     alertReminder: "Reminder",
     alertExpiry: "Document expiry",
     alertOk: "Okay, got it",
@@ -1375,7 +1387,7 @@ const en: Dict = {
     googleFailed: "Google sign-in failed",
   },
   home: {
-    greeting: "Namaste{name}",
+    greeting: "Hello{name}",
     briefLabel: "Today's brief",
     briefLoading: "Looking through your documents…",
     briefAttention:
@@ -1433,6 +1445,7 @@ const en: Dict = {
     doneTitle: "Done! Check below ✨",
     doneSub: "Saathi read the document automatically",
     detectedLabel: "According to Saathi",
+    summaryLabel: "What Saathi read",
     editHint: "(you can fix it)",
     camera: "Camera",
     gallery: "Gallery",
@@ -1484,6 +1497,8 @@ const en: Dict = {
     limitReached: "5 active reminders on Free — Saathi Plus for unlimited",
     askWhat: "What is this reminder for?",
     askWhatPlaceholder: "e.g. take medicine, pay electricity bill",
+    titleLabel: "Title",
+    titleEditHint: "(you can edit)",
     understanding: "Understanding…",
     askDay: "Which day should I remind you?",
     dayAfter: "Day after",
@@ -1513,7 +1528,7 @@ const en: Dict = {
   chat: {
     online: "your friend · online",
     greeting:
-      "Namaste{name}! I'm your Saathi. Ask me about your reminders, tasks and documents — I'll help. 🙂",
+      "Hello{name}! I'm your Saathi. Ask me about your reminders, tasks and documents — I'll help. 🙂",
     stubReply:
       "You can ask me about your reminders, tasks or documents. 🙂 I can't answer everything else just yet, but that's coming very soon — until then, use the Documents and Reminders tabs!",
     inputPlaceholder: "Type something…",
@@ -1650,6 +1665,7 @@ const en: Dict = {
     completeTitle: "Complete your profile",
     completeSub: "Name, phone, address — needed for referrals and Plus",
     referRow: "Refer & Earn — you both get {d} days of Plus free",
+    referralCodeRow: "Enter a referral code",
     plusActive: "Saathi Plus — active",
     plusLo: "Saathi Plus",
     plusActiveSub: "Unlimited reminders, documents and AI",
@@ -1664,7 +1680,7 @@ const en: Dict = {
     exportData: "Export my data",
     deleteAll: "Delete all data",
     help: "Help & support",
-    about: "About Apka Saathi",
+    about: "About Us",
     logout: "Log out",
     version: "Apka Saathi · v0.1.0 · Made in India",
     langAlertTitle: "Language",

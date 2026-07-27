@@ -33,15 +33,29 @@ type AskOpts = {
   context?: ChatContext;
 };
 
+/** Saathi chat se aane wala action — client execute karta hai (limits + notifications reuse). */
+export type SaathiAction =
+  | { type: "create_reminder"; title: string; remind_at: string }
+  | { type: "navigate"; to: "add_document" };
+
+export type SaathiReply = { reply: string; action: SaathiAction | null };
+
+/** Abhi ka LOCAL time naive ISO me (bina Z) — server isi se remind_at nikaalta hai. */
+function localNowIso(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00`;
+}
+
 /** Saathi se jawab lo. Network/config fail ho to bhi kuch na kuch lautata hai. */
 export async function askSaathi(
   message: string,
   history: ChatTurn[] = [],
   name?: string,
   opts: AskOpts = {},
-): Promise<string> {
+): Promise<SaathiReply> {
   const fallback = opts.fallback ?? STUB_REPLY;
-  if (!supabase) return fallback;
+  if (!supabase) return { reply: fallback, action: null };
   try {
     const { data, error } = await supabase.functions.invoke("ai", {
       body: {
@@ -51,13 +65,15 @@ export async function askSaathi(
         name,
         locale: opts.locale,
         context: opts.context,
+        now: localNowIso(),
       },
     });
-    if (error) return fallback;
-    const reply = (data as { reply?: string } | null)?.reply;
-    return reply && reply.trim() ? reply : fallback;
+    if (error) return { reply: fallback, action: null };
+    const d = data as { reply?: string; action?: SaathiAction | null } | null;
+    const reply = d?.reply && d.reply.trim() ? d.reply : fallback;
+    return { reply, action: d?.action ?? null };
   } catch {
-    return fallback;
+    return { reply: fallback, action: null };
   }
 }
 

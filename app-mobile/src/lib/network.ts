@@ -51,6 +51,28 @@ export async function timed<T>(work: Promise<T>): Promise<T> {
 
 export type NetStatus = { offline: boolean; slow: boolean };
 
+/**
+ * Sach me internet hai ya nahi — ek chhoti si request bhej ke check karo.
+ * expo-network ka `isInternetReachable` kai Android phones par galti se `false`
+ * atka reh jaata hai (net chalu hone par bhi). Isliye banner dikhane se pehle
+ * hum khud ek halki request bhej ke confirm karte hain.
+ */
+async function probeInternet(): Promise<boolean> {
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const target = base ? `${base}/auth/v1/health` : "https://www.gstatic.com/generate_204";
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    // Koi bhi HTTP jawaab (200/400/401 kuch bhi) = internet chalu hai.
+    // Sirf network error / timeout = sach me offline.
+    await fetch(target, { method: "GET", signal: ctrl.signal, cache: "no-store" });
+    clearTimeout(timer);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function useNetworkStatus(): NetStatus {
   const net = Network.useNetworkState();
   const [slow, setSlow] = useState(false);
@@ -67,21 +89,40 @@ export function useNetworkStatus(): NetStatus {
     };
   }, []);
 
-  // Raw offline: device connected hi nahi, YA internet reach nahi kar raha.
-  // isInternetReachable undefined ho sakta hai (abhi pata nahi) — tab offline mat kaho.
-  const rawOffline = net.isConnected === false || net.isInternetReachable === false;
+  const connected = net.isConnected;
+  const reachable = net.isInternetReachable;
 
-  // ⚠️ expo-network shuruaat me kuch pal ke liye galat `false` de deta hai (net on hone
-  //    par bhi) — isliye offline turant mat dikhao. 3s tak lagataar offline rahe tabhi
-  //    banner dikhao. Wapas online hote hi turant hata do.
   useEffect(() => {
-    if (!rawOffline) {
-      setOffline(false);
-      return;
+    let cancelled = false;
+
+    // 1) Device ke paas koi connection hi nahi (wifi/data band) = pakka offline.
+    if (connected === false) {
+      const t = setTimeout(() => !cancelled && setOffline(true), 1500);
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
     }
-    const t = setTimeout(() => setOffline(true), 3000);
-    return () => clearTimeout(t);
-  }, [rawOffline]);
+
+    // 2) Connection hai par reachability `false` — yeh flag bharosemand nahi hai.
+    //    Khud probe karke confirm karo; probe pass hua to banner mat dikhao.
+    if (reachable === false) {
+      const t = setTimeout(async () => {
+        const ok = await probeInternet();
+        if (!cancelled) setOffline(!ok);
+      }, 2500);
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
+    }
+
+    // 3) Sab theek — banner turant hata do.
+    setOffline(false);
+    return () => {
+      cancelled = true;
+    };
+  }, [connected, reachable]);
 
   return { offline, slow: slow && !offline };
 }

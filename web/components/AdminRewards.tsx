@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gift, Loader2, Save, UserPlus, SlidersHorizontal } from "lucide-react";
+import { Gift, Save, UserPlus, SlidersHorizontal } from "lucide-react";
+import Loader from "@/components/Loader";
 
 // Plus ka daam ab Pricing section me (country-wise). Yahan sirf referral + free limits.
 type Config = {
@@ -100,7 +101,7 @@ export default function AdminRewards() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        <Loader2 size={16} className="animate-spin" /> Load ho raha hai…
+        <Loader size={20} /> Load ho raha hai…
       </div>
     );
   }
@@ -169,7 +170,7 @@ export default function AdminRewards() {
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark disabled:opacity-60"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saving ? <Loader size={18} /> : <Save size={15} />}
             Save
           </button>
           {msg && <span className="text-sm text-ink-soft">{msg}</span>}
@@ -211,7 +212,7 @@ export default function AdminRewards() {
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark disabled:opacity-60"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saving ? <Loader size={18} /> : <Save size={15} />}
             Save
           </button>
           {msg && <span className="text-sm text-ink-soft">{msg}</span>}

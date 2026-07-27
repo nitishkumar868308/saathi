@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,9 +18,10 @@ import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
 import { listDocuments, deleteDocument, type Document } from "@/lib/documents";
 import { cancelDocumentExpiry } from "@/lib/notifications";
-import { shareDocument, shareDocuments } from "@/lib/share";
+import { shareDocuments } from "@/lib/share";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
+import { ConfirmModal } from "@/components/confirm-modal";
 import { Pagination, usePaged } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
@@ -40,6 +40,7 @@ export default function Documents() {
   const [filter, setFilter] = useState<Filter>("all");
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
 
   const filters: { key: Filter; label: string }[] = [
     { key: "all", label: d.filterAll },
@@ -70,25 +71,17 @@ export default function Documents() {
     }, [load]),
   );
 
-  function confirmDelete(doc: Document) {
-    Alert.alert(d.deleteConfirmTitle, tpl(d.deleteConfirmBody, { name: doc.name }), [
-      { text: c.no, style: "cancel" },
-      {
-        text: c.delete,
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDocument(doc.id);
-            // Warna delete kiye document ki expiry notification aati rehti.
-            await cancelDocumentExpiry(doc.id);
-            setDocs((prev) => prev.filter((x) => x.id !== doc.id));
-            toast.show(d.deleted, "success");
-          } catch {
-            toast.show(d.deleted + " ✕", "error");
-          }
-        },
-      },
-    ]);
+  async function runDelete(doc: Document) {
+    setPendingDelete(null);
+    try {
+      await deleteDocument(doc.id);
+      // Warna delete kiye document ki expiry notification aati rehti.
+      await cancelDocumentExpiry(doc.id);
+      setDocs((prev) => prev.filter((x) => x.id !== doc.id));
+      toast.show(d.deleted, "success");
+    } catch {
+      toast.show(d.deleted + " ✕", "error");
+    }
   }
 
   function toggleSelect(id: string) {
@@ -105,25 +98,12 @@ export default function Documents() {
     setSelected(new Set());
   }
 
-  async function onShareOne(doc: Document) {
-    const ok = await shareDocument(doc).catch(() => false);
-    if (!ok) toast.show(d.shareFailed, "error");
-  }
-
   async function onShareSelected() {
     const chosen = docs.filter((x) => selected.has(x.id) && !x.is_locked);
     if (chosen.length === 0) return;
     const n = await shareDocuments(chosen).catch(() => 0);
     toast.show(n > 0 ? tpl(d.sharedN, { n }) : d.shareFailed, n > 0 ? "success" : "error");
     exitSelect();
-  }
-
-  function docActions(doc: Document) {
-    Alert.alert(doc.name, undefined, [
-      { text: d.share, onPress: () => onShareOne(doc) },
-      { text: c.delete, style: "destructive", onPress: () => confirmDelete(doc) },
-      { text: c.no, style: "cancel" },
-    ]);
   }
 
   const list = docs.filter((x) => {
@@ -246,16 +226,15 @@ export default function Documents() {
                       },
                     } as never);
                   }}
-                  onLongPress={() => {
+                  onDelete={() => {
                     if (selectMode || doc.is_locked) return;
-                    docActions(doc);
+                    setPendingDelete(doc);
                   }}
                 />
               ))}
               <Pagination page={page} pageCount={pageCount} onPage={setPage} />
             </>
           )}
-          <Text style={styles.hint}>{d.longPressHint}</Text>
         </ScrollView>
       )}
 
@@ -281,6 +260,18 @@ export default function Documents() {
           <Ionicons name="add" size={28} color={colors.white} />
         </Pressable>
       )}
+
+      <ConfirmModal
+        visible={!!pendingDelete}
+        icon="trash-outline"
+        destructive
+        title={d.deleteConfirmTitle}
+        message={pendingDelete ? tpl(d.deleteConfirmBody, { name: pendingDelete.name }) : ""}
+        confirmLabel={c.delete}
+        cancelLabel={c.no}
+        onConfirm={() => pendingDelete && runDelete(pendingDelete)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </SafeAreaView>
   );
 }
