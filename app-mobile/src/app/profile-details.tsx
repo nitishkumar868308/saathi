@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,13 +13,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   isValidPhoneNumber,
+  isSupportedCountry,
   parsePhoneNumberFromString,
   getCountryCallingCode,
   type CountryCode,
 } from "libphonenumber-js";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -52,7 +52,8 @@ export default function ProfileDetails() {
   const [saving, setSaving] = useState(false);
 
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState(session?.user?.email ?? "");
+  // Login wale account ka email — read-only, isliye state ki zaroorat nahi.
+  const email = session?.user?.email ?? "";
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>("IN");
   const [phoneNational, setPhoneNational] = useState("");
   const [address, setAddress] = useState("");
@@ -77,7 +78,6 @@ export default function ProfileDetails() {
         setCountries(cs);
         if (existing) {
           setFullName(existing.full_name ?? "");
-          setEmail(existing.email ?? session?.user?.email ?? "");
           setAddress(existing.address ?? "");
           setGender(existing.gender ?? "");
           if (existing.phone_country)
@@ -125,12 +125,26 @@ export default function ProfileDetails() {
     }
   }
 
+  /** Chune gaye country ka ISO code ("IN") — phone code + validation isi se. */
+  const countryIso = ((): CountryCode | null => {
+    const c = countries.find((x) => x.id === countryId);
+    const code = c?.code?.toUpperCase();
+    return code && isSupportedCountry(code) ? (code as CountryCode) : null;
+  })();
+
   async function pickCountry(id: number) {
     setCountryId(id);
     setStateId(null);
     setCityId(null);
     setStates([]);
     setCities([]);
+    // Country badla to phone ka dial code bhi wahi ka — profile ab sirf India ke
+    // liye nahi hai, aur number hamesha address wale desh ka hi hona chahiye.
+    const iso = countries.find((c) => c.id === id)?.code?.toUpperCase();
+    if (iso && isSupportedCountry(iso) && iso !== phoneCountry) {
+      setPhoneCountry(iso as CountryCode);
+      setPhoneNational("");
+    }
     try {
       setStates(await getStates(id));
     } catch {
@@ -149,14 +163,16 @@ export default function ProfileDetails() {
     }
   }
 
-  const dial = `+${getCountryCallingCode(phoneCountry)}`;
+  // Phone ka desh: pehle location wala country, warna jo pehle se save tha.
+  const activeCountry: CountryCode = countryIso ?? phoneCountry;
+  const dial = `+${getCountryCallingCode(activeCountry)}`;
   const fullPhone = `${dial}${phoneNational.replace(/\D/g, "")}`;
+  // libphonenumber har desh ke apne rules jaanta hai — 10-digit ka hardcoded
+  // India wala check nahi.
   const phoneOk =
-    phoneNational.length > 0 && isValidPhoneNumber(fullPhone, phoneCountry);
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    phoneNational.length > 0 && isValidPhoneNumber(fullPhone, activeCountry);
   const valid =
     fullName.trim().length > 1 &&
-    emailOk &&
     phoneOk &&
     address.trim().length > 3 &&
     !!gender &&
@@ -172,13 +188,13 @@ export default function ProfileDetails() {
     }
     setSaving(true);
     try {
-      const parsed = parsePhoneNumberFromString(fullPhone, phoneCountry);
+      const parsed = parsePhoneNumberFromString(fullPhone, activeCountry);
       await saveUserDetails({
         full_name: fullName.trim(),
         email: email.trim(),
         phone: parsed?.number ?? fullPhone,
         phone_dial_code: dial,
-        phone_country: phoneCountry,
+        phone_country: activeCountry,
         address: address.trim(),
         gender,
         country_id: countryId,
@@ -207,9 +223,7 @@ export default function ProfileDetails() {
       </View>
 
       {loading ? (
-        <View style={{ marginTop: 40 }}>
-            <Loader />
-          </View>
+        <ScreenLoader />
       ) : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
           <ScrollView
@@ -221,11 +235,7 @@ export default function ProfileDetails() {
               <Pressable onPress={changePhoto} disabled={uploadingAvatar} style={styles.avatar}>
                 <UserAvatar uri={avatarUrl} name={fullName} size={92} radius={46} />
                 <View style={styles.avatarBadge}>
-                  {uploadingAvatar ? (
-                    <Loader size={26} color={colors.white} />
-                  ) : (
-                    <Ionicons name="camera" size={15} color={colors.white} />
-                  )}
+                  <Ionicons name="camera" size={15} color={colors.white} />
                 </View>
               </Pressable>
               <Text style={styles.avatarHint}>{t.photoHint}</Text>
@@ -240,24 +250,62 @@ export default function ProfileDetails() {
               placeholderTextColor={colors.inkSoft}
             />
 
+            {/* Email login se aata hai — badalna account todta hai, isliye
+                read-only. */}
             <Text style={styles.label}>{t.email}</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder={t.emailPlaceholder}
-              placeholderTextColor={colors.inkSoft}
-              keyboardType="email-address"
-              autoCapitalize="none"
+            <View style={[styles.input, styles.inputLocked]}>
+              <Text style={styles.lockedText} numberOfLines={1}>
+                {email}
+              </Text>
+              <Ionicons name="lock-closed" size={15} color={colors.inkSoft} />
+            </View>
+            <Text style={styles.hint}>{t.emailLocked}</Text>
+
+            {/* Country -> State -> City pehle. Phone ka code inhi se banta hai,
+                isliye order ulta nahi kiya ja sakta. */}
+            <Text style={styles.label}>{t.country}</Text>
+            <SearchSelect
+              items={countries}
+              value={countryId}
+              placeholder={countries.length ? t.countryPick : t.countryNoData}
+              searchPlaceholder={t.countrySearch}
+              emptyText={t.searchEmpty}
+              onSelect={pickCountry}
+            />
+
+            <Text style={styles.label}>{t.state}</Text>
+            <SearchSelect
+              items={states}
+              value={stateId}
+              placeholder={countryId ? t.statePick : t.stateFirst}
+              searchPlaceholder={t.stateSearch}
+              emptyText={t.searchEmpty}
+              onSelect={pickState}
+              disabled={!countryId}
+            />
+
+            <Text style={styles.label}>{t.city}</Text>
+            <SearchSelect
+              items={cities}
+              value={cityId}
+              placeholder={stateId ? t.cityPick : t.cityFirst}
+              searchPlaceholder={t.citySearch}
+              emptyText={t.searchEmpty}
+              onSelect={setCityId}
+              disabled={!stateId}
             />
 
             <Text style={styles.label}>{t.phone}</Text>
             <PhoneField
-              country={phoneCountry}
+              country={activeCountry}
               onCountry={setPhoneCountry}
               national={phoneNational}
               onNational={setPhoneNational}
+              locked={!!countryIso}
             />
+            {countryId && !countryIso && (
+              <Text style={styles.hint}>{t.phoneCountryUnknown}</Text>
+            )}
             {phoneNational.length > 0 && !phoneOk && (
               <Text style={styles.err}>{t.phoneError}</Text>
             )}
@@ -292,38 +340,6 @@ export default function ProfileDetails() {
               ))}
             </View>
 
-            <Text style={styles.label}>{t.country}</Text>
-            <SearchSelect
-              items={countries}
-              value={countryId}
-              placeholder={countries.length ? t.countryPick : t.countryNoData}
-              searchPlaceholder={t.countrySearch}
-              emptyText={t.searchEmpty}
-              onSelect={pickCountry}
-            />
-
-            <Text style={styles.label}>{t.state}</Text>
-            <SearchSelect
-              items={states}
-              value={stateId}
-              placeholder={countryId ? t.statePick : t.stateFirst}
-              searchPlaceholder={t.stateSearch}
-              emptyText={t.searchEmpty}
-              onSelect={pickState}
-              disabled={!countryId}
-            />
-
-            <Text style={styles.label}>{t.city}</Text>
-            <SearchSelect
-              items={cities}
-              value={cityId}
-              placeholder={stateId ? t.cityPick : t.cityFirst}
-              searchPlaceholder={t.citySearch}
-              emptyText={t.searchEmpty}
-              onSelect={setCityId}
-              disabled={!stateId}
-            />
-
             <View style={{ height: 20 }} />
           </ScrollView>
 
@@ -335,14 +351,13 @@ export default function ProfileDetails() {
               (pressed || saving || !valid) && { opacity: 0.6 },
             ]}
           >
-            {saving ? (
-              <Loader size={30} color={colors.white} />
-            ) : (
-              <Text style={styles.saveText}>{t.save}</Text>
-            )}
+            <Text style={styles.saveText}>{t.save}</Text>
           </Pressable>
         </KeyboardAvoidingView>
       )}
+
+      {/* Save/photo-upload — beech me overlay loader, peeche form blocked. */}
+      <LoaderOverlay visible={saving || uploadingAvatar} />
     </SafeAreaView>
   );
 }
@@ -403,6 +418,14 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
   },
+  inputLocked: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: colors.creamDeep,
+  },
+  lockedText: { flex: 1, fontSize: 15, color: colors.inkSoft },
+  hint: { marginTop: 6, fontSize: 12.5, lineHeight: 17, color: colors.inkSoft },
   err: { marginTop: 6, fontSize: 13, color: colors.terracotta, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

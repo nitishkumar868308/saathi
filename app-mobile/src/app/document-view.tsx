@@ -6,13 +6,12 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { signedUrl } from "@/lib/storage";
 import { shareDocument } from "@/lib/share";
 import { useToast } from "@/components/toast";
@@ -72,16 +71,12 @@ export default function DocumentView() {
           {name || "Document"}
         </Text>
         <Pressable onPress={onShare} hitSlop={10} style={styles.back} disabled={sharing}>
-          {sharing ? (
-            <Loader size={26} />
-          ) : (
-            <Ionicons name="share-outline" size={21} color={colors.ink} />
-          )}
+          <Ionicons name="share-outline" size={21} color={colors.ink} />
         </Pressable>
       </View>
       <View style={styles.body}>
         {loading ? (
-          <Loader size={32} />
+          <ScreenLoader />
         ) : resolved ? (
           <Image
             source={{ uri: resolved }}
@@ -95,6 +90,9 @@ export default function DocumentView() {
           </View>
         )}
       </View>
+
+      {/* Share ban raha hai. */}
+      <LoaderOverlay visible={sharing} />
     </SafeAreaView>
   );
 }

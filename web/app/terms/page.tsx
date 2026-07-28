@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo-server";
 import LegalPage from "@/components/LegalPage";
 
-export const metadata: Metadata = {
-  title: "Terms of Service",
-  description: "Saathi ki terms of service — seedhi aur saaf shartein.",
-};
+
+export function generateMetadata(): Promise<Metadata> {
+  // Meta DB (`seo_pages`) se aata hai — admin panel se badla ja sakta hai.
+  // Row na ho to yahi defaults chalte hain.
+  return pageMetadata("/terms", {
+    title: "Terms & Conditions",
+    description:
+      "The terms that apply when you use Apka Saathi — plain and short.",
+  });
+}
 
 const sections = [
   {

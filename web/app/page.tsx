@@ -27,6 +27,8 @@ import LiveDemo from "@/components/LiveDemo";
 import TrustSection from "@/components/TrustSection";
 import SupportedDocs from "@/components/SupportedDocs";
 import Testimonials from "@/components/Testimonials";
+import AppScreenshots from "@/components/AppScreenshots";
+import SeoIntro from "@/components/SeoIntro";
 import Pricing from "@/components/Pricing";
 import ReferralSection from "@/components/ReferralSection";
 import Footer from "@/components/Footer";
@@ -416,6 +418,16 @@ export default function Home() {
             </Reveal>
           </div>
         </section>
+
+        {/* App screenshots — Play Store launch ke baad lib/screenshots.ts bharte hi
+            apne aap dikhne lagta hai; tab tak kuch render nahi hota. */}
+        <AppScreenshots />
+
+        {/* Asli padhne layak content — Google ko yahin se pata chalta hai ki
+            page kis baare me hai. */}
+        <Reveal>
+          <SeoIntro />
+        </Reveal>
 
         {/* Pricing */}
         <section id="pricing" className="container-page scroll-mt-24 py-16 sm:py-28">

@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { LoaderOverlay } from "@/components/loader";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -136,11 +136,7 @@ export function ReviewPrompt() {
                   (pressed || rating === 0 || saving) && { opacity: 0.6 },
                 ]}
               >
-                {saving ? (
-                  <Loader size={30} color={colors.white} />
-                ) : (
-                  <Text style={styles.primaryText}>{r.submit}</Text>
-                )}
+                <Text style={styles.primaryText}>{r.submit}</Text>
               </Pressable>
               <Pressable onPress={onLater} style={styles.laterBtn}>
                 <Text style={styles.laterText}>{r.later}</Text>
@@ -149,6 +145,8 @@ export function ReviewPrompt() {
           )}
         </View>
       </View>
+
+      <LoaderOverlay visible={saving} />
     </Modal>
   );
 }

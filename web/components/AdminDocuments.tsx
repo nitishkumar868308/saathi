@@ -15,6 +15,7 @@ import {
 import Loader, { SkeletonRows } from "@/components/Loader";
 import Modal from "@/components/admin/Modal";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type Doc = {
   id: string;
@@ -60,6 +61,9 @@ function fmtBytes(n: number | null): string {
 }
 
 export default function AdminDocuments() {
+  const t = useAdminT();
+  const d = t.data.documents;
+  const sh = t.data.shared;
   const [docs, setDocs] = useState<Doc[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState("");
@@ -78,7 +82,7 @@ export default function AdminDocuments() {
       setDocs(body.rows ?? []);
       setTotal(body.total ?? body.rows?.length ?? 0);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Documents load nahi hue");
+      setError(e instanceof Error ? e.message : sh.loadFailed);
       setDocs([]);
     }
   }, [range]);
@@ -181,7 +185,7 @@ export default function AdminDocuments() {
                 view === v ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
               }`}
             >
-              {v === "all" ? "Saare" : "User-wise"}
+              {v === "all" ? d.viewAll : d.byUser}
             </button>
           ))}
         </div>
@@ -189,10 +193,10 @@ export default function AdminDocuments() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
-        <Stat icon={FileText} label="Documents" value={String(stats.total)} />
-        <Stat icon={HardDrive} label="Storage me" value={String(stats.inStorage)} />
-        <Stat icon={Users} label="Uploaders" value={String(stats.uploaders)} />
-        <Stat icon={FolderOpen} label="Total size" value={fmtBytes(stats.bytes)} />
+        <Stat icon={FileText} label={sh.documents} value={String(stats.total)} />
+        <Stat icon={HardDrive} label={d.inStorage} value={String(stats.inStorage)} />
+        <Stat icon={Users} label={d.uploaders} value={String(stats.uploaders)} />
+        <Stat icon={FolderOpen} label={d.totalSize} value={fmtBytes(stats.bytes)} />
       </div>
 
       {view === "all" ? (
@@ -207,7 +211,7 @@ export default function AdminDocuments() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Document, naam ya email..."
+                placeholder={d.searchPh}
                 className="h-11 w-full rounded-2xl border border-line bg-surface pl-10 pr-4 text-sm outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
               />
             </div>
@@ -217,7 +221,7 @@ export default function AdminDocuments() {
                 onChange={(e) => setTypeFilter(e.target.value)}
                 className="h-11 rounded-2xl border border-line bg-surface px-3 text-sm font-semibold text-ink-soft outline-none focus:border-terracotta"
               >
-                <option value="all">Sab type</option>
+                <option value="all">{d.allTypes}</option>
                 {types.map((t) => (
                   <option key={t} value={t}>
                     {t}
@@ -228,19 +232,19 @@ export default function AdminDocuments() {
           </div>
 
           {!filtered.length ? (
-            <Empty label="Is filter me koi document nahi." />
+            <Empty label={sh.emptyFilter} />
           ) : (
             <>
               <div className="overflow-x-auto rounded-3xl border border-line bg-surface shadow-soft">
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
                     <tr>
-                      <th className="px-4 py-3 font-semibold">User</th>
-                      <th className="px-4 py-3 font-semibold">Document</th>
-                      <th className="px-4 py-3 font-semibold">Kab upload</th>
-                      <th className="px-4 py-3 font-semibold">Size</th>
-                      <th className="px-4 py-3 font-semibold">Storage</th>
-                      <th className="px-4 py-3 text-right font-semibold">Dekho</th>
+                      <th className="px-4 py-3 font-semibold">{sh.user}</th>
+                      <th className="px-4 py-3 font-semibold">{d.document}</th>
+                      <th className="px-4 py-3 font-semibold">{d.uploadedWhen}</th>
+                      <th className="px-4 py-3 font-semibold">{d.size}</th>
+                      <th className="px-4 py-3 font-semibold">{d.storage}</th>
+                      <th className="px-4 py-3 text-right font-semibold">{d.view}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -296,7 +300,7 @@ export default function AdminDocuments() {
       ) : (
         <>
           {!byUser.length ? (
-            <Empty label="Abhi kisi ne document upload nahi kiya." />
+            <Empty label={d.noneYet} />
           ) : (
             <>
               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -349,6 +353,8 @@ export default function AdminDocuments() {
 /* ------------------------------ preview modal ----------------------------- */
 
 function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) {
+  const t = useAdminT();
+  const dd = t.data.documents;
   const [url, setUrl] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
   const [msg, setMsg] = useState("");
@@ -393,7 +399,7 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
     <Modal
       open={!!doc}
       onClose={onClose}
-      title={doc.name || "Document"}
+      title={doc.name || dd.document}
       subtitle={`${doc.userName || doc.userEmail || "—"} · ${fmtDateTime(doc.createdAt)}`}
       size="lg"
       footer={
@@ -417,15 +423,15 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
     >
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-          <Meta label="Type" value={doc.type || "—"} />
-          <Meta label="Size" value={fmtBytes(doc.fileSize)} />
-          <Meta label="Expiry" value={doc.expiry ? fmtDateTime(doc.expiry) : "—"} />
-          <Meta label="Storage" value={doc.inStorage ? "Haan" : "Nahi"} />
+          <Meta label={dd.type} value={doc.type || "—"} />
+          <Meta label={dd.size} value={fmtBytes(doc.fileSize)} />
+          <Meta label={dd.expiry} value={doc.expiry ? fmtDateTime(doc.expiry) : "—"} />
+          <Meta label={dd.storage} value={doc.inStorage ? t.common.yes : t.common.no} />
         </div>
 
         {doc.summary && (
           <div className="rounded-2xl border border-line bg-cream-deep/20 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-ink-soft">AI ne kya samjha</p>
+            <p className="text-[11px] uppercase tracking-wide text-ink-soft">{dd.aiUnderstood}</p>
             <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">
               {doc.summary}
             </p>
@@ -442,12 +448,12 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
         ) : state === "loading" ? (
           <div className="flex items-center justify-center gap-2 py-16 text-ink-soft">
             <Loader size={40} />
-            <span className="text-sm">Preview la rahe hain...</span>
+            <span className="text-sm">{dd.loadingPreview}</span>
           </div>
         ) : state === "error" ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-terracotta/30 bg-terracotta/10 py-12 text-center">
             <AlertTriangle size={20} className="text-terracotta-dark" />
-            <p className="text-sm text-terracotta-dark">{msg || "Preview load nahi hua."}</p>
+            <p className="text-sm text-terracotta-dark">{msg || dd.previewFailed}</p>
           </div>
         ) : url ? (
           isPdf ? (

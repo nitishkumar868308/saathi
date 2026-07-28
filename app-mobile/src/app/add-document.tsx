@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
 } from "react-native";
@@ -17,7 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { colors } from "@/theme/colors";
-import { Loader, HandsLoader } from "@/components/loader";
+import { LoaderOverlay } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
@@ -202,12 +201,7 @@ export default function AddDocument() {
               </View>
             )}
 
-            {scanning ? (
-              <View style={styles.scanningRow}>
-                <HandsLoader size={40} />
-                <Text style={styles.scanningText}>{d.scanning}</Text>
-              </View>
-            ) : (
+            {scanning ? null : (
               <>
                 <Text style={styles.scanTitle}>{scanned ? d.doneTitle : d.photoTitle}</Text>
                 <Text style={styles.scanSub}>{scanned ? d.doneSub : d.photoSub}</Text>
@@ -289,12 +283,11 @@ export default function AddDocument() {
         disabled={saving}
         style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
       >
-        {saving ? (
-          <Loader size={30} color={colors.white} />
-        ) : (
-          <Text style={styles.saveText}>{d.save}</Text>
-        )}
+        <Text style={styles.saveText}>{d.save}</Text>
       </Pressable>
+
+      {/* Scan + save — dono ke liye wahi ek center overlay loader. */}
+      <LoaderOverlay visible={scanning || saving} />
     </SafeAreaView>
   );
 }

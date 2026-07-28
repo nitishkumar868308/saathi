@@ -6,9 +6,13 @@ import {
   Modal,
   TextInput,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors } from "@/theme/colors";
 
@@ -37,6 +41,8 @@ export function SearchSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   const selected = items.find((i) => i.id === value);
 
@@ -70,9 +76,20 @@ export function SearchSelect({
         transparent
         onRequestClose={() => setOpen(false)}
       >
-        <View style={styles.backdrop}>
+        {/*
+          Sheet ko keyboard ke upar rakho.
+          Pehle sheet screen ke neeche chipki thi, isliye keyboard khulte hi
+          results uske peeche chale jaate the — 2-3 match hone par list bilkul
+          gayab lagti thi aur user samajhta tha "data hi nahi hai".
+          KeyboardAvoidingView sheet ko upar utha deta hai, aur list ki min-height
+          se kam-se-kam do rows hamesha dikhti hain.
+        */}
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)} />
-          <View style={styles.sheet}>
+          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 14) }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.searchBox}>
               <Ionicons name="search" size={18} color={colors.inkSoft} />
@@ -95,7 +112,9 @@ export function SearchSelect({
               data={filtered}
               keyExtractor={(it) => String(it.id)}
               keyboardShouldPersistTaps="handled"
-              style={{ maxHeight: 380 }}
+              keyboardDismissMode="none"
+              style={{ maxHeight: Math.min(380, height * 0.45) }}
+              contentContainerStyle={{ minHeight: filtered.length ? 108 : 0 }}
               ListEmptyComponent={<Text style={styles.empty}>{emptyText}</Text>}
               renderItem={({ item }) => {
                 const active = item.id === value;
@@ -118,7 +137,7 @@ export function SearchSelect({
               }}
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
@@ -147,7 +166,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 26,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 24,
   },
   sheetHandle: {
     alignSelf: "center",

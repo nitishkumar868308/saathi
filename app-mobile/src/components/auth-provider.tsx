@@ -16,6 +16,7 @@ import {
   enforcePlanLimits,
 } from "@/lib/plan";
 import { takePendingReferral } from "@/lib/referral-pending";
+import { clearUserDetailsCache } from "@/lib/user-details";
 import { sendWelcomeEmail } from "@/lib/welcome";
 import { useLocale } from "@/lib/i18n/LanguageProvider";
 
@@ -128,7 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
         void runRewards();
       }
-      if (event === "SIGNED_OUT") doneFor.current = null;
+      if (event === "SIGNED_OUT") {
+        doneFor.current = null;
+        // Profile cache saaf — agla user purane ka naam/photo na dekhe.
+        clearUserDetailsCache();
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [runRewards]);

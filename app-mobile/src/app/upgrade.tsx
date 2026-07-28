@@ -5,14 +5,13 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
 import { getPlan, markProfilePlus, enforcePlanLimits, type PlanId } from "@/lib/plan";
@@ -121,7 +120,8 @@ export default function Upgrade() {
     // 1. Details complete? nahi to form bharwao.
     let details = null;
     try {
-      details = await getUserDetails();
+      // force — payment se pehle DB ka taaza sach chahiye, cache nahi.
+      details = await getUserDetails(true);
     } catch {
       /* ignore, treat as incomplete */
     }
@@ -187,9 +187,7 @@ export default function Upgrade() {
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <View style={{ marginTop: 40 }}>
-            <Loader />
-          </View>
+          <ScreenLoader />
         ) : isPlus ? (
           <View style={styles.plusActive}>
             <View style={styles.plusBadge}>
@@ -249,9 +247,7 @@ export default function Upgrade() {
                   paying && { opacity: 0.7 },
                 ]}
               >
-                {paying ? (
-                  <Loader size={30} color={colors.white} />
-                ) : (
+                {(
                   <>
                     <Ionicons name="lock-closed" size={16} color={colors.white} />
                     <Text style={styles.payText}>{tpl(u.payBtn, { price: priceLabel })}</Text>
@@ -331,6 +327,9 @@ export default function Upgrade() {
           </View>
         </View>
       </Modal>
+
+      {/* Payment chal raha hai — screen block, beech me loader. */}
+      <LoaderOverlay visible={paying} />
     </SafeAreaView>
   );
 }

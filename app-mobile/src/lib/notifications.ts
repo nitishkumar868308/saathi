@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import notifee, {
+  AlarmType,
   AndroidImportance,
   AndroidVisibility,
   AndroidCategory,
@@ -96,7 +97,13 @@ async function schedule(
     const trigger: TimestampTrigger = {
       type: TriggerType.TIMESTAMP,
       timestamp: when.getTime(),
-      alarmManager: { allowWhileIdle: true }, // exact — SCHEDULE_EXACT_ALARM app.json me hai
+      // ⚠️ Pehle yahan sirf `{ allowWhileIdle: true }` tha. Wo notifee ka
+      // deprecated flag hai aur alarm ko SET_AND_ALLOW_WHILE_IDLE banata hai —
+      // yaani **inexact**. Android aise alarms ko ~10 min ki window me doosre
+      // alarms ke saath batch karta hai, isliye 8:36 wala reminder 8:38 pe 8:39
+      // wale ke saath ek jhund me aata tha. SET_EXACT_AND_ALLOW_WHILE_IDLE se
+      // alarm doze me bhi theek us minute par bajta hai.
+      alarmManager: { type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE },
     };
     await notifee.createTriggerNotification(
       {

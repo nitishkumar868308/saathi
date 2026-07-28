@@ -41,6 +41,9 @@ export type AdminDict = {
   };
   nav: {
     users: string;
+    seo: string;
+    blog: string;
+    analytics: string;
     message: string;
     usage: string;
     documents: string;
@@ -51,7 +54,18 @@ export type AdminDict = {
     rewards: string;
   };
   headings: Record<
-    "rewards" | "pricing" | "users" | "usage" | "documents" | "reviews" | "logs" | "contacts" | "message",
+    | "rewards"
+    | "pricing"
+    | "users"
+    | "usage"
+    | "documents"
+    | "reviews"
+    | "logs"
+    | "contacts"
+    | "message"
+    | "analytics"
+    | "seo"
+    | "blog",
     { title: string; sub: string }
   >;
   broadcast: {
@@ -77,6 +91,192 @@ export type AdminDict = {
     empty: string;
     searchPh: string;
     reply: string;
+  };
+  /**
+   * Data components (Users, Usage, Documents, Reviews, Logs, Pricing, Rewards).
+   * Pehle in saat screens ke saare labels hardcoded the, isliye language switcher
+   * se sirf aadha admin panel badalta tha. Ab poora.
+   */
+  data: {
+    /** Har screen me repeat hone wale chhote labels. */
+    shared: {
+      name: string;
+      email: string;
+      user: string;
+      plan: string;
+      source: string;
+      joined: string;
+      date: string;
+      status: string;
+      detail: string;
+      documents: string;
+      reminders: string;
+      chats: string;
+      unlimited: string;
+      never: string;
+      seeAll: string;
+      loadFailed: string;
+      emptyFilter: string;
+      empty: string;
+      total: string;
+      free: string;
+      plus: string;
+      expired: string;
+    };
+    rewards: {
+      totalUsers: string;
+      referrals: string;
+      rewarded: string;
+      limitsTitle: string;
+      limitsSub: string;
+      freeReminders: string;
+      freeDocuments: string;
+      referralsTitle: string;
+      referralDays: string;
+      referralsOn: string;
+      grantTitle: string;
+      grantSub: string;
+      grantDaysPh: string;
+      grantBtn: string;
+      /** {days} */
+      granted: string;
+      saved: string;
+      saveFailed: string;
+      grantFailed: string;
+      failedPrefix: string;
+    };
+    reviews: {
+      rating: string;
+      review: string;
+      websiteAllowed: string;
+      totalReviews: string;
+      average: string;
+      websiteOk: string;
+      filterAll: string;
+      filterWebsite: string;
+    };
+    logs: {
+      today: string;
+      sinceYesterday: string;
+      totalErrors: string;
+      distinct: string;
+      fromApp: string;
+      noneTitle: string;
+      noneSub: string;
+    };
+    users: {
+      sourceFirstN: string;
+      sourceReferral: string;
+      sourceReward: string;
+      sourceGooglePlay: string;
+      sourceAdmin: string;
+      activeTill: string;
+      referralDays: string;
+      code: string;
+      plusActive: string;
+      searchPh: string;
+      details: string;
+      referralCode: string;
+      cameFromCode: string;
+      noReferrer: string;
+      earnedFromReferral: string;
+      planEnds: string;
+      detailFailed: string;
+    };
+    usage: {
+      today: string;
+      yesterday: string;
+      all: string;
+      noActivity: string;
+      items: string;
+      lastActive: string;
+      activeUsers: string;
+      whatHappened: string;
+      searchPh: string;
+      docsShort: string;
+      loadingDetail: string;
+      nothingHere: string;
+    };
+    documents: {
+      viewAll: string;
+      byUser: string;
+      inStorage: string;
+      uploaders: string;
+      totalSize: string;
+      searchPh: string;
+      allTypes: string;
+      document: string;
+      uploadedWhen: string;
+      size: string;
+      storage: string;
+      view: string;
+      noneYet: string;
+      type: string;
+      expiry: string;
+      aiUnderstood: string;
+      loadingPreview: string;
+      previewFailed: string;
+    };
+    seo: {
+      addPath: string;
+      addBtn: string;
+      title: string;
+      description: string;
+      ogTitle: string;
+      ogDescription: string;
+      keywords: string;
+      keywordsHint: string;
+      noindex: string;
+    };
+    blog: {
+      postsLabel: string;
+      newPost: string;
+      noPosts: string;
+      published: string;
+      draft: string;
+      title: string;
+      slug: string;
+      slugHint: string;
+      description: string;
+      descriptionHint: string;
+      heading: string;
+      intro: string;
+      tags: string;
+      readingMinutes: string;
+      publishedAt: string;
+      sections: string;
+      sectionHeading: string;
+      sectionBody: string;
+      addSection: string;
+      publish: string;
+    };
+    analytics: {
+      events: string;
+      sessions: string;
+      peakUsers: string;
+      fromWeb: string;
+      daily: string;
+      topScreens: string;
+      journeyTitle: string;
+      journeySub: string;
+      userIdPh: string;
+      showJourney: string;
+      noJourney: string;
+    };
+    pricing: {
+      basePrice: string;
+      monthly: string;
+      yearly: string;
+      addCountry: string;
+      choose: string;
+      multiplier: string;
+      country: string;
+      currency: string;
+      symbol: string;
+      display: string;
+      remove: string;
+      applyToAll: string;
+    };
   };
 };
 
@@ -110,6 +310,9 @@ const en: AdminDict = {
   },
   nav: {
     users: "Users",
+    seo: "SEO",
+    blog: "Blog",
+    analytics: "Analytics",
     message: "Message",
     usage: "Usage",
     documents: "Documents",
@@ -120,6 +323,9 @@ const en: AdminDict = {
     rewards: "Rewards",
   },
   headings: {
+    seo: { title: "SEO", sub: "Title, description and keywords for every page. Saving here updates the live site — no deploy needed." },
+    blog: { title: "Blog", sub: "Write and edit posts. Published posts appear on the website and in the sitemap right away." },
+    analytics: { title: "Analytics", sub: "Where people go on the website and in the app — and what one user actually did." },
     rewards: { title: "Rewards & Referrals", sub: "Change offer and referral numbers here — they go live instantly." },
     pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. Users see their country's price + currency by IP." },
     users: { title: "Users", sub: "Who's on which plan, when they joined, and how active they are." },
@@ -154,6 +360,121 @@ const en: AdminDict = {
     searchPh: "Search messages…",
     reply: "Reply",
   },
+  data: {
+    shared: {
+      name: "Name", email: "Email", user: "User", plan: "Plan", source: "Source",
+      joined: "Joined", date: "Date", status: "Status", detail: "Detail",
+      documents: "Documents", reminders: "Reminders", chats: "Chats",
+      unlimited: "Unlimited", never: "Never", seeAll: "See all",
+      loadFailed: "Could not load", emptyFilter: "Nothing matches this filter.",
+      empty: "Nothing here yet.", total: "Total", free: "Free", plus: "Plus",
+      expired: "Expired",
+    },
+    rewards: {
+      totalUsers: "Total users", referrals: "Referrals", rewarded: "Rewarded",
+      limitsTitle: "Free plan limits",
+      limitsSub: "Change the free plan limits here. Plus pricing lives in the Pricing section (per country).",
+      freeReminders: "Free reminders", freeDocuments: "Free documents",
+      referralsTitle: "Referrals", referralDays: "Referral days (for both)",
+      referralsOn: "Referrals on",
+      grantTitle: "Grant Plus days manually",
+      grantSub: "Days are added to the user's current plan (a paid plan gets extended too).",
+      grantDaysPh: "Days", grantBtn: "Grant",
+      granted: "{days} days granted ✓",
+      saved: "Saved ✓", saveFailed: "Could not save",
+      grantFailed: "Could not grant", failedPrefix: "Failed:",
+    },
+    reviews: {
+      rating: "Rating", review: "Review", websiteAllowed: "Website allowed",
+      totalReviews: "Total reviews", average: "Average", websiteOk: "Website OK",
+      filterAll: "All", filterWebsite: "Website-allowed",
+    },
+    logs: {
+      today: "Today", sinceYesterday: "Since yesterday", totalErrors: "Total errors",
+      distinct: "Distinct kinds", fromApp: "From app",
+      noneTitle: "No errors 🎉", noneSub: "Everything ran fine in this range.",
+    },
+    users: {
+      sourceFirstN: "First-N offer", sourceReferral: "Referral", sourceReward: "Reward",
+      sourceGooglePlay: "Google Play", sourceAdmin: "Admin grant",
+      activeTill: "Active till", referralDays: "Referral days", code: "Code",
+      plusActive: "Plus (active)",
+      searchPh: "Email, name or referral code…",
+      details: "Details", referralCode: "Referral code",
+      cameFromCode: "Came from code", noReferrer: "Nobody referred them",
+      earnedFromReferral: "Earned from referrals", planEnds: "Plan ends",
+      detailFailed: "Could not load details",
+    },
+    usage: {
+      today: "Today", yesterday: "Yesterday", all: "All",
+      noActivity: "No activity in this range.", items: "items",
+      lastActive: "Last active", activeUsers: "Active users",
+      whatHappened: "What happened", searchPh: "Email or name…",
+      docsShort: "Docs", loadingDetail: "Loading full detail…",
+      nothingHere: "Nothing matches this filter.",
+    },
+    documents: {
+      viewAll: "All", byUser: "By user", inStorage: "In storage",
+      uploaders: "Uploaders", totalSize: "Total size",
+      searchPh: "Document, name or email…", allTypes: "All types",
+      document: "Document", uploadedWhen: "Uploaded", size: "Size",
+      storage: "Storage", view: "View",
+      noneYet: "Nobody has uploaded a document yet.",
+      type: "Type", expiry: "Expiry", aiUnderstood: "What the AI understood",
+      loadingPreview: "Loading preview…", previewFailed: "Preview could not load.",
+    },
+    seo: {
+      addPath: "Add a page path",
+      addBtn: "Add",
+      title: "Title",
+      description: "Meta description",
+      ogTitle: "Social title (OG)",
+      ogDescription: "Social description (OG)",
+      keywords: "Keywords",
+      keywordsHint:
+        "Comma separated. Use words people actually search for — a long list does not help.",
+      noindex: "Hide from search",
+    },
+    blog: {
+      postsLabel: "posts",
+      newPost: "New post",
+      noPosts: "No posts yet. Write the first one.",
+      published: "Published",
+      draft: "Draft",
+      title: "Title",
+      slug: "URL slug",
+      slugHint: "left blank = made from the title",
+      description: "Meta description",
+      descriptionHint: "This is the line people see in Google results. Around 155 characters.",
+      heading: "Heading on the page (H1)",
+      intro: "Opening paragraph",
+      tags: "Tags",
+      readingMinutes: "Reading minutes",
+      publishedAt: "Published on",
+      sections: "Sections",
+      sectionHeading: "Section heading (H2)",
+      sectionBody: "Paragraphs — leave a blank line to start a new one",
+      addSection: "Add section",
+      publish: "Publish on the website",
+    },
+    analytics: {
+      events: "Events", sessions: "Sessions", peakUsers: "Peak daily users",
+      fromWeb: "From website", daily: "Per day",
+      topScreens: "Most visited screens & pages",
+      journeyTitle: "One user's journey",
+      journeySub:
+        "Paste a user ID from the Users tab to see every screen and button, in order — website and app together.",
+      userIdPh: "User ID (UUID)", showJourney: "Show journey",
+      noJourney: "No events recorded for this user yet.",
+    },
+    pricing: {
+      basePrice: "Base price (INR)", monthly: "Monthly", yearly: "Yearly",
+      addCountry: "Add a country", choose: "Choose…",
+      multiplier: "Multiplier (outside India)", country: "Country",
+      currency: "Currency", symbol: "Symbol", display: "display",
+      remove: "Remove", applyToAll: "Apply to all",
+    },
+  },
 };
 
 const hi: AdminDict = {
@@ -186,6 +507,9 @@ const hi: AdminDict = {
   },
   nav: {
     users: "यूज़र्स",
+    seo: "SEO",
+    blog: "ब्लॉग",
+    analytics: "एनालिटिक्स",
     message: "मैसेज",
     usage: "उपयोग",
     documents: "डॉक्युमेंट्स",
@@ -196,6 +520,9 @@ const hi: AdminDict = {
     rewards: "रिवॉर्ड्स",
   },
   headings: {
+    seo: { title: "SEO", sub: "हर पेज का टाइटल, डिस्क्रिप्शन और कीवर्ड। यहाँ सेव करते ही लाइव साइट पर लग जाता है — डिप्लॉय नहीं करना पड़ता।" },
+    blog: { title: "ब्लॉग", sub: "पोस्ट लिखें और बदलें। पब्लिश्ड पोस्ट तुरंत वेबसाइट और sitemap दोनों में आ जाती है।" },
+    analytics: { title: "एनालिटिक्स", sub: "लोग वेबसाइट और ऐप में कहाँ जाते हैं — और एक यूज़र ने क्या किया।" },
     rewards: { title: "रिवॉर्ड्स और रेफरल", sub: "ऑफर और रेफरल के नंबर यहीं से बदलें — तुरंत लाइव हो जाते हैं।" },
     pricing: { title: "देश अनुसार प्राइसिंग", sub: "Base × multiplier × conversion rate. IP से यूज़र को उसके देश का प्राइस + करेंसी दिखता है।" },
     users: { title: "यूज़र्स", sub: "कौन किस प्लान पर है, कब जुड़ा, और कितना एक्टिव है।" },
@@ -230,6 +557,122 @@ const hi: AdminDict = {
     searchPh: "मैसेज खोजें…",
     reply: "जवाब दें",
   },
+  data: {
+    shared: {
+      name: "नाम", email: "ईमेल", user: "यूज़र", plan: "प्लान", source: "स्रोत",
+      joined: "कब जुड़े", date: "तारीख़", status: "स्थिति", detail: "डिटेल",
+      documents: "डॉक्युमेंट्स", reminders: "रिमाइंडर", chats: "चैट",
+      unlimited: "असीमित", never: "कभी नहीं", seeAll: "सब देखें",
+      loadFailed: "लोड नहीं हुआ", emptyFilter: "इस फ़िल्टर में कुछ नहीं।",
+      empty: "अभी कुछ नहीं।", total: "कुल", free: "फ्री", plus: "प्लस",
+      expired: "खत्म",
+    },
+    rewards: {
+      totalUsers: "कुल यूज़र", referrals: "रेफरल", rewarded: "रिवॉर्ड मिला",
+      limitsTitle: "फ्री प्लान लिमिट",
+      limitsSub: "फ्री प्लान की लिमिट यहीं से बदलें। प्लस का दाम Pricing section में (देश अनुसार) है।",
+      freeReminders: "फ्री रिमाइंडर", freeDocuments: "फ्री डॉक्युमेंट",
+      referralsTitle: "रेफरल", referralDays: "रेफरल दिन (दोनों को)",
+      referralsOn: "रेफरल चालू",
+      grantTitle: "मैन्युअली प्लस दिन दें",
+      grantSub: "दिन यूज़र के मौजूदा प्लान में जुड़ेंगे (पेड प्लान भी बढ़ेगा)।",
+      grantDaysPh: "दिन", grantBtn: "दें",
+      granted: "{days} दिन दे दिए ✓",
+      saved: "सेव हो गया ✓", saveFailed: "सेव नहीं हुआ",
+      grantFailed: "ग्रांट नहीं हुआ", failedPrefix: "नहीं हो पाया:",
+    },
+    reviews: {
+      rating: "रेटिंग", review: "रिव्यू", websiteAllowed: "वेबसाइट पर अनुमति",
+      totalReviews: "कुल रिव्यू", average: "औसत", websiteOk: "वेबसाइट OK",
+      filterAll: "सारे", filterWebsite: "वेबसाइट-अनुमति वाले",
+    },
+    logs: {
+      today: "आज", sinceYesterday: "कल से", totalErrors: "कुल एरर",
+      distinct: "अलग तरह के", fromApp: "ऐप से",
+      noneTitle: "कोई एरर नहीं 🎉", noneSub: "इस रेंज में सब ठीक चला।",
+    },
+    users: {
+      sourceFirstN: "First-N offer", sourceReferral: "रेफरल", sourceReward: "रिवॉर्ड",
+      sourceGooglePlay: "Google Play", sourceAdmin: "एडमिन ग्रांट",
+      activeTill: "कब तक एक्टिव", referralDays: "रेफरल दिन", code: "कोड",
+      plusActive: "प्लस (एक्टिव)",
+      searchPh: "ईमेल, नाम या रेफरल कोड…",
+      details: "डिटेल", referralCode: "रेफरल कोड",
+      cameFromCode: "किस कोड से आया", noReferrer: "किसी ने रेफर नहीं किया",
+      earnedFromReferral: "रेफरल से कमाए", planEnds: "प्लान खत्म",
+      detailFailed: "डिटेल लोड नहीं हुई",
+    },
+    usage: {
+      today: "आज", yesterday: "कल", all: "सब",
+      noActivity: "इस रेंज में कोई गतिविधि नहीं।", items: "आइटम",
+      lastActive: "आख़री बार एक्टिव", activeUsers: "एक्टिव यूज़र",
+      whatHappened: "क्या-क्या हुआ", searchPh: "ईमेल या नाम…",
+      docsShort: "डॉक्स", loadingDetail: "पूरा डिटेल ला रहे हैं…",
+      nothingHere: "इस फ़िल्टर में कुछ नहीं।",
+    },
+    documents: {
+      viewAll: "सारे", byUser: "यूज़र अनुसार", inStorage: "स्टोरेज में",
+      uploaders: "अपलोड करने वाले", totalSize: "कुल साइज़",
+      searchPh: "डॉक्युमेंट, नाम या ईमेल…", allTypes: "सब टाइप",
+      document: "डॉक्युमेंट", uploadedWhen: "कब अपलोड", size: "साइज़",
+      storage: "स्टोरेज", view: "देखें",
+      noneYet: "अभी किसी ने डॉक्युमेंट अपलोड नहीं किया।",
+      type: "टाइप", expiry: "एक्सपायरी", aiUnderstood: "AI ने क्या समझा",
+      loadingPreview: "प्रीव्यू ला रहे हैं…", previewFailed: "प्रीव्यू लोड नहीं हुआ।",
+    },
+    seo: {
+      addPath: "नया पेज पाथ जोड़ें",
+      addBtn: "जोड़ें",
+      title: "टाइटल",
+      description: "मेटा डिस्क्रिप्शन",
+      ogTitle: "सोशल टाइटल (OG)",
+      ogDescription: "सोशल डिस्क्रिप्शन (OG)",
+      keywords: "कीवर्ड",
+      keywordsHint:
+        "कॉमा से अलग करें। वही शब्द लिखें जो लोग सच में सर्च करते हैं — लंबी लिस्ट से फ़ायदा नहीं होता।",
+      noindex: "सर्च से छुपाएँ",
+    },
+    blog: {
+      postsLabel: "पोस्ट",
+      newPost: "नई पोस्ट",
+      noPosts: "अभी कोई पोस्ट नहीं। पहली लिख दें।",
+      published: "पब्लिश्ड",
+      draft: "ड्राफ़्ट",
+      title: "टाइटल",
+      slug: "URL slug",
+      slugHint: "खाली छोड़ें तो टाइटल से बन जाएगा",
+      description: "मेटा डिस्क्रिप्शन",
+      descriptionHint: "Google के रिज़ल्ट में यही लाइन दिखती है। लगभग 155 characters.",
+      heading: "पेज का हेडिंग (H1)",
+      intro: "पहला पैराग्राफ़",
+      tags: "टैग",
+      readingMinutes: "पढ़ने का समय (मिनट)",
+      publishedAt: "कब पब्लिश",
+      sections: "सेक्शन",
+      sectionHeading: "सेक्शन का हेडिंग (H2)",
+      sectionBody: "पैराग्राफ़ — खाली लाइन से नया पैराग्राफ़ बनता है",
+      addSection: "सेक्शन जोड़ें",
+      publish: "वेबसाइट पर पब्लिश करें",
+    },
+    analytics: {
+      events: "इवेंट", sessions: "सेशन",
+      peakUsers: "सबसे ज़्यादा रोज़ाना यूज़र",
+      fromWeb: "वेबसाइट से", daily: "रोज़ाना",
+      topScreens: "सबसे ज़्यादा देखे गए स्क्रीन और पेज",
+      journeyTitle: "एक यूज़र का सफ़र",
+      journeySub:
+        "Users टैब से यूज़र ID डालें — हर स्क्रीन और बटन क्रम से दिखेगा — वेबसाइट और ऐप दोनों।",
+      userIdPh: "यूज़र ID (UUID)", showJourney: "सफ़र दिखाएँ",
+      noJourney: "इस यूज़र का अभी कोई इवेंट नहीं।",
+    },
+    pricing: {
+      basePrice: "बेस प्राइस (INR)", monthly: "मासिक", yearly: "सालाना",
+      addCountry: "देश जोड़ें", choose: "चुनें…",
+      multiplier: "मल्टीप्लायर (बाहर के लिए)", country: "देश",
+      currency: "करेंसी", symbol: "चिह्न", display: "display",
+      remove: "हटाएँ", applyToAll: "सब पर लगाएँ",
+    },
+  },
 };
 
 const hinglish: AdminDict = {
@@ -262,6 +705,9 @@ const hinglish: AdminDict = {
   },
   nav: {
     users: "Users",
+    seo: "SEO",
+    blog: "Blog",
+    analytics: "Analytics",
     message: "Message",
     usage: "Usage",
     documents: "Documents",
@@ -272,6 +718,9 @@ const hinglish: AdminDict = {
     rewards: "Rewards",
   },
   headings: {
+    seo: { title: "SEO", sub: "Har page ka title, description aur keywords. Yahan save karte hi live site par lag jaata hai — deploy nahi karna padta." },
+    blog: { title: "Blog", sub: "Post likho aur badlo. Published post turant website aur sitemap dono me aa jaati hai." },
+    analytics: { title: "Analytics", sub: "Log website aur app me kahan jaate hain — aur ek user ne asal me kya kiya." },
     rewards: { title: "Rewards & Referrals", sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain." },
     pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. IP se user ko uske desh ka price + currency dikhta hai." },
     users: { title: "Users", sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai." },
@@ -305,6 +754,121 @@ const hinglish: AdminDict = {
     empty: "Abhi koi message nahi.",
     searchPh: "Message khojo…",
     reply: "Reply",
+  },
+  data: {
+    shared: {
+      name: "Naam", email: "Email", user: "User", plan: "Plan", source: "Source",
+      joined: "Kab juda", date: "Date", status: "Status", detail: "Detail",
+      documents: "Documents", reminders: "Reminders", chats: "Chats",
+      unlimited: "Unlimited", never: "Kabhi nahi", seeAll: "Sab dekho",
+      loadFailed: "Load nahi hua", emptyFilter: "Is filter me kuch nahi.",
+      empty: "Abhi kuch nahi.", total: "Total", free: "Free", plus: "Plus",
+      expired: "Khatam",
+    },
+    rewards: {
+      totalUsers: "Total users", referrals: "Referrals", rewarded: "Rewarded",
+      limitsTitle: "Free plan limits",
+      limitsSub: "Free plan ki limit yahin se badlo. Plus ka daam Pricing section me (country-wise) hai.",
+      freeReminders: "Free reminders", freeDocuments: "Free documents",
+      referralsTitle: "Referrals", referralDays: "Referral din (dono ko)",
+      referralsOn: "Referrals chalu",
+      grantTitle: "Manually Plus din do",
+      grantSub: "Din user ke maujooda plan me add honge (paid plan bhi extend hoga).",
+      grantDaysPh: "Din", grantBtn: "Do",
+      granted: "{days} din de diye ✓",
+      saved: "Save ho gaya ✓", saveFailed: "Save nahi hua",
+      grantFailed: "Grant nahi hua", failedPrefix: "Nahi ho paya:",
+    },
+    reviews: {
+      rating: "Rating", review: "Review", websiteAllowed: "Website allowed",
+      totalReviews: "Total reviews", average: "Average", websiteOk: "Website OK",
+      filterAll: "Saare", filterWebsite: "Website-allowed",
+    },
+    logs: {
+      today: "Aaj", sinceYesterday: "Kal se", totalErrors: "Total errors",
+      distinct: "Alag tarah ke", fromApp: "App se",
+      noneTitle: "Koi error nahi 🎉", noneSub: "Is range me sab theek chala.",
+    },
+    users: {
+      sourceFirstN: "First-N offer", sourceReferral: "Referral", sourceReward: "Reward",
+      sourceGooglePlay: "Google Play", sourceAdmin: "Admin grant",
+      activeTill: "Active till", referralDays: "Referral din", code: "Code",
+      plusActive: "Plus (active)",
+      searchPh: "Email, naam ya referral code…",
+      details: "Details", referralCode: "Referral code",
+      cameFromCode: "Kis code se aaya", noReferrer: "Kisi ne refer nahi kiya",
+      earnedFromReferral: "Referral se kamaaye", planEnds: "Plan khatam",
+      detailFailed: "Detail load nahi hui",
+    },
+    usage: {
+      today: "Aaj", yesterday: "Kal", all: "Sab",
+      noActivity: "Is range me koi activity nahi.", items: "items",
+      lastActive: "Last active", activeUsers: "Active users",
+      whatHappened: "Kya-kya hua", searchPh: "Email ya naam…",
+      docsShort: "Docs", loadingDetail: "Poora detail la rahe hain…",
+      nothingHere: "Is filter me kuch nahi.",
+    },
+    documents: {
+      viewAll: "Saare", byUser: "User-wise", inStorage: "Storage me",
+      uploaders: "Uploaders", totalSize: "Total size",
+      searchPh: "Document, naam ya email…", allTypes: "Sab type",
+      document: "Document", uploadedWhen: "Kab upload", size: "Size",
+      storage: "Storage", view: "Dekho",
+      noneYet: "Abhi kisi ne document upload nahi kiya.",
+      type: "Type", expiry: "Expiry", aiUnderstood: "AI ne kya samjha",
+      loadingPreview: "Preview la rahe hain…", previewFailed: "Preview load nahi hua.",
+    },
+    seo: {
+      addPath: "Naya page path jodo",
+      addBtn: "Add",
+      title: "Title",
+      description: "Meta description",
+      ogTitle: "Social title (OG)",
+      ogDescription: "Social description (OG)",
+      keywords: "Keywords",
+      keywordsHint:
+        "Comma se alag karo. Wahi shabd likho jo log sach me search karte hain — lambi list se faayda nahi hota.",
+      noindex: "Search se chhupao",
+    },
+    blog: {
+      postsLabel: "posts",
+      newPost: "Nayi post",
+      noPosts: "Abhi koi post nahi. Pehli likh do.",
+      published: "Published",
+      draft: "Draft",
+      title: "Title",
+      slug: "URL slug",
+      slugHint: "khaali chhodo to title se ban jaayega",
+      description: "Meta description",
+      descriptionHint: "Google ke result me yahi line dikhti hai. Lagbhag 155 characters.",
+      heading: "Page ka heading (H1)",
+      intro: "Pehla paragraph",
+      tags: "Tags",
+      readingMinutes: "Padhne ka time (min)",
+      publishedAt: "Kab publish",
+      sections: "Sections",
+      sectionHeading: "Section ka heading (H2)",
+      sectionBody: "Paragraphs — khaali line se naya paragraph banta hai",
+      addSection: "Section jodo",
+      publish: "Website par publish karo",
+    },
+    analytics: {
+      events: "Events", sessions: "Sessions", peakUsers: "Sabse zyada rozana users",
+      fromWeb: "Website se", daily: "Rozana",
+      topScreens: "Sabse zyada dekhe gaye screens aur pages",
+      journeyTitle: "Ek user ka safar",
+      journeySub:
+        "Users tab se user ID daalo — har screen aur button kram se dikhega, website aur app dono ka.",
+      userIdPh: "User ID (UUID)", showJourney: "Safar dikhao",
+      noJourney: "Is user ka abhi koi event nahi.",
+    },
+    pricing: {
+      basePrice: "Base price (INR)", monthly: "Monthly", yearly: "Yearly",
+      addCountry: "Country add karo", choose: "Choose…",
+      multiplier: "Multiplier (bahar ke liye)", country: "Country",
+      currency: "Currency", symbol: "Symbol", display: "display",
+      remove: "Remove", applyToAll: "Apply to all",
+    },
   },
 };
 

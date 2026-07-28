@@ -4,6 +4,12 @@ import { canAddReminder, FREE_REMINDER_LIMIT } from "./plan";
 export type Reminder = {
   id: string;
   title: string;
+  /**
+   * User ne apne shabdon me jo likha/bola tha. Title AI se saaf kiya hua chhota
+   * version hota hai; note poora context rakhta hai taaki reminder email/WhatsApp
+   * me sirf "Test" na jaye — user ko padh ke samajh aa jaye kis baare me tha.
+   */
+  note: string | null;
   time_label: string | null;
   remind_at: string | null; // ISO timestamp
   is_on: boolean;
@@ -47,6 +53,7 @@ export async function listReminders(): Promise<Reminder[]> {
 
 export async function addReminder(input: {
   title: string;
+  note?: string | null;
   time_label: string | null;
   remind_at: string | null;
   bucket: string;

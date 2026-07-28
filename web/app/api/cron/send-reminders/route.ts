@@ -30,6 +30,8 @@ async function sbGet<T>(query: string): Promise<T[]> {
 type DueReminder = {
   id: string;
   title: string;
+  /** User ne apne shabdon me jo likha tha — email/WhatsApp me title ke saath. */
+  note: string | null;
   time_label: string | null;
   remind_at: string;
   user_id: string | null;
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
   let due: DueReminder[];
   try {
     due = await sbGet<DueReminder>(
-      `reminders?select=id,title,time_label,remind_at,user_id` +
+      `reminders?select=id,title,note,time_label,remind_at,user_id` +
         `&is_on=eq.true&is_paused=eq.false&notified_at=is.null&remind_at=lte.${nowIso}` +
         `&order=remind_at.asc&limit=50`,
     );
@@ -119,7 +121,7 @@ export async function POST(request: Request) {
 
       if (phone) {
         try {
-          const res = await sendReminderWhatsApp(phone, r.title, label);
+          const res = await sendReminderWhatsApp(phone, r.title, label, r.note);
           if (res.sent) wa++;
         } catch (e) {
           errors.push(`wa ${r.id}: ${String(e)}`);
@@ -127,7 +129,13 @@ export async function POST(request: Request) {
       }
       if (profile.email) {
         try {
-          const res = await sendReminderEmail(profile.email, r.title, label, profile.language);
+          const res = await sendReminderEmail(
+            profile.email,
+            r.title,
+            label,
+            profile.language,
+            r.note,
+          );
           if (res.sent) mail++;
         } catch (e) {
           errors.push(`mail ${r.id}: ${String(e)}`);

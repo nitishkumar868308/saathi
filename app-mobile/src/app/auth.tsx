@@ -3,7 +3,7 @@ import { View, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { ScreenLoader } from "@/components/loader";
 import { supabase } from "@/lib/supabase";
 
 // Google login ke baad yahan aata hai — token le ke session set karta hai.
@@ -36,7 +36,7 @@ export default function AuthCallback() {
 
   return (
     <View style={styles.center}>
-      <Loader />
+      <ScreenLoader />
     </View>
   );
 }

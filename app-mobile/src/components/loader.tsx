@@ -1,5 +1,13 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Animated, Easing, StyleSheet, type ViewStyle } from "react-native";
+import {
+  View,
+  Text,
+  Modal,
+  Animated,
+  Easing,
+  StyleSheet,
+  type ViewStyle,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
@@ -141,6 +149,28 @@ export function ScreenLoader({ label }: { label?: string }) {
   );
 }
 
+/**
+ * Blocking loader — poore app ka ek hi tareeka.
+ *
+ * Screen ke theek beech me, peeche naram dark overlay. Overlay isliye ki jab tak
+ * kaam chal raha hai user peeche ka form chhu na sake (pehle loader inline aata
+ * tha, form clickable rehta tha aur do baar submit ho jaata tha).
+ *
+ * Jaan-boojh ke koi text nahi — "Samajh raha hoon…" jaisi lines hata di gayi
+ * hain. Loader ko sirf ye batana hai ki kaam chal raha hai, kahani nahi sunani.
+ */
+export function LoaderOverlay({ visible }: { visible: boolean }) {
+  return (
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
+      <View style={styles.overlay}>
+        <View style={styles.overlayCard}>
+          <BrandLoader size={76} halo />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 /* ------------------------------ skeleton ------------------------------ */
 
 export function Skeleton({
@@ -250,6 +280,20 @@ const styles = StyleSheet.create({
     height: 260,
     borderRadius: 130,
     backgroundColor: "rgba(18,81,86,0.07)",
+  },
+  overlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(46,40,35,0.45)",
+  },
+  overlayCard: {
+    height: 128,
+    width: 128,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
   },
   card: {
     flexDirection: "row",

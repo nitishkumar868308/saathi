@@ -68,6 +68,21 @@ type Dict = {
     visual: { docTitle: string; docSub: string; remTitle: string; remSub: string };
     trust: string[];
   };
+  /**
+   * Home ka SEO content block.
+   *
+   * Ye asli, padhne layak text hai — keyword stuffing nahi. Jo shabd log
+   * search karte hain ("document reminder", "medicine reminder", "bill
+   * reminder", "passport expiry") wo poore vaakyon me apni swabhavik jagah
+   * par aaye hain. Google ko isse pata chalta hai ki page kis baare me hai,
+   * aur user ko bhi ek line me samajh aa jaata hai.
+   */
+  seo: {
+    heading: string;
+    intro: string;
+    blocks: { h: string; p: string }[];
+    blogLink: string;
+  };
   insight: { pre: string; accent: string };
   features: {
     heading: string;
@@ -154,6 +169,8 @@ type Dict = {
       contact: string;
       privacy: string;
       terms: string;
+      blog: string;
+      support: string;
     };
     social: string;
     playstore: string;
@@ -288,6 +305,30 @@ const hinglish: Dict = {
     ],
     visual: { docTitle: "Car Insurance", docSub: "3 din mein expire", remTitle: "Gym · 7:00 AM", remSub: "Reminder set" },
     trust: ["100% private", "Voice + text", "Hindi + English", "Android first"],
+  },
+  seo: {
+    heading: "Saathi kis-kis cheez ka reminder deta hai",
+    intro:
+      "Ek hi app me documents, dawai, bill aur roz ke kaam â sab ka reminder. Hindi, English ya dono mila ke, jaise aap bolte ho.",
+    blocks: [
+      {
+        h: "Document expiry reminder",
+        p: "Passport, Aadhaar, driving licence, insurance, FASTag â document ki photo daalo, Saathi expiry date khud padh leta hai aur 14 din, 3 din aur usi din yaad dila deta hai. Renewal ke liye poora time mil jaata hai.",
+      },
+      {
+        h: "Medicine reminder",
+        p: "Dawai ka time bhoolna aam baat hai â khaaskar jab ghar me kisi bade ki dawai aapko yaad rakhni ho. Bol ke ya likh ke set karo, aur reminder me poora naam dikhta hai, taaki confusion na ho ki kaunsi dawai thi.",
+      },
+      {
+        h: "Bill aur EMI reminder",
+        p: "Bijli, rent, EMI, subscription â late fee paise ki kami se nahi, date nikal jaane se lagti hai. Saathi due date se pehle yaad dila deta hai, aur Plus me WhatsApp + email par bhi.",
+      },
+      {
+        h: "Roz ke chhote kaam",
+        p: "“kal subah 8 baje paani ka bill” jaisa likh do â Saathi time samajh ke reminder laga deta hai. Lock screen par poora alert aata hai, isliye notification me dab ke gum nahi hota.",
+      },
+    ],
+    blogLink: "Reminders aur documents par guides padho",
   },
   insight: {
     pre: "Aap yaad rakhne ki koshish karte reh jaate ho.",
@@ -543,7 +584,9 @@ const hinglish: Dict = {
       referral: "Refer & Earn",
       contact: "Contact",
       privacy: "Privacy Policy",
-      terms: "Terms of Service",
+      terms: "Terms & Conditions",
+      blog: "Blog",
+      support: "Support",
     },
     social: "Follow karo",
     playstore: "Play Store pe uplabdh",
@@ -674,6 +717,30 @@ const hi: Dict = {
     ],
     visual: { docTitle: "कार इंश्योरेंस", docSub: "3 दिन में एक्सपायर", remTitle: "जिम · 7:00 AM", remSub: "रिमाइंडर सेट" },
     trust: ["100% प्राइवेट", "वॉइस + टेक्स्ट", "हिंदी + अंग्रेज़ी", "Android पहले"],
+  },
+  seo: {
+    heading: "à¤¸à¤¾à¤¥à¥ à¤à¤¿à¤¨-à¤à¤¿à¤¨ à¤à¥à¤à¤¼à¥à¤ à¤à¤¾ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤¦à¥à¤¤à¤¾ à¤¹à¥",
+    intro:
+      "à¤à¤ à¤¹à¥ à¤à¤ª à¤®à¥à¤ à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤, à¤¦à¤µà¤¾à¤, à¤¬à¤¿à¤² à¤à¤° à¤°à¥à¤à¤¼ à¤à¥ à¤à¤¾à¤® â à¤¸à¤¬à¤à¤¾ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°à¥¤ à¤¹à¤¿à¤à¤¦à¥, à¤à¤à¤à¥à¤°à¥à¤à¤¼à¥ à¤¯à¤¾ à¤¦à¥à¤¨à¥à¤ à¤®à¤¿à¤²à¤¾à¤à¤°, à¤à¥à¤¸à¥ à¤à¤ª à¤¬à¥à¤²à¤¤à¥ à¤¹à¥à¤à¥¤",
+    blocks: [
+      {
+        h: "à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤ à¤à¤à¥à¤¸à¤ªà¤¾à¤¯à¤°à¥ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°",
+        p: "à¤ªà¤¾à¤¸à¤ªà¥à¤°à¥à¤, à¤à¤§à¤¾à¤°, à¤¡à¥à¤°à¤¾à¤à¤µà¤¿à¤à¤ à¤²à¤¾à¤à¤¸à¥à¤à¤¸, à¤¬à¥à¤®à¤¾, FASTag â à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤ à¤à¥ à¤«à¤¼à¥à¤à¥ à¤¡à¤¾à¤²à¥à¤, à¤¸à¤¾à¤¥à¥ à¤à¤à¥à¤¸à¤ªà¤¾à¤¯à¤°à¥ à¤¡à¥à¤ à¤à¥à¤¦ à¤ªà¤¢à¤¼ à¤²à¥à¤¤à¤¾ à¤¹à¥ à¤à¤° 14 à¤¦à¤¿à¤¨, 3 à¤¦à¤¿à¤¨ à¤à¤° à¤à¤¸à¥ à¤¦à¤¿à¤¨ à¤¯à¤¾à¤¦ à¤¦à¤¿à¤²à¤¾ à¤¦à¥à¤¤à¤¾ à¤¹à¥à¥¤ à¤°à¤¿à¤¨à¥à¤¯à¥à¤à¤² à¤à¥ à¤²à¤¿à¤ à¤ªà¥à¤°à¤¾ à¤¸à¤®à¤¯ à¤®à¤¿à¤² à¤à¤¾à¤¤à¤¾ à¤¹à¥à¥¤",
+      },
+      {
+        h: "à¤¦à¤µà¤¾à¤ à¤à¤¾ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°",
+        p: "à¤¦à¤µà¤¾à¤ à¤à¤¾ à¤¸à¤®à¤¯ à¤­à¥à¤²à¤¨à¤¾ à¤à¤® à¤¬à¤¾à¤¤ à¤¹à¥ â à¤à¤¼à¤¾à¤¸à¤à¤° à¤à¤¬ à¤à¤° à¤à¥ à¤à¤¿à¤¸à¥ à¤¬à¤¡à¤¼à¥ à¤à¥ à¤¦à¤µà¤¾à¤ à¤à¤ªà¤à¥ à¤¯à¤¾à¤¦ à¤°à¤à¤¨à¥ à¤¹à¥à¥¤ à¤¬à¥à¤²à¤à¤° à¤¯à¤¾ à¤²à¤¿à¤à¤à¤° à¤¸à¥à¤ à¤à¤°à¥à¤, à¤à¤° à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤®à¥à¤ à¤ªà¥à¤°à¤¾ à¤¨à¤¾à¤® à¤¦à¤¿à¤à¤¤à¤¾ à¤¹à¥ à¤¤à¤¾à¤à¤¿ à¤à¤²à¤à¤¨ à¤¨ à¤¹à¥ à¤à¤¿ à¤à¥à¤¨-à¤¸à¥ à¤¦à¤µà¤¾à¤ à¤¥à¥à¥¤",
+      },
+      {
+        h: "à¤¬à¤¿à¤² à¤à¤° EMI à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°",
+        p: "à¤¬à¤¿à¤à¤²à¥, à¤à¤¿à¤°à¤¾à¤¯à¤¾, EMI, à¤¸à¤¬à¥à¤¸à¤à¥à¤°à¤¿à¤ªà¥à¤¶à¤¨ â à¤²à¥à¤ à¤«à¤¼à¥à¤¸ à¤ªà¥à¤¸à¥ à¤à¥ à¤à¤®à¥ à¤¸à¥ à¤¨à¤¹à¥à¤, à¤¤à¤¾à¤°à¥à¤à¤¼ à¤¨à¤¿à¤à¤² à¤à¤¾à¤¨à¥ à¤¸à¥ à¤²à¤à¤¤à¥ à¤¹à¥à¥¤ à¤¸à¤¾à¤¥à¥ à¤¡à¥à¤¯à¥ à¤¡à¥à¤ à¤¸à¥ à¤ªà¤¹à¤²à¥ à¤¯à¤¾à¤¦ à¤¦à¤¿à¤²à¤¾ à¤¦à¥à¤¤à¤¾ à¤¹à¥, à¤à¤° à¤ªà¥à¤²à¤¸ à¤®à¥à¤ WhatsApp + à¤à¤®à¥à¤² à¤ªà¤° à¤­à¥à¥¤",
+      },
+      {
+        h: "à¤°à¥à¤à¤¼ à¤à¥ à¤à¥à¤à¥ à¤à¤¾à¤®",
+        p: "“à¤à¤² à¤¸à¥à¤¬à¤¹ 8 à¤¬à¤à¥ à¤ªà¤¾à¤¨à¥ à¤à¤¾ à¤¬à¤¿à¤²” à¤à¥à¤¸à¤¾ à¤²à¤¿à¤ à¤¦à¥à¤ â à¤¸à¤¾à¤¥à¥ à¤¸à¤®à¤¯ à¤¸à¤®à¤à¤à¤° à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤²à¤à¤¾ à¤¦à¥à¤¤à¤¾ à¤¹à¥à¥¤ à¤²à¥à¤ à¤¸à¥à¤à¥à¤°à¥à¤¨ à¤ªà¤° à¤ªà¥à¤°à¤¾ à¤à¤²à¤°à¥à¤ à¤à¤¤à¤¾ à¤¹à¥, à¤à¤¸à¤²à¤¿à¤ à¤¨à¥à¤à¤¿à¤«à¤¼à¤¿à¤à¥à¤¶à¤¨ à¤®à¥à¤ à¤¦à¤¬à¤à¤° à¤à¥ à¤¨à¤¹à¥à¤ à¤à¤¾à¤¤à¤¾à¥¤",
+      },
+    ],
+    blogLink: "à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤à¤° à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤ à¤ªà¤° à¤à¤¾à¤à¤¡ à¤ªà¤¢à¤¼à¥à¤",
   },
   insight: {
     pre: "आप याद रखने की कोशिश करते रह जाते हैं।",
@@ -929,7 +996,9 @@ const hi: Dict = {
       referral: "रेफ़र करें और पाएँ",
       contact: "संपर्क",
       privacy: "प्राइवेसी पॉलिसी",
-      terms: "सेवा की शर्तें",
+      terms: "नियम व शर्तें",
+      blog: "ब्लॉग",
+      support: "सपोर्ट",
     },
     social: "फ़ॉलो करें",
     playstore: "Play Store पर उपलब्ध",
@@ -1060,6 +1129,30 @@ const en: Dict = {
     ],
     visual: { docTitle: "Car Insurance", docSub: "Expires in 3 days", remTitle: "Gym · 7:00 AM", remSub: "Reminder set" },
     trust: ["100% private", "Voice + text", "Hindi + English", "Android first"],
+  },
+  seo: {
+    heading: "What Saathi reminds you about",
+    intro:
+      "Documents, medicines, bills and everyday tasks â all in one app, in Hindi, English or a mix of both.",
+    blocks: [
+      {
+        h: "Document expiry reminders",
+        p: "Passport, Aadhaar, driving licence, insurance, FASTag â add a photo and Saathi reads the expiry date itself, then reminds you 14 days before, 3 days before, and on the day. That is enough time to actually renew.",
+      },
+      {
+        h: "Medicine reminders",
+        p: "Forgetting a dose is rarely about the medicine â it is about the moment. Set it by voice or text, and the reminder shows the full name, so there is never any doubt about which tablet it meant.",
+      },
+      {
+        h: "Bill and EMI reminders",
+        p: "Electricity, rent, EMI, subscriptions â late fees are a timing problem, not a money problem. Saathi nudges you before the due date, and on Plus it reaches you on WhatsApp and email too.",
+      },
+      {
+        h: "Everyday tasks",
+        p: "Type something like “water bill tomorrow at 8 am” and Saathi works out the time for you. The alert opens full-screen on the lock screen, so it does not get buried under other notifications.",
+      },
+    ],
+    blogLink: "Read our guides on reminders and documents",
   },
   insight: {
     pre: "You keep trying to remember everything.",
@@ -1315,7 +1408,9 @@ const en: Dict = {
       referral: "Refer & Earn",
       contact: "Contact",
       privacy: "Privacy Policy",
-      terms: "Terms of Service",
+      terms: "Terms & Conditions",
+      blog: "Blog",
+      support: "Support",
     },
     social: "Follow us",
     playstore: "Available on Play Store",

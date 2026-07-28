@@ -10,6 +10,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { supabase } from "@/lib/supabase";
+import { registerDevice } from "@/lib/device";
 import {
   DEFAULT_LOCALE,
   LOCALES,
@@ -72,18 +73,36 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [chosen, setChosen] = useState(false);
 
   // 1) Pehle local (turant) — splash isi tak rukta hai.
+  //    Local me kuch na ho to device registry se poochho: ye phone pehle aa
+  //    chuka hai kya? Aa chuka hai to uski purani bhasha lagao aur language
+  //    screen skip — reinstall par dobara wahi sawaal poochhna bura lagta hai.
   useEffect(() => {
     let alive = true;
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((saved) => {
+
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
         if (!alive) return;
         if (isLocale(saved)) {
           setLocaleState(saved);
           setChosen(true);
+          return;
         }
-      })
-      .catch(() => {})
-      .finally(() => alive && setReady(true));
+
+        const dev = await registerDevice().catch(() => null);
+        if (!alive || !dev?.known) return;
+        // Purana device — bhasha pata ho to wahi, warna default. Dono soorat me
+        // sawaal dobara nahi poochhte.
+        if (isLocale(dev.language)) {
+          setLocaleState(dev.language);
+          AsyncStorage.setItem(STORAGE_KEY, dev.language).catch(() => {});
+        }
+        setChosen(true);
+      } finally {
+        if (alive) setReady(true);
+      }
+    })();
+
     return () => {
       alive = false;
     };
@@ -124,6 +143,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setChosen(true);
     AsyncStorage.setItem(STORAGE_KEY, l).catch(() => {});
     writeDbLocale(l); // cross-device + emails
+    // Device par bhi likh do — reinstall ke baad yahi bhasha wapas lagegi.
+    registerDevice(l).catch(() => {});
   }, []);
 
   const value = useMemo<Ctx>(

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bug, ChevronDown, RefreshCw, Smartphone, Globe } from "lucide-react";
 import { SkeletonRows } from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type AppError = {
   id: string;
@@ -19,12 +20,8 @@ type AppError = {
   name: string | null;
 };
 
-const RANGES = [
-  { key: 1, label: "Aaj" },
-  { key: 2, label: "Kal se" },
-  { key: 7, label: "7 din" },
-  { key: 30, label: "30 din" },
-] as const;
+// Range ke labels dictionary se aate hain (neeche component me), yahan sirf din.
+const RANGE_DAYS = [1, 2, 7, 30] as const;
 
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString("en-IN", {
@@ -37,6 +34,14 @@ function fmt(iso: string): string {
 }
 
 export default function AdminLogs() {
+  const t = useAdminT();
+  const d = t.data.logs;
+  const sh = t.data.shared;
+  // "Aaj / Kal se / 7 din / 30 din" — pehle ye ek module-level array me hardcoded
+  // the, isliye bhasha badalne par bhi angrezi/hinglish hi dikhte the.
+  const rangeLabel = (n: number) =>
+    n === 1 ? d.today : n === 2 ? d.sinceYesterday : `${n} ${t.time.d}`;
+
   const [errors, setErrors] = useState<AppError[] | null>(null);
   const [error, setError] = useState("");
   const [days, setDays] = useState<number>(7);
@@ -55,7 +60,7 @@ export default function AdminLogs() {
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setErrors(body.errors ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Logs load nahi hue");
+      setError(e instanceof Error ? e.message : sh.loadFailed);
       setErrors([]);
     } finally {
       setBusy(false);
@@ -96,23 +101,23 @@ export default function AdminLogs() {
       )}
 
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        <Stat label="Total errors" value={errors.length} />
-        <Stat label="Alag tarah ke" value={groups.length} />
-        <Stat label="App se" value={errors.filter((e) => e.source === "app").length} />
+        <Stat label={d.totalErrors} value={errors.length} />
+        <Stat label={d.distinct} value={groups.length} />
+        <Stat label={d.fromApp} value={errors.filter((e) => e.source === "app").length} />
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-2xl border border-line bg-surface p-1">
-          {RANGES.map((r) => (
+          {RANGE_DAYS.map((n) => (
             <button
-              key={r.key}
-              onClick={() => setDays(r.key)}
+              key={n}
+              onClick={() => setDays(n)}
               className={`h-9 rounded-xl px-3 text-xs font-semibold transition ${
-                days === r.key ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
+                days === n ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
               }`}
             >
-              {r.label}
+              {rangeLabel(n)}
             </button>
           ))}
         </div>
@@ -134,7 +139,7 @@ export default function AdminLogs() {
           className="ml-auto inline-flex h-10 items-center gap-2 rounded-2xl border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
         >
           <RefreshCw size={15} className={busy ? "animate-spin" : ""} />
-          Refresh
+          {t.common.refresh}
         </button>
       </div>
 
@@ -143,8 +148,8 @@ export default function AdminLogs() {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sage/15 text-sage">
             <Bug size={24} />
           </span>
-          <p className="text-sm font-semibold text-ink">Koi error nahi 🎉</p>
-          <p className="text-sm text-ink-soft">Is range me sab theek chala.</p>
+          <p className="text-sm font-semibold text-ink">{d.noneTitle}</p>
+          <p className="text-sm text-ink-soft">{d.noneSub}</p>
         </div>
       ) : (
         <div className="space-y-3">

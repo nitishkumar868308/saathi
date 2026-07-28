@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Plus, Trash2, Save, Globe, Check } from "lucide-react";
 import Loader from "@/components/Loader";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type Row = {
   country_code: string;
@@ -23,6 +24,9 @@ function roundPrice(n: number): number {
 }
 
 export default function AdminPricing() {
+  const t = useAdminT();
+  const d = t.data.pricing;
+  const sh = t.data.shared;
   const [rows, setRows] = useState<Row[] | null>(null);
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [base, setBase] = useState<Base>({ monthly: 99, yearly: 999 });
@@ -47,7 +51,7 @@ export default function AdminPricing() {
       setCountries(body.countries ?? []);
       if (body.base) setBase(body.base);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Pricing load nahi hui");
+      setError(e instanceof Error ? e.message : sh.loadFailed);
       setRows([]);
     }
   }, []);
@@ -146,7 +150,7 @@ export default function AdminPricing() {
       if (body.rows) setRows(body.rows);
       setSaved(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save nahi hua");
+      setError(e instanceof Error ? e.message : t.data.rewards.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -171,13 +175,13 @@ export default function AdminPricing() {
 
       {/* Base price (INR) */}
       <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
-        <h3 className="font-display text-lg font-semibold">Base price (INR)</h3>
+        <h3 className="font-display text-lg font-semibold">{d.basePrice}</h3>
         <p className="mt-1 text-sm text-ink-soft">
           Har country ka price = base × multiplier × conversion rate.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <LabeledInput
-            label="Monthly ₹"
+            label={`${d.monthly} ₹`}
             value={base.monthly}
             onChange={(v) => {
               setBase((b) => ({ ...b, monthly: v }));
@@ -185,7 +189,7 @@ export default function AdminPricing() {
             }}
           />
           <LabeledInput
-            label="Yearly ₹"
+            label={`${d.yearly} ₹`}
             value={base.yearly}
             onChange={(v) => {
               setBase((b) => ({ ...b, yearly: v }));
@@ -198,14 +202,14 @@ export default function AdminPricing() {
       {/* Add + bulk */}
       <div className="flex flex-col gap-3 rounded-3xl border border-line bg-surface p-5 shadow-soft sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="text-xs font-semibold text-ink-soft">Country add karo</label>
+          <label className="text-xs font-semibold text-ink-soft">{d.addCountry}</label>
           <div className="mt-1.5 flex gap-2">
             <select
               value={addCode}
               onChange={(e) => setAddCode(e.target.value)}
               className="h-10 flex-1 rounded-xl border border-line bg-cream px-3 text-sm outline-none focus:border-terracotta"
             >
-              <option value="">Choose…</option>
+              <option value="">{d.choose}</option>
               {available.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.name} ({c.code})
@@ -222,7 +226,7 @@ export default function AdminPricing() {
           </div>
         </div>
         <div>
-          <label className="text-xs font-semibold text-ink-soft">Multiplier (bahar ke liye)</label>
+          <label className="text-xs font-semibold text-ink-soft">{d.multiplier}</label>
           <div className="mt-1.5 flex gap-2">
             <input
               value={bulkMult}
@@ -240,7 +244,7 @@ export default function AdminPricing() {
               onClick={applyBulkMultiplier}
               className="inline-flex h-10 items-center rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink-soft hover:text-terracotta"
             >
-              Apply to all
+              {d.applyToAll}
             </button>
           </div>
         </div>
@@ -251,12 +255,12 @@ export default function AdminPricing() {
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
             <tr>
-              <th className="px-3 py-3 font-semibold">Country</th>
-              <th className="px-3 py-3 font-semibold">Currency</th>
-              <th className="px-3 py-3 font-semibold">Symbol</th>
-              <th className="px-3 py-3 font-semibold">Multiplier</th>
+              <th className="px-3 py-3 font-semibold">{d.country}</th>
+              <th className="px-3 py-3 font-semibold">{d.currency}</th>
+              <th className="px-3 py-3 font-semibold">{d.symbol}</th>
+              <th className="px-3 py-3 font-semibold">{d.multiplier}</th>
               <th className="px-3 py-3 font-semibold">1 INR =</th>
-              <th className="px-3 py-3 font-semibold">Monthly</th>
+              <th className="px-3 py-3 font-semibold">{d.monthly}</th>
               <th className="px-3 py-3 font-semibold">On</th>
               <th className="px-3 py-3" />
             </tr>
@@ -330,7 +334,7 @@ export default function AdminPricing() {
                       <button
                         onClick={() => removeRow(r.country_code)}
                         className="text-ink-soft transition hover:text-terracotta-dark"
-                        aria-label="Remove"
+                        aria-label={d.remove}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -350,11 +354,11 @@ export default function AdminPricing() {
           className="inline-flex h-11 items-center gap-2 rounded-2xl bg-terracotta px-6 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-70"
         >
           {saving ? <Loader size={18} /> : <Save size={16} />}
-          Save
+          {saving ? t.common.saving : t.common.save}
         </button>
         {saved && (
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-sage">
-            <Check size={16} /> Save ho gaya
+            <Check size={16} /> {t.data.rewards.saved}
           </span>
         )}
       </div>

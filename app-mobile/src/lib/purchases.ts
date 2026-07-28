@@ -1,8 +1,18 @@
 /**
- * RevenueCat (Google Play Billing) wrapper — safe.
+ * RevenueCat wrapper — Android (Play Billing) aur iOS (StoreKit), dono.
  * Native module na mile (Expo Go) ya API key na ho to sab no-op.
- * Prereq: EXPO_PUBLIC_REVENUECAT_ANDROID_KEY, entitlement "plus", offering with packages.
+ *
+ * Prereq: entitlement "plus", ek offering jisme packages hon, aur **har platform
+ * ki apni key**:
+ *   EXPO_PUBLIC_REVENUECAT_ANDROID_KEY  (goog_…)
+ *   EXPO_PUBLIC_REVENUECAT_IOS_KEY      (appl_…)
+ *
+ * ⚠️ Dono keys alag hoti hain — RevenueCat har app (Play / App Store) ke liye
+ * apni key deta hai. Pehle yahan sirf Android wali padhi jaati thi, isliye iOS
+ * build par `configure()` fail ho jaata aur poora Plus flow chup-chaap band
+ * rehta. Ab platform ke hisaab se sahi key uthti hai.
  */
+import { Platform } from "react-native";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Purchases: any = null;
@@ -14,7 +24,10 @@ try {
   Purchases = null;
 }
 
-const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "";
+const API_KEY =
+  (Platform.OS === "ios"
+    ? process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY
+    : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY) ?? "";
 const ENTITLEMENT = "plus";
 let configured = false;
 

@@ -9,8 +9,32 @@ export default function Faq() {
   const { faq } = useT();
   const [open, setOpen] = useState<number | null>(0);
 
+  /**
+   * FAQPage structured data — Google search result me sawaal-jawab seedhe dikha
+   * sakta hai (rich result).
+   *
+   * Markup wahi sawaal-jawab uthata hai jo screen par dikh rahe hain. Ye Google
+   * ki shart hai: agar markup me kuch aur ho aur page par kuch aur, to rich
+   * result to door, manual action bhi lag sakta hai. Isliye yahan bhi wahi
+   * `faq.items` hai jo neeche render ho rahi hai — bhasha badle to dono saath
+   * badalte hain.
+   */
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.items.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
   return (
     <div className="mx-auto max-w-3xl divide-y divide-line overflow-hidden rounded-4xl border border-line bg-surface">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {faq.items.map((f, i) => {
         const isOpen = open === i;
         return (

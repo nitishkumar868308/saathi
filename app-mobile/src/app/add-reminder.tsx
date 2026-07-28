@@ -8,7 +8,6 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +17,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 
 import { colors } from "@/theme/colors";
-import { Loader, HandsLoader } from "@/components/loader";
+import { LoaderOverlay } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
@@ -27,11 +26,8 @@ import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
 import { formatWhen, combine } from "@/utils/parse-time";
 import { parseReminderAI } from "@/lib/ai";
 import { logEvent } from "@/lib/analytics";
-import {
-  openBatteryOptimizationSettings,
-  batteryPromptShown,
-  markBatteryPromptShown,
-} from "@/lib/reliability";
+import { reliabilityPromptShown } from "@/lib/reliability";
+import { PermissionModal } from "@/components/permission-modal";
 import { VoiceButton } from "@/components/voice-button";
 import { useToast } from "@/components/toast";
 
@@ -54,7 +50,7 @@ function midnight(offset = 0): Date {
 export default function AddReminder() {
   const router = useRouter();
   const toast = useToast();
-  const { addReminder: a, common: c, reliability: rel } = useT();
+  const { addReminder: a, common: c } = useT();
   const { locale } = useLocale();
   const bcp = locale === "hi" ? "hi-IN" : "en-IN";
 
@@ -78,6 +74,7 @@ export default function AddReminder() {
     minutes: number | null;
   } | null>(null);
   const [parsing, setParsing] = useState(false);
+  const [permModal, setPermModal] = useState(false);
   const lastText = useRef("");
 
   useEffect(() => {
@@ -204,8 +201,13 @@ export default function AddReminder() {
     try {
       setSaving(true);
       const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
+      // User ka apna wakya bhi save karo — email/WhatsApp me title ke saath jaata
+      // hai. Title AI ka chhota version hota hai ("Test"); note se user ko yaad
+      // aa jaata hai ki baat kis baare me thi.
+      const raw = title.trim();
       const r = await addReminder({
         title: finalTitle,
+        note: raw && raw.toLowerCase() !== finalTitle.toLowerCase() ? raw : null,
         time_label: finalLabel,
         remind_at: when.toISOString(),
         bucket,
@@ -219,19 +221,21 @@ export default function AddReminder() {
         scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
         scheduled ? "success" : "info",
       );
-      // Pehli baar reminder set hone pe battery-optimization ka ek-time prompt.
-      if (scheduled && Platform.OS === "android" && !(await batteryPromptShown())) {
-        await markBatteryPromptShown();
-        Alert.alert(rel.promptTitle, rel.promptBody, [
-          { text: rel.promptLater, style: "cancel", onPress: () => router.back() },
-          {
-            text: rel.promptButton,
-            onPress: () => {
-              openBatteryOptimizationSettings();
-              router.back();
-            },
-          },
-        ]);
+      // Pehli baar reminder set hone pe reliability setup — ek hi baar.
+      // (Pehle yahan OS ka bhadda Alert tha jo sirf battery settings kholta tha;
+      //  ab apna modal hai jo har permission ka status live dikhata hai.)
+      //
+      // Android par hamesha (pehli baar): notification allow hone ke baad bhi
+      // exact-alarm, battery aur OEM auto-start baaki rehte hain — asli "reminder
+      // late aaya" wali dikkat wahin se aati hai.
+      //
+      // iOS par sirf tab jab permission mili hi na ho — wahan baaki teen steps
+      // hote hi nahi, to sab theek hote hue modal kholna bekaar hai. Pehle ye
+      // block Android-only tha, isliye iOS par notification band hone par user
+      // ko kabhi pata hi nahi chalta ki reminder aayega hi nahi.
+      const needsSetup = Platform.OS === "android" || !allowed;
+      if (needsSetup && !(await reliabilityPromptShown())) {
+        setPermModal(true);
         return;
       }
       router.back();
@@ -282,13 +286,6 @@ export default function AddReminder() {
             <VoiceButton onText={(txt) => setTitle((p) => (p ? p + " " + txt : txt))} />
           </View>
           <Text style={styles.hint}>🎤 {a.micHint}</Text>
-
-          {parsing && (
-            <View style={styles.parsingRow}>
-              <HandsLoader size={36} />
-              <Text style={styles.parsingText}>{a.understanding}</Text>
-            </View>
-          )}
 
           {started && (
             <View style={styles.card}>
@@ -436,12 +433,20 @@ export default function AddReminder() {
           (pressed || saving || !canSave) && { opacity: 0.55 },
         ]}
       >
-        {saving ? (
-          <Loader size={30} color={colors.white} />
-        ) : (
-          <Text style={styles.saveText}>{a.save}</Text>
-        )}
+        <Text style={styles.saveText}>{a.save}</Text>
       </Pressable>
+
+      {/* AI samajh raha ho ya save chal raha ho — dono ke liye wahi ek
+          center-me-overlay loader. Peeche ka form tab tak block rehta hai. */}
+      <LoaderOverlay visible={parsing || saving} />
+
+      <PermissionModal
+        visible={permModal}
+        onClose={() => {
+          setPermModal(false);
+          router.back();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -492,8 +497,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   hint: { marginTop: 8, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
-  parsingRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
-  parsingText: { fontSize: 13.5, fontWeight: "600", color: colors.terracotta },
   card: {
     marginTop: 18,
     borderRadius: 20,

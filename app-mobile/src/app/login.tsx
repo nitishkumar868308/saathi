@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 
 import { colors } from "@/theme/colors";
-import { Loader } from "@/components/loader";
+import { LoaderOverlay } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
@@ -196,11 +195,7 @@ export default function Login() {
             disabled={loading}
             style={({ pressed }) => [styles.btn, (pressed || loading) && { opacity: 0.85 }]}
           >
-            {loading ? (
-              <Loader size={30} color={colors.white} />
-            ) : (
-              <Text style={styles.btnText}>{mode === "login" ? l.loginBtn : l.signupBtn}</Text>
-            )}
+            <Text style={styles.btnText}>{mode === "login" ? l.loginBtn : l.signupBtn}</Text>
           </Pressable>
 
           {/* divider */}
@@ -216,9 +211,7 @@ export default function Login() {
             disabled={googleLoading}
             style={({ pressed }) => [styles.googleBtn, (pressed || googleLoading) && { opacity: 0.85 }]}
           >
-            {googleLoading ? (
-              <Loader size={30} color={colors.ink} />
-            ) : (
+            {(
               <>
                 <Ionicons name="logo-google" size={19} color="#DB4437" />
                 <Text style={styles.googleText}>{l.google}</Text>
@@ -240,6 +233,9 @@ export default function Login() {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Login / Google — dono ke liye ek hi center overlay loader. */}
+      <LoaderOverlay visible={loading || googleLoading} />
     </SafeAreaView>
   );
 }

@@ -6,11 +6,11 @@ import {
   Pressable,
   Modal,
   StyleSheet,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
+import { Loader } from "@/components/loader";
 import { applyReferralCode } from "@/lib/plan";
 import { useToast } from "@/components/toast";
 import { useLocale } from "@/lib/i18n/LanguageProvider";
@@ -132,7 +132,7 @@ export function ReferralCodeModal({
             style={({ pressed }) => [styles.apply, (pressed || loading) && { opacity: 0.85 }]}
           >
             {loading ? (
-              <ActivityIndicator color={colors.white} />
+              <Loader size={26} />
             ) : (
               <Text style={styles.applyText}>{copy.apply}</Text>
             )}

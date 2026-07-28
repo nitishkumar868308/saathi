@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo-server";
 import LegalPage from "@/components/LegalPage";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy",
-  description:
-    "Saathi ki privacy policy — aapka data kaise surakshit rehta hai aur aapke paas kya control hai.",
-};
+
+export function generateMetadata(): Promise<Metadata> {
+  // Meta DB (`seo_pages`) se aata hai — admin panel se badla ja sakta hai.
+  // Row na ho to yahi defaults chalte hain.
+  return pageMetadata("/privacy", {
+    title: "Privacy Policy",
+    description:
+      "How Apka Saathi stores your documents and reminders, what we never do with your data, and the control you keep.",
+  });
+}
 
 const sections = [
   {

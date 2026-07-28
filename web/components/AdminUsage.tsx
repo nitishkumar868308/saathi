@@ -14,6 +14,7 @@ import {
 import Loader, { SkeletonRows } from "@/components/Loader";
 import Modal from "@/components/admin/Modal";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type UsageRow = {
   id: string;
@@ -38,14 +39,10 @@ type ActivityRow = {
   at: string;
 };
 
-const RANGES = [
-  { key: "today", label: "Aaj" },
-  { key: "yesterday", label: "Kal" },
-  { key: "7", label: "7 din" },
-  { key: "30", label: "30 din" },
-  { key: "all", label: "Sab" },
-] as const;
-type RangeKey = (typeof RANGES)[number]["key"];
+// Labels dictionary se aate hain (component ke andar), yahan sirf keys —
+// warna language switcher se ye buttons kabhi badalte hi nahi the.
+const RANGE_KEYS = ["today", "yesterday", "7", "30", "all"] as const;
+type RangeKey = (typeof RANGE_KEYS)[number];
 
 const INACTIVE_DAYS = 14;
 
@@ -94,14 +91,28 @@ function download(filename: string, content: string) {
 }
 
 const KIND = {
-  document: { icon: FileText, label: "Document", cls: "bg-terracotta/12 text-terracotta-dark" },
-  reminder: { icon: Bell, label: "Reminder", cls: "bg-amber-warm/20 text-amber-warm" },
-  chat: { icon: MessageSquare, label: "Chat", cls: "bg-sage/15 text-sage" },
+  document: { icon: FileText, cls: "bg-terracotta/12 text-terracotta-dark" },
+  reminder: { icon: Bell, cls: "bg-amber-warm/20 text-amber-warm" },
+  chat: { icon: MessageSquare, cls: "bg-sage/15 text-sage" },
 } as const;
 
 type Filter = "all" | "active" | "inactive" | "dormant";
 
 export default function AdminUsage() {
+  const t = useAdminT();
+  const d = t.data.usage;
+  const sh = t.data.shared;
+  // Activity feed ki har line ka "Document / Reminder / Chat" label.
+  const kindLabel = (k: "document" | "reminder" | "chat") =>
+    k === "document" ? sh.documents : k === "reminder" ? sh.reminders : sh.chats;
+  const rangeLabel = (k: RangeKey) =>
+    k === "today"
+      ? d.today
+      : k === "yesterday"
+        ? d.yesterday
+        : k === "all"
+          ? d.all
+          : `${k} ${t.time.d}`;
   const [usage, setUsage] = useState<UsageRow[] | null>(null);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
   const [error, setError] = useState("");
@@ -125,7 +136,7 @@ export default function AdminUsage() {
       setUsage(body.usage ?? []);
       setActivity(body.activity ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Usage load nahi hua");
+      setError(e instanceof Error ? e.message : sh.loadFailed);
       setUsage([]);
     }
   }, [range]);
@@ -164,7 +175,7 @@ export default function AdminUsage() {
     download(
       "apka-saathi-usage.csv",
       toCsv([
-        ["Name", "Email", "Plan", "Documents", "Reminders", "Chats", "Last active", "Joined"],
+        [sh.name, sh.email, sh.plan, sh.documents, sh.reminders, sh.chats, d.lastActive, sh.joined],
         ...rows.map((u) => [
           u.name ?? "",
           u.email ?? "",
@@ -193,36 +204,36 @@ export default function AdminUsage() {
       {/* Date range — sab kuch isi ke hisaab se */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-2xl border border-line bg-surface p-1">
-          {RANGES.map((r) => (
+          {RANGE_KEYS.map((k) => (
             <button
-              key={r.key}
-              onClick={() => setRange(r.key)}
+              key={k}
+              onClick={() => setRange(k)}
               className={`h-9 rounded-xl px-3 text-xs font-semibold transition ${
-                range === r.key ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
+                range === k ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
               }`}
             >
-              {r.label}
+              {rangeLabel(k)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
-        <Stat label="Documents" value={stats.docs} />
-        <Stat label="Reminders" value={stats.rems} />
-        <Stat label="Chats" value={stats.chats} />
-        <Stat label="Active users" value={stats.active} />
+        <Stat label={sh.documents} value={stats.docs} />
+        <Stat label={sh.reminders} value={stats.rems} />
+        <Stat label={sh.chats} value={stats.chats} />
+        <Stat label={d.activeUsers} value={stats.active} />
       </div>
 
       {/* Activity feed — kaun sa item, kab */}
       <div className="rounded-3xl border border-line bg-surface shadow-soft">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h3 className="font-display text-base font-semibold">Kya-kya hua</h3>
-          <span className="text-xs font-semibold text-ink-soft">{activity.length} items</span>
+          <h3 className="font-display text-base font-semibold">{d.whatHappened}</h3>
+          <span className="text-xs font-semibold text-ink-soft">{activity.length} {d.items}</span>
         </div>
         {!activity.length ? (
           <p className="px-5 py-10 text-center text-sm text-ink-soft">
-            Is range me koi activity nahi.
+            {d.noActivity}
           </p>
         ) : (
           <ul className="max-h-[420px] divide-y divide-line/60 overflow-y-auto">
@@ -239,7 +250,7 @@ export default function AdminUsage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink">{a.title || "—"}</p>
                     <p className="truncate text-xs text-ink-soft">
-                      {k.label}
+                      {kindLabel(a.kind)}
                       {a.detail ? ` · ${a.detail}` : ""}
                       {a.name || a.email ? ` · ${a.name || a.email}` : ""}
                     </p>
@@ -262,7 +273,7 @@ export default function AdminUsage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Email ya naam..."
+            placeholder={d.searchPh}
             className="h-11 w-full rounded-2xl border border-line bg-surface pl-10 pr-4 text-sm outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
           />
         </div>
@@ -276,7 +287,7 @@ export default function AdminUsage() {
                   filter === f ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
                 }`}
               >
-                {f === "dormant" ? "Never" : f}
+                {f === "dormant" ? sh.never : f}
               </button>
             ))}
           </div>
@@ -296,7 +307,7 @@ export default function AdminUsage() {
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cream-deep/50 text-ink-soft">
             <Activity size={24} />
           </span>
-          <p className="text-sm text-ink-soft">Is filter me koi user nahi.</p>
+          <p className="text-sm text-ink-soft">{sh.emptyFilter}</p>
         </div>
       ) : (
         <>
@@ -304,13 +315,13 @@ export default function AdminUsage() {
             <table className="w-full min-w-[680px] text-left text-sm">
               <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
                 <tr>
-                  <th className="px-4 py-3 font-semibold">User</th>
-                  <th className="px-4 py-3 text-center font-semibold">Docs</th>
-                  <th className="px-4 py-3 text-center font-semibold">Reminders</th>
-                  <th className="px-4 py-3 text-center font-semibold">Chats</th>
-                  <th className="px-4 py-3 font-semibold">Last active</th>
-                  <th className="px-4 py-3 font-semibold">Status</th>
-                  <th className="px-4 py-3 text-right font-semibold">Detail</th>
+                  <th className="px-4 py-3 font-semibold">{sh.user}</th>
+                  <th className="px-4 py-3 text-center font-semibold">{d.docsShort}</th>
+                  <th className="px-4 py-3 text-center font-semibold">{sh.reminders}</th>
+                  <th className="px-4 py-3 text-center font-semibold">{sh.chats}</th>
+                  <th className="px-4 py-3 font-semibold">{d.lastActive}</th>
+                  <th className="px-4 py-3 font-semibold">{sh.status}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{sh.detail}</th>
                 </tr>
               </thead>
               <tbody>
@@ -372,15 +383,23 @@ export default function AdminUsage() {
 
 /* --------------------------- See all: user detail --------------------------- */
 
-const ACT_FILTERS = [
-  { key: "all", label: "Sab" },
-  { key: "document", label: "Documents" },
-  { key: "reminder", label: "Reminders" },
-  { key: "chat", label: "Chats" },
-] as const;
-type ActFilter = (typeof ACT_FILTERS)[number]["key"];
+const ACT_FILTER_KEYS = ["all", "document", "reminder", "chat"] as const;
+type ActFilter = (typeof ACT_FILTER_KEYS)[number];
 
 function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: () => void }) {
+  const t = useAdminT();
+  const d = t.data.usage;
+  const sh = t.data.shared;
+  const kindLabel = (k: "document" | "reminder" | "chat") =>
+    k === "document" ? sh.documents : k === "reminder" ? sh.reminders : sh.chats;
+  const actLabel = (k: ActFilter) =>
+    k === "all"
+      ? d.all
+      : k === "document"
+        ? sh.documents
+        : k === "reminder"
+          ? sh.reminders
+          : sh.chats;
   const [items, setItems] = useState<ActivityRow[] | null>(null);
   const [error, setError] = useState("");
   const [actFilter, setActFilter] = useState<ActFilter>("all");
@@ -426,7 +445,7 @@ function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: (
     <Modal
       open={!!user}
       onClose={onClose}
-      title={user.name || user.email || "User"}
+      title={user.name || user.email || sh.user}
       subtitle={`${user.documents} docs · ${user.reminders} reminders · ${user.messages} chats`}
       size="lg"
       footer={
@@ -445,15 +464,15 @@ function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: (
     >
       <div className="space-y-3">
         <div className="flex rounded-2xl border border-line bg-surface p-1">
-          {ACT_FILTERS.map((f) => (
+          {ACT_FILTER_KEYS.map((k) => (
             <button
-              key={f.key}
-              onClick={() => setActFilter(f.key)}
+              key={k}
+              onClick={() => setActFilter(k)}
               className={`h-9 flex-1 rounded-xl px-2 text-xs font-semibold transition ${
-                actFilter === f.key ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
+                actFilter === k ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
               }`}
             >
-              {f.label}
+              {actLabel(k)}
             </button>
           ))}
         </div>
@@ -461,7 +480,7 @@ function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: (
         {!items ? (
           <div className="flex items-center justify-center gap-2 py-14 text-ink-soft">
             <Loader size={40} />
-            <span className="text-sm">Poora detail la rahe hain...</span>
+            <span className="text-sm">{d.loadingDetail}</span>
           </div>
         ) : error ? (
           <div className="flex items-center gap-2 rounded-2xl border border-terracotta/30 bg-terracotta/10 p-4">
@@ -469,7 +488,7 @@ function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: (
             <p className="text-sm text-terracotta-dark">{error}</p>
           </div>
         ) : !filtered.length ? (
-          <p className="py-12 text-center text-sm text-ink-soft">Is filter me kuch nahi.</p>
+          <p className="py-12 text-center text-sm text-ink-soft">{d.nothingHere}</p>
         ) : (
           <ul className="divide-y divide-line/60">
             {pager.pageItems.map((a) => {
@@ -485,7 +504,7 @@ function UsageDetailModal({ user, onClose }: { user: UsageRow | null; onClose: (
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-ink">{a.title || "—"}</p>
                     <p className="text-xs text-ink-soft">
-                      {k.label}
+                      {kindLabel(a.kind)}
                       {a.detail ? ` · ${a.detail}` : ""}
                     </p>
                   </div>

@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,7 +27,7 @@ import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { useToast } from "@/components/toast";
 import { useUserName, useAuth } from "@/components/auth-provider";
-import { getUserDetails } from "@/lib/user-details";
+import { useUserDetails } from "@/lib/user-details";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useOffers } from "@/lib/use-offers";
@@ -58,18 +57,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refModal, setRefModal] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-
-  // Avatar load karo (best-effort) — header me user ka apna avatar dikhe.
-  useEffect(() => {
-    let alive = true;
-    getUserDetails()
-      .then((d) => alive && setAvatarUrl(d?.avatar_url ?? null))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [session?.user?.id]);
+  // Header ka avatar — shared cache se, taaki profile me photo badalte hi yahan
+  // bhi turant badal jaye (pehle logout-login tak purani photo dikhti thi).
+  const avatarUrl = useUserDetails().details?.avatar_url ?? null;
 
   // Referral code ek baar poochho — jinhone signup pe code nahi daala + pehle
   // se referred nahi. Dismiss/apply ke baad dobara nahi.

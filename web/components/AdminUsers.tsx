@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 import Loader from "@/components/Loader";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type AdminUser = {
   id: string;
@@ -90,24 +91,22 @@ function fmtDate(iso: string | null): string {
  */
 type Status = { label: string; tone: "plus" | "free" | "expired"; lifetime: boolean };
 
-function statusOf(u: { plan: string; planExpiresAt: string | null }): Status {
-  if (u.plan !== "plus") return { label: "Free", tone: "free", lifetime: false };
-  if (!u.planExpiresAt) return { label: "Plus", tone: "plus", lifetime: true };
+/**
+ * Status ke labels ab dictionary se aate hain, isliye ye function locale
+ * strings leta hai. Pehle "Free"/"Plus"/"Expired" module me hardcoded the —
+ * language switcher unhe kabhi badal hi nahi paata tha.
+ */
+function statusOf(
+  u: { plan: string; planExpiresAt: string | null },
+  L: { free: string; plus: string; expired: string },
+): Status {
+  if (u.plan !== "plus") return { label: L.free, tone: "free", lifetime: false };
+  if (!u.planExpiresAt) return { label: L.plus, tone: "plus", lifetime: true };
   const expired = new Date(u.planExpiresAt).getTime() < Date.now();
   return expired
-    ? { label: "Expired", tone: "expired", lifetime: false }
-    : { label: "Plus", tone: "plus", lifetime: false };
+    ? { label: L.expired, tone: "expired", lifetime: false }
+    : { label: L.plus, tone: "plus", lifetime: false };
 }
-
-const SOURCE_LABEL: Record<string, string> = {
-  first_n: "First-N offer",
-  referral: "Referral",
-  reward: "Reward",
-  google_play: "Google Play",
-  admin: "Admin grant",
-};
-
-const sourceLabel = (s: string | null) => (s ? (SOURCE_LABEL[s] ?? s) : "—");
 
 function toCsv(rows: string[][]): string {
   return rows
@@ -128,6 +127,18 @@ function download(filename: string, content: string) {
 /* -------------------------------- View -------------------------------- */
 
 export default function AdminUsers() {
+  const t = useAdminT();
+  const d = t.data.users;
+  const sh = t.data.shared;
+  const statusLabels = { free: sh.free, plus: sh.plus, expired: sh.expired };
+  const SOURCE_LABEL: Record<string, string> = {
+    first_n: d.sourceFirstN,
+    referral: d.sourceReferral,
+    reward: d.sourceReward,
+    google_play: d.sourceGooglePlay,
+    admin: d.sourceAdmin,
+  };
+  const sourceLabel = (v: string | null) => (v ? (SOURCE_LABEL[v] ?? v) : "—");
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
@@ -142,7 +153,7 @@ export default function AdminUsers() {
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setUsers(body.users ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Users load nahi hue");
+      setError(e instanceof Error ? e.message : sh.loadFailed);
       setUsers([]);
     }
   }, []);
@@ -155,7 +166,7 @@ export default function AdminUsers() {
     const list = users ?? [];
     const q = query.trim().toLowerCase();
     return list.filter((u) => {
-      const st = statusOf(u);
+      const st = statusOf(u, statusLabels);
       if (filter === "plus" && st.tone !== "plus") return false;
       if (filter === "free" && st.tone === "plus") return false;
       if (!q) return true;
@@ -171,7 +182,7 @@ export default function AdminUsers() {
     const list = users ?? [];
     return {
       total: list.length,
-      plus: list.filter((u) => statusOf(u).tone === "plus").length,
+      plus: list.filter((u) => statusOf(u, statusLabels).tone === "plus").length,
     };
   }, [users]);
 
@@ -181,16 +192,16 @@ export default function AdminUsers() {
     download(
       "apka-saathi-users.csv",
       toCsv([
-        ["Name", "Email", "Plan", "Source", "Joined", "Active till", "Referral days", "Code"],
+        [sh.name, sh.email, sh.plan, sh.source, sh.joined, d.activeTill, d.referralDays, d.code],
         ...rows.map((u) => {
-          const st = statusOf(u);
+          const st = statusOf(u, statusLabels);
           return [
             u.fullName ?? "",
             u.email ?? "",
             st.label,
             sourceLabel(u.planSource),
             fmtDate(u.createdAt),
-            st.lifetime ? "Unlimited" : fmtDate(u.planExpiresAt),
+            st.lifetime ? sh.unlimited : fmtDate(u.planExpiresAt),
             String(u.referralDaysEarned),
             u.referralCode ?? "",
           ];
@@ -219,8 +230,8 @@ export default function AdminUsers() {
       )}
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-        <Stat label="Total users" value={stats.total} />
-        <Stat label="Plus (active)" value={stats.plus} />
+        <Stat label={`${sh.total} ${t.nav.users}`} value={stats.total} />
+        <Stat label={d.plusActive} value={stats.plus} />
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -232,7 +243,7 @@ export default function AdminUsers() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Email, naam ya referral code..."
+            placeholder={d.searchPh}
             className="h-11 w-full rounded-2xl border border-line bg-surface pl-10 pr-4 text-sm outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
           />
         </div>
@@ -267,7 +278,7 @@ export default function AdminUsers() {
             <UsersIcon size={24} />
           </span>
           <p className="text-sm text-ink-soft">
-            {users.length ? "Is filter me koi user nahi." : "Abhi koi user nahi."}
+            {users.length ? sh.emptyFilter : sh.empty}
           </p>
         </div>
       ) : (
@@ -277,18 +288,18 @@ export default function AdminUsers() {
             <table className="w-full text-left text-sm">
               <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
                 <tr>
-                  <Th>User</Th>
-                  <Th>Plan</Th>
-                  <Th>Source</Th>
-                  <Th>Joined</Th>
-                  <Th>Active till</Th>
-                  <Th className="text-right">Referral din</Th>
+                  <Th>{sh.user}</Th>
+                  <Th>{sh.plan}</Th>
+                  <Th>{sh.source}</Th>
+                  <Th>{sh.joined}</Th>
+                  <Th>{d.activeTill}</Th>
+                  <Th className="text-right">{d.referralDays}</Th>
                   <Th className="w-10" />
                 </tr>
               </thead>
               <tbody>
                 {pager.pageItems.map((u) => {
-                  const st = statusOf(u);
+                  const st = statusOf(u, statusLabels);
                   const open = openId === u.id;
                   return (
                     <Fragment key={u.id}>
@@ -344,7 +355,7 @@ export default function AdminUsers() {
           {/* Mobile cards */}
           <div className="space-y-3 lg:hidden">
             {pager.pageItems.map((u) => {
-              const st = statusOf(u);
+              const st = statusOf(u, statusLabels);
               const open = openId === u.id;
               return (
                 <div key={u.id} className="rounded-3xl border border-line bg-surface shadow-soft">
@@ -367,13 +378,13 @@ export default function AdminUsers() {
                       </div>
                     </div>
                     <dl className="mt-3.5 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-3.5 text-xs">
-                      <Field label="Joined" value={fmtDate(u.createdAt)} />
+                      <Field label={sh.joined} value={fmtDate(u.createdAt)} />
                       <Field
-                        label="Active till"
-                        value={st.lifetime ? "Unlimited" : fmtDate(u.planExpiresAt)}
+                        label={d.activeTill}
+                        value={st.lifetime ? sh.unlimited : fmtDate(u.planExpiresAt)}
                       />
-                      <Field label="Source" value={sourceLabel(u.planSource)} />
-                      <Field label="Referral din" value={String(u.referralDaysEarned)} />
+                      <Field label={sh.source} value={sourceLabel(u.planSource)} />
+                      <Field label={d.referralDays} value={String(u.referralDaysEarned)} />
                     </dl>
                   </button>
                   {open && (
@@ -410,6 +421,9 @@ export default function AdminUsers() {
 
 /** Lazy — sirf expand karne pe fetch hota hai, list me har user ke liye nahi. */
 function Detail({ id }: { id: string }) {
+  const t = useAdminT();
+  const d = t.data.users;
+  const sh = t.data.shared;
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [error, setError] = useState("");
 
@@ -422,7 +436,7 @@ function Detail({ id }: { id: string }) {
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
         if (alive) setDetail(body.detail ?? null);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : "Detail load nahi hui");
+        if (alive) setError(e instanceof Error ? e.message : d.detailFailed);
       }
     })();
     return () => {
@@ -443,25 +457,25 @@ function Detail({ id }: { id: string }) {
     <div className="grid gap-5 lg:grid-cols-2">
       {/* Left: facts */}
       <div className="space-y-2.5">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-ink-soft">Details</h4>
-        <DetailRow label="Referral code" value={detail.referral_code ?? "—"} mono />
+        <h4 className="text-xs font-bold uppercase tracking-wider text-ink-soft">{d.details}</h4>
+        <DetailRow label={d.referralCode} value={detail.referral_code ?? "—"} mono />
         <DetailRow
-          label="Kis code se aaya"
+          label={d.cameFromCode}
           value={
             detail.referred_by
               ? `${detail.referred_by.code ?? "—"} (${detail.referred_by.email ?? "—"})`
-              : "Kisi ne refer nahi kiya"
+              : d.noReferrer
           }
         />
         <DetailRow
-          label="Referral se kamaaye"
-          value={`${detail.referral_days_earned} din`}
+          label={d.earnedFromReferral}
+          value={`${detail.referral_days_earned} ${t.time.d}`}
         />
         <DetailRow
-          label="Plan khatam"
+          label={d.planEnds}
           value={
             detail.plan === "plus" && !detail.plan_expires_at
-              ? "Unlimited"
+              ? sh.unlimited
               : fmtDate(detail.plan_expires_at)
           }
         />

@@ -22,7 +22,7 @@ import {
 } from "@/lib/plan";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
-import { Loader } from "@/components/loader";
+import { ScreenLoader } from "@/components/loader";
 
 export default function Referral() {
   const toast = useToast();
@@ -75,9 +75,7 @@ export default function Referral() {
       </View>
 
       {loading ? (
-        <View style={{ marginTop: 60 }}>
-          <Loader size={44} />
-        </View>
+        <ScreenLoader />
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Hero */}

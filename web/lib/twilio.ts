@@ -70,9 +70,20 @@ export async function sendWhatsApp(
   return { sent: true };
 }
 
-/** Reminder bhejo — template ho to template se, warna plain text. */
-export function sendReminderWhatsApp(to: string, title: string, whenLabel: string) {
-  return sendWhatsApp(to, reminderWhatsAppText(title, whenLabel), {
+/**
+ * Reminder bhejo — template ho to template se, warna plain text.
+ *
+ * `note` = user ke apne shabd. Sirf plain-text message me jaata hai; Twilio
+ * template ke variables Twilio console me pehle se tay hote hain, isliye wahan
+ * ek naya variable chupke se nahi ghusaya ja sakta.
+ */
+export function sendReminderWhatsApp(
+  to: string,
+  title: string,
+  whenLabel: string,
+  note?: string | null,
+) {
+  return sendWhatsApp(to, reminderWhatsAppText(title, whenLabel, note), {
     templateSid: TEMPLATE_REMINDER,
     variables: { "1": title, "2": whenLabel },
   });
@@ -87,10 +98,20 @@ export function sendDocumentWhatsApp(to: string, name: string, whenLabel: string
 }
 
 /** Branded WhatsApp reminder text (logo emoji + brand). */
-export function reminderWhatsAppText(title: string, whenLabel: string): string {
+export function reminderWhatsAppText(
+  title: string,
+  whenLabel: string,
+  note?: string | null,
+): string {
+  // Note tabhi jodo jab wo title se alag ho — warna ek hi baat do baar dikhti hai.
+  const extra =
+    note && note.trim() && note.trim().toLowerCase() !== title.trim().toLowerCase()
+      ? `_${note.trim()}_\n\n`
+      : "";
   return (
     `🔔 *Apka Saathi* — reminder\n\n` +
     `${title}\n\n` +
+    extra +
     `🕐 ${whenLabel}\n\n` +
     `_Apka Saathi · jo kuch nahi bhoolta_ 🙂`
   );

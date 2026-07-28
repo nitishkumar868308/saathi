@@ -41,7 +41,7 @@ export default function Loader({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="sa-logo"
-          src="/logo.png"
+          src="/logo-128.png"
           alt={label || "Loading"}
           width={size}
           height={size}

@@ -64,6 +64,7 @@ export default function Footer() {
                 [t.links.demo, "/#demo"],
                 [t.links.pricing, "/#pricing"],
                 [t.links.faq, "/#faq"],
+                [t.links.blog, "/blog"],
                 [t.links.about, "/about"],
                 [t.links.referral, "/referral"],
               ].map(([label, href]) => (
@@ -86,6 +87,7 @@ export default function Footer() {
                 [t.links.privacy, "/privacy"],
                 [t.links.terms, "/terms"],
                 [t.links.contact, "/contact"],
+                [t.links.support, "/support"],
               ].map(([label, href]) => (
                 <li key={href}>
                   <Link href={href} className={linkCls(href)}>

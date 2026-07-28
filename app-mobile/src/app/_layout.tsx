@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Stack } from "expo-router/js-stack";
-import { useRouter, useSegments } from "expo-router";
+import { useRouter, useSegments, usePathname } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
@@ -13,7 +13,7 @@ import { ReviewPrompt } from "@/components/review-prompt";
 import { NetworkBanner } from "@/components/network-banner";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
-import { setAnalyticsUser } from "@/lib/analytics";
+import { setAnalyticsUser, logScreen } from "@/lib/analytics";
 import { installGlobalErrorHandler } from "@/lib/report-error";
 
 // App start hote hi uncaught errors pakadna shuru.
@@ -81,6 +81,14 @@ function RootNavigator() {
     if (uid) void syncNotifications();
     setAnalyticsUser(uid ?? null);
   }, [uid]);
+
+  // Har screen change ek event — admin panel ka "journey" isi se banta hai.
+  // Ek hi jagah rakha hai taaki nayi screen add karne par kuch yaad na rakhna pade.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (loading || !langReady) return;
+    logScreen(pathname || "/");
+  }, [pathname, loading, langReady]);
 
   if (loading || !langReady) {
     return <ScreenLoader />;

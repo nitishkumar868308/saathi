@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Alert,
-  Linking,
   Modal,
   Platform,
 } from "react-native";
@@ -26,8 +25,8 @@ import { getPlan, WEB_URL } from "@/lib/plan";
 import { useOffers } from "@/lib/use-offers";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
-import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
-import { openBatteryOptimizationSettings } from "@/lib/reliability";
+import { useUserDetails, isDetailsComplete } from "@/lib/user-details";
+import { PermissionModal } from "@/components/permission-modal";
 
 type RowId =
   | "saathi_name"
@@ -49,13 +48,16 @@ export default function Settings() {
   const { locale, setLocale } = useLocale();
   const s = t.settings;
   const rel = t.reliability;
+  // Live details — profile save karte hi naam/photo yahan apne aap badal jaate hain.
+  const { details, loading: detailsLoading } = useUserDetails();
   const meta = session?.user?.user_metadata;
-  const name = meta?.full_name || meta?.name || s.account;
+  const name = details?.full_name || meta?.full_name || meta?.name || s.account;
+  const avatarUrl = details?.avatar_url ?? null;
+  const profileComplete = detailsLoading || isDetailsComplete(details);
   const [isPlus, setIsPlus] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [refModal, setRefModal] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [profileComplete, setProfileComplete] = useState(true);
+  const [permModal, setPermModal] = useState(false);
 
   const groups: { title: string; rows: Row[] }[] = [
     {
@@ -103,12 +105,6 @@ export default function Settings() {
     if (!isSupabaseConfigured) return;
     getPlan()
       .then((p) => setIsPlus(p.isPlus))
-      .catch(() => {});
-    getUserDetails()
-      .then((d) => {
-        setAvatarUrl(d?.avatar_url ?? null);
-        setProfileComplete(isDetailsComplete(d));
-      })
       .catch(() => {});
   }, [rewardsVersion]);
 
@@ -162,12 +158,10 @@ export default function Settings() {
         router.push("/profile-details" as never);
         return;
       case "notifications":
-        Linking.openSettings().catch(() =>
-          toast.show(s.settingsFailed, "error"),
-        );
-        return;
       case "reminders_reliable":
-        openBatteryOptimizationSettings();
+        // Dono rows ab wahi setup modal kholti hain — notification, exact alarm,
+        // battery aur OEM auto-start ek hi jagah, status ke saath.
+        setPermModal(true);
         return;
       case "language":
         setLangOpen(true);
@@ -315,6 +309,9 @@ export default function Settings() {
       </ScrollView>
 
       <ReferralCodeModal visible={refModal} onClose={() => setRefModal(false)} />
+
+      {/* Reminder reliability — notification, exact alarm, battery, auto-start */}
+      <PermissionModal visible={permModal} onClose={() => setPermModal(false)} />
 
       {/* Bhasha picker */}
       <Modal

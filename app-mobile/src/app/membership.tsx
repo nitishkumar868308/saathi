@@ -16,7 +16,7 @@ import { useAuth } from "@/components/auth-provider";
 import { getMyRewards, type MyRewards, type MyReferral } from "@/lib/plan";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl, type Dict } from "@/lib/i18n/dictionaries";
-import { Loader } from "@/components/loader";
+import { ScreenLoader } from "@/components/loader";
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -114,9 +114,7 @@ export default function Membership() {
       </View>
 
       {loading ? (
-        <View style={{ marginTop: 60 }}>
-          <Loader size={44} />
-        </View>
+        <ScreenLoader />
       ) : !data ? (
         <View style={styles.center}>
           <Text style={styles.muted}>{m.title} ✕</Text>

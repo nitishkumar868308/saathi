@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { getUserDetails, isDetailsComplete } from "./user-details";
+import { getDeviceId } from "./device";
 
 /**
  * Plan / subscription helpers.
@@ -163,9 +164,23 @@ export async function hasBeenReferred(): Promise<boolean> {
  */
 export async function checkReferralQualification(): Promise<string> {
   try {
-    const { data, error } = await client().rpc("check_referral_qualification");
-    if (error) return "error";
-    return (data as string) ?? "error";
+    const sb = client();
+    // Device ID bhi bhejo — ek phone se sirf ek baar reward mil sakta hai.
+    // Iske bina koi bhi naya email banake, apna hi code daal ke, usi phone se
+    // baar-baar 15-15 din le sakta tha.
+    const p_device_id = await getDeviceId().catch(() => null);
+
+    const { data, error } = await sb.rpc("check_referral_qualification", {
+      p_device_id,
+    });
+    if (!error) return (data as string) ?? "error";
+
+    // Purana server: 1-arg wala version abhi deploy nahi hua
+    // (supabase/devices-analytics.sql chalna baaki hai). Aise me 0-arg wale par
+    // gir jao — device check nahi hoga, par reward pipeline rukni nahi chahiye.
+    const legacy = await sb.rpc("check_referral_qualification");
+    if (legacy.error) return "error";
+    return (legacy.data as string) ?? "error";
   } catch {
     return "error";
   }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SkeletonRows } from "@/components/Loader";
 import { Star, AlertTriangle, Globe, Download, MessageSquare } from "lucide-react";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type AdminReview = {
   id: string;
@@ -54,6 +55,9 @@ function Stars({ n }: { n: number }) {
 }
 
 export default function AdminReviews() {
+  const t = useAdminT();
+  const d = t.data.reviews;
+  const sh = t.data.shared;
   const [reviews, setReviews] = useState<AdminReview[] | null>(null);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "display">("all");
@@ -66,7 +70,7 @@ export default function AdminReviews() {
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setReviews(body.reviews ?? []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Reviews load nahi hue");
+      setError(e instanceof Error ? e.message : sh.loadFailed);
       setReviews([]);
     }
   }, []);
@@ -98,7 +102,7 @@ export default function AdminReviews() {
     download(
       "apka-saathi-reviews.csv",
       toCsv([
-        ["Name", "Email", "Rating", "Review", "Website allowed", "Date"],
+        [sh.name, sh.email, d.rating, d.review, d.websiteAllowed, sh.date],
         ...rows.map((r) => [
           r.name ?? "",
           r.email ?? "",
@@ -127,9 +131,9 @@ export default function AdminReviews() {
       )}
 
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        <Stat label="Total reviews" value={String(stats.total)} />
-        <Stat label="Average" value={stats.avg} />
-        <Stat label="Website OK" value={String(stats.display)} />
+        <Stat label={d.totalReviews} value={String(stats.total)} />
+        <Stat label={d.average} value={stats.avg} />
+        <Stat label={d.websiteOk} value={String(stats.display)} />
       </div>
 
       <div className="flex items-center justify-between gap-2">
@@ -142,7 +146,7 @@ export default function AdminReviews() {
                 filter === f ? "bg-terracotta text-white" : "text-ink-soft hover:text-ink"
               }`}
             >
-              {f === "all" ? "All" : "Website-allowed"}
+              {f === "all" ? d.filterAll : d.filterWebsite}
             </button>
           ))}
         </div>
@@ -162,7 +166,7 @@ export default function AdminReviews() {
             <MessageSquare size={24} />
           </span>
           <p className="text-sm text-ink-soft">
-            {reviews.length ? "Is filter me koi review nahi." : "Abhi koi review nahi aaya."}
+            {reviews.length ? sh.emptyFilter : sh.empty}
           </p>
         </div>
       ) : (

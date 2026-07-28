@@ -8,13 +8,12 @@ import {
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
-import { HandsLoader } from "@/components/loader";
+import { TypingDots as Dots } from "@/components/typing-dots";
 import SaathiLogo from "@/components/saathi-logo";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
@@ -51,14 +50,21 @@ function matchDocs(text: string, docs: Document[]): DocRef[] {
     }));
 }
 
-function TypingDots() {
+/**
+ * "Saathi type kar raha hai" — WhatsApp jaisa, teen dots.
+ *
+ * Pehle yahan app ka brand loader (ghoomta logo) tha. Chat me loader galat ishaara
+ * deta hai — lagta hai app atak gaya. Dots batate hain ki saamne wala likh raha
+ * hai, isliye intezaar swabhavik lagta hai.
+ */
+function TypingBubble() {
   return (
     <View style={styles.saathiRow}>
       <View style={styles.miniAvatar}>
         <SaathiLogo size={26} radius={10} />
       </View>
       <View style={styles.saathiBubble}>
-        <HandsLoader size={30} />
+        <Dots />
       </View>
     </View>
   );
@@ -266,7 +272,7 @@ export default function Chat() {
               </View>
             ),
           )}
-          {sending && <TypingDots />}
+          {sending && <TypingBubble />}
         </ScrollView>
 
         {/* suggestions */}

@@ -38,7 +38,29 @@ CONNECTED. The single most important shot is the tap that takes the viewer from 
 straight into the attached document, with no searching in between. Spend the production
 budget on making that one transition feel seamless and inevitable.
 
-CHARACTER: Indian male 33, well-dressed but understated. Calm, unhurried.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAHUL-01]
+  Indian male, exactly 30 years old, oval face with a defined jawline, medium-brown
+  skin (Fitzpatrick IV), short black side-parted hair with a slight natural wave at
+  the front, thick straight eyebrows, dark brown almond-shaped eyes with mild
+  under-eye shadows, straight medium-width nose, close-trimmed 3-day stubble beard
+  connected to a thin moustache, a small dark mole on the left cheekbone below the
+  eye, no glasses, lean build, height 5 feet 9 inches.
+  Wardrobe: Light blue formal shirt, sleeves folded twice to the forearm, dark grey
+  trousers, black office ID lanyard. At home: plain charcoal t-shirt, same face.
+
+ROLES: RAHUL-01, calm and unhurried.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+RAHUL-01 in the final shot must be recognisably the SAME PERSON as RAHUL-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: A clean home study in the evening, a warm lamp, a laptop closed to one side.
 
 LOOK: Premium, warm, refined. 85mm shallow, smooth slow camera. Screen work must be crisp
@@ -47,6 +69,11 @@ VOICE: Hindi-Hinglish, male narrator, premium and assured, speed 0.95.
 CAPTIONS: Poppins Bold white, highlight #C25A37.
 MUSIC: Refined minimal electronic with a warm melodic layer. Elegant, not corporate.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -145,7 +172,29 @@ a different job. Attacking a tool everyone uses makes the viewer defensive; resp
 and drawing a category line makes the viewer agree. Fair comparison converts better than
 a takedown.
 
-CHARACTER: Indian male or female 31, practical and clear-thinking.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAHUL-01]
+  Indian male, exactly 30 years old, oval face with a defined jawline, medium-brown
+  skin (Fitzpatrick IV), short black side-parted hair with a slight natural wave at
+  the front, thick straight eyebrows, dark brown almond-shaped eyes with mild
+  under-eye shadows, straight medium-width nose, close-trimmed 3-day stubble beard
+  connected to a thin moustache, a small dark mole on the left cheekbone below the
+  eye, no glasses, lean build, height 5 feet 9 inches.
+  Wardrobe: Light blue formal shirt, sleeves folded twice to the forearm, dark grey
+  trousers, black office ID lanyard. At home: plain charcoal t-shirt, same face.
+
+ROLES: RAHUL-01, practical and clear-thinking.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+RAHUL-01 in the final shot must be recognisably the SAME PERSON as RAHUL-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: A desk with both a physical wall calendar and a document folder visible — the
 two objects are the two arguments.
 
@@ -155,6 +204,11 @@ VOICE: Hindi-Hinglish, clear and even, explanatory not combative, speed 0.98.
 CAPTIONS: Poppins Bold white, highlight #C25A37.
 MUSIC: Clean, light, neutral.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -250,8 +304,28 @@ TONE — CRITICAL: This is a mood film about a very specific, very common feelin
 nobody names out loud. It is quiet, not dramatic. Nothing bad happens; there is only an
 unnamed unease. Getting the ATMOSPHERE right matters more than the story here.
 
-CHARACTER: Indian male or female 30, in bed or on a sofa on a Sunday night. Awake when
-they should be asleep.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[KAVYA-01]
+  Indian woman, exactly 32 years old, long face with a strong jaw, wheatish skin,
+  dark brown hair tied back into a neat low ponytail with a centre parting, defined
+  straight eyebrows, sharp dark eyes, high cheekbones, a small scar on the left side
+  of the upper lip, thin black-framed rectangular glasses always worn, medium build,
+  height 5 feet 5 inches.
+  Wardrobe: Charcoal or navy blazer over a plain shirt, minimal steel wristwatch on
+  the left wrist.
+
+ROLES: KAVYA-01, awake on a Sunday night when she should be asleep.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+KAVYA-01 in the final shot must be recognisably the SAME PERSON as KAVYA-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: A dim bedroom on Sunday night. A phone face-down. A ceiling. A clock reading
 11:40 PM.
 
@@ -263,6 +337,11 @@ speed 0.88.
 CAPTIONS: Poppins Bold white, highlight #C25A37. Minimal.
 MUSIC: A single low ambient drone. No melody until the last five seconds.
 END CARD: standard Apka Saathi card, gentle fade.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -359,7 +438,29 @@ CORE IDEA: This film moves the product from ADMIN to RELATIONSHIPS. The reminder
 are not documents or payments — they are people. That distinction must be visible in every
 frame: show faces, not paperwork.
 
-CHARACTER: Indian male 32, warm and thoughtful.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAHUL-01]
+  Indian male, exactly 30 years old, oval face with a defined jawline, medium-brown
+  skin (Fitzpatrick IV), short black side-parted hair with a slight natural wave at
+  the front, thick straight eyebrows, dark brown almond-shaped eyes with mild
+  under-eye shadows, straight medium-width nose, close-trimmed 3-day stubble beard
+  connected to a thin moustache, a small dark mole on the left cheekbone below the
+  eye, no glasses, lean build, height 5 feet 9 inches.
+  Wardrobe: Light blue formal shirt, sleeves folded twice to the forearm, dark grey
+  trousers, black office ID lanyard. At home: plain charcoal t-shirt, same face.
+
+ROLES: RAHUL-01 across several short human moments.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+RAHUL-01 in the final shot must be recognisably the SAME PERSON as RAHUL-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: Several short human moments — a phone call on a balcony, a doorstep visit, a
 hospital corridor, a video call.
 
@@ -370,6 +471,11 @@ VOICE: Hindi-Hinglish, warm male narrator, gentle and sincere, speed 0.95.
 CAPTIONS: Poppins Bold white, highlight #C25A37.
 MUSIC: Soft warm piano with a light string layer. Tender.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -466,7 +572,28 @@ one shows them as intentions. That single shift changes what the product IS. The
 must match: no bills, no documents, no offices anywhere in this film. Mountains, music,
 a mother's face, an old photograph.
 
-CHARACTER: Indian male or female 33, thoughtful, quietly hopeful.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[KAVYA-01]
+  Indian woman, exactly 32 years old, long face with a strong jaw, wheatish skin,
+  dark brown hair tied back into a neat low ponytail with a centre parting, defined
+  straight eyebrows, sharp dark eyes, high cheekbones, a small scar on the left side
+  of the upper lip, thin black-framed rectangular glasses always worn, medium build,
+  height 5 feet 5 inches.
+  Wardrobe: Charcoal or navy blazer over a plain shirt, minimal steel wristwatch on
+  the left wrist.
+
+ROLES: KAVYA-01, thoughtful and quietly hopeful.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+KAVYA-01 in the final shot must be recognisably the SAME PERSON as KAVYA-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: A quiet evening at home to begin, then the dreams themselves — a mountain road, a
 classroom, a mother on a sofa telling a story.
 
@@ -478,6 +605,11 @@ speed 0.92.
 CAPTIONS: Poppins Bold white, highlight #C25A37.
 MUSIC: Piano opening, strings opening up as the frames widen, warm and hopeful.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -575,8 +707,50 @@ cannot be present. The parents are content and independent — they are not suff
 emotion is longing, not guilt-tripping. If the film makes the viewer feel accused, it has
 failed; it should make them feel seen.
 
-CHARACTERS: Son 34, living alone in another city. Father 66 and mother 62, at home,
-comfortable and self-sufficient.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAHUL-01]
+  Indian male, exactly 30 years old, oval face with a defined jawline, medium-brown
+  skin (Fitzpatrick IV), short black side-parted hair with a slight natural wave at
+  the front, thick straight eyebrows, dark brown almond-shaped eyes with mild
+  under-eye shadows, straight medium-width nose, close-trimmed 3-day stubble beard
+  connected to a thin moustache, a small dark mole on the left cheekbone below the
+  eye, no glasses, lean build, height 5 feet 9 inches.
+  Wardrobe: Light blue formal shirt, sleeves folded twice to the forearm, dark grey
+  trousers, black office ID lanyard. At home: plain charcoal t-shirt, same face.
+
+[PAPA-01]
+  Indian male, exactly 62 years old, square face with prominent cheekbones, wheatish
+  skin, full silver-grey hair combed straight back from a high forehead, thick black
+  rectangular-framed glasses, bushy grey eyebrows, deep-set warm brown eyes with
+  heavy crow's feet, prominent nasolabial folds, clean-shaven cheeks with a neat
+  trimmed grey moustache, a small vertical scar above the right eyebrow, slight
+  forward stoop, medium build.
+  Wardrobe: Cream cotton kurta, brown leather sandals. In winter: brown shawl over
+  the shoulder.
+
+[MAA-01]
+  Indian woman, exactly 55 years old, round face with soft full cheeks, wheatish
+  skin, black hair with visible grey at the temples pulled back into a low bun with a
+  centre parting, small maroon round bindi, thin gold hoop earrings, soft
+  double-lidded brown eyes, deep gentle smile lines around the mouth, a small mole on
+  the right side of the chin, no glasses, small build, height 5 feet 1 inch.
+  Wardrobe: Simple cotton saree in soft teal or mustard, cotton blouse, thin gold
+  mangalsutra. When reading: thin gold-rimmed reading glasses.
+
+ROLES: RAHUL-01 living alone in another city; PAPA-01 and MAA-01 at the family home.
+The two spaces never share a frame until the very end.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+Every character above must be recognisably the SAME PERSON in the final shot as in
+the first — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+descriptions above before generating each new shot. Where two of them share a frame,
+keep them clearly distinct people and never blend their features into each other.
+
 SETTING: Two homes, cut against each other throughout — his small flat and their family
 home. The two spaces never share a frame until the very end.
 
@@ -586,6 +760,11 @@ VOICE: Hindi-Hinglish, warm male narrator, tender and honest, speed 0.90.
 CAPTIONS: Poppins Bold white, highlight #C25A37.
 MUSIC: Solo piano, spacious. A single string line entering at the end.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -688,9 +867,39 @@ his daughter set her own exam reminder. Then her friends' birthdays. Then her sc
 deadline. Nobody taught her; she learnt by watching. We try so hard to teach children
 discipline — sometimes just showing them is enough. Habits get inherited.
 
-CHARACTERS: Father 42, warm and quietly proud. Daughter 16, independent, a little
-matter-of-fact about it — she doesn't think she's done anything special. That casualness
-is what makes the father's pride land.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAVI-01]
+  Indian male, exactly 45 years old, oval face with a heavy jaw, dark-brown weathered
+  skin, thick black hair with grey only at the sideburns, side-parted, a thick full
+  black moustache with no beard, tired warm eyes with deep lower-lid creases, a small
+  mole on the left side of the neck, no glasses, sturdy build, height 5 feet 8
+  inches.
+  Wardrobe: Half-sleeve checked shirt in blue or brown, dark trousers, a pen clipped
+  in the shirt pocket.
+
+[ANJALI-01]
+  Indian girl, exactly 17 years old, small round face, fair-wheatish skin, long
+  straight black hair worn in a single side braid, thin straight eyebrows, large
+  bright dark eyes, small round nose, a light scattering of freckles across the nose
+  and upper cheeks, braces on the upper teeth, no glasses, slight build, height 5
+  feet 2 inches.
+  Wardrobe: School uniform (white shirt, navy skirt or trousers), or a plain t-shirt
+  with jeans at home.
+
+ROLES: RAVI-01 the father, quietly proud; ANJALI-01 his daughter, matter-of-fact
+about it.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+Every character above must be recognisably the SAME PERSON in the final shot as in
+the first — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+descriptions above before generating each new shot. Where two of them share a frame,
+keep them clearly distinct people and never blend their features into each other.
+
 SETTING: An Indian home — a study desk, a dining table, a doorway.
 
 LOOK: Warm, natural, domestic. The key visual is the father WATCHING his daughter without
@@ -700,6 +909,11 @@ VOICE: Hindi-Hinglish, warm male narrator, quietly proud, speed 0.95.
 CAPTIONS: Poppins Bold white, highlight #C25A37.
 MUSIC: Light warm piano with a gentle lift at the last line.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -796,8 +1010,28 @@ CREDIBILITY NOTE: The specificity of the compliance list is the entire point. Na
 actual documents an Indian shop owner deals with is what makes this audience trust the
 brand. Do not generalise them into "paperwork".
 
-CHARACTER: Indian business owner 44, half-sleeve shirt, practical and experienced. Running
-a real business, not a startup.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAVI-01]
+  Indian male, exactly 45 years old, oval face with a heavy jaw, dark-brown weathered
+  skin, thick black hair with grey only at the sideburns, side-parted, a thick full
+  black moustache with no beard, tired warm eyes with deep lower-lid creases, a small
+  mole on the left side of the neck, no glasses, sturdy build, height 5 feet 8
+  inches.
+  Wardrobe: Half-sleeve checked shirt in blue or brown, dark trousers, a pen clipped
+  in the shirt pocket.
+
+ROLES: RAVI-01 the business owner.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+RAVI-01 in the final shot must be recognisably the SAME PERSON as RAVI-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: A small business premises — a shop, a small workshop or a godown. A cluttered
 office corner with a file rack, a wall calendar and a desktop computer.
 
@@ -807,6 +1041,11 @@ VOICE: Hindi-Hinglish, male narrator, grounded and practical, speed 0.98.
 CAPTIONS: Poppins Bold white, highlight #C25A37. Document names as chips.
 MUSIC: Simple percussive groove, understated and steady.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -914,7 +1153,29 @@ CORE DISTINCTION: Every other AI film in this series is about CREATING a reminde
 one is about ASKING and CHANGING. Show a back-and-forth — a question, an answer, then a
 follow-up. The two-way exchange is the whole claim.
 
-CHARACTER: Indian male or female 29, relaxed, treating the phone conversationally.
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[RAHUL-01]
+  Indian male, exactly 30 years old, oval face with a defined jawline, medium-brown
+  skin (Fitzpatrick IV), short black side-parted hair with a slight natural wave at
+  the front, thick straight eyebrows, dark brown almond-shaped eyes with mild
+  under-eye shadows, straight medium-width nose, close-trimmed 3-day stubble beard
+  connected to a thin moustache, a small dark mole on the left cheekbone below the
+  eye, no glasses, lean build, height 5 feet 9 inches.
+  Wardrobe: Light blue formal shirt, sleeves folded twice to the forearm, dark grey
+  trousers, black office ID lanyard. At home: plain charcoal t-shirt, same face.
+
+ROLES: RAHUL-01, relaxed and conversational with the phone.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+RAHUL-01 in the final shot must be recognisably the SAME PERSON as RAHUL-01 in the
+first shot — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+description above before generating each new shot.
+
 SETTING: A modern flat, a cafe table, a metro seat — somewhere ordinary and current.
 
 LOOK: Clean, modern, warm. The screen must be crisp and legible. Show the conversation
@@ -925,6 +1186,11 @@ CAPTIONS: Poppins Bold white, highlight #C25A37. Questions in a terracotta box, 
 in a plain box — so the exchange reads visually.
 MUSIC: Clean minimal electronic, light and conversational.
 END CARD: standard Apka Saathi card.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE
@@ -1022,6 +1288,59 @@ station half an hour early. Because he remembered. A friend messaged on the morn
 your exam. Because he remembered. Nobody ever said to you, "I remembered you." They just
 did it. Remembering isn't only memory. Remembering is love. And love shouldn't slip.
 
+CAST — LOCKED IDENTITIES. Generate exactly these people, from these exact
+descriptions. Do NOT reinterpret, restyle, re-age or beautify them, and do NOT
+invent a new face when the scene, location, outfit or lighting changes. If a
+reference image is attached for a character, that image overrides this text.
+
+[MAA-01]
+  Indian woman, exactly 55 years old, round face with soft full cheeks, wheatish
+  skin, black hair with visible grey at the temples pulled back into a low bun with a
+  centre parting, small maroon round bindi, thin gold hoop earrings, soft
+  double-lidded brown eyes, deep gentle smile lines around the mouth, a small mole on
+  the right side of the chin, no glasses, small build, height 5 feet 1 inch.
+  Wardrobe: Simple cotton saree in soft teal or mustard, cotton blouse, thin gold
+  mangalsutra. When reading: thin gold-rimmed reading glasses.
+
+[PAPA-01]
+  Indian male, exactly 62 years old, square face with prominent cheekbones, wheatish
+  skin, full silver-grey hair combed straight back from a high forehead, thick black
+  rectangular-framed glasses, bushy grey eyebrows, deep-set warm brown eyes with
+  heavy crow's feet, prominent nasolabial folds, clean-shaven cheeks with a neat
+  trimmed grey moustache, a small vertical scar above the right eyebrow, slight
+  forward stoop, medium build.
+  Wardrobe: Cream cotton kurta, brown leather sandals. In winter: brown shawl over
+  the shoulder.
+
+[AMAN-01]
+  Indian male, exactly 21 years old, thin narrow face, medium-brown skin, thick messy
+  black hair falling over the forehead, sparse patchy stubble on the chin only, thin
+  eyebrows, bright dark eyes, slightly prominent front teeth visible when smiling, a
+  small mole on the right jawline, no glasses, thin lanky build, height 5 feet 10
+  inches.
+  Wardrobe: Oversized grey hoodie or plain black t-shirt, wired earphones around the
+  neck, canvas backpack.
+
+[RAHUL-01]
+  Indian male, exactly 30 years old, oval face with a defined jawline, medium-brown
+  skin (Fitzpatrick IV), short black side-parted hair with a slight natural wave at
+  the front, thick straight eyebrows, dark brown almond-shaped eyes with mild
+  under-eye shadows, straight medium-width nose, close-trimmed 3-day stubble beard
+  connected to a thin moustache, a small dark mole on the left cheekbone below the
+  eye, no glasses, lean build, height 5 feet 9 inches.
+  Wardrobe: Light blue formal shirt, sleeves folded twice to the forearm, dark grey
+  trousers, black office ID lanyard. At home: plain charcoal t-shirt, same face.
+
+ROLES: MAA-01 with a tiffin, PAPA-01 on a railway platform, AMAN-01 the friend, then
+RAHUL-01 present-day — now the one who remembers.
+
+SHOT-TO-SHOT CONSISTENCY — the single most important rule in this prompt:
+Every character above must be recognisably the SAME PERSON in the final shot as in
+the first — same face, same hair, same distinguishing marks — even if the location,
+outfit, time of day or lighting changes completely in between. Re-read the identity
+descriptions above before generating each new shot. Where two of them share a frame,
+keep them clearly distinct people and never blend their features into each other.
+
 STRUCTURE: Three small, precise acts of remembering — each shown as a tiny concrete detail,
 not a grand gesture. Then the turn: nobody announced it, they just did it. Then the thesis.
 
@@ -1029,9 +1348,6 @@ CRITICAL — SPECIFICITY: The power is entirely in how small and exact the detai
 "Mom cooked lunch" but "the one vegetable you liked, in the tiffin". Not "Dad came to the
 station" but "half an hour early, standing on the platform". Generalise these and the film
 loses everything.
-
-CHARACTERS: A mother 55 with a tiffin. A father 60 on a railway platform. A friend 25 with
-a phone. Then a present-day adult, 33, receiving reminders — now the one who remembers.
 
 LOOK: Warm, tender, beautifully lit. 85mm, very shallow, golden light. The three memories
 in a soft nostalgic grade; the present day slightly sharper but equally warm. Slow
@@ -1043,6 +1359,11 @@ CAPTIONS: Poppins Bold white, highlight #C25A37. Extremely minimal.
 MUSIC: Solo piano, cello entering at "Kisi ne aapse kabhi nahi kaha", full warm strings at
 the thesis line, resolving at the logo. No percussion.
 END CARD: standard Apka Saathi card, narrator speaks the tagline aloud, hold 4s.
+
+NEGATIVE — avoid entirely: a different person between shots, face swap, changed facial
+features, inconsistent identity, drifting age, different hairline, glasses appearing or
+disappearing, changed beard style, beautified or plastic skin, western features, two
+characters blended into one, extra fingers, distorted hands, text, watermark, logo.
 ```
 
 ### SCENE TABLE

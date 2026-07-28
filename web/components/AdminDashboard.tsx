@@ -20,6 +20,8 @@ import {
   Bug,
   FileText,
   Megaphone,
+  LineChart,
+  PenLine,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
@@ -34,6 +36,9 @@ import AdminBroadcast from "@/components/AdminBroadcast";
 import AdminDocuments from "@/components/AdminDocuments";
 import AdminPricing from "@/components/AdminPricing";
 import AdminLogs from "@/components/AdminLogs";
+import AdminAnalytics from "@/components/AdminAnalytics";
+import AdminSeo from "@/components/AdminSeo";
+import AdminBlog from "@/components/AdminBlog";
 
 type ContactEntry = {
   name: string;
@@ -44,6 +49,9 @@ type ContactEntry = {
 
 type Data = { contacts: ContactEntry[] };
 type Section =
+  | "analytics"
+  | "seo"
+  | "blog"
   | "rewards"
   | "pricing"
   | "users"
@@ -56,6 +64,9 @@ type Section =
 
 const NAV: { key: Section; icon: typeof Gift }[] = [
   { key: "users", icon: Users },
+  { key: "analytics", icon: LineChart },
+  { key: "seo", icon: Search },
+  { key: "blog", icon: PenLine },
   { key: "message", icon: Megaphone },
   { key: "usage", icon: Activity },
   { key: "documents", icon: FileText },
@@ -415,6 +426,9 @@ function Dashboard({
               {section === "documents" && <AdminDocuments />}
               {section === "reviews" && <AdminReviews />}
               {section === "logs" && <AdminLogs />}
+              {section === "analytics" && <AdminAnalytics />}
+              {section === "seo" && <AdminSeo />}
+              {section === "blog" && <AdminBlog />}
               {section === "contacts" && <ContactsView rows={filteredContacts} />}
             </div>
           </div>

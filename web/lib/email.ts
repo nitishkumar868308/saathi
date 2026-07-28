@@ -126,7 +126,44 @@ const LINE = "#E5DBC9";
  * @param preheader Inbox preview me dikhne wali chhoti line. Na do to client
  *                  body ka pehla text utha lega — aksar bhadda lagta hai.
  */
-export function renderEmail(title: string, inner: string, preheader = ""): string {
+export type EmailLocale = "hinglish" | "hi" | "en";
+
+/**
+ * Email footer ki do lines — user ki bhasha me.
+ *
+ * ⚠️ Brand ka naam **"Apka Saathi"** har bhasha me waisa hi rehta hai. Naam
+ * translate nahi hota; wo pehchaan hai.
+ *
+ * Uske neeche wali line (slogan) zaroor badalti hai. English me "jo kuch nahi
+ * bhoolta" ka koi matlab nahi banta — wahan hamara asli English slogan chalta
+ * hai: "never forgets what matters".
+ *
+ * Doosri line pehle "Koi spam nahi. Sirf zaroori baat." thi — wo defensive
+ * lagti thi, jaise safai de rahe hon. Ab wo jagah kaam ki baat kehti hai: ye
+ * email aaya kyun.
+ */
+const FOOTER: Record<EmailLocale, { slogan: string; why: string }> = {
+  hinglish: {
+    slogan: "jo kuch nahi bhoolta.",
+    why: "Ye email isliye aaya kyunki aapne Saathi me ye yaad rakhne ko kaha tha.",
+  },
+  hi: {
+    slogan: "जो कुछ नहीं भूलता।",
+    why: "यह ईमेल इसलिए आया क्योंकि आपने साथी से यह याद रखने को कहा था।",
+  },
+  en: {
+    slogan: "never forgets what matters.",
+    why: "You're getting this because you asked Saathi to remember it for you.",
+  },
+};
+
+export function renderEmail(
+  title: string,
+  inner: string,
+  preheader = "",
+  locale: EmailLocale = "hinglish",
+): string {
+  const f = FOOTER[locale] ?? FOOTER.hinglish;
   return `<!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -191,9 +228,9 @@ export function renderEmail(title: string, inner: string, preheader = ""): strin
           <!-- Footer -->
           <tr>
             <td align="center" style="padding:24px 12px 0;color:${SOFT};font-size:12.5px;line-height:1.75;">
-              <strong style="color:${INK};">Apka Saathi</strong> — jo kuch nahi bhoolta.<br/>
-              <a href="${SITE_URL}" style="color:${SOFT};text-decoration:underline;">apkasaathi.com</a>
-              &nbsp;·&nbsp; Koi spam nahi. Sirf zaroori baat. 🤍
+              <strong style="color:${INK};">Apka Saathi</strong> — ${f.slogan}<br/>
+              <a href="${SITE_URL}" style="color:${SOFT};text-decoration:underline;">apkasaathi.com</a><br/>
+              <span style="color:${SOFT};">${f.why} 🤍</span>
             </td>
           </tr>
 
@@ -225,43 +262,71 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-type ReminderCopy = { subject: (t: string) => string; heading: string; intro: string; outro: string };
+type ReminderCopy = {
+  subject: (t: string) => string;
+  heading: string;
+  intro: string;
+  outro: string;
+  /** "Aapne kaha tha:" — user ke apne shabdon ke upar ka label. */
+  yourWords: string;
+};
 
-const REMINDER: Record<"hinglish" | "hi" | "en", ReminderCopy> = {
+const REMINDER: Record<EmailLocale, ReminderCopy> = {
   hinglish: {
     subject: (t) => `🔔 Reminder: ${t}`,
     heading: "Aapka reminder ⏰",
     intro: "Bas yaad dila raha hoon 🙂 — aapne ye set kiya tha:",
     outro: "Ho gaya to badhiya — warna abhi kar lo. Main yahin hoon. 🤍",
+    yourWords: "Aapne kaha tha",
   },
   hi: {
     subject: (t) => `🔔 रिमाइंडर: ${t}`,
     heading: "आपका रिमाइंडर ⏰",
     intro: "बस याद दिला रहा हूँ 🙂 — आपने यह सेट किया था:",
     outro: "हो गया तो बढ़िया — वरना अभी कर लो। मैं यहीं हूँ। 🤍",
+    yourWords: "आपने कहा था",
   },
   en: {
     subject: (t) => `🔔 Reminder: ${t}`,
     heading: "Your reminder ⏰",
     intro: "Just a gentle nudge 🙂 — you had set this:",
     outro: "Done already? Great — if not, do it now. I'm right here. 🤍",
+    yourWords: "You said",
   },
 };
 
-/** Reminder email — due reminder pe user ko, uski chuni bhasha me. */
+/**
+ * Reminder email — due reminder pe user ko, uski chuni bhasha me.
+ *
+ * `note` = user ne apne shabdon me jo likha/bola tha. Pehle email me sirf title
+ * jaata tha; title AI ka saaf kiya hua chhota version hota hai ("Test"), isliye
+ * mail padh ke user ko yaad hi nahi aata tha ki baat kis baare me thi. Note
+ * hone par wo title ke neeche dikh jaata hai.
+ */
 export async function sendReminderEmail(
   to: string,
   title: string,
   whenLabel: string,
-  locale: "hinglish" | "hi" | "en" = "hinglish",
+  locale: EmailLocale = "hinglish",
+  note?: string | null,
 ): Promise<{ sent: boolean; skipped?: boolean }> {
   const r = REMINDER[locale] ?? REMINDER.hinglish;
+
+  const noteBlock =
+    note && note.trim() && note.trim().toLowerCase() !== title.trim().toLowerCase()
+      ? `<div style="margin-top:12px;padding-top:12px;border-top:1px dashed ${LINE};">
+           <div style="font-size:11.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:${SOFT};">${escapeHtml(r.yourWords)}</div>
+           <div style="margin-top:5px;font-size:14.5px;line-height:1.6;color:${SOFT};white-space:pre-wrap;word-break:break-word;">${escapeHtml(note.trim())}</div>
+         </div>`
+      : "";
+
   const inner =
     emailParagraph(r.intro) +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
        <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${BRAND};border-radius:14px;background:${CREAM};">
          <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(title)}</div>
          <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${escapeHtml(whenLabel)}</div>
+         ${noteBlock}
        </td></tr>
      </table>` +
     emailParagraph(r.outro);
@@ -269,7 +334,13 @@ export async function sendReminderEmail(
   return sendMail({
     to,
     subject: r.subject(title),
-    html: renderEmail(r.heading, inner, `${title} · ${whenLabel}`),
+    // Preheader me note bhi — inbox ki preview line se hi kaam yaad aa jaata hai.
+    html: renderEmail(
+      r.heading,
+      inner,
+      [title, whenLabel, note?.trim()].filter(Boolean).join(" · "),
+      locale,
+    ),
     fromName: "Apka Saathi",
   });
 }
@@ -289,7 +360,7 @@ type WelcomeCopy = {
   outro: string;
 };
 
-const WELCOME: Record<"hinglish" | "hi" | "en", WelcomeCopy> = {
+const WELCOME: Record<EmailLocale, WelcomeCopy> = {
   hinglish: {
     subject: "Welcome to Apka Saathi 🎉",
     title: "Aa gaye aap! Chalo shuru karein 🎉",
@@ -341,7 +412,7 @@ const WELCOME: Record<"hinglish" | "hi" | "en", WelcomeCopy> = {
 export async function sendWelcomeEmail(
   to: string,
   name: string,
-  locale: "hinglish" | "hi" | "en" = "hinglish",
+  locale: EmailLocale = "hinglish",
 ): Promise<{ sent: boolean; skipped?: boolean }> {
   const w = WELCOME[locale] ?? WELCOME.hinglish;
   const firstName = (name || "").trim().split(" ")[0];
@@ -368,7 +439,7 @@ export async function sendWelcomeEmail(
   return sendMail({
     to,
     subject: w.subject,
-    html: renderEmail(w.title, inner, w.preheader),
+    html: renderEmail(w.title, inner, w.preheader, locale),
     fromName: "Apka Saathi",
   });
 }

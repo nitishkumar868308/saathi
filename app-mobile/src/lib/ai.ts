@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { timed } from "./network";
 
 /**
  * Saathi AI — sab kuch ek hi Supabase edge function `ai` se hota hai (Gemini pe).
@@ -40,6 +41,31 @@ export type SaathiAction =
 
 export type SaathiReply = { reply: string; action: SaathiAction | null };
 
+/**
+ * AI call kitni der tak intezaar kare.
+ *
+ * Bina limit ke edge function kabhi-kabhi 30-60s tak latak jaati thi aur user ke
+ * saamne loader ghoomta rehta tha. Ab tay hai: itne me jawab na aaya to fallback
+ * de do — user ko rukna nahi padega. Chat me thoda zyada (jawab lamba hota hai),
+ * reminder parse me kam (waha aage local pickers hain hi).
+ */
+const CHAT_TIMEOUT_MS = 20_000;
+const TASK_TIMEOUT_MS = 12_000;
+
+/** Promise ko time-box karo — der ho gayi to `fallback` lauta do. */
+async function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const guard = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  try {
+    // `timed` slow-internet banner ke liye — 4s+ lage to user ko pata chal jaye.
+    return await timed(Promise.race([work, guard]));
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Abhi ka LOCAL time naive ISO me (bina Z) — server isi se remind_at nikaalta hai. */
 function localNowIso(): string {
   const d = new Date();
@@ -57,17 +83,21 @@ export async function askSaathi(
   const fallback = opts.fallback ?? STUB_REPLY;
   if (!supabase) return { reply: fallback, action: null };
   try {
-    const { data, error } = await supabase.functions.invoke("ai", {
-      body: {
-        task: "chat",
-        message,
-        history,
-        name,
-        locale: opts.locale,
-        context: opts.context,
-        now: localNowIso(),
-      },
-    });
+    const { data, error } = await withTimeout(
+      supabase.functions.invoke("ai", {
+        body: {
+          task: "chat",
+          message,
+          history,
+          name,
+          locale: opts.locale,
+          context: opts.context,
+          now: localNowIso(),
+        },
+      }),
+      CHAT_TIMEOUT_MS,
+      { data: null, error: new Error("timeout") } as never,
+    );
     if (error) return { reply: fallback, action: null };
     const d = data as { reply?: string; action?: SaathiAction | null } | null;
     const reply = d?.reply && d.reply.trim() ? d.reply : fallback;
@@ -97,9 +127,13 @@ export async function parseReminderAI(
 ): Promise<ReminderAI | null> {
   if (!supabase || !text.trim()) return null;
   try {
-    const { data, error } = await supabase.functions.invoke("ai", {
-      body: { task: "reminder", text, locale, now: new Date().toISOString() },
-    });
+    const { data, error } = await withTimeout(
+      supabase.functions.invoke("ai", {
+        body: { task: "reminder", text, locale, now: new Date().toISOString() },
+      }),
+      TASK_TIMEOUT_MS,
+      { data: null, error: new Error("timeout") } as never,
+    );
     if (error || !data) return null;
     const r = data as Partial<ReminderAI> & { error?: string };
     if (r.error || typeof r.title !== "string") return null;
@@ -134,9 +168,14 @@ export async function scanDocumentAI(
 ): Promise<DocumentAI | null> {
   if (!supabase || !base64) return null;
   try {
-    const { data, error } = await supabase.functions.invoke("ai", {
-      body: { task: "scan", image: base64, mime, locale },
-    });
+    const { data, error } = await withTimeout(
+      supabase.functions.invoke("ai", {
+        body: { task: "scan", image: base64, mime, locale },
+      }),
+      // Image bhejni hai — scan ko thodi zyada mohlat.
+      TASK_TIMEOUT_MS * 2,
+      { data: null, error: new Error("timeout") } as never,
+    );
     if (error || !data) return null;
     const r = data as Partial<DocumentAI> & { error?: string };
     if (r.error) return null;

@@ -27,11 +27,20 @@ export function PhoneField({
   onCountry,
   national,
   onNational,
+  locked = false,
+  placeholder,
 }: {
   country: CountryCode;
   onCountry: (c: CountryCode) => void;
   national: string;
   onNational: (v: string) => void;
+  /**
+   * Code upar chune gaye Country se aa raha hai — user use yahan se badal nahi
+   * sakta. Isse number hamesha usi desh ka hota hai jo address me diya gaya hai,
+   * aur validation bhi usi desh ke rules se chalti hai.
+   */
+  locked?: boolean;
+  placeholder?: string;
 }) {
   const { phoneField: p } = useT();
   const [open, setOpen] = useState(false);
@@ -51,7 +60,11 @@ export function PhoneField({
 
   return (
     <View style={styles.row}>
-      <Pressable style={styles.codeBtn} onPress={() => setOpen(true)}>
+      <Pressable
+        style={[styles.codeBtn, locked && styles.codeBtnLocked]}
+        onPress={() => !locked && setOpen(true)}
+        disabled={locked}
+      >
         <Text style={styles.codeText}>
           {flag(country)} +{getCountryCallingCode(country)}
         </Text>
@@ -59,14 +72,16 @@ export function PhoneField({
       <TextInput
         style={styles.input}
         value={national}
-        onChangeText={onNational}
-        placeholder={p.placeholder}
+        onChangeText={(v) => onNational(v.replace(/[^\d\s-]/g, ""))}
+        placeholder={placeholder ?? p.placeholder}
         placeholderTextColor={colors.inkSoft}
         keyboardType="phone-pad"
+        textContentType="telephoneNumber"
+        autoComplete="tel-national"
       />
 
       <Modal
-        visible={open}
+        visible={open && !locked}
         animationType="slide"
         onRequestClose={() => setOpen(false)}
       >
@@ -117,6 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     paddingHorizontal: 14,
   },
+  codeBtnLocked: { backgroundColor: colors.creamDeep },
   codeText: { fontSize: 15, fontWeight: "600", color: colors.ink },
   input: {
     flex: 1,

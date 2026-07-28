@@ -5,11 +5,16 @@ import { motion, useReducedMotion } from "framer-motion";
 import SaathiLogo from "@/components/SaathiLogo";
 
 /**
- * Pyaara full-screen loader — screen ke beech mein, backdrop blur ke saath.
- * Submit hone tak dikhta hai taki user ko clearly pata chale.
+ * Full-screen loader — screen ke theek beech mein, peeche blur wala overlay
+ * taaki kaam poora hone tak user peeche ka form chhu na sake.
  *
  * Portal se document.body pe render hota hai — taaki transformed ancestors
  * (framer-motion / animate-fade-up) fixed positioning ko clip na karein.
+ *
+ * ⚠️ Loader par koi dikhne wala text nahi. `label` sirf screen readers ke liye
+ * hai (`aria-label`). App ka loader bhi aisa hi hai — "Sending…" / "Samajh raha
+ * hoon…" jaisi lines hata di gayi hain: loader ka kaam sirf ye batana hai ki
+ * kuch chal raha hai, kahani sunana nahi.
  */
 export default function LoadingOverlay({ label }: { label?: string }) {
   const reduce = useReducedMotion();
@@ -68,11 +73,6 @@ export default function LoadingOverlay({ label }: { label?: string }) {
           ))}
         </span>
 
-        {label && (
-          <p className="font-display text-base font-semibold text-ink">
-            {label}
-          </p>
-        )}
       </div>
     </motion.div>,
     document.body,

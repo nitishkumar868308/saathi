@@ -88,6 +88,19 @@ export type Dict = {
     promptLater: string;
     settingsRow: string;
     settingsRowSub: string;
+    /* Permission modal — har step ki apni line */
+    stepAllow: string;
+    stepDone: string;
+    stepNotif: string;
+    stepNotifSub: string;
+    stepAlarm: string;
+    stepAlarmSub: string;
+    stepBattery: string;
+    stepBatterySub: string;
+    stepOem: string;
+    stepOemSub: string;
+    allSetTitle: string;
+    allSetBody: string;
   };
   login: {
     welcomeBack: string;
@@ -375,8 +388,10 @@ export type Dict = {
     fullNamePlaceholder: string;
     email: string;
     emailPlaceholder: string;
+    emailLocked: string;
     phone: string;
     phoneError: string;
+    phoneCountryUnknown: string;
     address: string;
     addressPlaceholder: string;
     gender: string;
@@ -509,13 +524,25 @@ const hinglish: Dict = {
     close: "Band karo",
   },
   reliability: {
-    promptTitle: "Reminder time pe aaye — ek chhota step",
+    promptTitle: "Reminder theek time pe aaye",
     promptBody:
-      "Kai phone (Xiaomi, Realme, Oppo, Vivo, Samsung) app band hone pe reminders rok dete hain. Battery settings me Saathi ko \"Unrestricted\" kar do — phir app band ho tab bhi reminder + sound aayega.",
-    promptButton: "Battery settings kholo",
+      "In cheezon ke bina Android reminder ko der se bhejta hai — kabhi 5-10 minute baad. Ek-ek karke Allow dabao, bas ek baar ka kaam hai.",
+    promptButton: "Setup karo",
     promptLater: "Baad me",
     settingsRow: "Reminders reliable banao",
-    settingsRowSub: "Battery optimization off — app band ho tab bhi reminder aaye",
+    settingsRowSub: "Notification, exact alarm aur battery — sab ek jagah",
+    stepAllow: "Allow",
+    stepDone: "Ho gaya",
+    stepNotif: "Notification allow karo",
+    stepNotifSub: "Iske bina reminder dikhega hi nahi",
+    stepAlarm: "Alarms & reminders",
+    stepAlarmSub: "Iske bina Android reminder ko der se, dusre alarms ke saath bhejta hai",
+    stepBattery: "Background me chalne do",
+    stepBatterySub: "Battery optimization off — app band ho tab bhi reminder aaye",
+    stepOem: "Auto-start on karo",
+    stepOemSub: "Phone ki apni setting — Saathi ko background me rehne do",
+    allSetTitle: "Sab set hai 🎉",
+    allSetBody: "Ab har reminder theek apne time pe aayega — app band ho ya phone lock.",
   },
   login: {
     welcomeBack: "Wapas aa gaye",
@@ -793,8 +820,10 @@ const hinglish: Dict = {
     fullNamePlaceholder: "Aapka naam",
     email: "Email",
     emailPlaceholder: "you@email.com",
+    emailLocked: "Ye aapke login ka email hai — badla nahi ja sakta.",
     phone: "Phone number",
     phoneError: "Sahi phone number daalo",
+    phoneCountryUnknown: "Is desh ka code nahi mila — code khud chun lo.",
     address: "Address",
     addressPlaceholder: "Ghar / office ka pata",
     gender: "Gender",
@@ -927,13 +956,25 @@ const hi: Dict = {
     close: "बंद करें",
   },
   reliability: {
-    promptTitle: "रिमाइंडर समय पर आए — एक छोटा स्टेप",
+    promptTitle: "रिमाइंडर ठीक समय पर आए",
     promptBody:
-      "कई फ़ोन (Xiaomi, Realme, Oppo, Vivo, Samsung) ऐप बंद होने पर reminders रोक देते हैं। बैटरी सेटिंग्स में साथी को \"Unrestricted\" कर दें — फिर ऐप बंद हो तब भी reminder + आवाज़ आएगी।",
-    promptButton: "बैटरी सेटिंग्स खोलें",
+      "इनके बिना Android रिमाइंडर देर से भेजता है — कभी 5-10 मिनट बाद। एक-एक करके Allow दबाएँ, बस एक बार का काम है।",
+    promptButton: "सेटअप करें",
     promptLater: "बाद में",
     settingsRow: "रिमाइंडर भरोसेमंद बनाएँ",
-    settingsRowSub: "बैटरी ऑप्टिमाइज़ेशन ऑफ़ — ऐप बंद हो तब भी reminder आए",
+    settingsRowSub: "नोटिफ़िकेशन, exact alarm और बैटरी — सब एक जगह",
+    stepAllow: "Allow",
+    stepDone: "हो गया",
+    stepNotif: "नोटिफ़िकेशन allow करें",
+    stepNotifSub: "इसके बिना रिमाइंडर दिखेगा ही नहीं",
+    stepAlarm: "Alarms & reminders",
+    stepAlarmSub: "इसके बिना Android रिमाइंडर को देर से, दूसरे alarms के साथ भेजता है",
+    stepBattery: "बैकग्राउंड में चलने दें",
+    stepBatterySub: "बैटरी ऑप्टिमाइज़ेशन ऑफ़ — ऐप बंद हो तब भी रिमाइंडर आए",
+    stepOem: "ऑटो-स्टार्ट ऑन करें",
+    stepOemSub: "फ़ोन की अपनी सेटिंग — साथी को बैकग्राउंड में रहने दें",
+    allSetTitle: "सब सेट है 🎉",
+    allSetBody: "अब हर रिमाइंडर ठीक अपने समय पर आएगा — ऐप बंद हो या फ़ोन लॉक।",
   },
   login: {
     welcomeBack: "वापस आ गए",
@@ -1210,8 +1251,10 @@ const hi: Dict = {
     fullNamePlaceholder: "आपका नाम",
     email: "ईमेल",
     emailPlaceholder: "you@email.com",
+    emailLocked: "यह आपके लॉगिन का ईमेल है — इसे बदला नहीं जा सकता।",
     phone: "फ़ोन नंबर",
     phoneError: "सही फ़ोन नंबर डालें",
+    phoneCountryUnknown: "इस देश का कोड नहीं मिला — कोड खुद चुन लें।",
     address: "पता",
     addressPlaceholder: "घर / ऑफ़िस का पता",
     gender: "लिंग",
@@ -1344,13 +1387,25 @@ const en: Dict = {
     close: "Close",
   },
   reliability: {
-    promptTitle: "Get reminders on time — one quick step",
+    promptTitle: "Get reminders exactly on time",
     promptBody:
-      "Many phones (Xiaomi, Realme, Oppo, Vivo, Samsung) stop reminders when the app is closed. Set Saathi to \"Unrestricted\" in battery settings — then reminders and sound arrive even when the app is closed.",
-    promptButton: "Open battery settings",
+      "Without these, Android delivers reminders late — sometimes 5-10 minutes off. Tap Allow on each one. It's a one-time setup.",
+    promptButton: "Set up",
     promptLater: "Later",
     settingsRow: "Make reminders reliable",
-    settingsRowSub: "Turn off battery optimization so reminders fire even when closed",
+    settingsRowSub: "Notifications, exact alarms and battery — all in one place",
+    stepAllow: "Allow",
+    stepDone: "Done",
+    stepNotif: "Allow notifications",
+    stepNotifSub: "Without this, reminders never show up",
+    stepAlarm: "Alarms & reminders",
+    stepAlarmSub: "Without this, Android batches your reminder with other alarms and delivers it late",
+    stepBattery: "Allow background activity",
+    stepBatterySub: "Battery optimization off — reminders fire even when the app is closed",
+    stepOem: "Turn on auto-start",
+    stepOemSub: "Your phone's own setting — let Saathi stay in the background",
+    allSetTitle: "All set 🎉",
+    allSetBody: "Every reminder will now arrive right on time — app closed or phone locked.",
   },
   login: {
     welcomeBack: "Welcome back",
@@ -1626,8 +1681,10 @@ const en: Dict = {
     fullNamePlaceholder: "Your name",
     email: "Email",
     emailPlaceholder: "you@email.com",
+    emailLocked: "This is your login email — it can't be changed.",
     phone: "Phone number",
     phoneError: "Enter a valid phone number",
+    phoneCountryUnknown: "No dial code found for this country — pick one yourself.",
     address: "Address",
     addressPlaceholder: "Home / office address",
     gender: "Gender",

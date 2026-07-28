@@ -1,9 +1,12 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Mulish } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { ToastProvider } from "@/components/Toast";
 import Analytics from "@/components/Analytics";
+import PageTracker from "@/components/PageTracker";
+import { pageMetadata, SITE_URL, SITE_NAME } from "@/lib/seo-server";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -19,52 +22,54 @@ const mulish = Mulish({
   preload: true,
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
-
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: "Apka Saathi — jo kuch nahi bhoolta",
-    template: "%s · Apka Saathi",
-  },
-  description:
-    "Apka Saathi ek AI companion hai jo aapke documents ki expiry, zaroori dates aur roz ke kaam bina pooche yaad dilata hai. Passport, insurance, FASTag, EMI — sab yaad. Hindi + English. Play Store se free download karo.",
-  keywords: [
-    "Apka Saathi",
-    "AI reminder app",
-    "document expiry reminder",
-    "India reminder app",
-    "Hindi AI assistant",
-    "FASTag reminder",
-    "insurance expiry reminder",
-    "personal AI companion",
-  ],
-  authors: [{ name: "Apka Saathi" }],
-  creator: "Apka Saathi",
-  applicationName: "Apka Saathi",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "Apka Saathi — jo kuch nahi bhoolta",
-    description:
-      "Documents ki expiry, daily brief, aur reminders — sab ek dost ki tarah bina pooche sambhalta hai. Never forget what matters.",
-    url: SITE_URL,
-    siteName: "Apka Saathi",
-    locale: "en_IN",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Apka Saathi — jo kuch nahi bhoolta",
-    description:
-      "AI saathi jo aapke documents, dates aur kaam bina pooche yaad dilata hai.",
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true, "max-image-preview": "large" },
-  },
-  category: "productivity",
-};
+/**
+ * Home ka meta ab DB (`seo_pages`) se aata hai — admin panel se badla ja sakta
+ * hai, deploy ki zaroorat nahi. Yahan diye gaye defaults tab chalte hain jab row
+ * na ho ya DB na chale (site kabhi khaali <title> ke saath live na jaaye).
+ *
+ * Default likhne ka tareeka:
+ *  - Title 60 characters ke andar, sabse kaam ka keyword pehle, brand aakhir me.
+ *  - Description ~155 characters, usme wahi shabd jo log sach me search karte hain.
+ *  - Keyword stuffing nahi: har shabd ek poore vaakya me apni jagah par.
+ *
+ * `template` yahin rehta hai — child pages ka title "%s · Apka Saathi" banta hai.
+ */
+export function generateMetadata(): Promise<Metadata> {
+  return pageMetadata(
+    "/",
+    {
+      title: "Reminder App for Documents, Medicine & Bills — Apka Saathi",
+      description:
+        "Apka Saathi reminds you before your passport, Aadhaar, insurance or FASTag expires, and nudges you for medicines, bills and daily tasks. Free Android app in Hindi and English.",
+      keywords: [
+        "reminder app",
+        "document reminder app",
+        "document expiry reminder",
+        "medicine reminder app",
+        "bill reminder app",
+        "passport expiry reminder",
+        "Aadhaar reminder",
+        "insurance renewal reminder",
+        "FASTag recharge reminder",
+        "Hindi reminder app",
+        "Apka Saathi",
+      ],
+    },
+    {
+      metadataBase: new URL(SITE_URL),
+      authors: [{ name: SITE_NAME }],
+      creator: SITE_NAME,
+      publisher: SITE_NAME,
+      applicationName: SITE_NAME,
+      // Google Search Console ka HTML-tag verification. Env set karte hi tag lag
+      // jaata hai — code me kabhi paste karne ki zaroorat nahi.
+      verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION },
+      category: "productivity",
+    },
+    // Child pages ka title isi saanche me: "About · Apka Saathi".
+    `%s · ${SITE_NAME}`,
+  );
+}
 
 export const viewport: Viewport = {
   themeColor: "#F7F2E9",
@@ -73,21 +78,67 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * Structured data (JSON-LD) — Google ko saaf-saaf batata hai ki company kaun hai
+ * aur app kya karta hai. Teen alag @type ek graph me:
+ *
+ *   Organization      — company/brand ki pehchaan (logo, sampark, social)
+ *   WebSite           — site ka naam, taaki sitelinks aur brand box ban sake
+ *   SoftwareApplication — app ka category, platform aur price
+ *
+ * ⚠️ `aggregateRating` jaan-boojh ke hata diya gaya hai. Google ka policy hai ki
+ * rating asli aur site par dikhti honi chahiye; banaya hua rating markup manual
+ * action la sakta hai. Play Store par asli reviews aane ke baad wahi number
+ * yahan daalna.
+ */
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Apka Saathi",
-  applicationCategory: "ProductivityApplication",
-  operatingSystem: "Android",
-  description:
-    "AI companion that reminds you about document expiries, important dates and daily tasks — without being asked.",
-  offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: "4.9",
-    ratingCount: "500",
-  },
-  inLanguage: ["hi", "en"],
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
+      email: "info@apkasaathi.com",
+      description:
+        "Apka Saathi builds a friendly reminder app that remembers document expiries, medicines and bills for you.",
+      areaServed: "IN",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: SITE_NAME,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      inLanguage: ["en-IN", "hi-IN"],
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#app`,
+      name: SITE_NAME,
+      applicationCategory: "ProductivityApplication",
+      operatingSystem: "Android",
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      description:
+        "Reminder app that tracks document expiry dates — passport, Aadhaar, insurance, FASTag — and reminds you about medicines, bills and daily tasks.",
+      featureList: [
+        "Document expiry reminders",
+        "Medicine reminders",
+        "Bill and EMI reminders",
+        "Daily brief",
+        "Hindi and English",
+      ],
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "INR",
+        availability: "https://schema.org/InStock",
+      },
+      inLanguage: ["hi", "en"],
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -108,6 +159,10 @@ export default function RootLayout({
           <ToastProvider>{children}</ToastProvider>
         </LanguageProvider>
         <Analytics />
+        {/* Apna per-user journey tracking. useSearchParams ke kaaran Suspense me. */}
+        <Suspense fallback={null}>
+          <PageTracker />
+        </Suspense>
       </body>
     </html>
   );

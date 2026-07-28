@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Gift, Save, UserPlus, SlidersHorizontal } from "lucide-react";
 import Loader from "@/components/Loader";
+import { useAdminT, atpl } from "@/lib/i18n/admin";
 
 // Plus ka daam ab Pricing section me (country-wise). Yahan sirf referral + free limits.
 type Config = {
@@ -30,6 +31,8 @@ const input =
   "mt-1.5 w-full rounded-xl border border-line bg-cream-deep/20 px-3 py-2 text-sm outline-none focus:border-terracotta";
 
 export default function AdminRewards() {
+  const t = useAdminT();
+  const d = t.data.rewards;
   const [cfg, setCfg] = useState<Config>(DEFAULTS);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +54,7 @@ export default function AdminRewards() {
         if (d?.config) setCfg({ ...DEFAULTS, ...d.config });
         if (d?.stats) setStats(d.stats);
       } catch (e) {
-        setMsg(e instanceof Error ? e.message : "Config load nahi hua");
+        setMsg(e instanceof Error ? e.message : t.data.shared.loadFailed);
       } finally {
         setLoading(false);
       }
@@ -70,9 +73,9 @@ export default function AdminRewards() {
       const d = await res.json();
       if (!res.ok) throw new Error(d?.error || "save failed");
       setCfg({ ...DEFAULTS, ...d.config });
-      setMsg("Save ho gaya ✓");
+      setMsg(d.saved);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Save nahi hua");
+      setMsg(e instanceof Error ? e.message : d.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -89,10 +92,10 @@ export default function AdminRewards() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d?.error || "grant failed");
-      setGrantMsg(`${grantDays} din de diye ✓`);
+      setGrantMsg(atpl(d.granted, { days: grantDays }));
       setGrantEmail("");
     } catch (e) {
-      setGrantMsg(e instanceof Error ? e.message : "Grant nahi hua");
+      setGrantMsg(e instanceof Error ? e.message : d.grantFailed);
     } finally {
       setGranting(false);
     }
@@ -101,7 +104,7 @@ export default function AdminRewards() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-6 text-ink-soft">
-        <Loader size={20} /> Load ho raha hai…
+        <Loader size={20} /> {t.common.loading}
       </div>
     );
   }
@@ -112,7 +115,7 @@ export default function AdminRewards() {
     <div className="space-y-5">
       {isError && (
         <div className="rounded-2xl border border-terracotta/30 bg-terracotta/10 p-4 text-sm text-ink">
-          <strong className="font-semibold text-terracotta-dark">Nahi ho paya:</strong> {msg}
+          <strong className="font-semibold text-terracotta-dark">{d.failedPrefix}</strong> {msg}
         </div>
       )}
 
@@ -120,9 +123,9 @@ export default function AdminRewards() {
       {stats && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            ["Total users", stats.totalUsers],
-            ["Referrals", stats.referralsTotal],
-            ["Rewarded", stats.referralsRewarded],
+            [d.totalUsers, stats.totalUsers],
+            [d.referrals, stats.referralsTotal],
+            [d.rewarded, stats.referralsRewarded],
           ].map(([k, v]) => (
             <div key={k as string} className="rounded-2xl border border-line bg-surface p-4">
               <p className="text-2xl font-bold text-ink">{v as number}</p>
@@ -136,16 +139,13 @@ export default function AdminRewards() {
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-2">
           <SlidersHorizontal size={17} className="text-terracotta" />
-          <h3 className="font-display text-lg font-semibold">Free plan limits</h3>
+          <h3 className="font-display text-lg font-semibold">{d.limitsTitle}</h3>
         </div>
-        <p className="mt-1.5 text-sm text-ink-soft">
-          Free plan ki limit yahin se badlo. Plus ka daam ab{" "}
-          <strong>Pricing</strong> section me (country-wise) hai.
-        </p>
+        <p className="mt-1.5 text-sm text-ink-soft">{d.limitsSub}</p>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className={label}>Free reminders</label>
+            <label className={label}>{d.freeReminders}</label>
             <input
               type="number"
               className={input}
@@ -154,7 +154,7 @@ export default function AdminRewards() {
             />
           </div>
           <div>
-            <label className={label}>Free documents</label>
+            <label className={label}>{d.freeDocuments}</label>
             <input
               type="number"
               className={input}
@@ -171,7 +171,7 @@ export default function AdminRewards() {
             className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark disabled:opacity-60"
           >
             {saving ? <Loader size={18} /> : <Save size={15} />}
-            Save
+            {saving ? t.common.saving : t.common.save}
           </button>
           {msg && <span className="text-sm text-ink-soft">{msg}</span>}
         </div>
@@ -181,12 +181,12 @@ export default function AdminRewards() {
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-2">
           <Gift size={17} className="text-terracotta" />
-          <h3 className="font-display text-lg font-semibold">Referrals</h3>
+          <h3 className="font-display text-lg font-semibold">{d.referralsTitle}</h3>
         </div>
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className={label}>Referral din (dono ko)</label>
+            <label className={label}>{d.referralDays}</label>
             <input
               type="number"
               className={input}
@@ -201,7 +201,7 @@ export default function AdminRewards() {
                 checked={cfg.referrals_enabled}
                 onChange={(e) => setCfg({ ...cfg, referrals_enabled: e.target.checked })}
               />
-              Referrals chalu
+              {d.referralsOn}
             </label>
           </div>
         </div>
@@ -213,7 +213,7 @@ export default function AdminRewards() {
             className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark disabled:opacity-60"
           >
             {saving ? <Loader size={18} /> : <Save size={15} />}
-            Save
+            {saving ? t.common.saving : t.common.save}
           </button>
           {msg && <span className="text-sm text-ink-soft">{msg}</span>}
         </div>
@@ -223,11 +223,9 @@ export default function AdminRewards() {
       <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center gap-2">
           <UserPlus size={17} className="text-sage" />
-          <h3 className="font-display text-lg font-semibold">Manually Plus din do</h3>
+          <h3 className="font-display text-lg font-semibold">{d.grantTitle}</h3>
         </div>
-        <p className="mt-1.5 text-sm text-ink-soft">
-          Din user ke maujooda plan me <strong>add</strong> honge (paid plan bhi extend hoga).
-        </p>
+        <p className="mt-1.5 text-sm text-ink-soft">{d.grantSub}</p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_140px_auto]">
           <input
@@ -239,7 +237,7 @@ export default function AdminRewards() {
           />
           <input
             type="number"
-            placeholder="Din"
+            placeholder={d.grantDaysPh}
             className={input}
             value={grantDays}
             onChange={(e) => setGrantDays(Number(e.target.value))}
@@ -249,7 +247,7 @@ export default function AdminRewards() {
             disabled={granting || !grantEmail.trim()}
             className="mt-1.5 rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-cream transition hover:opacity-90 disabled:opacity-50"
           >
-            {granting ? "…" : "Do"}
+            {granting ? "…" : d.grantBtn}
           </button>
         </div>
         {grantMsg && <p className="mt-3 text-sm text-ink-soft">{grantMsg}</p>}
