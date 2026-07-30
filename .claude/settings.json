@@ -264,7 +264,13 @@
       "Bash(grep -v \"eas-cli@\\\\|upgrade\\\\|npm install\\\\|Proceeding\\\\|^$\")",
       "Bash(node \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/27f74463-1c53-471f-b200-8f40c8af3eca/scratchpad/gen-phone-codes.mjs\")",
       "Bash(sed -n '19,24p;/IN/p' /d/my-app/supabase/country-phone-codes.sql)",
-      "Bash(node scripts/gen-phone-codes.mjs)"
+      "Bash(node scripts/gen-phone-codes.mjs)",
+      "Bash(node \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/27f74463-1c53-471f-b200-8f40c8af3eca/scratchpad/verify-iso.mjs\")",
+      "Bash(curl -s --max-time 15 \"https://open.er-api.com/v6/latest/INR\" -o /tmp/fx.json)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash(node scripts/gen-pricing.mjs)",
+      "Bash(node scripts/gen-tz-country.mjs)",
+      "Bash(sed -i 's|^console.log\\(`\\\\${entries.length} zones|console.log\\(`${entries.length} zones \\(${aliasCount} purane naam bhi\\)|' scripts/gen-tz-country.mjs)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

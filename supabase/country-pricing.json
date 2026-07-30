@@ -1,0 +1,2009 @@
+{
+  "generated_at": "Thu, 30 Jul 2026 00:02:31 +0000",
+  "source": "https://open.er-api.com/v6/latest/INR",
+  "base_country": "IN",
+  "multiplier": 2,
+  "note": "conversion_rate = 1 INR me kitni local currency. India base hai (rate 1, multiplier 1).",
+  "count": 249,
+  "skipped": [
+    {
+      "iso2": "KP",
+      "name": "North Korea",
+      "currency": "KPW"
+    }
+  ],
+  "countries": [
+    {
+      "country_code": "AD",
+      "country_name": "Andorra",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AE",
+      "country_name": "United Arab Emirates",
+      "currency": "AED",
+      "symbol": "د.إ",
+      "conversion_rate": 0.03835,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AF",
+      "country_name": "Afghanistan",
+      "currency": "AFN",
+      "symbol": "؋",
+      "conversion_rate": 0.68762,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AG",
+      "country_name": "Antigua and Barbuda",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AI",
+      "country_name": "Anguilla",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AL",
+      "country_name": "Albania",
+      "currency": "ALL",
+      "symbol": "L",
+      "conversion_rate": 0.859511,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AM",
+      "country_name": "Armenia",
+      "currency": "AMD",
+      "symbol": "֏",
+      "conversion_rate": 3.827,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AO",
+      "country_name": "Angola",
+      "currency": "AOA",
+      "symbol": "Kz",
+      "conversion_rate": 9.8535,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AQ",
+      "country_name": "Antarctica",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AR",
+      "country_name": "Argentina",
+      "currency": "ARS",
+      "symbol": "$",
+      "conversion_rate": 15.6257,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AS",
+      "country_name": "American Samoa",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AT",
+      "country_name": "Austria",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AU",
+      "country_name": "Australia",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AW",
+      "country_name": "Aruba",
+      "currency": "AWG",
+      "symbol": "ƒ",
+      "conversion_rate": 0.018692,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AX",
+      "country_name": "Aland Islands",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "AZ",
+      "country_name": "Azerbaijan",
+      "currency": "AZN",
+      "symbol": "₼",
+      "conversion_rate": 0.017774,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BA",
+      "country_name": "Bosnia and Herzegovina",
+      "currency": "BAM",
+      "symbol": "KM",
+      "conversion_rate": 0.017944,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BB",
+      "country_name": "Barbados",
+      "currency": "BBD",
+      "symbol": "$",
+      "conversion_rate": 0.020885,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BD",
+      "country_name": "Bangladesh",
+      "currency": "BDT",
+      "symbol": "৳",
+      "conversion_rate": 1.2904,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BE",
+      "country_name": "Belgium",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BF",
+      "country_name": "Burkina Faso",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "currency": "BGN",
+      "symbol": "лв",
+      "conversion_rate": 0.017944,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BH",
+      "country_name": "Bahrain",
+      "currency": "BHD",
+      "symbol": "د.ب",
+      "conversion_rate": 0.003926,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BI",
+      "country_name": "Burundi",
+      "currency": "BIF",
+      "symbol": "FBu",
+      "conversion_rate": 31.2136,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BJ",
+      "country_name": "Benin",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BL",
+      "country_name": "Saint-Barthelemy",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BM",
+      "country_name": "Bermuda",
+      "currency": "BMD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BN",
+      "country_name": "Brunei",
+      "currency": "BND",
+      "symbol": "$",
+      "conversion_rate": 0.01351,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BO",
+      "country_name": "Bolivia",
+      "currency": "BOB",
+      "symbol": "Bs.",
+      "conversion_rate": 0.11887,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BQ",
+      "country_name": "Bonaire, Sint Eustatius and Saba",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "currency": "BRL",
+      "symbol": "R$",
+      "conversion_rate": 0.053526,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BS",
+      "country_name": "The Bahamas",
+      "currency": "BSD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BT",
+      "country_name": "Bhutan",
+      "currency": "BTN",
+      "symbol": "Nu.",
+      "conversion_rate": 1,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BV",
+      "country_name": "Bouvet Island",
+      "currency": "NOK",
+      "symbol": "kr",
+      "conversion_rate": 0.100978,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BW",
+      "country_name": "Botswana",
+      "currency": "BWP",
+      "symbol": "P",
+      "conversion_rate": 0.146875,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BY",
+      "country_name": "Belarus",
+      "currency": "BYN",
+      "symbol": "Br",
+      "conversion_rate": 0.030471,
+      "multiplier": 2
+    },
+    {
+      "country_code": "BZ",
+      "country_name": "Belize",
+      "currency": "BZD",
+      "symbol": "$",
+      "conversion_rate": 0.020885,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CA",
+      "country_name": "Canada",
+      "currency": "CAD",
+      "symbol": "$",
+      "conversion_rate": 0.014729,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CC",
+      "country_name": "Cocos (Keeling) Islands",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CD",
+      "country_name": "Democratic Republic of the Congo",
+      "currency": "CDF",
+      "symbol": "FC",
+      "conversion_rate": 24.1729,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CF",
+      "country_name": "Central African Republic",
+      "currency": "XAF",
+      "symbol": "FCFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CG",
+      "country_name": "Congo",
+      "currency": "CDF",
+      "symbol": "FC",
+      "conversion_rate": 24.1729,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CH",
+      "country_name": "Switzerland",
+      "currency": "CHF",
+      "symbol": "CHF",
+      "conversion_rate": 0.008564,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CI",
+      "country_name": "Ivory Coast",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CK",
+      "country_name": "Cook Islands",
+      "currency": "NZD",
+      "symbol": "$",
+      "conversion_rate": 0.01805,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CL",
+      "country_name": "Chile",
+      "currency": "CLP",
+      "symbol": "$",
+      "conversion_rate": 9.7628,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CM",
+      "country_name": "Cameroon",
+      "currency": "XAF",
+      "symbol": "FCFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CN",
+      "country_name": "China",
+      "currency": "CNY",
+      "symbol": "¥",
+      "conversion_rate": 0.070662,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CO",
+      "country_name": "Colombia",
+      "currency": "COP",
+      "symbol": "$",
+      "conversion_rate": 33.506,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CR",
+      "country_name": "Costa Rica",
+      "currency": "CRC",
+      "symbol": "₡",
+      "conversion_rate": 4.7538,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CU",
+      "country_name": "Cuba",
+      "currency": "CUP",
+      "symbol": "$",
+      "conversion_rate": 0.25062,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CV",
+      "country_name": "Cape Verde",
+      "currency": "CVE",
+      "symbol": "$",
+      "conversion_rate": 1.0116,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CW",
+      "country_name": "Curacao",
+      "currency": "ANG",
+      "symbol": "ƒ",
+      "conversion_rate": 0.018692,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CX",
+      "country_name": "Christmas Island",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CY",
+      "country_name": "Cyprus",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "CZ",
+      "country_name": "Czech Republic",
+      "currency": "CZK",
+      "symbol": "Kč",
+      "conversion_rate": 0.22204,
+      "multiplier": 2
+    },
+    {
+      "country_code": "DE",
+      "country_name": "Germany",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "DJ",
+      "country_name": "Djibouti",
+      "currency": "DJF",
+      "symbol": "Fdj",
+      "conversion_rate": 1.8559,
+      "multiplier": 2
+    },
+    {
+      "country_code": "DK",
+      "country_name": "Denmark",
+      "currency": "DKK",
+      "symbol": "kr",
+      "conversion_rate": 0.068445,
+      "multiplier": 2
+    },
+    {
+      "country_code": "DM",
+      "country_name": "Dominica",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "DO",
+      "country_name": "Dominican Republic",
+      "currency": "DOP",
+      "symbol": "$",
+      "conversion_rate": 0.606934,
+      "multiplier": 2
+    },
+    {
+      "country_code": "DZ",
+      "country_name": "Algeria",
+      "currency": "DZD",
+      "symbol": "د.ج",
+      "conversion_rate": 1.394,
+      "multiplier": 2
+    },
+    {
+      "country_code": "EC",
+      "country_name": "Ecuador",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "EE",
+      "country_name": "Estonia",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "EG",
+      "country_name": "Egypt",
+      "currency": "EGP",
+      "symbol": "ج.م",
+      "conversion_rate": 0.529972,
+      "multiplier": 2
+    },
+    {
+      "country_code": "EH",
+      "country_name": "Western Sahara",
+      "currency": "MAD",
+      "symbol": "د.م.",
+      "conversion_rate": 0.098062,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ER",
+      "country_name": "Eritrea",
+      "currency": "ERN",
+      "symbol": "Nfk",
+      "conversion_rate": 0.156638,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ES",
+      "country_name": "Spain",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ET",
+      "country_name": "Ethiopia",
+      "currency": "ETB",
+      "symbol": "Br",
+      "conversion_rate": 1.6762,
+      "multiplier": 2
+    },
+    {
+      "country_code": "FI",
+      "country_name": "Finland",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "FJ",
+      "country_name": "Fiji Islands",
+      "currency": "FJD",
+      "symbol": "$",
+      "conversion_rate": 0.023304,
+      "multiplier": 2
+    },
+    {
+      "country_code": "FK",
+      "country_name": "Falkland Islands",
+      "currency": "FKP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "FM",
+      "country_name": "Micronesia",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "FO",
+      "country_name": "Faroe Islands",
+      "currency": "DKK",
+      "symbol": "kr",
+      "conversion_rate": 0.068445,
+      "multiplier": 2
+    },
+    {
+      "country_code": "FR",
+      "country_name": "France",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GA",
+      "country_name": "Gabon",
+      "currency": "XAF",
+      "symbol": "FCFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "currency": "GBP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GD",
+      "country_name": "Grenada",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GE",
+      "country_name": "Georgia",
+      "currency": "GEL",
+      "symbol": "₾",
+      "conversion_rate": 0.027422,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GF",
+      "country_name": "French Guiana",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GG",
+      "country_name": "Guernsey",
+      "currency": "GBP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GH",
+      "country_name": "Ghana",
+      "currency": "GHS",
+      "symbol": "₵",
+      "conversion_rate": 0.122024,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GI",
+      "country_name": "Gibraltar",
+      "currency": "GIP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GL",
+      "country_name": "Greenland",
+      "currency": "DKK",
+      "symbol": "kr",
+      "conversion_rate": 0.068445,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GM",
+      "country_name": "The Gambia",
+      "currency": "GMD",
+      "symbol": "D",
+      "conversion_rate": 0.777977,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GN",
+      "country_name": "Guinea",
+      "currency": "GNF",
+      "symbol": "FG",
+      "conversion_rate": 91.8096,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GP",
+      "country_name": "Guadeloupe",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GQ",
+      "country_name": "Equatorial Guinea",
+      "currency": "XAF",
+      "symbol": "FCFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GR",
+      "country_name": "Greece",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GS",
+      "country_name": "South Georgia",
+      "currency": "GBP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GT",
+      "country_name": "Guatemala",
+      "currency": "GTQ",
+      "symbol": "Q",
+      "conversion_rate": 0.07974,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GU",
+      "country_name": "Guam",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GW",
+      "country_name": "Guinea-Bissau",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "GY",
+      "country_name": "Guyana",
+      "currency": "GYD",
+      "symbol": "$",
+      "conversion_rate": 2.1841,
+      "multiplier": 2
+    },
+    {
+      "country_code": "HK",
+      "country_name": "Hong Kong S.A.R.",
+      "currency": "HKD",
+      "symbol": "$",
+      "conversion_rate": 0.081978,
+      "multiplier": 2
+    },
+    {
+      "country_code": "HM",
+      "country_name": "Heard Island and McDonald Islands",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "HN",
+      "country_name": "Honduras",
+      "currency": "HNL",
+      "symbol": "L",
+      "conversion_rate": 0.280326,
+      "multiplier": 2
+    },
+    {
+      "country_code": "HR",
+      "country_name": "Croatia",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "HT",
+      "country_name": "Haiti",
+      "currency": "HTG",
+      "symbol": "G",
+      "conversion_rate": 1.3658,
+      "multiplier": 2
+    },
+    {
+      "country_code": "HU",
+      "country_name": "Hungary",
+      "currency": "HUF",
+      "symbol": "Ft",
+      "conversion_rate": 3.3201,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "currency": "IDR",
+      "symbol": "Rp",
+      "conversion_rate": 189,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IL",
+      "country_name": "Israel",
+      "currency": "ILS",
+      "symbol": "₪",
+      "conversion_rate": 0.032081,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IM",
+      "country_name": "Man (Isle of)",
+      "currency": "GBP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IN",
+      "country_name": "India",
+      "currency": "INR",
+      "symbol": "₹",
+      "conversion_rate": 1,
+      "multiplier": 1
+    },
+    {
+      "country_code": "IO",
+      "country_name": "British Indian Ocean Territory",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IQ",
+      "country_name": "Iraq",
+      "currency": "IQD",
+      "symbol": "ع.د",
+      "conversion_rate": 13.6809,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IR",
+      "country_name": "Iran",
+      "currency": "IRR",
+      "symbol": "﷼",
+      "conversion_rate": 14381,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IS",
+      "country_name": "Iceland",
+      "currency": "ISK",
+      "symbol": "kr",
+      "conversion_rate": 1.3076,
+      "multiplier": 2
+    },
+    {
+      "country_code": "IT",
+      "country_name": "Italy",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "JE",
+      "country_name": "Jersey",
+      "currency": "GBP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "JM",
+      "country_name": "Jamaica",
+      "currency": "JMD",
+      "symbol": "J$",
+      "conversion_rate": 1.6512,
+      "multiplier": 2
+    },
+    {
+      "country_code": "JO",
+      "country_name": "Jordan",
+      "currency": "JOD",
+      "symbol": "د.ا",
+      "conversion_rate": 0.007404,
+      "multiplier": 2
+    },
+    {
+      "country_code": "JP",
+      "country_name": "Japan",
+      "currency": "JPY",
+      "symbol": "¥",
+      "conversion_rate": 1.7115,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KE",
+      "country_name": "Kenya",
+      "currency": "KES",
+      "symbol": "KSh",
+      "conversion_rate": 1.3529,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KG",
+      "country_name": "Kyrgyzstan",
+      "currency": "KGS",
+      "symbol": "лв",
+      "conversion_rate": 0.91379,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KH",
+      "country_name": "Cambodia",
+      "currency": "KHR",
+      "symbol": "៛",
+      "conversion_rate": 42.3026,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KI",
+      "country_name": "Kiribati",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KM",
+      "country_name": "Comoros",
+      "currency": "KMF",
+      "symbol": "CF",
+      "conversion_rate": 4.5135,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KN",
+      "country_name": "Saint Kitts and Nevis",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KR",
+      "country_name": "South Korea",
+      "currency": "KRW",
+      "symbol": "₩",
+      "conversion_rate": 15.1292,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KW",
+      "country_name": "Kuwait",
+      "currency": "KWD",
+      "symbol": "د.ك",
+      "conversion_rate": 0.00324,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KY",
+      "country_name": "Cayman Islands",
+      "currency": "KYD",
+      "symbol": "$",
+      "conversion_rate": 0.008702,
+      "multiplier": 2
+    },
+    {
+      "country_code": "KZ",
+      "country_name": "Kazakhstan",
+      "currency": "KZT",
+      "symbol": "₸",
+      "conversion_rate": 4.9789,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LA",
+      "country_name": "Laos",
+      "currency": "LAK",
+      "symbol": "₭",
+      "conversion_rate": 234,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LB",
+      "country_name": "Lebanon",
+      "currency": "LBP",
+      "symbol": "ل.ل",
+      "conversion_rate": 935,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LC",
+      "country_name": "Saint Lucia",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LI",
+      "country_name": "Liechtenstein",
+      "currency": "CHF",
+      "symbol": "CHF",
+      "conversion_rate": 0.008564,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LK",
+      "country_name": "Sri Lanka",
+      "currency": "LKR",
+      "symbol": "₨",
+      "conversion_rate": 3.5101,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LR",
+      "country_name": "Liberia",
+      "currency": "LRD",
+      "symbol": "$",
+      "conversion_rate": 1.8951,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LS",
+      "country_name": "Lesotho",
+      "currency": "LSL",
+      "symbol": "L",
+      "conversion_rate": 0.175094,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LT",
+      "country_name": "Lithuania",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LV",
+      "country_name": "Latvia",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "LY",
+      "country_name": "Libya",
+      "currency": "LYD",
+      "symbol": "ل.د",
+      "conversion_rate": 0.066986,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "currency": "MAD",
+      "symbol": "د.م.",
+      "conversion_rate": 0.098062,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MC",
+      "country_name": "Monaco",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MD",
+      "country_name": "Moldova",
+      "currency": "MDL",
+      "symbol": "L",
+      "conversion_rate": 0.18438,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ME",
+      "country_name": "Montenegro",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MF",
+      "country_name": "Saint-Martin (French part)",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MG",
+      "country_name": "Madagascar",
+      "currency": "MGA",
+      "symbol": "Ar",
+      "conversion_rate": 45.2817,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MH",
+      "country_name": "Marshall Islands",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MK",
+      "country_name": "North Macedonia",
+      "currency": "MKD",
+      "symbol": "ден",
+      "conversion_rate": 0.564256,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ML",
+      "country_name": "Mali",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MM",
+      "country_name": "Myanmar",
+      "currency": "MMK",
+      "symbol": "K",
+      "conversion_rate": 21.9331,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MN",
+      "country_name": "Mongolia",
+      "currency": "MNT",
+      "symbol": "₮",
+      "conversion_rate": 37.6725,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MO",
+      "country_name": "Macau S.A.R.",
+      "currency": "MOP",
+      "symbol": "MOP$",
+      "conversion_rate": 0.08443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MP",
+      "country_name": "Northern Mariana Islands",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MQ",
+      "country_name": "Martinique",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MR",
+      "country_name": "Mauritania",
+      "currency": "MRU",
+      "symbol": "UM",
+      "conversion_rate": 0.418565,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MS",
+      "country_name": "Montserrat",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MT",
+      "country_name": "Malta",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MU",
+      "country_name": "Mauritius",
+      "currency": "MUR",
+      "symbol": "₨",
+      "conversion_rate": 0.499643,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MV",
+      "country_name": "Maldives",
+      "currency": "MVR",
+      "symbol": "Rf",
+      "conversion_rate": 0.161637,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MW",
+      "country_name": "Malawi",
+      "currency": "MWK",
+      "symbol": "MK",
+      "conversion_rate": 18.199,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MX",
+      "country_name": "Mexico",
+      "currency": "MXN",
+      "symbol": "$",
+      "conversion_rate": 0.18283,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "currency": "MYR",
+      "symbol": "RM",
+      "conversion_rate": 0.042747,
+      "multiplier": 2
+    },
+    {
+      "country_code": "MZ",
+      "country_name": "Mozambique",
+      "currency": "MZN",
+      "symbol": "MT",
+      "conversion_rate": 0.66655,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NA",
+      "country_name": "Namibia",
+      "currency": "NAD",
+      "symbol": "$",
+      "conversion_rate": 0.175094,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NC",
+      "country_name": "New Caledonia",
+      "currency": "XPF",
+      "symbol": "₣",
+      "conversion_rate": 1.0948,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NE",
+      "country_name": "Niger",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NF",
+      "country_name": "Norfolk Island",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NG",
+      "country_name": "Nigeria",
+      "currency": "NGN",
+      "symbol": "₦",
+      "conversion_rate": 14.2659,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NI",
+      "country_name": "Nicaragua",
+      "currency": "NIO",
+      "symbol": "C$",
+      "conversion_rate": 0.384228,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NL",
+      "country_name": "Netherlands",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NO",
+      "country_name": "Norway",
+      "currency": "NOK",
+      "symbol": "kr",
+      "conversion_rate": 0.100978,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NP",
+      "country_name": "Nepal",
+      "currency": "NPR",
+      "symbol": "₨",
+      "conversion_rate": 1.6,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NR",
+      "country_name": "Nauru",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NU",
+      "country_name": "Niue",
+      "currency": "NZD",
+      "symbol": "$",
+      "conversion_rate": 0.01805,
+      "multiplier": 2
+    },
+    {
+      "country_code": "NZ",
+      "country_name": "New Zealand",
+      "currency": "NZD",
+      "symbol": "$",
+      "conversion_rate": 0.01805,
+      "multiplier": 2
+    },
+    {
+      "country_code": "OM",
+      "country_name": "Oman",
+      "currency": "OMR",
+      "symbol": "﷼",
+      "conversion_rate": 0.004015,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PA",
+      "country_name": "Panama",
+      "currency": "PAB",
+      "symbol": "B/.",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PE",
+      "country_name": "Peru",
+      "currency": "PEN",
+      "symbol": "S/",
+      "conversion_rate": 0.035525,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PF",
+      "country_name": "French Polynesia",
+      "currency": "XPF",
+      "symbol": "₣",
+      "conversion_rate": 1.0948,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PG",
+      "country_name": "Papua New Guinea",
+      "currency": "PGK",
+      "symbol": "K",
+      "conversion_rate": 0.046399,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PH",
+      "country_name": "Philippines",
+      "currency": "PHP",
+      "symbol": "₱",
+      "conversion_rate": 0.641447,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PK",
+      "country_name": "Pakistan",
+      "currency": "PKR",
+      "symbol": "₨",
+      "conversion_rate": 2.9067,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PL",
+      "country_name": "Poland",
+      "currency": "PLN",
+      "symbol": "zł",
+      "conversion_rate": 0.039715,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PM",
+      "country_name": "Saint Pierre and Miquelon",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PN",
+      "country_name": "Pitcairn Island",
+      "currency": "NZD",
+      "symbol": "$",
+      "conversion_rate": 0.01805,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PR",
+      "country_name": "Puerto Rico",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PS",
+      "country_name": "Palestinian Territory Occupied",
+      "currency": "ILS",
+      "symbol": "₪",
+      "conversion_rate": 0.032081,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PT",
+      "country_name": "Portugal",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PW",
+      "country_name": "Palau",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "PY",
+      "country_name": "Paraguay",
+      "currency": "PYG",
+      "symbol": "₲",
+      "conversion_rate": 62.9585,
+      "multiplier": 2
+    },
+    {
+      "country_code": "QA",
+      "country_name": "Qatar",
+      "currency": "QAR",
+      "symbol": "﷼",
+      "conversion_rate": 0.038011,
+      "multiplier": 2
+    },
+    {
+      "country_code": "RE",
+      "country_name": "Reunion",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "RO",
+      "country_name": "Romania",
+      "currency": "RON",
+      "symbol": "lei",
+      "conversion_rate": 0.04808,
+      "multiplier": 2
+    },
+    {
+      "country_code": "RS",
+      "country_name": "Serbia",
+      "currency": "RSD",
+      "symbol": "дин",
+      "conversion_rate": 1.0778,
+      "multiplier": 2
+    },
+    {
+      "country_code": "RU",
+      "country_name": "Russia",
+      "currency": "RUB",
+      "symbol": "₽",
+      "conversion_rate": 0.832074,
+      "multiplier": 2
+    },
+    {
+      "country_code": "RW",
+      "country_name": "Rwanda",
+      "currency": "RWF",
+      "symbol": "FRw",
+      "conversion_rate": 15.3758,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SA",
+      "country_name": "Saudi Arabia",
+      "currency": "SAR",
+      "symbol": "﷼",
+      "conversion_rate": 0.039159,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SB",
+      "country_name": "Solomon Islands",
+      "currency": "SBD",
+      "symbol": "$",
+      "conversion_rate": 0.083405,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SC",
+      "country_name": "Seychelles",
+      "currency": "SCR",
+      "symbol": "₨",
+      "conversion_rate": 0.152109,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SD",
+      "country_name": "Sudan",
+      "currency": "SDG",
+      "symbol": "ج.س",
+      "conversion_rate": 4.6662,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "currency": "SEK",
+      "symbol": "kr",
+      "conversion_rate": 0.101447,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SG",
+      "country_name": "Singapore",
+      "currency": "SGD",
+      "symbol": "$",
+      "conversion_rate": 0.01351,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SH",
+      "country_name": "Saint Helena",
+      "currency": "SHP",
+      "symbol": "£",
+      "conversion_rate": 0.00786,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SI",
+      "country_name": "Slovenia",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SJ",
+      "country_name": "Svalbard and Jan Mayen Islands",
+      "currency": "NOK",
+      "symbol": "kr",
+      "conversion_rate": 0.100978,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SK",
+      "country_name": "Slovakia",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SL",
+      "country_name": "Sierra Leone",
+      "currency": "SLL",
+      "symbol": "Le",
+      "conversion_rate": 252,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SM",
+      "country_name": "San Marino",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SN",
+      "country_name": "Senegal",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SO",
+      "country_name": "Somalia",
+      "currency": "SOS",
+      "symbol": "Sh",
+      "conversion_rate": 5.9648,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SR",
+      "country_name": "Suriname",
+      "currency": "SRD",
+      "symbol": "$",
+      "conversion_rate": 0.397552,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SS",
+      "country_name": "South Sudan",
+      "currency": "SSP",
+      "symbol": "£",
+      "conversion_rate": 51.2204,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ST",
+      "country_name": "Sao Tome and Principe",
+      "currency": "STN",
+      "symbol": "Db",
+      "conversion_rate": 0.224775,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SV",
+      "country_name": "El Salvador",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SX",
+      "country_name": "Sint Maarten (Dutch part)",
+      "currency": "ANG",
+      "symbol": "ƒ",
+      "conversion_rate": 0.018692,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SY",
+      "country_name": "Syria",
+      "currency": "SYP",
+      "symbol": "£",
+      "conversion_rate": 1.2729,
+      "multiplier": 2
+    },
+    {
+      "country_code": "SZ",
+      "country_name": "Eswatini",
+      "currency": "SZL",
+      "symbol": "E",
+      "conversion_rate": 0.175094,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TC",
+      "country_name": "Turks and Caicos Islands",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TD",
+      "country_name": "Chad",
+      "currency": "XAF",
+      "symbol": "FCFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TF",
+      "country_name": "French Southern Territories",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TG",
+      "country_name": "Togo",
+      "currency": "XOF",
+      "symbol": "CFA",
+      "conversion_rate": 6.0181,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TH",
+      "country_name": "Thailand",
+      "currency": "THB",
+      "symbol": "฿",
+      "conversion_rate": 0.350412,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TJ",
+      "country_name": "Tajikistan",
+      "currency": "TJS",
+      "symbol": "SM",
+      "conversion_rate": 0.096508,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TK",
+      "country_name": "Tokelau",
+      "currency": "NZD",
+      "symbol": "$",
+      "conversion_rate": 0.01805,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TL",
+      "country_name": "Timor-Leste",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TM",
+      "country_name": "Turkmenistan",
+      "currency": "TMT",
+      "symbol": "m",
+      "conversion_rate": 0.036593,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TN",
+      "country_name": "Tunisia",
+      "currency": "TND",
+      "symbol": "د.ت",
+      "conversion_rate": 0.030922,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TO",
+      "country_name": "Tonga",
+      "currency": "TOP",
+      "symbol": "T$",
+      "conversion_rate": 0.024905,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TR",
+      "country_name": "Turkey",
+      "currency": "TRY",
+      "symbol": "₺",
+      "conversion_rate": 0.495735,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago",
+      "currency": "TTD",
+      "symbol": "$",
+      "conversion_rate": 0.070944,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TV",
+      "country_name": "Tuvalu",
+      "currency": "AUD",
+      "symbol": "$",
+      "conversion_rate": 0.015032,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TW",
+      "country_name": "Taiwan",
+      "currency": "TWD",
+      "symbol": "NT$",
+      "conversion_rate": 0.337962,
+      "multiplier": 2
+    },
+    {
+      "country_code": "TZ",
+      "country_name": "Tanzania",
+      "currency": "TZS",
+      "symbol": "TSh",
+      "conversion_rate": 27.7961,
+      "multiplier": 2
+    },
+    {
+      "country_code": "UA",
+      "country_name": "Ukraine",
+      "currency": "UAH",
+      "symbol": "₴",
+      "conversion_rate": 0.469759,
+      "multiplier": 2
+    },
+    {
+      "country_code": "UG",
+      "country_name": "Uganda",
+      "currency": "UGX",
+      "symbol": "USh",
+      "conversion_rate": 39.1523,
+      "multiplier": 2
+    },
+    {
+      "country_code": "UM",
+      "country_name": "United States Minor Outlying Islands",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "US",
+      "country_name": "United States",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "UY",
+      "country_name": "Uruguay",
+      "currency": "UYU",
+      "symbol": "$",
+      "conversion_rate": 0.420352,
+      "multiplier": 2
+    },
+    {
+      "country_code": "UZ",
+      "country_name": "Uzbekistan",
+      "currency": "UZS",
+      "symbol": "лв",
+      "conversion_rate": 127,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VA",
+      "country_name": "Vatican City State (Holy See)",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VC",
+      "country_name": "Saint Vincent and the Grenadines",
+      "currency": "XCD",
+      "symbol": "$",
+      "conversion_rate": 0.028195,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VE",
+      "country_name": "Venezuela",
+      "currency": "VES",
+      "symbol": "Bs",
+      "conversion_rate": 7.7863,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VG",
+      "country_name": "Virgin Islands (British)",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VI",
+      "country_name": "Virgin Islands (US)",
+      "currency": "USD",
+      "symbol": "$",
+      "conversion_rate": 0.010443,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VN",
+      "country_name": "Vietnam",
+      "currency": "VND",
+      "symbol": "₫",
+      "conversion_rate": 276,
+      "multiplier": 2
+    },
+    {
+      "country_code": "VU",
+      "country_name": "Vanuatu",
+      "currency": "VUV",
+      "symbol": "VT",
+      "conversion_rate": 1.2459,
+      "multiplier": 2
+    },
+    {
+      "country_code": "WF",
+      "country_name": "Wallis and Futuna Islands",
+      "currency": "XPF",
+      "symbol": "₣",
+      "conversion_rate": 1.0948,
+      "multiplier": 2
+    },
+    {
+      "country_code": "WS",
+      "country_name": "Samoa",
+      "currency": "WST",
+      "symbol": "WS$",
+      "conversion_rate": 0.028427,
+      "multiplier": 2
+    },
+    {
+      "country_code": "XK",
+      "country_name": "Kosovo",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "YE",
+      "country_name": "Yemen",
+      "currency": "YER",
+      "symbol": "﷼",
+      "conversion_rate": 2.4931,
+      "multiplier": 2
+    },
+    {
+      "country_code": "YT",
+      "country_name": "Mayotte",
+      "currency": "EUR",
+      "symbol": "€",
+      "conversion_rate": 0.009174,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ZA",
+      "country_name": "South Africa",
+      "currency": "ZAR",
+      "symbol": "R",
+      "conversion_rate": 0.175094,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ZM",
+      "country_name": "Zambia",
+      "currency": "ZMW",
+      "symbol": "ZK",
+      "conversion_rate": 0.196684,
+      "multiplier": 2
+    },
+    {
+      "country_code": "ZW",
+      "country_name": "Zimbabwe",
+      "currency": "ZWL",
+      "symbol": "$",
+      "conversion_rate": 0.27876,
+      "multiplier": 2
+    }
+  ]
+}

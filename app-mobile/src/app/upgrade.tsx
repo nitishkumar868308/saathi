@@ -30,6 +30,7 @@ import {
   localAmount,
   type LocalPricing,
 } from "@/lib/pricing";
+import { countryFromTimezone } from "@/lib/tz-country";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
@@ -59,7 +60,18 @@ export default function Upgrade() {
         getUserDetails().catch(() => null),
       ]);
       if (!alive) return;
-      const prof = details?.phone_country?.toUpperCase() || null;
+      /**
+       * Doosri raay — IP ke saamne rakhne ke liye.
+       *
+       * Pehle sirf profile ka country dekha jaata tha. Dikkat: zyadatar log
+       * profile bharte hi nahi, aur unke liye ye check chup-chaap band pada
+       * rehta tha — VPN chalake koi bhi sasta price dekh leta.
+       *
+       * Phone ka TIMEZONE VPN se nahi badalta, isliye wo achhi doosri raay hai.
+       * Profile pehle (user ne khud bhara hai), warna timezone.
+       */
+      const prof =
+        details?.phone_country?.toUpperCase() || countryFromTimezone() || null;
       setIpCode(ip);
       setProfileCode(prof);
       const useCode = ip || prof || "IN";

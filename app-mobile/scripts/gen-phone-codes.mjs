@@ -55,13 +55,24 @@ ${rows.join(",\n")}
 ) as v(iso2, dial)
 where upper(coalesce(c.iso2, c.code)) = v.iso2;
 
--- Chala ke ye dekh lena — "baaki" 0 hona chahiye:
+-- ⚠️ Index ka naam \`countries_iso2_idx\` NAHI rakh sakte — wo
+-- \`add-country-currency.sql\` pehle hi (iso2) par bana chuka hai. Wahi naam
+-- dobara dene se \`if not exists\` chup-chaap skip kar deta aur ye index banta
+-- hi nahi (koi error bhi nahi aata).
+create index if not exists countries_phone_lookup_idx
+  on public.countries (upper(coalesce(iso2, code)));
+
+-- Chala ke ye dekh lena — "baaki" 7 aana chahiye:
 --
 --   select count(*) filter (where phone_code is not null) as bhar_gaya,
 --          count(*) filter (where phone_code is null)     as baaki
 --   from public.countries;
 --
--- Kuch baaki reh jaayein to unka iso2 khali hoga:
+-- Wo 7 hain: Antarctica, Bouvet Island, French Southern Territories,
+-- Heard Island, Pitcairn, South Georgia, US Minor Outlying Islands.
+-- Inka koi calling code hota hi nahi (koi rehta hi nahi wahan) — ye galti nahi
+-- hai. App inhe \`isSupportedCountry\` par chhaan deti hai, isliye crash bhi
+-- nahi hota.
 --
 --   select id, name, code, iso2 from public.countries where phone_code is null;
 `;
