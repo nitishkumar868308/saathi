@@ -260,7 +260,11 @@
       "Bash(node scripts/firebase-env.mjs \"~/Downloads/saathi-c42f0-firebase-adminsdk-fbsvc-8c9ca90b0e.json\")",
       "Bash(node scripts/firebase-env.mjs \"~/Downloads/nahi-hai.json\")",
       "Bash(node \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/27f74463-1c53-471f-b200-8f40c8af3eca/scratchpad/repeat-sim.mjs\")",
-      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./app-mobile/package.json'\\).scripts,null,2\\)\\)\")"
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./app-mobile/package.json'\\).scripts,null,2\\)\\)\")",
+      "Bash(grep -v \"eas-cli@\\\\|upgrade\\\\|npm install\\\\|Proceeding\\\\|^$\")",
+      "Bash(node \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/27f74463-1c53-471f-b200-8f40c8af3eca/scratchpad/gen-phone-codes.mjs\")",
+      "Bash(sed -n '19,24p;/IN/p' /d/my-app/supabase/country-phone-codes.sql)",
+      "Bash(node scripts/gen-phone-codes.mjs)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

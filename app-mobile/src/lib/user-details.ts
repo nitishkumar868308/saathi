@@ -5,9 +5,29 @@ import { supabase } from "./supabase";
 export type LocationItem = {
   id: number;
   name: string;
-  /** Sirf countries par — ISO 3166-1 alpha-2 ("IN", "US"). Phone code isi se banta hai. */
+  /**
+   * Sirf countries par. ⚠️ Isme kahin ISO2 hai kahin ISO3 — isi wajah se alag
+   * `iso2` column banaya gaya tha. Number validate karne ke liye `countryIso2()`
+   * use karo, seedha ye nahi.
+   */
   code?: string | null;
+  /** Pakka ISO 3166-1 alpha-2 ("IN", "US") — validation isi se. */
+  iso2?: string | null;
+  /**
+   * Dial code DB se ("+91").
+   *
+   * ⚠️ Ye pehle app ke andar libphonenumber-js se banta tha. Ab DB hi sach hai —
+   * naya country jodne ya code badalne ke liye nayi app build nahi karni padti.
+   * Null ho (SQL na chala ho) to caller library par gir jaata hai.
+   */
+  phone_code?: string | null;
 };
+
+/** Country row ka bharosemand ISO2 — `iso2` pehle, warna `code`. */
+export function countryIso2(c: LocationItem | undefined | null): string | null {
+  const v = (c?.iso2 || c?.code || "").toUpperCase();
+  return v.length === 2 ? v : null;
+}
 
 export type UserDetails = {
   full_name: string;
@@ -31,8 +51,8 @@ function client() {
 export async function getCountries(): Promise<LocationItem[]> {
   const { data, error } = await client()
     .from("countries")
-    // `code` (ISO alpha-2) bhi chahiye — phone ka dial code aur validation isi se.
-    .select("id,name,code")
+    // phone_code = dikhne wala dial code (DB se). iso2 = validation ke liye.
+    .select("id,name,code,iso2,phone_code")
     .order("name");
   if (error) throw error;
   return (data ?? []) as LocationItem[];

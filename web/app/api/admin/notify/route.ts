@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin";
 import { sendMail, renderEmail, emailParagraph, escapeHtml } from "@/lib/email";
 import { isFcmConfigured, sendPush } from "@/lib/fcm";
+import { logServerError } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -225,6 +226,7 @@ export async function POST(request: Request) {
         else skipped++;
       } catch (e) {
         errors.push(`${p.email}: ${String(e)}`);
+        void logServerError(e, { where: "admin/notify", step: "email", to: p.email });
       }
     }
   }
@@ -234,10 +236,37 @@ export async function POST(request: Request) {
   let push: { sent: number; failed: number; devices: number } | null = null;
 
   if (wantsPush) {
-    const tokens = await tokensFor(targets.map((p) => p.id)).catch(() => [] as string[]);
+    const tokens = await tokensFor(targets.map((p) => p.id)).catch((e) => {
+      void logServerError(e, { where: "admin/notify", step: "device_tokens fetch" });
+      return [] as string[];
+    });
     const res = await sendPush(tokens, subject, message);
     push = { sent: res.sent, failed: res.failed, devices: tokens.length };
     errors.push(...res.errors);
+
+    // ⚠️ Ye logging pehle nahi thi, aur usi wajah se push fail hone par admin ko
+    // kuch pata hi nahi chalta tha: error sirf HTTP response me jaata tha, aur
+    // Logs screen khaali rehti thi. Ab har fail wahan dikhega.
+    if (res.errors.length) {
+      void logServerError(new Error(`push failed: ${res.errors[0]}`), {
+        where: "admin/notify",
+        channel,
+        devices: tokens.length,
+        sent: res.sent,
+        failed: res.failed,
+        allErrors: res.errors,
+      });
+    }
+    // "Ek bhi device nahi mila" bhi batane laayak hai — ye fail nahi hai, par
+    // admin ko lagta hai push toot gayi. Warning level isi ke liye.
+    if (tokens.length === 0) {
+      void logServerError(new Error("push: koi device token nahi mila"), {
+        where: "admin/notify",
+        channel,
+        users: targets.length,
+        hint: "users ne push wali nayi app install/login nahi ki",
+      });
+    }
 
     // App uninstall ho chuki / token expire — DB se hata do, warna har broadcast
     // me ye tokens fail ginte rahenge aur list kachre se bharti jaayegi.

@@ -34,6 +34,7 @@ import {
   getCities,
   getUserDetails,
   saveUserDetails,
+  countryIso2,
   type LocationItem,
 } from "@/lib/user-details";
 
@@ -125,10 +126,18 @@ export default function ProfileDetails() {
     }
   }
 
-  /** Chune gaye country ka ISO code ("IN") — phone code + validation isi se. */
+  /** Chuni hui country ki poori DB row — dial code aur ISO dono isi se. */
+  const countryRow = countries.find((x) => x.id === countryId);
+
+  /**
+   * Chune gaye country ka ISO2 ("IN") — number VALIDATE karne ke liye.
+   *
+   * Ye ab bhi library ke kaam aata hai (kaunsa number us desh me valid hai, ye
+   * DB nahi bata sakti). Par jo code screen par DIKHTA hai wo neeche `dial` me
+   * DB se aata hai.
+   */
   const countryIso = ((): CountryCode | null => {
-    const c = countries.find((x) => x.id === countryId);
-    const code = c?.code?.toUpperCase();
+    const code = countryIso2(countryRow);
     return code && isSupportedCountry(code) ? (code as CountryCode) : null;
   })();
 
@@ -140,7 +149,7 @@ export default function ProfileDetails() {
     setCities([]);
     // Country badla to phone ka dial code bhi wahi ka — profile ab sirf India ke
     // liye nahi hai, aur number hamesha address wale desh ka hi hona chahiye.
-    const iso = countries.find((c) => c.id === id)?.code?.toUpperCase();
+    const iso = countryIso2(countries.find((c) => c.id === id));
     if (iso && isSupportedCountry(iso) && iso !== phoneCountry) {
       setPhoneCountry(iso as CountryCode);
       setPhoneNational("");
@@ -165,7 +174,21 @@ export default function ProfileDetails() {
 
   // Phone ka desh: pehle location wala country, warna jo pehle se save tha.
   const activeCountry: CountryCode = countryIso ?? phoneCountry;
-  const dial = `+${getCountryCallingCode(activeCountry)}`;
+
+  /**
+   * Dikhne wala dial code — DB se.
+   *
+   * ⚠️ Pehle ye seedha `getCountryCallingCode()` se banta tha. Wo hardcoded to
+   * nahi tha, par tha app ke ANDAR: DB me naya country jodne par uska code apne
+   * aap nahi aata tha, aur kisi desh ka code badalne ke liye nayi app build
+   * karni padti thi.
+   *
+   * Ab `countries.phone_code` hi sach hai. Library par sirf tab girte hain jab
+   * wo column khaali ho (`country-phone-codes.sql` na chala ho) — warna purane
+   * users ko khaali code dikhta aur unka number save hi na hota.
+   */
+  const dial =
+    countryRow?.phone_code?.trim() || `+${getCountryCallingCode(activeCountry)}`;
   const fullPhone = `${dial}${phoneNational.replace(/\D/g, "")}`;
   // libphonenumber har desh ke apne rules jaanta hai — 10-digit ka hardcoded
   // India wala check nahi.
@@ -302,6 +325,7 @@ export default function ProfileDetails() {
               national={phoneNational}
               onNational={setPhoneNational}
               locked={!!countryIso}
+              dialCode={dial}
             />
             {countryId && !countryIso && (
               <Text style={styles.hint}>{t.phoneCountryUnknown}</Text>

@@ -29,6 +29,7 @@ export function PhoneField({
   onNational,
   locked = false,
   placeholder,
+  dialCode,
 }: {
   country: CountryCode;
   onCountry: (c: CountryCode) => void;
@@ -41,6 +42,13 @@ export function PhoneField({
    */
   locked?: boolean;
   placeholder?: string;
+  /**
+   * Dikhne wala dial code ("+91") — DB se.
+   *
+   * Na do to library se ban jaata hai. Ye prop isliye hai ki dial code ka sach
+   * ab `countries.phone_code` hai; library sirf validation ke liye rehti hai.
+   */
+  dialCode?: string;
 }) {
   const { phoneField: p } = useT();
   const [open, setOpen] = useState(false);
@@ -66,7 +74,7 @@ export function PhoneField({
         disabled={locked}
       >
         <Text style={styles.codeText}>
-          {flag(country)} +{getCountryCallingCode(country)}
+          {flag(country)} {dialCode || `+${getCountryCallingCode(country)}`}
         </Text>
       </Pressable>
       <TextInput
