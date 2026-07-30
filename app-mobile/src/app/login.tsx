@@ -45,6 +45,8 @@ export default function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Password hamesha chhupa hua shuru hota hai — user khud aankh dabaye to dikhe.
+  const [showPassword, setShowPassword] = useState(false);
   const [refCode, setRefCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -158,17 +160,33 @@ export default function Login() {
             style={styles.input}
           />
 
-          {/* password */}
+          {/* password — default chhupa hua, aankh dabao to dikhta hai */}
           <Text style={styles.label}>{l.password}</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder={l.passwordPlaceholder}
-            placeholderTextColor={colors.inkSoft}
-            secureTextEntry
-            autoCapitalize="none"
-            style={styles.input}
-          />
+          <View style={styles.passWrap}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder={l.passwordPlaceholder}
+              placeholderTextColor={colors.inkSoft}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[styles.input, styles.passInput]}
+            />
+            <Pressable
+              onPress={() => setShowPassword((v) => !v)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? l.hidePassword : l.showPassword}
+              style={({ pressed }) => [styles.eye, pressed && { opacity: 0.6 }]}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color={colors.inkSoft}
+              />
+            </Pressable>
+          </View>
 
           {/* referral code (signup only, optional; referrals band ho to nahi) */}
           {mode === "signup" && offers.referralsEnabled && (
@@ -274,6 +292,18 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     color: colors.ink,
     fontSize: 15,
+  },
+  passWrap: { position: "relative", justifyContent: "center" },
+  // Text aankh ke neeche na chala jaaye.
+  passInput: { paddingRight: 52 },
+  eye: {
+    position: "absolute",
+    right: 4,
+    top: 0,
+    bottom: 0,
+    width: 46,
+    alignItems: "center",
+    justifyContent: "center",
   },
   btn: {
     marginTop: 24,

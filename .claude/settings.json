@@ -270,7 +270,9 @@
       "WebFetch(domain:en.wikipedia.org)",
       "Bash(node scripts/gen-pricing.mjs)",
       "Bash(node scripts/gen-tz-country.mjs)",
-      "Bash(sed -i 's|^console.log\\(`\\\\${entries.length} zones|console.log\\(`${entries.length} zones \\(${aliasCount} purane naam bhi\\)|' scripts/gen-tz-country.mjs)"
+      "Bash(sed -i 's|^console.log\\(`\\\\${entries.length} zones|console.log\\(`${entries.length} zones \\(${aliasCount} purane naam bhi\\)|' scripts/gen-tz-country.mjs)",
+      "Bash(grep -n \"^\\\\s*//\\\\|{/\\\\*\" /d/my-app/app-mobile/src/app/profile-details.tsx)",
+      "Bash(grep -n \"delete\\\\|Delete\\\\|/\\\\* \\\\|{/\\\\*\" /d/my-app/app-mobile/src/app/\\\\\\(tabs\\\\\\)/settings.tsx)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

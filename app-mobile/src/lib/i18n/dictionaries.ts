@@ -126,6 +126,10 @@ export type Dict = {
     emailPlaceholder: string;
     password: string;
     passwordPlaceholder: string;
+    /** Eye icon ka accessibility label — password chhupa hua hai. */
+    showPassword: string;
+    /** Eye icon ka accessibility label — password dikh raha hai. */
+    hidePassword: string;
     referralCode: string;
     referralOptional: string;
     referralPlaceholder: string;
@@ -666,6 +670,8 @@ const hinglish: Dict = {
     emailPlaceholder: "aapka@email.com",
     password: "Password",
     passwordPlaceholder: "Kam se kam 6 characters",
+    showPassword: "Password dikhao",
+    hidePassword: "Password chhupao",
     referralCode: "Referral code",
     referralOptional: "optional",
     referralPlaceholder: "Dost ka code",
@@ -1181,6 +1187,8 @@ const hi: Dict = {
     emailPlaceholder: "aapka@email.com",
     password: "पासवर्ड",
     passwordPlaceholder: "कम से कम 6 अक्षर",
+    showPassword: "पासवर्ड दिखाएँ",
+    hidePassword: "पासवर्ड छुपाएँ",
     referralCode: "रेफ़रल कोड",
     referralOptional: "optional",
     referralPlaceholder: "दोस्त का कोड",
@@ -1695,6 +1703,8 @@ const en: Dict = {
     emailPlaceholder: "you@email.com",
     password: "Password",
     passwordPlaceholder: "At least 6 characters",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     referralCode: "Referral code",
     referralOptional: "optional",
     referralPlaceholder: "Friend's code",

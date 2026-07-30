@@ -38,12 +38,64 @@ export type ErrorContext = {
   [k: string]: unknown;
 };
 
+/** Jin fields me asli message chhupa hota hai — pehla jo mile wahi lete hain. */
+const MESSAGE_KEYS = ["message", "error_description", "msg", "error", "reason"] as const;
+/** Ye alag se context me jaate hain, taaki admin > Logs me poora haal dikhe. */
+const DETAIL_KEYS = ["code", "status", "statusCode", "details", "hint", "name"] as const;
+
+function objectMessage(o: Record<string, unknown>): string {
+  for (const k of MESSAGE_KEYS) {
+    const v = o[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    // Nested error object (jaise `{ error: { message } }`).
+    if (v && typeof v === "object") {
+      const nested = objectMessage(v as Record<string, unknown>);
+      if (nested !== "Unknown error") return nested;
+    }
+  }
+  try {
+    const json = JSON.stringify(o);
+    if (json && json !== "{}") return json.slice(0, 300);
+  } catch {
+    /* circular object */
+  }
+  return "Unknown error";
+}
+
+/**
+ * `throw error` se aksar Error nahi, plain object aata hai — Supabase ka
+ * PostgrestError, fetch ka response, ya AuthError. Pehle hum seedha
+ * `String(err)` karte the, jisse admin > Logs me har aisi error
+ * "[object Object]" ban jaati thi — na message, na code, kuch pata nahi chalta
+ * tha. Ab message andar se nikalte hain aur code/details context me bhejte hain.
+ */
+function normalize(err: unknown): { error: Error; details: Record<string, unknown> } {
+  if (err instanceof Error) return { error: err, details: {} };
+  if (typeof err === "string") {
+    return { error: new Error(err.trim() || "Unknown error"), details: {} };
+  }
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    const error = new Error(objectMessage(o));
+    // Original stack ho to wahi rakho — reportError ka apna stack bekaar hai.
+    if (typeof o.stack === "string" && o.stack) error.stack = o.stack;
+    const details: Record<string, unknown> = {};
+    for (const k of DETAIL_KEYS) {
+      const v = o[k];
+      if (v !== undefined && v !== null && v !== "") details[k] = v;
+    }
+    return { error, details };
+  }
+  // null / undefined / number / boolean
+  return { error: new Error(err == null ? "Unknown error" : String(err)), details: {} };
+}
+
 export function reportError(
   err: unknown,
   context: ErrorContext = {},
   level: "error" | "warn" = "error",
 ): void {
-  const e = err instanceof Error ? err : new Error(String(err));
+  const { error: e, details } = normalize(err);
   const message = e.message || "Unknown error";
 
   // Crashlytics (jab Firebase on ho) — dono jagah record ho.
@@ -58,7 +110,7 @@ export function reportError(
       p_source: "app",
       p_level: level,
       p_stack: e.stack ?? null,
-      p_context: context,
+      p_context: Object.keys(details).length ? { ...context, ...details } : context,
       p_platform: Platform.OS,
       p_app_version: APP_VERSION,
     }),

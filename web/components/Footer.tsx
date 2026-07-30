@@ -88,6 +88,9 @@ export default function Footer() {
                 [t.links.terms, "/terms"],
                 [t.links.contact, "/contact"],
                 [t.links.support, "/support"],
+                // Play Store maangta hai ki account-deletion ka link site par
+                // aasani se mile — isliye footer me, har page par.
+                [t.links.deleteAccount, "/delete-account"],
               ].map(([label, href]) => (
                 <li key={href}>
                   <Link href={href} className={linkCls(href)}>

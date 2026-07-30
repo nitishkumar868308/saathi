@@ -8,7 +8,7 @@ import { colors } from "@/theme/colors";
 import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
-import { isSupabaseConfigured } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
@@ -19,6 +19,7 @@ import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
 import { useUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { PermissionModal } from "@/components/permission-modal";
 import { ALERT_MODES, alertUser, useAlertMode, type AlertMode } from "@/lib/alert-mode";
+import { reportError } from "@/lib/report-error";
 
 /**
  * "You" tab — account, plan aur settings.
@@ -32,6 +33,9 @@ import { ALERT_MODES, alertUser, useAlertMode, type AlertMode } from "@/lib/aler
  * hain, dus nahi.
  */
 
+/** Logout aur delete — dono jagah wahi laal. */
+const DANGER = "#B23B3B";
+
 type RowId =
   | "profile"
   | "membership"
@@ -44,7 +48,8 @@ type RowId =
   | "privacy"
   | "contact"
   | "help"
-  | "about";
+  | "about"
+  | "delete_all";
 
 type Row = {
   id: RowId;
@@ -52,6 +57,8 @@ type Row = {
   label: string;
   /** Row ke daayin taraf chhota sa haal (jaise chuni hui bhasha). */
   value?: string;
+  /** Delete jaisi row — laal rang me, taaki galti se na dabe. */
+  danger?: boolean;
 };
 
 export default function Settings() {
@@ -73,6 +80,7 @@ export default function Settings() {
   const [refModal, setRefModal] = useState(false);
   const [permModal, setPermModal] = useState(false);
   const [logoutAsk, setLogoutAsk] = useState(false);
+  const [deleteAsk, setDeleteAsk] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
   // Ring / vibrate / silent — device par local, server par kuch nahi jaata.
   const [alertMode, setAlertModePref] = useAlertMode();
@@ -129,6 +137,9 @@ export default function Settings() {
         { id: "help", icon: "help-circle-outline", label: s.help },
         { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
         { id: "about", icon: "information-circle-outline", label: s.about },
+        // Apna saara data ek jagah se hata sakein — Play Store ki data-deletion
+        // requirement bhi yahi maangti hai.
+        { id: "delete_all", icon: "trash-outline", label: s.deleteAll, danger: true },
       ],
     },
   ];
@@ -150,6 +161,27 @@ export default function Settings() {
       router.replace("/language" as never);
     } catch {
       toast.show(s.logout + " ✕", "error");
+    }
+  }
+
+  /** Sirf apna data (documents + reminders) delete — account bana rehta hai. */
+  async function deleteAllData() {
+    setDeleteAsk(false);
+    try {
+      const sb = supabase;
+      const uid = session?.user?.id;
+      if (!sb || !uid) throw new Error("no session");
+      // Do alag deletes — ek fail ho to bhi doosre ka pata chale.
+      const [docs, rems] = await Promise.all([
+        sb.from("documents").delete().eq("user_id", uid),
+        sb.from("reminders").delete().eq("user_id", uid),
+      ]);
+      if (docs.error) throw docs.error;
+      if (rems.error) throw rems.error;
+      toast.show(s.deleted, "success");
+    } catch (e) {
+      reportError(e, { screen: "settings", action: "delete_all_data" });
+      toast.show(`${s.deleteAll} ✕`, "error");
     }
   }
 
@@ -191,6 +223,9 @@ export default function Settings() {
         return;
       case "about":
         router.push("/about" as never);
+        return;
+      case "delete_all":
+        setDeleteAsk(true);
         return;
     }
   }
@@ -276,10 +311,17 @@ export default function Settings() {
                     pressed && { backgroundColor: colors.creamDeep },
                   ]}
                 >
-                  <View style={styles.rowIcon}>
-                    <Ionicons name={r.icon} size={18} color={colors.terracotta} />
+                  <View style={[styles.rowIcon, r.danger && styles.rowIconDanger]}>
+                    <Ionicons
+                      name={r.icon}
+                      size={18}
+                      color={r.danger ? DANGER : colors.terracotta}
+                    />
                   </View>
-                  <Text style={styles.rowLabel} numberOfLines={1}>
+                  <Text
+                    style={[styles.rowLabel, r.danger && { color: DANGER }]}
+                    numberOfLines={1}
+                  >
                     {r.label}
                   </Text>
                   {!!r.value && <Text style={styles.rowValue}>{r.value}</Text>}
@@ -316,6 +358,19 @@ export default function Settings() {
         destructive
         onConfirm={logout}
         onCancel={() => setLogoutAsk(false)}
+      />
+
+      {/* Sab data delete — wapas nahi aata, isliye poochh ke hi. */}
+      <ConfirmModal
+        visible={deleteAsk}
+        title={s.deleteTitle}
+        message={s.deleteBody}
+        confirmLabel={s.deleteYes}
+        cancelLabel={t.common.cancel}
+        icon="trash"
+        destructive
+        onConfirm={deleteAllData}
+        onCancel={() => setDeleteAsk(false)}
       />
 
       {/* Alert kaise sunayi de — ring / vibrate / silent (item 6).
@@ -536,6 +591,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "rgba(194,90,55,0.09)",
   },
+  rowIconDanger: { backgroundColor: "rgba(178,59,59,0.10)" },
   rowLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
   rowValue: { fontSize: 13.5, color: colors.inkSoft, fontWeight: "600" },
 

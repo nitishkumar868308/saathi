@@ -595,6 +595,60 @@ export async function sendWelcomeEmail(
 /* ------------------------------------------------------------------ */
 
 /** Contact — admin ko notification + user ko confirmation. */
+/**
+ * Account deletion request — Play Store ki data-deletion policy ke liye.
+ * Admin ko turant pata chale (7 din ke andar poora karna hota hai) aur user ko
+ * likhit confirmation mile ki request aa gayi hai.
+ */
+export async function sendAccountDeletionEmails(
+  name: string,
+  email: string,
+  reason: string,
+) {
+  const adminHtml = renderEmail(
+    "Account delete karne ki request 🗑️",
+    `<table style="width:100%;font-size:15px;color:${INK};border-collapse:collapse;">
+        <tr><td style="padding:6px 0;color:${SOFT};width:80px;">Naam</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(name)}</td></tr>
+        <tr><td style="padding:6px 0;color:${SOFT};">Email</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(email)}</td></tr>
+      </table>
+      ${
+        reason
+          ? `<div style="margin-top:16px;padding:16px;background:${CREAM};border-radius:14px;font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap;word-break:break-word;">${escapeHtml(reason)}</div>`
+          : ""
+      }
+      ${emailParagraph("⏳ Ise 7 din ke andar poora karna hai — account, documents, reminders sab hatane hain.")}`,
+    `${name} — account delete request`,
+  );
+
+  const userHtml = renderEmail(
+    "Delete request mil gayi 🗑️",
+    `${emailParagraph(
+      `Namaste ${escapeHtml(name)}, aapki account delete karne ki request hum tak pahunch gayi hai. 7 din ke andar aapka account aur uska saara data — documents, reminders, profile — hamesha ke liye hata diya jayega.`,
+    )}
+     ${emailParagraph(
+       "Agar ye request aapne nahi bheji, ya aap iraada badal chuke ho, to is email ka jawab de do — hum delete rok denge.",
+     )}
+     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">— Team Apka Saathi</p>`,
+    "Aapka account 7 din ke andar delete ho jayega",
+  );
+
+  return Promise.all([
+    sendMail({
+      to: CONTACT_TO ?? email,
+      replyTo: email,
+      fromName: "Apka Saathi Delete Request",
+      subject: `🗑️ Account delete request — ${name} <${email}>`,
+      html: adminHtml,
+    }),
+    sendMail({
+      to: email,
+      subject: "Aapki delete request mil gayi — Apka Saathi",
+      html: userHtml,
+      fromName: "Apka Saathi",
+    }),
+  ]);
+}
+
 export async function sendContactEmails(
   name: string,
   email: string,

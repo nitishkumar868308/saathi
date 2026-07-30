@@ -172,6 +172,7 @@ type Dict = {
       terms: string;
       blog: string;
       support: string;
+      deleteAccount: string;
     };
     social: string;
     playstore: string;
@@ -589,6 +590,7 @@ const hinglish: Dict = {
       terms: "Terms & Conditions",
       blog: "Blog",
       support: "Support",
+      deleteAccount: "Account delete",
     },
     social: "Follow karo",
     playstore: "Play Store pe uplabdh",
@@ -1002,6 +1004,7 @@ const hi: Dict = {
       terms: "नियम व शर्तें",
       blog: "ब्लॉग",
       support: "सपोर्ट",
+      deleteAccount: "अकाउंट डिलीट",
     },
     social: "फ़ॉलो करें",
     playstore: "Play Store पर उपलब्ध",
@@ -1415,6 +1418,7 @@ const en: Dict = {
       terms: "Terms & Conditions",
       blog: "Blog",
       support: "Support",
+      deleteAccount: "Delete account",
     },
     social: "Follow us",
     playstore: "Available on Play Store",

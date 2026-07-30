@@ -14,13 +14,58 @@ function headers(extra?: Record<string, string>) {
   };
 }
 
+const MESSAGE_KEYS = ["message", "error_description", "msg", "error", "reason"] as const;
+const DETAIL_KEYS = ["code", "status", "statusCode", "details", "hint", "name"] as const;
+
+function objectMessage(o: Record<string, unknown>): string {
+  for (const k of MESSAGE_KEYS) {
+    const v = o[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (v && typeof v === "object") {
+      const nested = objectMessage(v as Record<string, unknown>);
+      if (nested !== "Unknown error") return nested;
+    }
+  }
+  try {
+    const json = JSON.stringify(o);
+    if (json && json !== "{}") return json.slice(0, 300);
+  } catch {
+    /* circular object */
+  }
+  return "Unknown error";
+}
+
+/**
+ * Supabase/fetch se aksar plain object throw hota hai, Error nahi. Pehle
+ * `String(err)` karte the — admin > Logs me wo "[object Object]" ban jaata tha.
+ * Ab message andar se nikaalte hain aur code/details context me daalte hain.
+ */
+function normalize(err: unknown): { error: Error; details: Record<string, unknown> } {
+  if (err instanceof Error) return { error: err, details: {} };
+  if (typeof err === "string") {
+    return { error: new Error(err.trim() || "Unknown error"), details: {} };
+  }
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    const error = new Error(objectMessage(o));
+    if (typeof o.stack === "string" && o.stack) error.stack = o.stack;
+    const details: Record<string, unknown> = {};
+    for (const k of DETAIL_KEYS) {
+      const v = o[k];
+      if (v !== undefined && v !== null && v !== "") details[k] = v;
+    }
+    return { error, details };
+  }
+  return { error: new Error(err == null ? "Unknown error" : String(err)), details: {} };
+}
+
 /** Server-side error record karo. Best-effort — kabhi throw nahi karta. */
 export async function logServerError(
   err: unknown,
   context: Record<string, unknown> = {},
 ): Promise<void> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
-  const e = err instanceof Error ? err : new Error(String(err));
+  const { error: e, details } = normalize(err);
   try {
     await fetch(`${SUPABASE_URL}/rest/v1/app_errors`, {
       method: "POST",
@@ -28,9 +73,9 @@ export async function logServerError(
       body: JSON.stringify({
         source: "web",
         level: "error",
-        message: e.message.slice(0, 2000),
+        message: (e.message || "Unknown error").slice(0, 2000),
         stack: e.stack?.slice(0, 8000) ?? null,
-        context,
+        context: Object.keys(details).length ? { ...context, ...details } : context,
         platform: "web",
       }),
       cache: "no-store",
