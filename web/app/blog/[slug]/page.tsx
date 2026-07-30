@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Clock, Calendar, Sparkles } from "lucide-react";
 
 import SubHeader from "@/components/SubHeader";
 import Footer from "@/components/Footer";
@@ -68,6 +68,19 @@ function fmt(date: string): string {
   });
 }
 
+/**
+ * Ek blog post.
+ *
+ * ⚠️ Pehle poora page ek hi lambi patti tha — heading, phir paragraph, phir
+ * paragraph, bina kisi saans ke (item 1). Padhne me thakau lagta tha aur ye
+ * bhi pata nahi chalta tha ki aage kitna bacha hai.
+ *
+ * Ab teen cheezein badli hain:
+ *   1. Upar ek saaf header — breadcrumb, tags, reading time, date.
+ *   2. Har section ke beech halki line aur zyada jagah, taaki aankh ruk sake.
+ *   3. Intro alag se ubhra hua (lead paragraph), CTA aur "aage padho" niche
+ *      apne apne card me — content aur vigyapan ghul-mil na jaayein.
+ */
 export default async function BlogPostPage({ params }: Params) {
   const post = await getPostBySlug(params.slug);
   if (!post) notFound();
@@ -115,84 +128,106 @@ export default async function BlogPostPage({ params }: Params) {
 
       <SubHeader />
 
-      <main className="container-page py-14 sm:py-20">
+      <main className="container-page py-12 sm:py-16">
         <article className="mx-auto max-w-2xl">
           <Link
             href="/blog"
-            className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-terracotta"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
           >
             <ArrowLeft size={16} /> All posts
           </Link>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-            {post.tags.map((t) => (
-              <span key={t} className="rounded-full bg-cream-deep/50 px-3 py-1">
-                {t}
+          {/* Header */}
+          <header className="mt-7 border-b border-line pb-8">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+              {post.tags.map((t) => (
+                <span key={t} className="rounded-full bg-cream-deep/60 px-3 py-1">
+                  {t}
+                </span>
+              ))}
+            </div>
+
+            {/* Ek page par ek hi h1 — SEO ka sabse basic niyam. */}
+            <h1 className="mt-4 font-display text-4xl font-semibold leading-[1.15] tracking-tight sm:text-5xl">
+              {post.heading}
+            </h1>
+
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-ink-soft">
+              <span className="inline-flex items-center gap-1.5">
+                <Clock size={13} />
+                {post.readingMinutes} min read
               </span>
-            ))}
-            <span>{post.readingMinutes} min read</span>
-          </div>
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar size={13} />
+                {fmt(post.published)}
+              </span>
+              {post.updated !== post.published && <span>Updated {fmt(post.updated)}</span>}
+            </div>
+          </header>
 
-          {/* Ek page par ek hi h1 — SEO ka sabse basic niyam. */}
-          <h1 className="mt-3 font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            {post.heading}
-          </h1>
+          {/* Lead — baaki text se bada, taaki shuruaat saaf mile. */}
+          <p className="mt-8 text-lg leading-[1.75] text-ink sm:text-xl">{post.intro}</p>
 
-          <p className="mt-3 text-sm text-ink-soft">
-            Published {fmt(post.published)}
-            {post.updated !== post.published && <> · Updated {fmt(post.updated)}</>}
-          </p>
-
-          <p className="mt-8 text-lg leading-relaxed text-ink">{post.intro}</p>
-
-          <div className="mt-8 space-y-8">
-            {post.sections.map((s) => (
-              <section key={s.h}>
-                <h2 className="font-display text-2xl font-semibold">{s.h}</h2>
-                {s.p.map((para) => (
-                  <p key={para} className="mt-3 leading-relaxed text-ink-soft">
-                    {para}
-                  </p>
-                ))}
+          {/* Sections — beech me halki line, taaki aankh ruk sake. */}
+          <div className="mt-10 space-y-10">
+            {post.sections.map((s, i) => (
+              <section key={s.h} className={i > 0 ? "border-t border-line pt-10" : undefined}>
+                <h2 className="font-display text-2xl font-semibold leading-snug">{s.h}</h2>
+                <div className="mt-4 space-y-4">
+                  {s.p.map((para) => (
+                    <p key={para} className="leading-[1.8] text-ink-soft">
+                      {para}
+                    </p>
+                  ))}
+                </div>
               </section>
             ))}
           </div>
 
           {/* Post ke aakhir me ek seedha next step. */}
-          <div className="mt-12 rounded-4xl border border-line bg-surface p-6 sm:p-8">
-            <h2 className="font-display text-xl font-semibold">
+          <aside className="mt-14 overflow-hidden rounded-[2rem] bg-ink p-7 text-cream sm:p-9">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide">
+              <Sparkles size={13} className="text-amber-warm" />
+              Apka Saathi
+            </span>
+            <h2 className="mt-4 font-display text-2xl font-semibold leading-snug">
               Let Saathi remember it for you
             </h2>
-            <p className="mt-2 leading-relaxed text-ink-soft">
-              Add a document or a reminder once. Saathi handles the dates from
-              there — free to start, in Hindi or English.
+            <p className="mt-3 leading-relaxed text-cream/75">
+              Add a document or a reminder once. Saathi handles the dates from there —
+              free to start, in Hindi or English.
             </p>
             <Link
               href="/#download"
-              className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:gap-2.5"
+              className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-terracotta px-6 py-3 text-sm font-semibold text-white transition hover:gap-3"
             >
               Get the app <ArrowRight size={16} />
             </Link>
-          </div>
+          </aside>
 
           {related.length > 0 && (
-            <div className="mt-12">
+            <div className="mt-14">
               <h2 className="font-display text-xl font-semibold">Read next</h2>
-              <ul className="mt-4 space-y-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {related.map((r) => (
-                  <li key={r.slug}>
-                    <Link
-                      href={`/blog/${r.slug}`}
-                      className="font-semibold text-ink hover:text-terracotta"
-                    >
+                  <Link
+                    key={r.slug}
+                    href={`/blog/${r.slug}`}
+                    className="group rounded-2xl border border-line bg-surface p-5 transition hover:border-terracotta/40 hover:shadow-warm"
+                  >
+                    <h3 className="font-display font-semibold leading-snug transition group-hover:text-terracotta">
                       {r.title}
-                    </Link>
-                    <p className="text-sm leading-relaxed text-ink-soft">
+                    </h3>
+                    <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-soft">
                       {r.description}
                     </p>
-                  </li>
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft">
+                      <Clock size={12} />
+                      {r.readingMinutes} min
+                    </span>
+                  </Link>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
         </article>

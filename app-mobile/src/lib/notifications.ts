@@ -48,7 +48,19 @@ async function notifDict() {
 }
 
 const CHANNEL_ID = "reminders-fs"; // full-screen wala naya channel
-const EXPIRY_LEAD_DAYS = [14, 3, 0] as const;
+
+/**
+ * Document expiry ka teen-qadam ladder: 7 din pehle, 1 din pehle, aur us din.
+ *
+ * ⚠️ Ye web ke cron (`web/app/api/cron/document-expiry/route.ts`) ke saath
+ * BILKUL milna chahiye — wahan email + WhatsApp isi ladder par jaate hain.
+ * Ek jagah badla aur doosri jagah nahi, to user ko notification aaj aayegi aur
+ * email kisi aur din — sabse bura tajurba.
+ *
+ * Pehle [14, 3, 0] tha. 7/1/0 isliye behtar hai: 14 din pehle wali baat log bhool
+ * jaate hain, aur 1 din pehle wali chetavni sach me kaam karati hai.
+ */
+export const EXPIRY_LEAD_DAYS = [7, 1, 0] as const;
 const NOTIFY_HOUR = 9;
 
 /** Reminders channel (HIGH importance + sound + public). */
@@ -145,6 +157,24 @@ async function cancel(id: string): Promise<void> {
 
 /* ----------------------------- reminders ----------------------------- */
 
+/**
+ * Roz wale reminder ke liye kitne din aage tak alarm laga ke rakhein.
+ *
+ * Android me "roz 6 baje" wala ek repeating alarm bharosemand nahi hai: OEM ke
+ * battery saver aise alarms ko sabse pehle maarte hain, aur notifee ka interval
+ * trigger exact bhi nahi hota (~15 min idhar-udhar). Isliye hum har occurrence
+ * ka apna EXACT alarm lagate hain.
+ *
+ * 14 ka aankda soch ke hai: itne alarm har OEM aaram se sambhal leta hai, aur
+ * user app 2 hafte me kam se kam ek baar to kholta hi hai — har baar khulne par
+ * `syncNotifications()` khidki ko aage sarka deta hai. Isse 90 din wala reminder
+ * bhi bina 90 alarm lagaye poora chalta hai.
+ */
+const REPEAT_WINDOW = 14;
+
+/** Ek occurrence ka notification id. Pehla = reminder id (purane ids na tootein). */
+const occId = (id: string, i: number) => (i === 0 ? id : `${id}#${i}`);
+
 export async function scheduleReminder(
   id: string,
   title: string,
@@ -154,8 +184,53 @@ export async function scheduleReminder(
   return schedule(id, n.reminderTitle, title, when);
 }
 
+/**
+ * Roz/har-hafte wala reminder — aage ke kai occurrences ek saath schedule karo.
+ *
+ * `everyDays` na ho (ya 1 se kam) to ye ek hi alarm lagata hai — bilkul purana
+ * vyavhaar. `until` (YYYY-MM-DD) ke baad ka koi alarm nahi lagta: 90 din wala
+ * reminder 91ve din chup ho jaata hai, apne aap.
+ */
+export async function scheduleReminderSeries(
+  id: string,
+  title: string,
+  first: Date,
+  everyDays?: number | null,
+  until?: string | null,
+): Promise<boolean> {
+  // Purani khidki hata do — warna repeat band karne par ya time badalne par
+  // pichhle alarm chupchaap bajte rehte hain.
+  await cancelReminder(id);
+
+  const n = await notifDict();
+  const every = everyDays && everyDays >= 1 ? Math.floor(everyDays) : 0;
+  if (!every) return schedule(id, n.reminderTitle, title, first);
+
+  // "90 din tak" — us din ke aakhir tak (us din ka reminder bhi jaata hai).
+  const lastMs = until ? endOfDay(until) : null;
+
+  let any = false;
+  const when = new Date(first);
+  for (let i = 0; i < REPEAT_WINDOW; i++) {
+    if (lastMs !== null && when.getTime() > lastMs) break;
+    if (await schedule(occId(id, i), n.reminderTitle, title, new Date(when), "reminder")) {
+      any = true;
+    }
+    when.setDate(when.getDate() + every);
+  }
+  return any;
+}
+
+/** "YYYY-MM-DD" ke us din ka aakhri lamha (local). */
+function endOfDay(day: string): number | null {
+  const [y, m, d] = day.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+
+/** Reminder ke SAARE alarm hatao — poori repeat khidki samet. */
 export async function cancelReminder(id: string): Promise<void> {
-  await cancel(id);
+  for (let i = 0; i < REPEAT_WINDOW; i++) await cancel(occId(id, i));
 }
 
 /* -------------------------- document expiry -------------------------- */
@@ -201,9 +276,17 @@ export async function syncNotifications(): Promise<void> {
     const [reminders, documents] = await Promise.all([listReminders(), listDocuments()]);
 
     for (const r of reminders) {
-      if (r.is_on && !r.is_paused && r.remind_at)
-        await scheduleReminder(r.id, r.title, new Date(r.remind_at));
-      else await cancelReminder(r.id);
+      // Har sync par repeat ki khidki aage sarak jaati hai — isi wajah se 90 din
+      // wala reminder sirf 14 alarm rakh ke bhi poore 90 din chalta hai.
+      if (r.is_on && !r.is_paused && r.remind_at) {
+        await scheduleReminderSeries(
+          r.id,
+          r.title,
+          new Date(r.remind_at),
+          r.repeat_every_days,
+          r.repeat_until,
+        );
+      } else await cancelReminder(r.id);
     }
     for (const d of documents) {
       await scheduleDocumentExpiry(d.id, d.name, d.expiry);

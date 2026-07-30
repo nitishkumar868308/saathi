@@ -68,6 +68,15 @@ export type Dict = {
     alertDid: string;
     alertDone: string;
     alertLater: string;
+    /**
+     * Document expiry follow-up ki default lines (item 18).
+     * Net ho to Saathi apne shabd bhejta hai; ye tab chalti hain jab AI na aaye.
+     */
+    docAsk: string;
+    docDone: string;
+    docLater: string;
+    docAddNew: string;
+    docAddBtn: string;
   };
   voice: {
     /** BCP-47 tag for speech recognition, e.g. "en-IN" / "hi-IN" */
@@ -95,6 +104,10 @@ export type Dict = {
     stepNotifSub: string;
     stepAlarm: string;
     stepAlarmSub: string;
+    /** Android 14+ "Full screen notifications" — bade popup ki asli chaabi. */
+    stepFsi: string;
+    stepFsiSub: string;
+    fsiSpotlight: string;
     stepBattery: string;
     stepBatterySub: string;
     stepOem: string;
@@ -240,6 +253,32 @@ export type Dict = {
     deleteConfirmTitle: string;
     /** {title} */
     deleteConfirmBody: string;
+    /** Card ke actions — dekho / hatao / on-off. */
+    viewAction: string;
+    deleteAction: string;
+    activeLabel: string;
+    inactiveLabel: string;
+    detailTitle: string;
+    detailWhen: string;
+    detailNote: string;
+    detailStatus: string;
+    deleted: string;
+    /** Roz wala reminder — list card + detail sheet ki lines. */
+    repeatLabel: string;
+    repeatDaily: string;
+    repeatWeekly: string;
+    repeatMonthly: string;
+    /** {n} */
+    repeatEvery: string;
+    /** {date} */
+    repeatUntil: string;
+    repeatForever: string;
+    repeatOff: string;
+    /** "Ho gaya" ke baad ka jawab. */
+    doneToday: string;
+    doneAll: string;
+    doneBtn: string;
+    doneBtnRepeat: string;
   };
   addReminder: {
     title: string;
@@ -269,6 +308,17 @@ export type Dict = {
     pastError: string;
     askAmPm: string;
     otherTime: string;
+    /** Roz wala reminder — Saathi ne kya samjha (item: "gym roz 6 baje 90 din tak"). */
+    repeatLabel: string;
+    repeatDaily: string;
+    repeatWeekly: string;
+    repeatMonthly: string;
+    /** {n} */
+    repeatEvery: string;
+    /** {date} */
+    repeatUntil: string;
+    repeatForever: string;
+    repeatOff: string;
   };
   review: {
     title: string;
@@ -285,6 +335,33 @@ export type Dict = {
     offline: string;
     slow: string;
     retry: string;
+    /** Net ki wajah se kaam ruka — poore app ka popup. */
+    failTitle: string;
+    failLoad: string;
+    failSave: string;
+    failAi: string;
+    failHint: string;
+    tryAgain: string;
+    later: string;
+  };
+  /** App ke andar se "hume likho" form. */
+  contact: {
+    title: string;
+    sub: string;
+    nameLabel: string;
+    namePlaceholder: string;
+    emailLabel: string;
+    emailPlaceholder: string;
+    messageLabel: string;
+    messagePlaceholder: string;
+    send: string;
+    sending: string;
+    sentTitle: string;
+    sentBody: string;
+    needMessage: string;
+    needEmail: string;
+    failed: string;
+    row: string;
   };
   chat: {
     online: string;
@@ -292,6 +369,11 @@ export type Dict = {
     stubReply: string;
     inputPlaceholder: string;
     suggestions: string[];
+    /** Net fail hua — wahi message dobara bhejne ka button. */
+    retrySend: string;
+    /** AI tak baat nahi pahunchi, par local samajh se reminder ban gaya. */
+    offlineReminderSet: string;
+    reminderFailed: string;
   };
   upgrade: {
     title: string;
@@ -370,6 +452,12 @@ export type Dict = {
     condProfile: string;
     goDo: string;
     yourCode: string;
+    /** Code/link ke saath copy button — tap pe clipboard me chala jaata hai. */
+    copyCode: string;
+    copiedCode: string;
+    yourLink: string;
+    copyLink: string;
+    copiedLink: string;
     shareBtn: string;
     statReferrals: string;
     statDays: string;
@@ -435,11 +523,24 @@ export type Dict = {
     plusLo: string;
     plusActiveSub: string;
     plusSub: string;
+    groupAccount: string;
     groupSaathi: string;
     groupPrivacy: string;
     groupMore: string;
+    /** Profile card par — "tap karke details badlo". */
+    editProfile: string;
     saathiName: string;
     notifications: string;
+    /** Alert kaise sunayi de — ring / vibrate / silent (item 6). */
+    alertMode: string;
+    alertModeSub: string;
+    alertRing: string;
+    alertRingSub: string;
+    alertVibrate: string;
+    alertVibrateSub: string;
+    alertSilent: string;
+    alertSilentSub: string;
+    alertTest: string;
     language: string;
     privacy: string;
     exportData: string;
@@ -511,6 +612,11 @@ const hinglish: Dict = {
     alertDid: "Kya aapne yeh kar liya?",
     alertDone: "Haan, ho gaya",
     alertLater: "Abhi nahi",
+    docAsk: "Ye kaam ho gaya kya?",
+    docDone: "Badhiya! 🎉 Ab is document ke reminder band kar diye.",
+    docLater: "Koi baat nahi — main phir yaad dila dunga. 🙂",
+    docAddNew: "Naye document ki photo daal do — nayi expiry main sambhal lunga.",
+    docAddBtn: "Naya document daalo",
   },
   voice: {
     recogLang: "en-IN",
@@ -537,6 +643,11 @@ const hinglish: Dict = {
     stepNotifSub: "Iske bina reminder dikhega hi nahi",
     stepAlarm: "Alarms & reminders",
     stepAlarmSub: "Iske bina Android reminder ko der se, dusre alarms ke saath bhejta hai",
+    stepFsi: "Poori screen par alert",
+    stepFsiSub:
+      "Iske bina sirf upar patli si notification aayegi — screen ke beech me bada alert nahi",
+    fsiSpotlight:
+      "Reminder ka BADA popup poori screen par aane ke liye yahi ek cheez sabse zaroori hai. Android 14 se ye default me BAND aata hai — isliye baaki sab allow karne par bhi bada alert nahi aata.",
     stepBattery: "Background me chalne do",
     stepBatterySub: "Battery optimization off — app band ho tab bhi reminder aaye",
     stepOem: "Auto-start on karo",
@@ -671,7 +782,28 @@ const hinglish: Dict = {
     longPressHint: "Delete karne ke liye card ko dabaye rakho",
     pausedTag: "Plus khatam hone pe paused — dekhne ke liye tap karein",
     deleteConfirmTitle: "Delete karein?",
-    deleteConfirmBody: "\"{title}\" hata denge?",
+    deleteConfirmBody: "\"{title}\" hata denge? Ye wapas nahi aayega.",
+    viewAction: "Dekho",
+    deleteAction: "Hatao",
+    activeLabel: "Chalu",
+    inactiveLabel: "Band",
+    detailTitle: "Reminder",
+    detailWhen: "Kab",
+    detailNote: "Aapne kaha tha",
+    detailStatus: "Haalat",
+    deleted: "Reminder hata diya",
+    repeatLabel: "Kitni baar",
+    repeatDaily: "Roz",
+    repeatWeekly: "Har hafte",
+    repeatMonthly: "Har mahine",
+    repeatEvery: "Har {n} din",
+    repeatUntil: "{date} tak",
+    repeatForever: "Jab tak band na karo",
+    repeatOff: "Sirf ek baar",
+    doneToday: "Shabaash! Aaj ka ho gaya ✅ Kal phir yaad dila dunga.",
+    doneAll: "Ho gaya! Ye reminder ab band kar diya ✅",
+    doneBtn: "Ho gaya",
+    doneBtnRepeat: "Aaj ka ho gaya",
   },
   addReminder: {
     title: "Naya reminder",
@@ -701,6 +833,14 @@ const hinglish: Dict = {
     pastError: "Ye time nikal chuka — aage ka time chuno",
     askAmPm: "Subah ya shaam?",
     otherTime: "Koi aur time",
+    repeatLabel: "Kitni baar",
+    repeatDaily: "Roz",
+    repeatWeekly: "Har hafte",
+    repeatMonthly: "Har mahine",
+    repeatEvery: "Har {n} din",
+    repeatUntil: "{date} tak",
+    repeatForever: "Jab tak band na karo",
+    repeatOff: "Sirf ek baar",
   },
   review: {
     title: "Saathi ko kitne star doge?",
@@ -718,6 +858,31 @@ const hinglish: Dict = {
     offline: "Internet nahi hai — kaam offline save ho raha hai",
     slow: "Internet dheema hai…",
     retry: "Dobara try karo",
+    failTitle: "Internet ne saath nahi diya",
+    failLoad: "Aapka data laaya nahi ja saka.",
+    failSave: "Aapka kaam save nahi ho paaya.",
+    failAi: "Saathi aapki baat padh nahi paaya.",
+    failHint: "Ye app ki galti nahi hai — net wapas aate hi ye chal jayega.",
+    tryAgain: "Dobara koshish karo",
+    later: "Theek hai",
+  },
+  contact: {
+    title: "Humein likho",
+    sub: "Koi dikkat, sawaal ya sujhav — seedha humein bhejo. Hum jawab dete hain. 🤍",
+    nameLabel: "Aapka naam",
+    namePlaceholder: "Naam",
+    emailLabel: "Email",
+    emailPlaceholder: "aapka@email.com",
+    messageLabel: "Baat kya hai?",
+    messagePlaceholder: "Jo bhi kehna ho, yahan likho…",
+    send: "Bhejo",
+    sending: "Bheja ja raha hai…",
+    sentTitle: "Mil gaya 🤍",
+    sentBody: "Aapka message hum tak pahunch gaya. Jald jawab denge.",
+    needMessage: "Pehle message likho",
+    needEmail: "Sahi email daalo",
+    failed: "Message bhej nahi paaye",
+    row: "Humein likho",
   },
   chat: {
     online: "aapka dost · online",
@@ -727,6 +892,9 @@ const hinglish: Dict = {
       "Aap apne reminder, task ya document se judi cheezein pooch sakte ho. 🙂 Abhi main baaki sab kuch nahi bata sakta, par wo bahut jald aa raha hai — tab tak Documents aur Reminders tabs use karo!",
     inputPlaceholder: "Kuch likho…",
     suggestions: ["Kal 8 baje uthana", "Insurance kab expire hai?", "Aaj kya karna hai?"],
+    retrySend: "Dobara bhejo",
+    offlineReminderSet: "Net nahi tha, par maine reminder laga diya",
+    reminderFailed: "Reminder ban nahi paaya",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -803,6 +971,11 @@ const hinglish: Dict = {
     condProfile: "Profile complete karo",
     goDo: "Karo",
     yourCode: "Aapka referral code",
+    copyCode: "Code copy karo",
+    copiedCode: "Code copy ho gaya 👍",
+    yourLink: "Aapka invite link",
+    copyLink: "Link copy karo",
+    copiedLink: "Link copy ho gaya 👍",
     shareBtn: "Dost ko bhejo",
     statReferrals: "Successful referrals",
     statDays: "Plus din kamaaye",
@@ -866,11 +1039,22 @@ const hinglish: Dict = {
     plusLo: "Saathi Plus",
     plusActiveSub: "Unlimited reminders, documents aur AI",
     plusSub: "Unlimited reminders, documents aur AI",
+    groupAccount: "Account",
     groupSaathi: "Saathi",
     groupPrivacy: "Privacy",
     groupMore: "Aur",
+    editProfile: "Details badlo",
     saathiName: "Saathi ka naam",
     notifications: "Notifications",
+    alertMode: "Alert ki awaaz",
+    alertModeSub: "Saathi ka popup kaise sunayi de",
+    alertRing: "Awaaz + vibrate",
+    alertRingSub: "Saathi aapka naam le ke bolega, saath me vibrate bhi",
+    alertVibrate: "Sirf vibrate",
+    alertVibrateSub: "Koi awaaz nahi — bas halka sa vibrate",
+    alertSilent: "Chup",
+    alertSilentSub: "Na awaaz, na vibrate — sirf screen par dikhega",
+    alertTest: "Sun ke dekho",
     language: "Bhasha",
     privacy: "Privacy & data",
     exportData: "Mera data export karo",
@@ -943,6 +1127,11 @@ const hi: Dict = {
     alertDid: "क्या आपने यह कर लिया?",
     alertDone: "हाँ, हो गया",
     alertLater: "अभी नहीं",
+    docAsk: "यह काम हो गया क्या?",
+    docDone: "बढ़िया! 🎉 अब इस डॉक्युमेंट के रिमाइंडर बंद कर दिए।",
+    docLater: "कोई बात नहीं — मैं फिर याद दिला दूँगा। 🙂",
+    docAddNew: "नए डॉक्युमेंट की फ़ोटो डाल दें — नई एक्सपायरी मैं सँभाल लूँगा।",
+    docAddBtn: "नया डॉक्युमेंट डालें",
   },
   voice: {
     recogLang: "hi-IN",
@@ -969,6 +1158,11 @@ const hi: Dict = {
     stepNotifSub: "इसके बिना रिमाइंडर दिखेगा ही नहीं",
     stepAlarm: "Alarms & reminders",
     stepAlarmSub: "इसके बिना Android रिमाइंडर को देर से, दूसरे alarms के साथ भेजता है",
+    stepFsi: "पूरी स्क्रीन पर अलर्ट",
+    stepFsiSub:
+      "इसके बिना सिर्फ़ ऊपर पतली सी नोटिफ़िकेशन आएगी — स्क्रीन के बीच में बड़ा अलर्ट नहीं",
+    fsiSpotlight:
+      "रिमाइंडर का बड़ा पॉपअप पूरी स्क्रीन पर आने के लिए यही एक चीज़ सबसे ज़रूरी है। Android 14 से यह डिफ़ॉल्ट में बंद आता है — इसलिए बाकी सब allow करने पर भी बड़ा अलर्ट नहीं आता।",
     stepBattery: "बैकग्राउंड में चलने दें",
     stepBatterySub: "बैटरी ऑप्टिमाइज़ेशन ऑफ़ — ऐप बंद हो तब भी रिमाइंडर आए",
     stepOem: "ऑटो-स्टार्ट ऑन करें",
@@ -1102,7 +1296,28 @@ const hi: Dict = {
     longPressHint: "डिलीट करने के लिए कार्ड को दबाए रखें",
     pausedTag: "प्लस खत्म होने पर रुका — देखने के लिए टैप करें",
     deleteConfirmTitle: "डिलीट करें?",
-    deleteConfirmBody: "\"{title}\" हटा दें?",
+    deleteConfirmBody: "\"{title}\" हटा दें? यह वापस नहीं आएगा।",
+    viewAction: "देखें",
+    deleteAction: "हटाएँ",
+    activeLabel: "चालू",
+    inactiveLabel: "बंद",
+    detailTitle: "रिमाइंडर",
+    detailWhen: "कब",
+    detailNote: "आपने कहा था",
+    detailStatus: "हालत",
+    deleted: "रिमाइंडर हटा दिया",
+    repeatLabel: "कितनी बार",
+    repeatDaily: "रोज़",
+    repeatWeekly: "हर हफ़्ते",
+    repeatMonthly: "हर महीने",
+    repeatEvery: "हर {n} दिन",
+    repeatUntil: "{date} तक",
+    repeatForever: "जब तक बंद न करें",
+    repeatOff: "सिर्फ़ एक बार",
+    doneToday: "शाबाश! आज का हो गया ✅ कल फिर याद दिला दूँगा।",
+    doneAll: "हो गया! ये रिमाइंडर अब बंद कर दिया ✅",
+    doneBtn: "हो गया",
+    doneBtnRepeat: "आज का हो गया",
   },
   addReminder: {
     title: "नया रिमाइंडर",
@@ -1132,6 +1347,14 @@ const hi: Dict = {
     pastError: "यह समय निकल चुका — आगे का समय चुनें",
     askAmPm: "सुबह या शाम?",
     otherTime: "कोई और समय",
+    repeatLabel: "कितनी बार",
+    repeatDaily: "रोज़",
+    repeatWeekly: "हर हफ़्ते",
+    repeatMonthly: "हर महीने",
+    repeatEvery: "हर {n} दिन",
+    repeatUntil: "{date} तक",
+    repeatForever: "जब तक बंद न करें",
+    repeatOff: "सिर्फ़ एक बार",
   },
   review: {
     title: "साथी को कितने स्टार दोगे?",
@@ -1149,6 +1372,31 @@ const hi: Dict = {
     offline: "इंटरनेट नहीं है — काम ऑफ़लाइन सेव हो रहा है",
     slow: "इंटरनेट धीमा है…",
     retry: "दोबारा कोशिश करें",
+    failTitle: "इंटरनेट ने साथ नहीं दिया",
+    failLoad: "आपका डेटा लाया नहीं जा सका।",
+    failSave: "आपका काम सेव नहीं हो पाया।",
+    failAi: "साथी आपकी बात पढ़ नहीं पाया।",
+    failHint: "यह ऐप की ग़लती नहीं है — नेट वापस आते ही यह चल जाएगा।",
+    tryAgain: "दोबारा कोशिश करें",
+    later: "ठीक है",
+  },
+  contact: {
+    title: "हमें लिखें",
+    sub: "कोई दिक्कत, सवाल या सुझाव — सीधे हमें भेजें। हम जवाब देते हैं। 🤍",
+    nameLabel: "आपका नाम",
+    namePlaceholder: "नाम",
+    emailLabel: "ईमेल",
+    emailPlaceholder: "aapka@email.com",
+    messageLabel: "बात क्या है?",
+    messagePlaceholder: "जो भी कहना हो, यहाँ लिखें…",
+    send: "भेजें",
+    sending: "भेजा जा रहा है…",
+    sentTitle: "मिल गया 🤍",
+    sentBody: "आपका मैसेज हम तक पहुँच गया। जल्द जवाब देंगे।",
+    needMessage: "पहले मैसेज लिखें",
+    needEmail: "सही ईमेल डालें",
+    failed: "मैसेज भेज नहीं पाए",
+    row: "हमें लिखें",
   },
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
@@ -1158,6 +1406,9 @@ const hi: Dict = {
       "आप अपने reminder, task या document से जुड़ी चीज़ें पूछ सकते हैं। 🙂 अभी मैं बाकी सब कुछ नहीं बता सकता, पर वो बहुत जल्द आ रहा है — तब तक Documents और Reminders टैब इस्तेमाल करें!",
     inputPlaceholder: "कुछ लिखें…",
     suggestions: ["कल 8 बजे उठाना", "इंश्योरेंस कब एक्सपायर है?", "आज क्या करना है?"],
+    retrySend: "दोबारा भेजें",
+    offlineReminderSet: "नेट नहीं था, फिर भी मैंने रिमाइंडर लगा दिया",
+    reminderFailed: "रिमाइंडर बन नहीं पाया",
   },
   upgrade: {
     title: "साथी प्लस",
@@ -1234,6 +1485,11 @@ const hi: Dict = {
     condProfile: "प्रोफ़ाइल पूरी करें",
     goDo: "करें",
     yourCode: "आपका रेफ़रल कोड",
+    copyCode: "कोड कॉपी करें",
+    copiedCode: "कोड कॉपी हो गया 👍",
+    yourLink: "आपका इनवाइट लिंक",
+    copyLink: "लिंक कॉपी करें",
+    copiedLink: "लिंक कॉपी हो गया 👍",
     shareBtn: "दोस्त को भेजें",
     statReferrals: "सफल रेफ़रल",
     statDays: "प्लस दिन कमाए",
@@ -1297,11 +1553,22 @@ const hi: Dict = {
     plusLo: "साथी प्लस",
     plusActiveSub: "अनलिमिटेड रिमाइंडर, डॉक्युमेंट और AI",
     plusSub: "अनलिमिटेड रिमाइंडर, डॉक्युमेंट और AI",
+    groupAccount: "अकाउंट",
+    editProfile: "डिटेल्स बदलें",
     groupSaathi: "साथी",
     groupPrivacy: "प्राइवेसी",
     groupMore: "और",
     saathiName: "साथी का नाम",
     notifications: "नोटिफ़िकेशन",
+    alertMode: "अलर्ट की आवाज़",
+    alertModeSub: "साथी का पॉपअप कैसे सुनाई दे",
+    alertRing: "आवाज़ + वाइब्रेट",
+    alertRingSub: "साथी आपका नाम लेकर बोलेगा, साथ में वाइब्रेट भी",
+    alertVibrate: "सिर्फ़ वाइब्रेट",
+    alertVibrateSub: "कोई आवाज़ नहीं — बस हल्का सा वाइब्रेट",
+    alertSilent: "चुप",
+    alertSilentSub: "न आवाज़, न वाइब्रेट — सिर्फ़ स्क्रीन पर दिखेगा",
+    alertTest: "सुनकर देखें",
     language: "भाषा",
     privacy: "प्राइवेसी & डेटा",
     exportData: "मेरा डेटा export करें",
@@ -1374,6 +1641,11 @@ const en: Dict = {
     alertDid: "Did you do this?",
     alertDone: "Yes, done",
     alertLater: "Not yet",
+    docAsk: "Is this sorted now?",
+    docDone: "Lovely! 🎉 I've switched off the reminders for this document.",
+    docLater: "No problem — I'll remind you again. 🙂",
+    docAddNew: "Add a photo of the new one and I'll track the new expiry for you.",
+    docAddBtn: "Add the new document",
   },
   voice: {
     recogLang: "en-IN",
@@ -1400,6 +1672,11 @@ const en: Dict = {
     stepNotifSub: "Without this, reminders never show up",
     stepAlarm: "Alarms & reminders",
     stepAlarmSub: "Without this, Android batches your reminder with other alarms and delivers it late",
+    stepFsi: "Full-screen alert",
+    stepFsiSub:
+      "Without this you only get a thin notification at the top — no big alert in the middle of the screen",
+    fsiSpotlight:
+      "This is the one setting that makes the reminder show as a BIG full-screen popup. Android 14 turns it off by default — which is why the big alert never appears even when everything else is allowed.",
     stepBattery: "Allow background activity",
     stepBatterySub: "Battery optimization off — reminders fire even when the app is closed",
     stepOem: "Turn on auto-start",
@@ -1532,7 +1809,28 @@ const en: Dict = {
     longPressHint: "Press and hold a card to delete",
     pausedTag: "Paused after Plus ended — tap to view",
     deleteConfirmTitle: "Delete?",
-    deleteConfirmBody: "Remove \"{title}\"?",
+    deleteConfirmBody: "Remove \"{title}\"? This can't be undone.",
+    viewAction: "View",
+    deleteAction: "Remove",
+    activeLabel: "On",
+    inactiveLabel: "Off",
+    detailTitle: "Reminder",
+    detailWhen: "When",
+    detailNote: "You said",
+    detailStatus: "Status",
+    deleted: "Reminder removed",
+    repeatLabel: "How often",
+    repeatDaily: "Every day",
+    repeatWeekly: "Every week",
+    repeatMonthly: "Every month",
+    repeatEvery: "Every {n} days",
+    repeatUntil: "until {date}",
+    repeatForever: "until you turn it off",
+    repeatOff: "Just once",
+    doneToday: "Nice one! Today's done ✅ I'll remind you again tomorrow.",
+    doneAll: "Done! I've switched this reminder off ✅",
+    doneBtn: "Mark done",
+    doneBtnRepeat: "Done for today",
   },
   addReminder: {
     title: "New reminder",
@@ -1562,6 +1860,14 @@ const en: Dict = {
     pastError: "That time has passed — pick a future time",
     askAmPm: "Morning or evening?",
     otherTime: "Another time",
+    repeatLabel: "How often",
+    repeatDaily: "Every day",
+    repeatWeekly: "Every week",
+    repeatMonthly: "Every month",
+    repeatEvery: "Every {n} days",
+    repeatUntil: "until {date}",
+    repeatForever: "until you turn it off",
+    repeatOff: "Just once",
   },
   review: {
     title: "How many stars for Saathi?",
@@ -1579,6 +1885,31 @@ const en: Dict = {
     offline: "No internet — your work is saved offline",
     slow: "Slow internet…",
     retry: "Try again",
+    failTitle: "The internet gave up",
+    failLoad: "We couldn't load your data.",
+    failSave: "We couldn't save your work.",
+    failAi: "Saathi couldn't read what you said.",
+    failHint: "This isn't the app's fault — it'll work as soon as the network is back.",
+    tryAgain: "Try again",
+    later: "OK",
+  },
+  contact: {
+    title: "Write to us",
+    sub: "A problem, a question or an idea — send it straight to us. We do reply. 🤍",
+    nameLabel: "Your name",
+    namePlaceholder: "Name",
+    emailLabel: "Email",
+    emailPlaceholder: "you@email.com",
+    messageLabel: "What's on your mind?",
+    messagePlaceholder: "Whatever you want to say, write it here…",
+    send: "Send",
+    sending: "Sending…",
+    sentTitle: "Got it 🤍",
+    sentBody: "Your message reached us. We'll reply soon.",
+    needMessage: "Write a message first",
+    needEmail: "Enter a valid email",
+    failed: "Couldn't send the message",
+    row: "Write to us",
   },
   chat: {
     online: "your friend · online",
@@ -1588,6 +1919,9 @@ const en: Dict = {
       "You can ask me about your reminders, tasks or documents. 🙂 I can't answer everything else just yet, but that's coming very soon — until then, use the Documents and Reminders tabs!",
     inputPlaceholder: "Type something…",
     suggestions: ["Wake me at 8am", "When does my insurance expire?", "What's on today?"],
+    retrySend: "Send again",
+    offlineReminderSet: "No internet, but I've set the reminder",
+    reminderFailed: "Couldn't create the reminder",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -1664,6 +1998,11 @@ const en: Dict = {
     condProfile: "Complete your profile",
     goDo: "Do it",
     yourCode: "Your referral code",
+    copyCode: "Copy code",
+    copiedCode: "Code copied 👍",
+    yourLink: "Your invite link",
+    copyLink: "Copy link",
+    copiedLink: "Link copied 👍",
     shareBtn: "Send to a friend",
     statReferrals: "Successful referrals",
     statDays: "Plus days earned",
@@ -1727,11 +2066,22 @@ const en: Dict = {
     plusLo: "Saathi Plus",
     plusActiveSub: "Unlimited reminders, documents and AI",
     plusSub: "Unlimited reminders, documents and AI",
+    groupAccount: "Account",
     groupSaathi: "Saathi",
     groupPrivacy: "Privacy",
     groupMore: "More",
+    editProfile: "Edit details",
     saathiName: "Saathi's name",
     notifications: "Notifications",
+    alertMode: "Alert sound",
+    alertModeSub: "How Saathi's popup should sound",
+    alertRing: "Sound + vibrate",
+    alertRingSub: "Saathi says your name out loud, and vibrates too",
+    alertVibrate: "Vibrate only",
+    alertVibrateSub: "No sound — just a gentle buzz",
+    alertSilent: "Silent",
+    alertSilentSub: "No sound, no vibration — it only shows on screen",
+    alertTest: "Hear it",
     language: "Language",
     privacy: "Privacy & data",
     exportData: "Export my data",

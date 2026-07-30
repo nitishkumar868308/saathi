@@ -2,6 +2,8 @@ import nodemailer from "nodemailer";
 import fs from "fs";
 import path from "path";
 
+import { logServiceUsage } from "@/lib/usage-server";
+
 /**
  * Reusable email layer — Hostinger SMTP se (info@apkasaathi.com).
  *
@@ -82,12 +84,16 @@ export type MailOptions = {
   html: string;
   replyTo?: string;
   fromName?: string;
+  /** Admin ke hisaab ke liye — 'reminder' | 'document' | 'welcome' … (item 3). */
+  kind?: string;
+  userId?: string | null;
 };
 
 /** Ek email bhejo. Env na ho to { skipped: true }. */
 export async function sendMail(
   opts: MailOptions,
 ): Promise<{ sent: boolean; skipped?: boolean }> {
+  const kind = opts.kind ?? "other";
   if (!emailConfigured()) {
     console.warn("[email] SMTP env not set — email skipped");
     return { sent: false, skipped: true };
@@ -97,14 +103,26 @@ export async function sendMail(
     LOGO_BUFFER && opts.html.includes(`cid:${LOGO_CID}`)
       ? [{ filename: "logo.png", content: LOGO_BUFFER, cid: LOGO_CID, contentType: "image/png" }]
       : undefined;
-  await getTransporter().sendMail({
-    from: `"${opts.fromName ?? "Apka Saathi"}" <${FROM_EMAIL}>`,
-    to: opts.to,
-    replyTo: opts.replyTo,
-    subject: opts.subject,
-    html: opts.html,
-    attachments,
-  });
+  try {
+    await getTransporter().sendMail({
+      from: `"${opts.fromName ?? "Apka Saathi"}" <${FROM_EMAIL}>`,
+      to: opts.to,
+      replyTo: opts.replyTo,
+      subject: opts.subject,
+      html: opts.html,
+      attachments,
+    });
+  } catch (err) {
+    // Fail bhi ginte hain — SMTP ka quota khatam ho ya password badal jaye to
+    // admin ko sabse pehle yahi dikhta hai (item 3).
+    logServiceUsage("email", kind, {
+      ok: false,
+      userId: opts.userId,
+      meta: { error: String(err).slice(0, 200) },
+    });
+    throw err;
+  }
+  logServiceUsage("email", kind, { userId: opts.userId });
   return { sent: true };
 }
 
@@ -262,6 +280,34 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/**
+ * Gmail ko email me se "event" na dikhe — iske liye time todo (item 10).
+ *
+ * Dikkat: Gmail ka "Events from Gmail" khud-ba-khud email padh ke calendar me
+ * event bana deta hai. Reminder mail me "Reminder: Calling" jaisa subject aur
+ * "Today 8:03 pm" jaisa waqt milte hi wo maan leta hai ki ye koi appointment
+ * hai — aur inbox me Google Calendar ka card, "Invite others" button, sab aa
+ * jaata hai. User ka email hamara dikhta hi nahi.
+ *
+ * Bhejne wale ke liye ise band karne ka koi official header ya flag nahi hai
+ * (Google ye setting sirf paane wale ko deta hai). Isliye ek hi raasta bachta
+ * hai: waqt ko aise likho ki insaan padh le par parser na pakde.
+ *
+ * U+2060 (WORD JOINER) bilkul invisible hai, jagah nahi leta, line bhi nahi
+ * todta — bas "8:03" ko ek time token ke roop me tootne se rok deta hai.
+ * Screen reader isse chhod deta hai, copy-paste me bhi kuch dikhta nahi.
+ */
+const WORD_JOINER = "⁠";
+
+export function unparseableTime(s: string): string {
+  // Ginti aur ":" ke beech joiner daalo — baaki text waisa ka waisa.
+  // Ek hi ank ho ("8 AM") to beech me daalne ki jagah hi nahi bachti, isliye
+  // uske dono taraf lagate hain — warna wo akela number time ban jaata hai.
+  return s.replace(/\d[\d:]*\d|\d/g, (num) =>
+    num.length === 1 ? WORD_JOINER + num + WORD_JOINER : num.split("").join(WORD_JOINER),
+  );
+}
+
 type ReminderCopy = {
   subject: (t: string) => string;
   heading: string;
@@ -271,23 +317,31 @@ type ReminderCopy = {
   yourWords: string;
 };
 
+/**
+ * ⚠️ Subject me "Reminder:" jaan-boojh ke hataya gaya hai (item 10).
+ *
+ * "Reminder: Calling" Gmail ke liye ek appointment ka sabse pehchana hua shakl
+ * hai — usi se wo calendar card aur "Invite others" button bana deta tha. Brand
+ * ka naam aage rakhne se inbox me hamari pehchaan bhi banti hai aur Gmail ise
+ * event nahi samajhta.
+ */
 const REMINDER: Record<EmailLocale, ReminderCopy> = {
   hinglish: {
-    subject: (t) => `🔔 Reminder: ${t}`,
+    subject: (t) => `Apka Saathi ⏰ — ${t}`,
     heading: "Aapka reminder ⏰",
     intro: "Bas yaad dila raha hoon 🙂 — aapne ye set kiya tha:",
     outro: "Ho gaya to badhiya — warna abhi kar lo. Main yahin hoon. 🤍",
     yourWords: "Aapne kaha tha",
   },
   hi: {
-    subject: (t) => `🔔 रिमाइंडर: ${t}`,
+    subject: (t) => `Apka Saathi ⏰ — ${t}`,
     heading: "आपका रिमाइंडर ⏰",
     intro: "बस याद दिला रहा हूँ 🙂 — आपने यह सेट किया था:",
     outro: "हो गया तो बढ़िया — वरना अभी कर लो। मैं यहीं हूँ। 🤍",
     yourWords: "आपने कहा था",
   },
   en: {
-    subject: (t) => `🔔 Reminder: ${t}`,
+    subject: (t) => `Apka Saathi ⏰ — ${t}`,
     heading: "Your reminder ⏰",
     intro: "Just a gentle nudge 🙂 — you had set this:",
     outro: "Done already? Great — if not, do it now. I'm right here. 🤍",
@@ -309,6 +363,7 @@ export async function sendReminderEmail(
   whenLabel: string,
   locale: EmailLocale = "hinglish",
   note?: string | null,
+  userId?: string | null,
 ): Promise<{ sent: boolean; skipped?: boolean }> {
   const r = REMINDER[locale] ?? REMINDER.hinglish;
 
@@ -325,7 +380,7 @@ export async function sendReminderEmail(
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
        <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${BRAND};border-radius:14px;background:${CREAM};">
          <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(title)}</div>
-         <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${escapeHtml(whenLabel)}</div>
+         <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">🕐 ${unparseableTime(escapeHtml(whenLabel))}</div>
          ${noteBlock}
        </td></tr>
      </table>` +
@@ -335,13 +390,104 @@ export async function sendReminderEmail(
     to,
     subject: r.subject(title),
     // Preheader me note bhi — inbox ki preview line se hi kaam yaad aa jaata hai.
+    // Waqt yahan bhi toda hua: preview line Gmail ke scanner ko utni hi dikhti
+    // hai jitni body (item 10).
     html: renderEmail(
       r.heading,
       inner,
-      [title, whenLabel, note?.trim()].filter(Boolean).join(" · "),
+      [title, unparseableTime(whenLabel), note?.trim()].filter(Boolean).join(" · "),
       locale,
     ),
     fromName: "Apka Saathi",
+    kind: "reminder",
+    userId,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Document expiry email — 7 din / 1 din pehle, aur us din (item 18)   */
+/* ------------------------------------------------------------------ */
+
+type DocExpiryCopy = {
+  subject: (name: string, when: string) => string;
+  heading: string;
+  /** {name} {when} */
+  intro: (name: string, when: string) => string;
+  outro: string;
+  whenLabel: (lead: number) => string;
+  cta: string;
+};
+
+const DOC_EXPIRY: Record<EmailLocale, DocExpiryCopy> = {
+  hinglish: {
+    subject: (name, when) => `Apka Saathi — ${name} ${when}`,
+    heading: "Document ki yaad dila raha hoon 📄",
+    intro: (name, when) =>
+      `Aapka <b>${name}</b> ${when} expire ho raha hai. Time rehte kar lo — baad me bhaag-daud na ho.`,
+    outro: "Ho gaya ho to app me bata dena — main aage ke reminder band kar dunga. 🤍",
+    whenLabel: (lead) =>
+      lead === 0 ? "aaj" : lead === 1 ? "kal" : `${lead} din me`,
+    cta: "App me dekho",
+  },
+  hi: {
+    subject: (name, when) => `Apka Saathi — ${name} ${when}`,
+    heading: "डॉक्युमेंट की याद दिला रहा हूँ 📄",
+    intro: (name, when) =>
+      `आपका <b>${name}</b> ${when} एक्सपायर हो रहा है। समय रहते कर लीजिए — बाद में भाग-दौड़ न हो।`,
+    outro: "हो गया हो तो ऐप में बता दीजिए — मैं आगे के रिमाइंडर बंद कर दूँगा। 🤍",
+    whenLabel: (lead) => (lead === 0 ? "आज" : lead === 1 ? "कल" : `${lead} दिन में`),
+    cta: "ऐप में देखें",
+  },
+  en: {
+    subject: (name, when) => `Apka Saathi — ${name} expires ${when}`,
+    heading: "A quick nudge about a document 📄",
+    intro: (name, when) =>
+      `Your <b>${name}</b> expires ${when}. Worth sorting now rather than in a rush later.`,
+    outro: "Already done? Tell me in the app and I'll switch off the rest of the reminders. 🤍",
+    whenLabel: (lead) =>
+      lead === 0 ? "today" : lead === 1 ? "tomorrow" : `in ${lead} days`,
+    cta: "Open the app",
+  },
+};
+
+/**
+ * Document expiry email — ladder ke teenon padav par (7 din, 1 din, us din).
+ *
+ * ⚠️ Ye WhatsApp aur phone ki notification ke SAATH jaata hai, teenon ek hi
+ * moment par. Pehle sirf notification aur (der se) WhatsApp jaata tha; email
+ * kabhi nahi. Isliye jo log app kam kholte hain unhe expiry ka pata hi nahi
+ * chalta tha (item 18).
+ */
+export async function sendDocumentExpiryEmail(
+  to: string,
+  name: string,
+  lead: number,
+  locale: EmailLocale = "hinglish",
+  userId?: string | null,
+): Promise<{ sent: boolean; skipped?: boolean }> {
+  const c = DOC_EXPIRY[locale] ?? DOC_EXPIRY.hinglish;
+  const when = c.whenLabel(lead);
+  // Aaj wala sabse zaroori — usse alag rang deta hai.
+  const accent = lead === 0 ? BRAND : lead === 1 ? "#E0A458" : LINE;
+
+  const inner =
+    emailParagraph(c.intro(escapeHtml(name), when)) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
+       <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${accent};border-radius:14px;background:${CREAM};">
+         <div style="font-size:18px;font-weight:700;color:${INK};line-height:1.4;">${escapeHtml(name)}</div>
+         <div style="margin-top:8px;font-size:14px;font-weight:600;color:${BRAND};">${escapeHtml(when)}</div>
+       </td></tr>
+     </table>` +
+    emailButton(SITE_URL, c.cta) +
+    emailParagraph(c.outro);
+
+  return sendMail({
+    to,
+    subject: c.subject(name, when),
+    html: renderEmail(c.heading, inner, `${name} · ${when}`, locale),
+    fromName: "Apka Saathi",
+    kind: "document",
+    userId,
   });
 }
 

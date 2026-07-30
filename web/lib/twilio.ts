@@ -9,6 +9,8 @@
  * Env na ho to sendWhatsApp silently skip karta hai (caller fail nahi hota).
  */
 
+import { logServiceUsage } from "@/lib/usage-server";
+
 const SID = process.env.TWILIO_ACCOUNT_SID;
 const TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const FROM = process.env.TWILIO_WHATSAPP_FROM;
@@ -34,8 +36,15 @@ export function twilioConfigured(): boolean {
 export async function sendWhatsApp(
   to: string,
   body: string,
-  opts: { templateSid?: string; variables?: Record<string, string> } = {},
+  opts: {
+    templateSid?: string;
+    variables?: Record<string, string>;
+    /** Admin ke hisaab ke liye — 'reminder' | 'document' (item 3). */
+    kind?: string;
+    userId?: string | null;
+  } = {},
 ): Promise<{ sent: boolean; skipped?: boolean }> {
+  const kind = opts.kind ?? "other";
   if (!twilioConfigured()) {
     console.warn("[twilio] env not set — WhatsApp skipped");
     return { sent: false, skipped: true };
@@ -65,8 +74,19 @@ export async function sendWhatsApp(
 
   if (!res.ok) {
     const txt = await res.text();
+    // Fail bhi ginte hain — Twilio ka number block ho jaye ya template reject ho
+    // to admin ko yahi sabse pehle dikhta hai (item 3).
+    logServiceUsage("twilio", kind, {
+      ok: false,
+      userId: opts.userId,
+      meta: { status: res.status },
+    });
     throw new Error(`twilio send failed: ${res.status} ${txt}`);
   }
+  logServiceUsage("twilio", kind, {
+    userId: opts.userId,
+    meta: { template: opts.templateSid ? true : false },
+  });
   return { sent: true };
 }
 
@@ -82,18 +102,28 @@ export function sendReminderWhatsApp(
   title: string,
   whenLabel: string,
   note?: string | null,
+  userId?: string | null,
 ) {
   return sendWhatsApp(to, reminderWhatsAppText(title, whenLabel, note), {
     templateSid: TEMPLATE_REMINDER,
     variables: { "1": title, "2": whenLabel },
+    kind: "reminder",
+    userId,
   });
 }
 
 /** Document expiry bhejo — template ho to template se, warna plain text. */
-export function sendDocumentWhatsApp(to: string, name: string, whenLabel: string) {
+export function sendDocumentWhatsApp(
+  to: string,
+  name: string,
+  whenLabel: string,
+  userId?: string | null,
+) {
   return sendWhatsApp(to, documentWhatsAppText(name, whenLabel), {
     templateSid: TEMPLATE_DOCUMENT,
     variables: { "1": name, "2": whenLabel },
+    kind: "document",
+    userId,
   });
 }
 

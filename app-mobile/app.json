@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.saathi.app",
+      "bundleIdentifier": "com.apkasaathi.app",
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
         "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
@@ -19,7 +19,8 @@
       }
     },
     "android": {
-      "package": "com.saathi.app",
+      "package": "com.apkasaathi.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#125156",
         "foregroundImage": "./assets/images/adaptive-foreground.png"
@@ -67,7 +68,15 @@
         }
       ],
       "expo-sharing",
-      "./plugins/with-fullscreen-notifications"
+      "./plugins/with-fullscreen-notifications",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          "ios": { "useFrameworks": "static" }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

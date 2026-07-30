@@ -36,6 +36,7 @@ import {
 const ICONS: Record<StepKey, keyof typeof Ionicons.glyphMap> = {
   notif: "notifications-outline",
   alarm: "alarm-outline",
+  fsi: "phone-portrait-outline",
   battery: "battery-charging-outline",
   oem: "shield-checkmark-outline",
 };
@@ -95,6 +96,7 @@ export function PermissionModal({
   const copy: Record<StepKey, { title: string; sub: string }> = {
     notif: { title: r.stepNotif, sub: r.stepNotifSub },
     alarm: { title: r.stepAlarm, sub: r.stepAlarmSub },
+    fsi: { title: r.stepFsi, sub: r.stepFsiSub },
     battery: { title: r.stepBattery, sub: r.stepBatterySub },
     oem: {
       title: r.stepOem,
@@ -118,9 +120,27 @@ export function PermissionModal({
             <Text style={styles.title}>{allOk ? r.allSetTitle : r.promptTitle}</Text>
             <Text style={styles.body}>{allOk ? r.allSetBody : r.promptBody}</Text>
 
+            {/* Full-screen alert Android 14+ par default se BAND hota hai —
+                yahi sabse zyada log miss karte hain (item 11). Baaki sab green
+                hone par bhi bada popup isi ke bina nahi aata, isliye ye pending
+                ho to alag se upar bataate hain. */}
+            {!allOk && steps.some((s) => s.key === "fsi" && !s.ok) && (
+              <View style={styles.spotlight}>
+                <Ionicons name="sparkles" size={16} color={colors.terracotta} />
+                <Text style={styles.spotlightText}>{r.fsiSpotlight}</Text>
+              </View>
+            )}
+
             <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
               {steps.map((s) => (
-                <View key={s.key} style={[styles.step, s.ok && styles.stepDone]}>
+                <View
+                  key={s.key}
+                  style={[
+                    styles.step,
+                    s.ok && styles.stepDone,
+                    !s.ok && s.key === "fsi" && styles.stepKey,
+                  ]}
+                >
                   <View style={[styles.stepIcon, s.ok && styles.stepIconDone]}>
                     <Ionicons
                       name={s.ok ? "checkmark" : ICONS[s.key]}
@@ -175,31 +195,56 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 22,
   },
-  cardWrap: { width: "100%", maxWidth: 400 },
+  cardWrap: { width: "100%", maxWidth: 440 },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 26,
-    padding: 22,
+    borderRadius: 28,
+    padding: 24,
     borderWidth: 1,
     borderColor: colors.line,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 16,
   },
   iconWrap: {
-    height: 52,
-    width: 52,
-    borderRadius: 18,
+    height: 60,
+    width: 60,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.12)",
   },
   title: {
-    marginTop: 14,
-    fontSize: 19,
+    marginTop: 15,
+    fontSize: 21,
     fontWeight: "800",
     color: colors.ink,
-    lineHeight: 25,
+    lineHeight: 28,
   },
-  body: { marginTop: 8, fontSize: 14, lineHeight: 21, color: colors.inkSoft },
-  list: { marginTop: 16, maxHeight: 320 },
+  body: { marginTop: 8, fontSize: 14.5, lineHeight: 22, color: colors.inkSoft },
+  spotlight: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginTop: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  spotlightText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+    color: colors.ink,
+  },
+  stepKey: { borderColor: colors.terracotta, borderWidth: 1.5 },
+  list: { marginTop: 16, maxHeight: 380 },
   step: {
     flexDirection: "row",
     alignItems: "center",

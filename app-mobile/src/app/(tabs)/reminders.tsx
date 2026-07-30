@@ -1,34 +1,43 @@
 import { useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  Switch,
-  ScrollView,
-  Pressable,
-  StyleSheet,
-  Alert,
-} from "react-native";
+import { View, Text, Switch, ScrollView, Pressable, StyleSheet, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useRouter, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
 import { SkeletonList } from "@/components/loader";
+import { ConfirmModal } from "@/components/confirm-modal";
 import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
+import { reportIfNetwork } from "@/lib/net-alert";
 import {
   listReminders,
   setReminderOn,
   deleteReminder,
+  completeReminder,
+  isRepeating,
   type Reminder,
 } from "@/lib/reminders";
-import { scheduleReminder, cancelReminder } from "@/lib/notifications";
+import { scheduleReminderSeries, cancelReminder } from "@/lib/notifications";
+import { repeatLine } from "@/lib/repeat-label";
 import { formatWhen } from "@/utils/parse-time";
-import { Pagination, usePaged } from "@/components/pagination";
+import { Pagination, usePaged, PAGE_SIZE } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+
+/** Ye reminder aaj hi bajega? (Home tab bhi bilkul yahi hisaab lagata hai.) */
+function isToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
 
 export default function Reminders() {
   const router = useRouter();
@@ -38,14 +47,21 @@ export default function Reminders() {
   const words = { today: c.today, tomorrow: c.tomorrow };
   const [items, setItems] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Delete confirm — OS ke bhadde Alert ki jagah apna branded modal (item 9). */
+  const [toDelete, setToDelete] = useState<Reminder | null>(null);
+  /** "Dekho" — poori detail ek saaf sheet me. */
+  const [viewing, setViewing] = useState<Reminder | null>(null);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setItems(await timed(listReminders()));
     } catch (e) {
-      reportError(e, { screen: "reminders", action: "load" });
-      toast.show(r0.title + " ✕", "error");
+      // Net ki dikkat ho to poore app wala popup + retry; warna hi toast.
+      if (!reportIfNetwork(e, "load", load)) {
+        reportError(e, { screen: "reminders", action: "load" });
+        toast.show(r0.title + " ✕", "error");
+      }
     } finally {
       setLoading(false);
     }
@@ -63,45 +79,104 @@ export default function Reminders() {
     try {
       await setReminderOn(r.id, next);
       if (next && r.remind_at) {
-        await scheduleReminder(r.id, r.title, new Date(r.remind_at));
+        await scheduleReminderSeries(
+          r.id,
+          r.title,
+          new Date(r.remind_at),
+          r.repeat_every_days,
+          r.repeat_until,
+        );
       } else {
         await cancelReminder(r.id);
       }
-    } catch {
-      toast.show(r0.title + " ✕", "error");
+    } catch (e) {
+      if (!reportIfNetwork(e, "save")) toast.show(r0.title + " ✕", "error");
       load();
     }
   }
 
-  function confirmDelete(r: Reminder) {
-    Alert.alert(r0.deleteConfirmTitle, tpl(r0.deleteConfirmBody, { title: r.title }), [
-      { text: c.no, style: "cancel" },
-      {
-        text: c.delete,
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteReminder(r.id);
-            await cancelReminder(r.id);
-            setItems((prev) => prev.filter((x) => x.id !== r.id));
-            toast.show(c.delete + " ✓", "success");
-          } catch {
-            toast.show(c.delete + " ✕", "error");
-          }
-        },
-      },
-    ]);
+  /**
+   * "Ho gaya" — roz wale reminder me sirf AAJ ka.
+   *
+   * Server tay karta hai ki agla occurrence kab hai (`complete_reminder`), taaki
+   * app aur cron kabhi alag din na nikalein. Wahi se phone ke alarm bhi nayi
+   * khidki par lag jaate hain.
+   *
+   * `next` null aaya matlab series khatam (90 din poore) ya ek-baar wala
+   * reminder tha — dono soorat me reminder chup ho jaata hai.
+   */
+  async function markDone(r: Reminder) {
+    try {
+      const next = await completeReminder(r.id);
+      if (next) {
+        await scheduleReminderSeries(
+          r.id,
+          r.title,
+          new Date(next),
+          r.repeat_every_days,
+          r.repeat_until,
+        );
+        toast.show(r0.doneToday, "success");
+      } else {
+        await cancelReminder(r.id);
+        toast.show(r0.doneAll, "success");
+      }
+      setViewing(null);
+      load();
+    } catch (e) {
+      if (!reportIfNetwork(e, "save", () => markDone(r))) {
+        toast.show(r0.title + " ✕", "error");
+      }
+    }
   }
 
-  const today = items.filter((r) => r.bucket === "today");
-  const upcoming = items.filter((r) => r.bucket !== "today");
+  async function doDelete() {
+    const r = toDelete;
+    setToDelete(null);
+    if (!r) return;
+    try {
+      await deleteReminder(r.id);
+      await cancelReminder(r.id);
+      setItems((prev) => prev.filter((x) => x.id !== r.id));
+      toast.show(r0.deleted, "success");
+    } catch (e) {
+      if (!reportIfNetwork(e, "save")) toast.show(c.delete + " ✕", "error");
+    }
+  }
 
-  // Upcoming list lambi ho sakti hai — 10 per page. (Today hamesha poora dikhta.)
-  const up = usePaged(upcoming, 10);
+  // ⚠️ Yahan pehle stored `bucket` column padha jaata tha. Wo reminder banate
+  // waqt ek baar likha jaata hai aur uske baad kabhi badalta nahi — isliye:
+  //   * kal ke liye banaya reminder kal aa jaane par bhi "Aane wale" me hi
+  //     pada rehta tha, "Aaj" me kabhi nahi aata tha;
+  //   * aur roz wale reminder me to ye aur bura tha — "gym roz 6 baje" hamesha
+  //     ke liye "Aaj" me chipak jaata, chahe agli baar 3 hafte baad ho.
+  //
+  // Home tab pehle se hi `remind_at` se hisaab lagata hai (`isToday`). Ab dono
+  // screen ek hi sach dikhate hain.
+  const today = items.filter((r) => isToday(r.remind_at));
+  const upcoming = items.filter((r) => !isToday(r.remind_at));
+
+  // 7 se zyada hote hi pagination — dono list me (item 21).
+  const tp = usePaged(today, PAGE_SIZE);
+  const up = usePaged(upcoming, PAGE_SIZE);
 
   // Card pe time hamesha current bhasha me — stored label ki jagah remind_at se.
   const timeOf = (r: Reminder): string | null =>
     r.remind_at ? formatWhen(new Date(r.remind_at), words, locale) : r.time_label ?? null;
+
+  // "Roz · 90 din tak" — card aur detail sheet dono ek hi line dikhate hain.
+  const repeatOf = (r: Reminder): string | null =>
+    repeatLine(r.repeat_every_days, r.repeat_until, r0, locale);
+
+  const rowProps = {
+    onToggle: toggle,
+    onDelete: setToDelete,
+    onView: setViewing,
+    pausedTag: r0.pausedTag,
+    timeOf,
+    repeatOf,
+    labels: { view: r0.viewAction, remove: r0.deleteAction },
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -126,10 +201,10 @@ export default function Reminders() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Section title={r0.today} items={today} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
-          <Section title={r0.upcoming} items={up.pageItems} onToggle={toggle} onDelete={confirmDelete} pausedTag={r0.pausedTag} timeOf={timeOf} />
+          <Section title={r0.today} items={tp.pageItems} {...rowProps} />
+          <Pagination page={tp.page} pageCount={tp.pageCount} onPage={tp.setPage} />
+          <Section title={r0.upcoming} items={up.pageItems} {...rowProps} />
           <Pagination page={up.page} pageCount={up.pageCount} onPage={up.setPage} />
-          <Text style={styles.hint}>{r0.longPressHint}</Text>
         </ScrollView>
       )}
 
@@ -140,75 +215,247 @@ export default function Reminders() {
         <Ionicons name="add" size={20} color={colors.white} />
         <Text style={styles.addText}>{r0.title}</Text>
       </Pressable>
+
+      <ConfirmModal
+        visible={!!toDelete}
+        title={r0.deleteConfirmTitle}
+        message={toDelete ? tpl(r0.deleteConfirmBody, { title: toDelete.title }) : undefined}
+        confirmLabel={c.delete}
+        cancelLabel={c.cancel}
+        icon="trash"
+        destructive
+        onConfirm={doDelete}
+        onCancel={() => setToDelete(null)}
+      />
+
+      <DetailSheet
+        reminder={viewing}
+        onClose={() => setViewing(null)}
+        onDone={markDone}
+        timeOf={timeOf}
+        repeatOf={repeatOf}
+        copy={r0}
+      />
     </SafeAreaView>
   );
 }
 
+/* ------------------------------- section ------------------------------- */
+
+type RowProps = {
+  onToggle: (r: Reminder) => void;
+  onDelete: (r: Reminder) => void;
+  onView: (r: Reminder) => void;
+  pausedTag: string;
+  timeOf: (r: Reminder) => string | null;
+  /** "Roz · 90 din tak" — ek baar wale reminder me null. */
+  repeatOf: (r: Reminder) => string | null;
+  labels: { view: string; remove: string };
+};
+
+/**
+ * Reminder card.
+ *
+ * ⚠️ Pehle yahan sirf ek Switch tha aur delete ke liye "press and hold" — koi
+ * icon nahi, koi ishaara nahi. Log hold karna jaante hi nahi the (item 9). Ab
+ * har card par teen saaf cheezein hain: dekho (aankh), hatao (trash), aur
+ * chalu/band ka toggle apne label ke saath.
+ */
 function Section({
   title,
   items,
   onToggle,
   onDelete,
+  onView,
   pausedTag,
   timeOf,
-}: {
-  title: string;
-  items: Reminder[];
-  onToggle: (r: Reminder) => void;
-  onDelete: (r: Reminder) => void;
-  pausedTag: string;
-  timeOf: (r: Reminder) => string | null;
-}) {
+  repeatOf,
+  labels,
+}: RowProps & { title: string; items: Reminder[] }) {
   if (items.length === 0) return null;
   return (
     <View style={{ marginBottom: 20 }}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.card}>
-        {items.map((r, i) => (
-          <Pressable
-            key={r.id}
-            onPress={r.is_paused ? () => router.push("/upgrade" as never) : undefined}
-            onLongPress={() => onDelete(r)}
-            delayLongPress={350}
-            style={[styles.row, i < items.length - 1 && styles.rowBorder]}
-          >
-            <View style={[styles.rIcon, { opacity: r.is_on && !r.is_paused ? 1 : 0.4 }]}>
-              <Ionicons
-                name={r.is_paused ? "lock-closed" : "notifications"}
-                size={17}
-                color={colors.terracotta}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[styles.rTitle, (!r.is_on || r.is_paused) && styles.off]}
-                numberOfLines={2}
+      <View style={{ gap: 10 }}>
+        {items.map((r) => {
+          const live = r.is_on && !r.is_paused;
+          return (
+            <View key={r.id} style={styles.card}>
+              <Pressable
+                onPress={() =>
+                  r.is_paused ? router.push("/upgrade" as never) : onView(r)
+                }
+                style={styles.cardTop}
               >
-                {r.title}
-              </Text>
-              {r.is_paused ? (
-                <Text style={styles.pausedTag}>{pausedTag}</Text>
-              ) : timeOf(r) ? (
-                <Text style={styles.rTime}>{timeOf(r)}</Text>
-              ) : null}
+                <View style={[styles.rIcon, !live && { opacity: 0.4 }]}>
+                  <Ionicons
+                    name={r.is_paused ? "lock-closed" : "notifications"}
+                    size={18}
+                    color={colors.terracotta}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rTitle, !live && styles.off]} numberOfLines={2}>
+                    {r.title}
+                  </Text>
+                  {r.is_paused ? (
+                    <Text style={styles.pausedTag}>{pausedTag}</Text>
+                  ) : timeOf(r) ? (
+                    <Text style={styles.rTime}>🕒 {timeOf(r)}</Text>
+                  ) : null}
+                  {/* Roz wala reminder ek nazar me alag dikhe — warna user ko
+                      lagta hai ye bhi ek baar wala hai aur wo dobara bana deta
+                      hai. */}
+                  {!r.is_paused && !!repeatOf(r) && (
+                    <View style={styles.repeatTag}>
+                      <Ionicons name="repeat" size={12} color={colors.terracotta} />
+                      <Text style={styles.repeatTagText}>{repeatOf(r)}</Text>
+                    </View>
+                  )}
+                </View>
+                {r.is_paused && (
+                  <View style={styles.pausedPill}>
+                    <Ionicons name="star" size={11} color={colors.white} />
+                    <Text style={styles.pausedPillText}>Plus</Text>
+                  </View>
+                )}
+              </Pressable>
+
+              {!r.is_paused && (
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => onView(r)}
+                    style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
+                    hitSlop={4}
+                  >
+                    <Ionicons name="eye-outline" size={17} color={colors.inkSoft} />
+                    <Text style={styles.actionText}>{labels.view}</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => onDelete(r)}
+                    style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
+                    hitSlop={4}
+                  >
+                    <Ionicons name="trash-outline" size={17} color="#B23B3B" />
+                    <Text style={[styles.actionText, { color: "#B23B3B" }]}>
+                      {labels.remove}
+                    </Text>
+                  </Pressable>
+
+                  <View style={styles.spacer} />
+
+                  <Switch
+                    value={r.is_on}
+                    onValueChange={() => onToggle(r)}
+                    trackColor={{ false: colors.line, true: colors.terracotta }}
+                    thumbColor={colors.white}
+                  />
+                </View>
+              )}
             </View>
-            {r.is_paused ? (
-              <View style={styles.pausedPill}>
-                <Ionicons name="star" size={11} color={colors.white} />
-                <Text style={styles.pausedPillText}>Plus</Text>
-              </View>
-            ) : (
-              <Switch
-                value={r.is_on}
-                onValueChange={() => onToggle(r)}
-                trackColor={{ false: colors.line, true: colors.terracotta }}
-                thumbColor={colors.white}
-              />
-            )}
-          </Pressable>
-        ))}
+          );
+        })}
       </View>
     </View>
+  );
+}
+
+/* ----------------------------- detail sheet ----------------------------- */
+
+/** "Dekho" — reminder ki poori baat, wahi jo user ne bola/likha tha bhi. */
+function DetailSheet({
+  reminder,
+  onClose,
+  onDone,
+  timeOf,
+  repeatOf,
+  copy,
+}: {
+  reminder: Reminder | null;
+  onClose: () => void;
+  onDone: (r: Reminder) => void;
+  timeOf: (r: Reminder) => string | null;
+  repeatOf: (r: Reminder) => string | null;
+  copy: {
+    detailTitle: string;
+    detailWhen: string;
+    detailNote: string;
+    detailStatus: string;
+    activeLabel: string;
+    inactiveLabel: string;
+    repeatLabel: string;
+    doneToday: string;
+    doneBtn: string;
+    doneBtnRepeat: string;
+  };
+}) {
+  if (!reminder) return null;
+  const r = reminder;
+  return (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.sheetHandle} />
+
+          <View style={styles.sheetHead}>
+            <View style={styles.rIcon}>
+              <Ionicons name="notifications" size={18} color={colors.terracotta} />
+            </View>
+            <Text style={styles.sheetLabel}>{copy.detailTitle}</Text>
+          </View>
+
+          <Text style={styles.sheetTitle}>{r.title}</Text>
+
+          <View style={styles.sheetRow}>
+            <Ionicons name="time-outline" size={17} color={colors.inkSoft} />
+            <Text style={styles.sheetRowLabel}>{copy.detailWhen}</Text>
+            <Text style={styles.sheetRowValue}>{timeOf(r) ?? "—"}</Text>
+          </View>
+
+          <View style={styles.sheetRow}>
+            <Ionicons name="pulse-outline" size={17} color={colors.inkSoft} />
+            <Text style={styles.sheetRowLabel}>{copy.detailStatus}</Text>
+            <Text
+              style={[
+                styles.sheetRowValue,
+                { color: r.is_on ? colors.sage : colors.inkSoft },
+              ]}
+            >
+              {r.is_on ? copy.activeLabel : copy.inactiveLabel}
+            </Text>
+          </View>
+
+          {!!repeatOf(r) && (
+            <View style={styles.sheetRow}>
+              <Ionicons name="repeat" size={17} color={colors.inkSoft} />
+              <Text style={styles.sheetRowLabel}>{copy.repeatLabel}</Text>
+              <Text style={styles.sheetRowValue}>{repeatOf(r)}</Text>
+            </View>
+          )}
+
+          {!!r.note?.trim() && (
+            <View style={styles.noteBox}>
+              <Text style={styles.noteLabel}>{copy.detailNote}</Text>
+              <Text style={styles.noteText}>{r.note.trim()}</Text>
+            </View>
+          )}
+
+          {/* "Ho gaya" — roz wale me sirf aaj ka, ek baar wale me poora band.
+              Button ka text bhi wahi batata hai, taaki user ko dar na ho ki
+              usne poori series delete kar di. */}
+          <Pressable
+            onPress={() => onDone(r)}
+            style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.9 }]}
+          >
+            <Ionicons name="checkmark-circle" size={19} color={colors.white} />
+            <Text style={styles.doneBtnText}>
+              {isRepeating(r) ? copy.doneBtnRepeat : copy.doneBtn}
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -253,25 +500,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     overflow: "hidden",
   },
-  row: {
+  cardTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.line },
   rIcon: {
     height: 40,
     width: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
+    borderRadius: 13,
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  rTitle: { fontSize: 15.5, fontWeight: "600", color: colors.ink },
+  rTitle: { fontSize: 15.5, fontWeight: "700", color: colors.ink },
   off: { textDecorationLine: "line-through", color: colors.inkSoft },
-  rTime: { marginTop: 2, fontSize: 13, color: colors.inkSoft },
+  rTime: { marginTop: 3, fontSize: 13, color: colors.inkSoft },
+  repeatTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(194,90,55,0.10)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  repeatTagText: { fontSize: 11.5, fontWeight: "700", color: colors.terracotta },
+  doneBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 22,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: colors.terracotta,
+  },
+  doneBtnText: { fontSize: 16, fontWeight: "800", color: colors.white },
   pausedTag: { marginTop: 2, fontSize: 12, fontWeight: "600", color: colors.terracotta },
   pausedPill: {
     flexDirection: "row",
@@ -283,12 +553,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.terracotta,
   },
   pausedPillText: { fontSize: 11.5, fontWeight: "800", color: colors.white },
-  hint: {
-    textAlign: "center",
-    fontSize: 12,
-    color: colors.inkSoft,
-    opacity: 0.7,
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    backgroundColor: colors.cream,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  actionPressed: { backgroundColor: colors.creamDeep },
+  actionText: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
+  spacer: { flex: 1 },
   addBtn: {
     position: "absolute",
     right: 20,
@@ -307,4 +592,72 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   addText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(46,40,35,0.5)",
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 22,
+    paddingBottom: 34,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.line,
+    marginBottom: 18,
+  },
+  sheetHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  sheetLabel: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: colors.inkSoft,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  sheetTitle: {
+    marginTop: 14,
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.ink,
+    lineHeight: 29,
+  },
+  sheetRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+    paddingTop: 14,
+  },
+  sheetRowLabel: { fontSize: 14, color: colors.inkSoft, fontWeight: "600" },
+  sheetRowValue: {
+    flex: 1,
+    textAlign: "right",
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.ink,
+  },
+  noteBox: {
+    marginTop: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.cream,
+    padding: 14,
+  },
+  noteLabel: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    color: colors.inkSoft,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  noteText: { marginTop: 6, fontSize: 15, lineHeight: 22, color: colors.ink },
 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 import { Stack } from "expo-router/js-stack";
 import { useRouter, useSegments, usePathname } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -11,8 +12,10 @@ import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ReminderAlertHost } from "@/components/reminder-alert";
 import { ReviewPrompt } from "@/components/review-prompt";
 import { NetworkBanner } from "@/components/network-banner";
+import { NetAlertModal } from "@/components/net-alert-modal";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
+import { listenForegroundPush, registerPushToken } from "@/lib/push";
 import { setAnalyticsUser, logScreen } from "@/lib/analytics";
 import { installGlobalErrorHandler } from "@/lib/report-error";
 
@@ -29,6 +32,8 @@ export default function RootLayout() {
             <RootNavigator />
             {/* Internet nahi/dheema — sabse upar patli patti. */}
             <NetworkBanner />
+            {/* Net ki wajah se koi kaam ruka — beech screen me popup + retry. */}
+            <NetAlertModal />
             {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
             <ReminderAlertHost />
             {/* 1 hafte baad rating/review popup. */}
@@ -80,6 +85,46 @@ function RootNavigator() {
   useEffect(() => {
     if (uid) void syncNotifications();
     setAnalyticsUser(uid ?? null);
+  }, [uid]);
+
+  /**
+   * Push (admin ke message ke liye) — login ke baad is phone ka pata server ko.
+   *
+   * Login ke saath bandha hai kyunki token user ke naam par save hota hai:
+   * logout hone par listener band ho jaata hai, aur agla user login karega to
+   * usi token ka maalik badal jaayega (`save_device_token`). Warna ek hi phone
+   * par purane user ko naye user ki notification chali jaati.
+   *
+   * Firebase set na ho to dono function chup-chaap kuch nahi karte — local
+   * reminders par koi asar nahi.
+   */
+  useEffect(() => {
+    if (!uid) return;
+    const stopToken = registerPushToken();
+    const stopForeground = listenForegroundPush();
+    return () => {
+      stopToken();
+      stopForeground();
+    };
+  }, [uid]);
+
+  /**
+   * App wapas saamne aate hi schedules dobara mila lo (item 17).
+   *
+   * ⚠️ Pehle sync SIRF login par chalta tha. Isliye ye sab chup-chaap toot jaata
+   * tha: net na hone par bana reminder OS me kabhi schedule hi nahi hota; doosre
+   * phone se banaya reminder is phone par kabhi nahi aata; permission baad me
+   * di ho to usse pehle ke saare reminders bina alarm ke pade rehte the.
+   *
+   * Ye sirf local scheduling hai — net ki zaroorat nahi, isliye dheeme internet
+   * par bhi notification theek waqt par bajti hai.
+   */
+  useEffect(() => {
+    if (!uid) return;
+    const sub = AppState.addEventListener("change", (s: AppStateStatus) => {
+      if (s === "active") void syncNotifications();
+    });
+    return () => sub.remove();
   }, [uid]);
 
   // Har screen change ek event — admin panel ka "journey" isi se banta hai.

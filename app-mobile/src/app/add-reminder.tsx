@@ -17,15 +17,18 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 
 import { colors } from "@/theme/colors";
-import { LoaderOverlay } from "@/components/loader";
+import { LoaderOverlay, TopProgress } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { addReminder, ReminderLimitError } from "@/lib/reminders";
 import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
-import { ensureNotifPermission, scheduleReminder } from "@/lib/notifications";
+import { ensureNotifPermission, scheduleReminderSeries } from "@/lib/notifications";
 import { formatWhen, combine } from "@/utils/parse-time";
 import { parseReminderAI } from "@/lib/ai";
+import { repeatLine } from "@/lib/repeat-label";
+import { reportIfNetwork } from "@/lib/net-alert";
 import { logEvent } from "@/lib/analytics";
+import { markFirstReminder } from "@/lib/reviews";
 import { reliabilityPromptShown } from "@/lib/reliability";
 import { PermissionModal } from "@/components/permission-modal";
 import { VoiceButton } from "@/components/voice-button";
@@ -66,17 +69,37 @@ export default function AddReminder() {
   const [iosTime, setIosTime] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // AI se samjha hua reminder. Ek reminder = ek AI call — user typing rukne ke
-  // 800ms baad ek hi baar hit hota hai (same text dobara hit nahi hota).
+  /**
+   * Saathi ne jo samjha.
+   *
+   * ⚠️ Yahan pehle ek LOCAL keyword parser bhi chalta tha jo AI se pehle andaaza
+   * lagata tha. Wo hata diya gaya hai. Wajah: wo aksar aadha-adhoora samajhta
+   * tha aur AI ke sahi jawab se pehle screen bhar deta tha — user ko galat din
+   * ya galat time dikh jaata tha, aur "roz"/"90 din tak" jaisi baat to wo kabhi
+   * pakad hi nahi paata tha. Ab samajhne ka ek hi zimmedaar hai: AI.
+   *
+   * Net na ho to AI null lautati hai — tab pickers (din/time chips) apna kaam
+   * karte hain aur `net-alert` popup saaf bata deta hai ki dikkat internet ki
+   * hai. Screen tab bhi khaali nahi rehti, bas andaaza koi nahi lagata.
+   */
   const [ai, setAi] = useState<{
     title: string;
     date: Date | null;
     minutes: number | null;
+    /** Roz/har-hafte — AI se aaya. App khud kabhi kuch nahi maanti. */
+    everyDays: number | null;
+    until: string | null;
   } | null>(null);
   const [parsing, setParsing] = useState(false);
   const [permModal, setPermModal] = useState(false);
   const lastText = useRef("");
 
+  // Text khaali ho to samajh bhi khaali.
+  useEffect(() => {
+    if (!title.trim()) setAi(null);
+  }, [title]);
+
+  // AI — typing rukne ke baad ek baar. Yahi ek jagah hai jahan se samajh aati hai.
   useEffect(() => {
     const t = title.trim();
     if (t.length < 3) return;
@@ -86,25 +109,29 @@ export default function AddReminder() {
       setParsing(true);
       try {
         const r = await parseReminderAI(t, locale);
-        if (r) {
-          let date: Date | null = null;
-          let minutes: number | null = null;
-          if (r.remind_at) {
-            const d = new Date(r.remind_at);
-            if (!isNaN(d.getTime())) {
-              date = new Date(d);
-              date.setHours(0, 0, 0, 0);
-              if (!r.needsTime) minutes = d.getHours() * 60 + d.getMinutes();
-            }
+        if (!r) return; // net/AI fail — pickers se user khud bhar sakta hai
+        let date: Date | null = null;
+        let minutes: number | null = null;
+        if (r.remind_at) {
+          const d = new Date(r.remind_at);
+          if (!isNaN(d.getTime())) {
+            date = new Date(d);
+            date.setHours(0, 0, 0, 0);
+            if (!r.needsTime) minutes = d.getHours() * 60 + d.getMinutes();
           }
-          setAi({ title: r.title || t, date, minutes });
-          // AI ka title editable field me bhar do — jab tak user ne khud na badla ho.
-          if (!titleTouched.current) setSubject((r.title || t).trim());
         }
+        setAi((prev) => ({
+          title: r.title?.trim() || prev?.title || t,
+          date: date ?? prev?.date ?? null,
+          minutes: minutes ?? prev?.minutes ?? null,
+          everyDays: r.repeat_every_days ?? null,
+          until: r.repeat_until ?? null,
+        }));
+        if (!titleTouched.current && r.title?.trim()) setSubject(r.title.trim());
       } finally {
         setParsing(false);
       }
-    }, 800);
+    }, 700);
     return () => clearTimeout(handle);
   }, [title, locale]);
 
@@ -112,11 +139,13 @@ export default function AddReminder() {
   const finalTitle = subject.trim() || ai?.title?.trim() || "";
   const finalDate = pickedDate ?? ai?.date ?? null;
   const finalMinutes = pickedMinutes ?? ai?.minutes ?? null;
+  const everyDays = ai?.everyDays ?? null;
+  const repeatUntil = ai?.until ?? null;
+  const repeatText = repeatLine(everyDays, repeatUntil, a, locale);
   const when =
     finalDate && finalMinutes != null ? combine(finalDate, finalMinutes) : null;
   const isPast = !!when && when.getTime() <= Date.now();
 
-  const missingTitle = !finalTitle;
   const missingDate = !finalDate;
   const missingTime = finalMinutes == null;
   const canSave = !!finalTitle && !!when && !isPast;
@@ -211,12 +240,18 @@ export default function AddReminder() {
         time_label: finalLabel,
         remind_at: when.toISOString(),
         bucket,
+        repeat_every_days: everyDays,
+        repeat_until: repeatUntil,
       });
       logEvent("reminder_created");
       // Referral reward: document + reminder dono hone pe unlock (server verify).
       checkReferralQualification().catch(() => {});
+      // Review popup ka padav — document + reminder dono ho jaayein to poochho.
+      markFirstReminder().catch(() => {});
       const allowed = await ensureNotifPermission();
-      const scheduled = allowed && (await scheduleReminder(r.id, r.title, when));
+      const scheduled =
+        allowed &&
+        (await scheduleReminderSeries(r.id, r.title, when, everyDays, repeatUntil));
       toast.show(
         scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
         scheduled ? "success" : "info",
@@ -243,6 +278,10 @@ export default function AddReminder() {
       if (e instanceof ReminderLimitError) {
         toast.show(a.limitReached, "info");
         router.replace("/upgrade" as never);
+      } else if (reportIfNetwork(e, "save", save)) {
+        // Net ki dikkat — popup khud "dobara koshish karo" de raha hai. Toast
+        // dikhana bekaar hai; user ko lagta tha reminder ban gaya aur ban hi
+        // nahi paaya (item 12).
       } else {
         reportError(e, { screen: "add-reminder", action: "save" });
         toast.show(a.title + " ✕", "error");
@@ -262,6 +301,10 @@ export default function AddReminder() {
           <Ionicons name="close" size={22} color={colors.ink} />
         </Pressable>
       </View>
+
+      {/* AI peeche behtar samajhne ki koshish kar raha hai — patli patti bas
+          itna batati hai. Kuch block nahi hota. */}
+      <TopProgress visible={parsing} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -373,6 +416,22 @@ export default function AddReminder() {
                 </View>
               </View>
 
+              {/* --- Kitni baar (repeat) ---
+                  Sirf tab dikhta hai jab Saathi ne sach me repeat samjha ho.
+                  Ek baar wale reminder me ye row bilkul nahi aati — warna har
+                  reminder par "Sirf ek baar" likha rehta aur shor lagta. */}
+              {!!repeatText && (
+                <View style={styles.slot}>
+                  <View style={styles.slotIcon}>
+                    <Ionicons name="repeat" size={17} color={colors.terracotta} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.slotLabel}>{a.repeatLabel}</Text>
+                    <Text style={styles.slotValue}>{repeatText}</Text>
+                  </View>
+                </View>
+              )}
+
               {isPast && !missingTime && (
                 <Text style={styles.err}>{a.pastError}</Text>
               )}
@@ -436,9 +495,11 @@ export default function AddReminder() {
         <Text style={styles.saveText}>{a.save}</Text>
       </Pressable>
 
-      {/* AI samajh raha ho ya save chal raha ho — dono ke liye wahi ek
-          center-me-overlay loader. Peeche ka form tab tak block rehta hai. */}
-      <LoaderOverlay visible={parsing || saving} />
+      {/* Sirf SAVE ke waqt blocking loader.
+          AI ka refine ab peeche chalta hai — uske liye form block karna galat
+          tha: local samajh to pehle hi bhar chuki hoti hai, aur user ko bekaar
+          rukna padta tha (item 8). Uska ishaara upar ki patli patti deti hai. */}
+      <LoaderOverlay visible={saving} />
 
       <PermissionModal
         visible={permModal}

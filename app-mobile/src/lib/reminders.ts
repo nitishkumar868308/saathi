@@ -11,7 +11,21 @@ export type Reminder = {
    */
   note: string | null;
   time_label: string | null;
-  remind_at: string | null; // ISO timestamp
+  /**
+   * AGLI baar kab (ISO timestamp).
+   *
+   * ⚠️ Roz wale reminder me ye har occurrence ke baad aage sarak jaata hai —
+   * "wo ek baar kab tha" nahi. Purani screens jo isse "reminder ka time" maanti
+   * thi wo ab bhi theek chalti hain, kyunki agla time bhi wahi time-of-day hota
+   * hai, bas din badalta hai.
+   */
+  remind_at: string | null;
+  /** Kitne din baad dobara. null/0 = ek hi baar. 1 = roz, 7 = har hafte. */
+  repeat_every_days: number | null;
+  /** Aakhri din (YYYY-MM-DD). null = jab tak user khud band na kare. */
+  repeat_until: string | null;
+  /** Aaj ka "ho gaya" kab hua. Roz wale me ye sirf ek din ke liye ginta hai. */
+  last_done_at: string | null;
   is_on: boolean;
   /** Plus expire hone pe 5 se aage ke reminders paused ho jaate hain. */
   is_paused: boolean;
@@ -57,6 +71,10 @@ export async function addReminder(input: {
   time_label: string | null;
   remind_at: string | null;
   bucket: string;
+  /** Roz/har-hafte wala reminder — kitne din baad dobara. */
+  repeat_every_days?: number | null;
+  /** Aakhri din (YYYY-MM-DD) — "90 din tak" wali baat. */
+  repeat_until?: string | null;
 }): Promise<Reminder> {
   // Free plan limit (5) — Plus na ho to naya reminder block.
   if (!(await canAddReminder())) throw new ReminderLimitError();
@@ -81,4 +99,25 @@ export async function setReminderOn(id: string, is_on: boolean): Promise<void> {
 export async function deleteReminder(id: string): Promise<void> {
   const { error } = await client().from("reminders").delete().eq("id", id);
   if (error) throw error;
+}
+
+/** Reminder roz/har-hafte chalta hai? (UI isi se "Roz" wala tag dikhata hai.) */
+export function isRepeating(r: Pick<Reminder, "repeat_every_days">): boolean {
+  return !!r.repeat_every_days && r.repeat_every_days >= 1;
+}
+
+/**
+ * User ne kaha "ye kaam ho gaya".
+ *
+ * Roz wale reminder me ye SIRF AAJ ka kaam band karta hai — kal wahi time phir
+ * aayega. Ek baar wale reminder me poora reminder off ho jaata hai. Dono ka
+ * hisaab server (`complete_reminder`) karta hai, taaki app aur cron kabhi alag
+ * din na nikalein.
+ *
+ * Lautata hai: agli baar kab — ya null, agar series khatam ho gayi.
+ */
+export async function completeReminder(id: string): Promise<string | null> {
+  const { data, error } = await client().rpc("complete_reminder", { p_id: id });
+  if (error) throw error;
+  return (data as string | null) ?? null;
 }

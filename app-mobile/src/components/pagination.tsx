@@ -4,10 +4,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/theme/colors";
 
 /**
+ * Poore app ka ek hi page size.
+ *
+ * 7 isliye: ek phone ki screen par itne card bina scroll ke aaram se aa jaate
+ * hain. Isse zyada dikhate hi list "lambi" lagne lagti hai aur user scroll me
+ * kho jaata hai. Ek jagah rakha hai taaki har list par ek jaisa lage.
+ */
+export const PAGE_SIZE = 7;
+
+/**
  * List ko chhote pages me baanto (client-side). resetKey badle (filter/search)
  * to page 1 pe wapas.
  */
-export function usePaged<T>(items: T[], pageSize = 10, resetKey?: unknown) {
+export function usePaged<T>(items: T[], pageSize = PAGE_SIZE, resetKey?: unknown) {
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
 

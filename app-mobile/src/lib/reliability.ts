@@ -1,6 +1,7 @@
 import { Linking, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Application from "expo-application";
+import * as Device from "expo-device";
 import * as IntentLauncher from "expo-intent-launcher";
 import notifee, {
   AndroidNotificationSetting,
@@ -20,7 +21,22 @@ import notifee, {
  *                deta hai — isi wajah se 8:36 wala reminder 8:38 pe, 8:39 wale
  *                ke saath, ek hi jhund me aata tha.
  *   3. battery — app battery optimization se chhoot (doze me alarm na mare)
- *   4. oem     — MIUI/ColorOS/FuntouchOS/OneUI ka apna "auto-start / background"
+ *   4. fsi     — "Full screen notifications" (Android 14+ / API 34+). YAHI wo
+ *                cheez hai jiske bina reminder ka BADA popup screen ke beech me
+ *                nahi aata — sirf upar patli si notification aati hai.
+ *
+ *                Android 14 se pehle `USE_FULL_SCREEN_INTENT` manifest me likh
+ *                dena kaafi tha. Ab wo ek "special app access" ban gaya hai:
+ *                Google ne alarm/calling apps ke alawa sab ke liye ise DEFAULT
+ *                SE BAND kar diya. Isliye user sab kuch allow kar deta hai, sab
+ *                green dikhta hai, aur phir bhi bada alert kabhi nahi aata
+ *                (item 11).
+ *
+ *                Iska status padhne ka koi JS API nahi hai (notifee me bhi
+ *                nahi), isliye `oem` ki tarah: user ek baar screen khol le to
+ *                step done maan lete hain.
+ *
+ *   5. oem     — MIUI/ColorOS/FuntouchOS/OneUI ka apna "auto-start / background"
  *                switch. notifee `getPowerManagerInfo()` batata hai ki is device
  *                par aisi screen hai ya nahi.
  *
@@ -30,8 +46,12 @@ import notifee, {
 
 const ASKED_KEY = "saathi-reliability-asked";
 const OEM_KEY = "saathi-oem-done";
+const FSI_KEY = "saathi-fsi-done";
 
-export type StepKey = "notif" | "alarm" | "battery" | "oem";
+/** Full-screen intent "special app access" Android 14 (API 34) se aaya. */
+const FSI_MIN_API = 34;
+
+export type StepKey = "notif" | "alarm" | "fsi" | "battery" | "oem";
 
 export type ReadinessStep = {
   key: StepKey;
@@ -73,13 +93,14 @@ export async function checkReadiness(): Promise<Readiness> {
     return { steps, allOk: ok, pending: ok ? [] : ["notif"], oemName: null };
   }
 
-  const [settings, batteryOn, power, oemDone] = await Promise.all([
+  const [settings, batteryOn, power, oemDone, fsiDone] = await Promise.all([
     notifee.getNotificationSettings().catch(() => null),
     notifee.isBatteryOptimizationEnabled().catch(() => false),
     notifee
       .getPowerManagerInfo()
       .catch(() => ({}) as { activity?: string | null; manufacturer?: string }),
     AsyncStorage.getItem(OEM_KEY).catch(() => null),
+    AsyncStorage.getItem(FSI_KEY).catch(() => null),
   ]);
 
   const notifOk =
@@ -92,6 +113,9 @@ export async function checkReadiness(): Promise<Readiness> {
   const alarmSupported = alarmSetting !== AndroidNotificationSetting.NOT_SUPPORTED;
   const oemActivity = power?.activity ?? null;
 
+  // Android 14+ par hi "Full screen notifications" wali screen hoti hai.
+  const fsiSupported = (Device.platformApiLevel ?? 0) >= FSI_MIN_API;
+
   const steps: ReadinessStep[] = [
     { key: "notif", supported: true, ok: !!notifOk },
     {
@@ -99,6 +123,9 @@ export async function checkReadiness(): Promise<Readiness> {
       supported: alarmSupported,
       ok: !alarmSupported || alarmSetting === AndroidNotificationSetting.ENABLED,
     },
+    // OS iska status nahi batata (koi API nahi) — `oem` ki tarah, ek baar khol
+    // lene par done maante hain. Warna step kabhi green hi na ho.
+    { key: "fsi", supported: fsiSupported, ok: !fsiSupported || fsiDone === "1" },
     { key: "battery", supported: true, ok: !batteryOn },
     // OEM screen ka status OS nahi batata (koi API hi nahi). Isliye "ok" tab
     // maante hain jab user ek baar khol chuka ho — warna step kabhi green na ho.
@@ -185,6 +212,23 @@ export async function requestStep(key: StepKey): Promise<void> {
         // "Alarms & reminders" — Android 12+ ka dedicated screen.
         await notifee.openAlarmPermissionSettings();
         return;
+      case "fsi": {
+        // "Full screen notifications" — Android 14+ ka special app access.
+        // Isi ke bina reminder ka bada popup nahi aata (item 11).
+        await AsyncStorage.setItem(FSI_KEY, "1").catch(() => {});
+        const pkg = Application.applicationId;
+        try {
+          await IntentLauncher.startActivityAsync(
+            "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",
+            pkg ? { data: `package:${pkg}` } : {},
+          );
+        } catch {
+          // Kuch OEM ye screen nahi dete — app ki notification settings hi
+          // khol do, wahan se bhi raasta mil jaata hai.
+          await notifee.openNotificationSettings();
+        }
+        return;
+      }
       case "battery":
         await requestBatteryExemption();
         return;

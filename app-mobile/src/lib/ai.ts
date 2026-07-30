@@ -36,10 +36,32 @@ type AskOpts = {
 
 /** Saathi chat se aane wala action — client execute karta hai (limits + notifications reuse). */
 export type SaathiAction =
-  | { type: "create_reminder"; title: string; remind_at: string }
+  | {
+      type: "create_reminder";
+      title: string;
+      /** Pehli baar kab. Aage ka hisaab client/server khud karte hain. */
+      remind_at: string;
+      /** Roz wala reminder — kitne din baad dobara. null = ek hi baar. */
+      repeat_every_days?: number | null;
+      /** Aakhri din (YYYY-MM-DD) — "90 din tak". null = koi limit nahi. */
+      repeat_until?: string | null;
+    }
   | { type: "navigate"; to: "add_document" };
 
-export type SaathiReply = { reply: string; action: SaathiAction | null };
+export type SaathiReply = {
+  reply: string;
+  action: SaathiAction | null;
+  /**
+   * AI tak baat pahunchi hi nahi (net/timeout/server) — `reply` sirf fallback
+   * text hai, Saathi ka asli jawab nahi.
+   *
+   * ⚠️ Ye flag isliye hai kyunki pehle dono cheezein ek jaisi dikhti thi: net
+   * fail hone par bhi wahi "main sirf reminders/documents me madad kar sakta
+   * hoon" wala message aata tha. User ko lagta tha Saathi ne mana kar diya,
+   * jabki asal me request pahunchi hi nahi thi (item 7 & 15).
+   */
+  failed?: boolean;
+};
 
 /**
  * AI call kitni der tak intezaar kare.
@@ -49,14 +71,22 @@ export type SaathiReply = { reply: string; action: SaathiAction | null };
  * de do — user ko rukna nahi padega. Chat me thoda zyada (jawab lamba hota hai),
  * reminder parse me kam (waha aage local pickers hain hi).
  */
-const CHAT_TIMEOUT_MS = 20_000;
-const TASK_TIMEOUT_MS = 12_000;
+const CHAT_TIMEOUT_MS = 25_000;
+const TASK_TIMEOUT_MS = 15_000;
 
-/** Promise ko time-box karo — der ho gayi to `fallback` lauta do. */
-async function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+/** Timeout ka apna error — caller ise net-failure maan sakta hai. */
+class AiTimeoutError extends Error {
+  constructor() {
+    super("AI timeout — network");
+    this.name = "AiTimeoutError";
+  }
+}
+
+/** Promise ko time-box karo — der ho gayi to throw. */
+async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const guard = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), ms);
+  const guard = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new AiTimeoutError()), ms);
   });
   try {
     // `timed` slow-internet banner ke liye — 4s+ lage to user ko pata chal jaye.
@@ -64,6 +94,38 @@ async function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promis
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * Ek AI call, do koshish.
+ *
+ * Dheeme net par pehli request aksar beech me toot jaati hai — aur wahi "AI kaam
+ * nahi kar raha" wali shikayat banti thi. Ek chhoti si dobara-koshish 90% aise
+ * cases nikaal deti hai. Do se zyada nahi: usse user ka intezaar hi lamba hoga.
+ */
+async function callAi<T>(
+  body: Record<string, unknown>,
+  timeoutMs: number,
+): Promise<T> {
+  if (!supabase) throw new Error("supabase not configured");
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.functions.invoke("ai", { body }),
+        timeoutMs,
+      );
+      if (error) throw error;
+      return data as T;
+    } catch (e) {
+      lastErr = e;
+      // Aakhri koshish thi — aage error hi jayega.
+      if (attempt === 1) break;
+      // Thoda ruk ke dobara — turant retry usi toote connection par jaata hai.
+      await new Promise((r) => setTimeout(r, 700));
+    }
+  }
+  throw lastErr;
 }
 
 /** Abhi ka LOCAL time naive ISO me (bina Z) — server isi se remind_at nikaalta hai. */
@@ -81,40 +143,42 @@ export async function askSaathi(
   opts: AskOpts = {},
 ): Promise<SaathiReply> {
   const fallback = opts.fallback ?? STUB_REPLY;
-  if (!supabase) return { reply: fallback, action: null };
+  if (!supabase) return { reply: fallback, action: null, failed: true };
   try {
-    const { data, error } = await withTimeout(
-      supabase.functions.invoke("ai", {
-        body: {
-          task: "chat",
-          message,
-          history,
-          name,
-          locale: opts.locale,
-          context: opts.context,
-          now: localNowIso(),
-        },
-      }),
+    const d = await callAi<{ reply?: string; action?: SaathiAction | null } | null>(
+      {
+        task: "chat",
+        message,
+        history,
+        name,
+        locale: opts.locale,
+        context: opts.context,
+        now: localNowIso(),
+      },
       CHAT_TIMEOUT_MS,
-      { data: null, error: new Error("timeout") } as never,
     );
-    if (error) return { reply: fallback, action: null };
-    const d = data as { reply?: string; action?: SaathiAction | null } | null;
     const reply = d?.reply && d.reply.trim() ? d.reply : fallback;
+    // Server ne jawab to diya — ye AI ki apni baat hai, net ki nahi.
     return { reply, action: d?.action ?? null };
   } catch {
-    return { reply: fallback, action: null };
+    // Yahan pahunchna hamesha "baat pahunchi hi nahi" hai. `failed` se caller
+    // retry dikha deta hai — decline message nahi.
+    return { reply: fallback, action: null, failed: true };
   }
 }
 
 /** Reminder text ko AI se samajho. Local logic time/date combine karta hai. */
 export type ReminderAI = {
   title: string;
-  /** ISO 8601 datetime ya null. */
+  /** ISO 8601 datetime ya null — PEHLI baar ka time. */
   remind_at: string | null;
   label: string | null;
   needsDate: boolean;
   needsTime: boolean;
+  /** Roz wala reminder — kitne din baad dobara. null = ek hi baar. */
+  repeat_every_days: number | null;
+  /** Aakhri din (YYYY-MM-DD). null = jab tak user khud band na kare. */
+  repeat_until: string | null;
 };
 
 /**
@@ -127,15 +191,12 @@ export async function parseReminderAI(
 ): Promise<ReminderAI | null> {
   if (!supabase || !text.trim()) return null;
   try {
-    const { data, error } = await withTimeout(
-      supabase.functions.invoke("ai", {
-        body: { task: "reminder", text, locale, now: new Date().toISOString() },
-      }),
+    const data = await callAi<(Partial<ReminderAI> & { error?: string }) | null>(
+      { task: "reminder", text, locale, now: new Date().toISOString() },
       TASK_TIMEOUT_MS,
-      { data: null, error: new Error("timeout") } as never,
     );
-    if (error || !data) return null;
-    const r = data as Partial<ReminderAI> & { error?: string };
+    if (!data) return null;
+    const r = data;
     if (r.error || typeof r.title !== "string") return null;
     return {
       title: r.title,
@@ -143,7 +204,44 @@ export async function parseReminderAI(
       label: r.label ?? null,
       needsDate: r.needsDate ?? !r.remind_at,
       needsTime: r.needsTime ?? !r.remind_at,
+      repeat_every_days: r.repeat_every_days ?? null,
+      repeat_until: r.repeat_until ?? null,
     };
+  } catch {
+    // Net/timeout — caller local parser par chalta rehta hai, isliye `null` hi
+    // theek hai. Screen kabhi khaali nahi rehti.
+    return null;
+  }
+}
+
+/**
+ * Expiry alert ke baad ka follow-up — "ye kaam ho gaya kya?" (item 18).
+ *
+ * Lines AI banata hai, static nahi: passport "renew" hota hai, insurance "phir
+ * se karana" hota hai, warranty bas khatam ho jaati hai. Ek hi ratta-lagaya
+ * wakya teenon par bhadda lagta hai.
+ *
+ * Fail ho to null — screen apni default lines dikha deti hai, flow rukta nahi.
+ */
+export type DocFollowUp = {
+  ask: string | null;
+  done: string | null;
+  later: string | null;
+  addNew: string | null;
+};
+
+export async function documentFollowUp(
+  doc: { name: string; type?: string; expiry?: string | null },
+  locale?: string,
+): Promise<DocFollowUp | null> {
+  if (!supabase || !doc?.name) return null;
+  try {
+    const data = await callAi<DocFollowUp | null>(
+      { task: "docfollow", document: doc, locale, now: new Date().toISOString().slice(0, 10) },
+      TASK_TIMEOUT_MS,
+    );
+    if (!data?.ask) return null;
+    return data;
   } catch {
     return null;
   }
@@ -168,16 +266,13 @@ export async function scanDocumentAI(
 ): Promise<DocumentAI | null> {
   if (!supabase || !base64) return null;
   try {
-    const { data, error } = await withTimeout(
-      supabase.functions.invoke("ai", {
-        body: { task: "scan", image: base64, mime, locale },
-      }),
+    const data = await callAi<(Partial<DocumentAI> & { error?: string }) | null>(
+      { task: "scan", image: base64, mime, locale },
       // Image bhejni hai — scan ko thodi zyada mohlat.
       TASK_TIMEOUT_MS * 2,
-      { data: null, error: new Error("timeout") } as never,
     );
-    if (error || !data) return null;
-    const r = data as Partial<DocumentAI> & { error?: string };
+    if (!data) return null;
+    const r = data;
     if (r.error) return null;
     return {
       type: r.type || "other",

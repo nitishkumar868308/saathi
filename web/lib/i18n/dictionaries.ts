@@ -24,6 +24,7 @@ type Dict = {
   nav: {
     earlyAccess: string;
     home: string;
+    blog: string;
     about: string;
     contact: string;
     backHome: string;
@@ -237,6 +238,7 @@ const hinglish: Dict = {
   nav: {
     earlyAccess: "Early access",
     home: "Home",
+    blog: "Blog",
     about: "About",
     contact: "Contact",
     backHome: "Home pe wapas",
@@ -649,6 +651,7 @@ const hi: Dict = {
   nav: {
     earlyAccess: "अर्ली एक्सेस",
     home: "होम",
+    blog: "ब्लॉग",
     about: "हमारे बारे में",
     contact: "संपर्क",
     backHome: "होम पर वापस",
@@ -1061,6 +1064,7 @@ const en: Dict = {
   nav: {
     earlyAccess: "Early access",
     home: "Home",
+    blog: "Blog",
     about: "About",
     contact: "Contact",
     backHome: "Back to home",

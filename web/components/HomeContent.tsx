@@ -54,7 +54,17 @@ const dayColors = [
 const exampleIcons = [Plane, ShieldCheck, Cake, IndianRupee];
 const trustIcons = [ShieldCheck, Mic, MessageCircleHeart, Bell];
 
-export default function Home() {
+/**
+ * Home page ka poora content — client component (language switcher `useT()` se
+ * chalta hai, isliye client hona zaroori hai).
+ *
+ * ⚠️ `blog` prop se aata hai, yahan import nahi hota. Wajah: blog ki posts
+ * database se aati hain aur unhe server par hi padhna chahiye — tabhi wo
+ * build/revalidate ke waqt HTML me chali jaati hain aur Google ko dikhti hain.
+ * Client component ke andar async server component nahi chal sakta, isliye
+ * `app/page.tsx` (server) usse banata hai aur yahan bhej deta hai.
+ */
+export default function Home({ blog }: { blog?: React.ReactNode }) {
   const t = useT();
 
   return (
@@ -456,6 +466,11 @@ export default function Home() {
             <Faq />
           </Reveal>
         </section>
+
+        {/* Blog — FAQ ke baad, final CTA se pehle. Yahan isliye ki jo log
+            padhne ke mood me hain wo neeche tak aate hain; upar rakhne se
+            download wale raaste me rukawat banta. */}
+        {blog}
 
         {/* Final CTA */}
         <section className="container-page pb-20 sm:pb-24">

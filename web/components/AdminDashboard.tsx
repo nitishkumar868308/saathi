@@ -22,6 +22,7 @@ import {
   Megaphone,
   LineChart,
   PenLine,
+  Wallet,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
@@ -32,6 +33,7 @@ import AdminRewards from "@/components/AdminRewards";
 import AdminUsers from "@/components/AdminUsers";
 import AdminReviews from "@/components/AdminReviews";
 import AdminUsage from "@/components/AdminUsage";
+import AdminSpend from "@/components/AdminSpend";
 import AdminBroadcast from "@/components/AdminBroadcast";
 import AdminDocuments from "@/components/AdminDocuments";
 import AdminPricing from "@/components/AdminPricing";
@@ -56,6 +58,7 @@ type Section =
   | "pricing"
   | "users"
   | "usage"
+  | "spend"
   | "documents"
   | "reviews"
   | "logs"
@@ -69,6 +72,7 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   { key: "blog", icon: PenLine },
   { key: "message", icon: Megaphone },
   { key: "usage", icon: Activity },
+  { key: "spend", icon: Wallet },
   { key: "documents", icon: FileText },
   { key: "reviews", icon: Star },
   { key: "logs", icon: Bug },
@@ -339,9 +343,9 @@ function Dashboard({
           <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" />
           <aside
             onClick={(e) => e.stopPropagation()}
-            className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-line bg-surface p-5"
+            className="absolute left-0 top-0 flex h-full w-72 flex-col overflow-hidden border-r border-line bg-surface p-5"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between">
               <Brand />
               <button
                 onClick={() => setNavOpen(false)}
@@ -351,18 +355,28 @@ function Dashboard({
                 <X size={16} />
               </button>
             </div>
-            <div className="mt-7">{nav}</div>
-            <LogoutBtn onLogout={onLogout} className="mt-auto" />
+            {/* Desktop jaisa hi — sirf list scroll karti hai (item 2). */}
+            <div className="-mr-2 mt-7 min-h-0 flex-1 overflow-y-auto pr-2">{nav}</div>
+            <LogoutBtn onLogout={onLogout} className="mt-4 shrink-0" />
           </aside>
         </div>
       )}
 
       <div className="lg:flex">
-        {/* Desktop sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-surface p-5 lg:flex">
+        {/* Desktop sidebar.
+
+            ⚠️ Pehle poora `aside` ek hi h-screen box tha aur andar kuch bhi
+            scroll nahi karta tha. Bara nav (12 menu) chhote laptop par neeche
+            se bahar nikal jaata tha — Rewards/Pricing jaise aakhri items tak
+            pahunchne ka koi raasta hi nahi bachta tha (item 2).
+
+            Ab sirf nav wala hissa scroll karta hai: brand upar chipka rehta
+            hai, logout neeche chipka rehta hai, aur beech me list apne aap
+            scroll ho jaati hai. */}
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-line bg-surface p-5 lg:flex">
           <Brand />
-          <div className="mt-8">{nav}</div>
-          <LogoutBtn onLogout={onLogout} className="mt-auto" />
+          <div className="-mr-2 mt-8 min-h-0 flex-1 overflow-y-auto pr-2">{nav}</div>
+          <LogoutBtn onLogout={onLogout} className="mt-4 shrink-0" />
         </aside>
 
         {/* Content */}
@@ -423,6 +437,9 @@ function Dashboard({
               {section === "users" && <AdminUsers />}
               {section === "message" && <AdminBroadcast />}
               {section === "usage" && <AdminUsage />}
+              {/* "Usage" = kaun user kitna active hai.
+                  "AI & WhatsApp" = humara kitna kharcha ho raha hai (item 3). */}
+              {section === "spend" && <AdminSpend />}
               {section === "documents" && <AdminDocuments />}
               {section === "reviews" && <AdminReviews />}
               {section === "logs" && <AdminLogs />}

@@ -30,14 +30,41 @@ import SaathiLogo from "@/components/saathi-logo";
 
 const TEAL = "#125156";
 
+/**
+ * Loader ke peeche hamesha "Apka Saathi" — brand ka naam, halka sa.
+ *
+ * Pehle blocking loader ek safed/neela sa chauda card tha jiske andar logo
+ * ghoomta tha. Wo card har jagah alag rang ka dikhta tha aur bhadda lagta tha
+ * (item 6). Ab koi card nahi — sirf logo, uske neeche brand ka naam.
+ */
+function BrandName({ size, onDark }: { size: number; onDark: boolean }) {
+  return (
+    <Text
+      style={[
+        styles.brand,
+        onDark ? styles.brandOnDark : styles.brandOnLight,
+        { fontSize: Math.max(12, Math.round(size * 0.19)) },
+      ]}
+    >
+      Apka Saathi
+    </Text>
+  );
+}
+
 function BrandLoader({
   size = 72,
   label,
   halo = false,
+  /** Logo ke neeche brand ka naam bhi dikhao. */
+  brand = false,
+  /** Naam dark overlay par hai (cream text) ya cream bg par (ink text)? */
+  onDark = false,
 }: {
   size?: number;
   label?: string;
   halo?: boolean;
+  brand?: boolean;
+  onDark?: boolean;
 }) {
   const beat = useRef(new Animated.Value(0)).current;
   const ring1 = useRef(new Animated.Value(0)).current;
@@ -119,6 +146,7 @@ function BrandLoader({
           </Animated.View>
         )}
       </View>
+      {brand ? <BrandName size={size} onDark={onDark} /> : null}
       {label ? <Text style={styles.label}>{label}</Text> : null}
     </View>
   );
@@ -139,12 +167,12 @@ export function HandsLoader({ size = 60, label }: { size?: number; label?: strin
   return <BrandLoader size={size} label={label} halo />;
 }
 
-/** Poori screen ka loader — naram bg ke saath. */
+/** Poori screen ka loader — naram cream bg ke saath (safed/neela kabhi nahi). */
 export function ScreenLoader({ label }: { label?: string }) {
   return (
     <View style={styles.screen}>
       <View style={styles.screenGlow} />
-      <BrandLoader size={84} label={label} halo />
+      <BrandLoader size={84} label={label} halo brand />
     </View>
   );
 }
@@ -158,14 +186,17 @@ export function ScreenLoader({ label }: { label?: string }) {
  *
  * Jaan-boojh ke koi text nahi — "Samajh raha hoon…" jaisi lines hata di gayi
  * hain. Loader ko sirf ye batana hai ki kaam chal raha hai, kahani nahi sunani.
+ *
+ * ⚠️ Pehle loader ke peeche ek safed (kahin neela sa) card box hota tha. Wo har
+ * screen ke bg par alag rang ka dikhta tha aur poora bhadda lagta tha (item 6).
+ * Ab card hata diya gaya hai — sirf brand ka logo, uske neeche "Apka Saathi",
+ * aur peeche naram dark overlay. Har jagah bilkul ek jaisa.
  */
 export function LoaderOverlay({ visible }: { visible: boolean }) {
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
       <View style={styles.overlay}>
-        <View style={styles.overlayCard}>
-          <BrandLoader size={76} halo />
-        </View>
+        <BrandLoader size={78} halo brand onDark />
       </View>
     </Modal>
   );
@@ -268,6 +299,14 @@ export function TopProgress({ visible }: { visible: boolean }) {
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", justifyContent: "center", gap: 12 },
   label: { fontSize: 14, color: colors.inkSoft, fontWeight: "600" },
+  brand: { fontWeight: "800", letterSpacing: 0.3 },
+  brandOnDark: {
+    color: colors.cream,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  brandOnLight: { color: colors.ink, opacity: 0.85 },
   screen: {
     flex: 1,
     alignItems: "center",
@@ -286,14 +325,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(46,40,35,0.45)",
-  },
-  overlayCard: {
-    height: 128,
-    width: 128,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
   },
   card: {
     flexDirection: "row",

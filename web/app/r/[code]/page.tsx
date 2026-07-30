@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Gift, Smartphone } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
+import CopyButton from "@/components/CopyButton";
 import { PLAY_STORE_URL } from "@/lib/links";
 import { getOffers } from "@/lib/offers";
 
@@ -43,6 +44,14 @@ export default async function ReferralInvite({ params }: { params: { code: strin
           <p className="mt-1.5 font-display text-3xl font-bold tracking-[0.3em] text-terracotta">
             {code}
           </p>
+          {/* App abhi install nahi hui to code yaad rakhna padta tha — ab ek tap
+              me clipboard me, signup ke waqt paste kar do. */}
+          <CopyButton
+            value={code}
+            label="Code copy karo"
+            copiedLabel="Copy ho gaya"
+            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-terracotta/35 bg-surface px-3.5 py-2 text-xs font-bold text-terracotta transition hover:bg-terracotta/10 active:scale-[0.98]"
+          />
         </div>
 
         <a

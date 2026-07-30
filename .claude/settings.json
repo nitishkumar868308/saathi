@@ -245,10 +245,26 @@
       "Bash(npx eas-cli@latest env:push --help)",
       "Bash(python -c \"import json;json.load\\(open\\('eas.json'\\)\\);print\\('JSON-VALID'\\)\")",
       "Bash(node -e \"require\\('./eas.json'\\);console.log\\('JSON-VALID'\\)\")",
-      "Bash(npx eas-cli@latest build --help)"
+      "Bash(npx eas-cli@latest build --help)",
+      "Bash(curl -sSIL -o /dev/null -w \"final_url=%{url_effective}\\\\nhttp=%{http_code}\\\\nsize=%{size_download}\\\\ntype=%{content_type}\\\\n\" \"https://expo.dev/artifacts/eas/OrTQ5dM8maV-6kVBEezqgFjTh5QnmRByPyCFCzr0_Gk.apk\")",
+      "Bash(rm -f cron-document-whatsapp.sql)",
+      "Bash(git mv *)",
+      "Bash(node -p \"require\\('./node_modules/tailwindcss/package.json'\\).version\")",
+      "Bash(git -C /d/my-app status --short app-mobile/package.json app-mobile/eslint.config.js)",
+      "Bash(npx eslint *)",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const r=JSON.parse\\(s\\);const c={};r.forEach\\(f=>f.messages.forEach\\(m=>{c[m.ruleId]=\\(c[m.ruleId]||0\\)+1}\\)\\);console.log\\(Object.entries\\(c\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).map\\(\\([k,v]\\)=>v+'  '+k\\).join\\('\\\\n'\\)\\)}\\)\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const r=JSON.parse\\(s\\);const mine=['alert-mode','net-alert-modal','repeat-label','reminders.ts','notifications.ts','referral.tsx','settings.tsx','add-reminder','chat.tsx','reminder-alert','ai.ts'];r.forEach\\(f=>{if\\(!mine.some\\(m=>f.filePath.includes\\(m\\)\\)\\)return;f.messages.forEach\\(m=>console.log\\(f.filePath.split\\('src'\\)[1]+':'+m.line+'  '+m.ruleId+'  '+m.message.split\\('\\\\n'\\)[0]\\)\\)}\\)}\\)\")",
+      "Bash(grep -c . web/.env.local 2>/dev/null; echo \"--- keys present \\(values hidden\\) ---\"; sed -n 's/^\\\\\\([A-Z_][A-Z0-9_]*\\\\\\)=.*/\\\\1/p' web/.env.local 2>/dev/null; echo \"--- FIREBASE lines? ---\"; grep -c \"FIREBASE\" web/.env.local 2>/dev/null || echo 0)",
+      "Bash(node scripts/firebase-env.mjs ../app-mobile/google-services.json)",
+      "Bash(node scripts/firebase-env.mjs)",
+      "Bash(node scripts/firebase-env.mjs \"~/Downloads/saathi-c42f0-firebase-adminsdk-fbsvc-8c9ca90b0e.json\")",
+      "Bash(node scripts/firebase-env.mjs \"~/Downloads/nahi-hai.json\")",
+      "Bash(node \"/c/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/27f74463-1c53-471f-b200-8f40c8af3eca/scratchpad/repeat-sim.mjs\")",
+      "Bash(node -e \"console.log\\(JSON.stringify\\(require\\('./app-mobile/package.json'\\).scripts,null,2\\)\\)\")"
     ],
     "additionalDirectories": [
-      "D:\\my-app\\.reel"
+      "D:\\my-app\\.reel",
+      "D:\\my-app\\web"
     ]
   }
 }

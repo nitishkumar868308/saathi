@@ -17,6 +17,7 @@ import {
 } from "@/lib/plan";
 import { takePendingReferral } from "@/lib/referral-pending";
 import { clearUserDetailsCache } from "@/lib/user-details";
+import { loadAlertMode, setAlertUserName } from "@/lib/alert-mode";
 import { sendWelcomeEmail } from "@/lib/welcome";
 import { useLocale } from "@/lib/i18n/LanguageProvider";
 
@@ -137,6 +138,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.subscription.unsubscribe();
   }, [runRewards]);
+
+  /**
+   * Alert system ko user ka naam aur chuna hua mode pata ho.
+   *
+   * Alert (internet popup, reminder popup) kisi bhi waqt khul sakta hai, aur us
+   * waqt storage padhne ka intezaar saaf sunayi deta hai — popup dikh jaata hai
+   * aur awaaz aadha second baad aati hai. Isliye dono cheezein yahin, login ke
+   * saath hi, memory me daal dete hain.
+   */
+  useEffect(() => {
+    void loadAlertMode();
+    const meta = session?.user?.user_metadata as
+      | { full_name?: string; name?: string }
+      | undefined;
+    setAlertUserName(meta?.full_name || meta?.name || null);
+  }, [session]);
 
   return (
     <AuthContext.Provider value={{ session, loading, rewardsVersion, refreshRewards }}>

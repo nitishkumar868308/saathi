@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
@@ -18,14 +18,17 @@ import SaathiLogo from "@/components/saathi-logo";
 import { VoiceButton } from "@/components/voice-button";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useUserName, useAuth } from "@/components/auth-provider";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { askSaathi, ChatTurn, ChatContext, type SaathiAction } from "@/lib/ai";
 import { listReminders, addReminder, ReminderLimitError } from "@/lib/reminders";
 import { listDocuments, type Document } from "@/lib/documents";
-import { scheduleReminder, ensureNotifPermission } from "@/lib/notifications";
+import { scheduleReminderSeries, ensureNotifPermission } from "@/lib/notifications";
 import { formatWhen } from "@/utils/parse-time";
+import { reportNetFailure, reportIfNetwork } from "@/lib/net-alert";
+import { markFirstReminder } from "@/lib/reviews";
+import { useToast } from "@/components/toast";
 
 /** Chat ki ek line — saathi ki line ke saath tappable document chips ho sakti hain. */
 type DocRef = { id: string; name: string; uri: string; path: string };
@@ -74,6 +77,9 @@ function TypingBubble() {
 const CHAT_KEY_PREFIX = "saathi-chat:";
 const MAX_STORED = 60;
 
+/** Chat me ek turn ke liye zaroori sab kuch — retry isi se dobara chalta hai. */
+type Pending = { text: string; history: ChatTurn[] };
+
 function isSameDay(a: Date, b: Date) {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -86,12 +92,15 @@ export default function Chat() {
   const router = useRouter();
   const name = useUserName();
   const { session } = useAuth();
+  const toast = useToast();
   const t = useT();
   const ch = t.chat;
   const c = t.common;
   const { locale } = useLocale();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  /** Aakhri turn jo net ki wajah se fail hua — "Dobara bhejo" isi ko chalata hai. */
+  const [failedTurn, setFailedTurn] = useState<Pending | null>(null);
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
       id: "1",
@@ -131,23 +140,27 @@ export default function Chat() {
     AsyncStorage.setItem(storeKey, JSON.stringify(messages.slice(-MAX_STORED))).catch(() => {});
   }, [messages, storeKey]);
 
-  async function sendText(text: string) {
-    const t = text.trim();
-    if (!t || sending) return;
-    setInput("");
+  /**
+   * User ka data (reminders + documents) chat ke context ke liye.
+   *
+   * ⚠️ Pehle ye dono request HAR message par, AI call se PEHLE chalti thi —
+   * yaani ek jawab ke liye teen round-trip lagti thi aur chat "slow" lagti thi
+   * (item 7). Ab ye screen khulte hi ek baar aa jaata hai aur cache me rehta
+   * hai; bhejte waqt sirf ek hi call jaati hai — AI ki.
+   */
+  const ctxRef = useRef<{ context: ChatContext; docs: Document[] }>({
+    context: { today: new Date().toISOString(), reminders: [], documents: [] },
+    docs: [],
+  });
 
-    const history: ChatTurn[] = messages
-      .filter((m) => m.id !== "1")
-      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
-
-    setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
-    setSending(true);
-    try {
-      const [rem, docs] = await Promise.all([
-        listReminders().catch(() => []),
-        listDocuments().catch(() => []),
-      ]);
-      const context: ChatContext = {
+  const refreshContext = useCallback(async () => {
+    const [rem, docs] = await Promise.all([
+      listReminders().catch(() => []),
+      listDocuments().catch(() => []),
+    ]);
+    ctxRef.current = {
+      docs,
+      context: {
         today: new Date().toISOString(),
         reminders: rem
           .filter((r) => r.is_on && !r.is_paused)
@@ -158,14 +171,65 @@ export default function Chat() {
           type: dd.type,
           expiry: dd.expiry,
         })),
-      };
-      const { reply, action } = await askSaathi(t, history, name, {
+      },
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshContext();
+    }, [refreshContext]),
+  );
+
+  async function sendText(text: string) {
+    const t = text.trim();
+    if (!t || sending) return;
+    setInput("");
+    setFailedTurn(null);
+
+    const history: ChatTurn[] = messages
+      .filter((m) => m.id !== "1")
+      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
+
+    setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
+    await ask({ text: t, history });
+  }
+
+  /**
+   * Ek turn AI ko bhejo. Retry bhi isi ko dobara chalata hai — isliye user ka
+   * message dobara add nahi hota.
+   */
+  async function ask(turn: Pending) {
+    setSending(true);
+    try {
+      const { context, docs } = ctxRef.current;
+      const { reply, action, failed } = await askSaathi(turn.text, turn.history, name, {
         locale,
         context,
         fallback: ch.stubReply,
       });
+
+      if (failed) {
+        // ⚠️ Yahi wo jagah thi jahan sabse zyada gadbad hoti thi: net fail hone
+        // par bhi Saathi ka "main sirf reminders/documents me madad kar sakta
+        // hoon" wala decline message chipak jaata tha. User ko lagta tha Saathi
+        // ne mana kar diya (item 7 & 15) — jabki baat pahunchi hi nahi thi.
+        //
+        // Ab: koi jhoota jawab nahi. Ek popup jo sach batata hai + wahi turn
+        // dobara bhejne ka raasta.
+        //
+        // ⚠️ Yahan pehle ek local keyword-parser bhi chalta tha jo net fail hone
+        // par khud reminder bana deta tha. Wo hata diya gaya: wo aksar galat
+        // time nikaalta tha ("roz 6 baje 90 din tak" ko ek baar ka 6 baje samajh
+        // ke) aur user ko lagta tha reminder theek lag gaya. Galat reminder
+        // se behtar hai saaf keh dena ki net nahi tha — aur retry de dena.
+        setFailedTurn(turn);
+        reportNetFailure("ai", () => ask(turn));
+        return;
+      }
+
       // Reply ya sawaal me jis document ka naam aaya, uska tappable chip dikhao.
-      const refs = matchDocs(reply + " " + t, docs);
+      const refs = matchDocs(reply + " " + turn.text, docs);
       setMessages((m) => [
         ...m,
         { id: String(m.length + 1), role: "saathi", text: reply, docs: refs },
@@ -173,6 +237,48 @@ export default function Chat() {
       if (action) await runAction(action);
     } finally {
       setSending(false);
+    }
+  }
+
+  /** Reminder DB me daalo + OS me schedule karo. Dono jagah ek hi raasta. */
+  async function createReminder(
+    title: string,
+    when: Date,
+    /** Roz wala reminder — AI batata hai, app khud kuch nahi maanti. */
+    repeat?: { everyDays?: number | null; until?: string | null },
+  ): Promise<boolean> {
+    try {
+      const label = formatWhen(when, { today: c.today, tomorrow: c.tomorrow }, locale);
+      const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
+      const r = await addReminder({
+        title,
+        time_label: label,
+        remind_at: when.toISOString(),
+        bucket,
+        repeat_every_days: repeat?.everyDays ?? null,
+        repeat_until: repeat?.until ?? null,
+      });
+      const allowed = await ensureNotifPermission();
+      if (allowed) {
+        await scheduleReminderSeries(
+          r.id,
+          r.title,
+          when,
+          repeat?.everyDays ?? null,
+          repeat?.until ?? null,
+        );
+      }
+      // Review popup ka padav — chat se bana reminder bhi ginta hai.
+      markFirstReminder().catch(() => {});
+      return true;
+    } catch (e) {
+      if (e instanceof ReminderLimitError) {
+        router.push("/upgrade" as never);
+        return false;
+      }
+      if (reportIfNetwork(e, "save")) return false;
+      toast.show(ch.reminderFailed, "error");
+      return false;
     }
   }
 
@@ -186,22 +292,12 @@ export default function Chat() {
       const when = new Date(action.remind_at);
       // Galat/past time — reply already samhaal chuka hai, chup-chaap chhod do.
       if (isNaN(when.getTime()) || when.getTime() <= Date.now()) return;
-      try {
-        const label = formatWhen(when, { today: c.today, tomorrow: c.tomorrow }, locale);
-        const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
-        const r = await addReminder({
-          title: action.title,
-          time_label: label,
-          remind_at: when.toISOString(),
-          bucket,
-        });
-        const allowed = await ensureNotifPermission();
-        if (allowed) await scheduleReminder(r.id, r.title, when);
-      } catch (e) {
-        if (e instanceof ReminderLimitError) {
-          router.push("/upgrade" as never);
-        }
-      }
+      const ok = await createReminder(action.title, when, {
+        everyDays: action.repeat_every_days,
+        until: action.repeat_until,
+      });
+      // Naya reminder context me bhi aa jaye — agla sawaal usi par ho sakta hai.
+      if (ok) void refreshContext();
     }
   }
 
@@ -273,6 +369,23 @@ export default function Chat() {
             ),
           )}
           {sending && <TypingBubble />}
+
+          {/* Net ki wajah se jawab nahi aaya — message chat me chipka rehta
+              hai, aur ek saaf "dobara bhejo". Pehle yahan Saathi ka jhoota
+              decline message aa jaata tha (item 7 & 15). */}
+          {!!failedTurn && !sending && (
+            <Pressable
+              onPress={() => {
+                const turn = failedTurn;
+                setFailedTurn(null);
+                void ask(turn);
+              }}
+              style={styles.retryRow}
+            >
+              <Ionicons name="refresh" size={15} color={colors.terracotta} />
+              <Text style={styles.retryText}>{ch.retrySend}</Text>
+            </Pressable>
+          )}
         </ScrollView>
 
         {/* suggestions */}
@@ -388,6 +501,19 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   userText: { color: colors.white, fontSize: 15, lineHeight: 22 },
+  retryRow: {
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.35)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  retryText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
   chipsScroll: { flexGrow: 0, maxHeight: 56 },
   chips: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: "center" },
   chip: {

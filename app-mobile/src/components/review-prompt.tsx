@@ -20,13 +20,20 @@ import {
   snoozeReview,
   markReviewDone,
   markFirstOpen,
+  onMilestone,
   PLAY_STORE_URL,
 } from "@/lib/reviews";
 import { logEvent } from "@/lib/analytics";
 
 /**
- * 1 hafte baad ek baar rating/review popup (#9). Root me mount hai. Session ho
- * tabhi check karta hai. Submit pe DB me save + Play Store nudge.
+ * Rating/review popup — root me mount, session ho tabhi chalta hai.
+ *
+ * Do mauke par poochta hai (item 4):
+ *   1. Jab user register ke baad pehla document AUR pehla reminder dono bana
+ *      le — yahi wo lamha hai jab usne app ko kaam karte dekha hai.
+ *   2. Warna 1 hafte baad.
+ *
+ * Ek baar submit/dismiss ke baad dobara nahi. "Baad me" par 2 din ka aaram.
  */
 export function ReviewPrompt() {
   const { review: r } = useT();
@@ -41,15 +48,27 @@ export function ReviewPrompt() {
   useEffect(() => {
     if (!session?.user?.id) return;
     let alive = true;
-    (async () => {
-      await markFirstOpen();
-      // App khulte hi turant nahi — thoda ruk ke, taaki dakhal na lage.
+
+    const check = async (delay: number) => {
+      // Turant nahi — thoda ruk ke, taaki dakhal na lage. Reminder banne ke
+      // baad wala toast/permission modal pehle nikal jaana chahiye.
       setTimeout(async () => {
         if (alive && (await shouldShowReview())) setVisible(true);
-      }, 2500);
+      }, delay);
+    };
+
+    (async () => {
+      await markFirstOpen();
+      await check(2500);
     })();
+
+    // Padav abhi-abhi pura hua (document + reminder dono) — usi waqt poochho,
+    // agli launch ka intezaar nahi.
+    const off = onMilestone(() => void check(1800));
+
     return () => {
       alive = false;
+      off();
     };
   }, [session?.user?.id]);
 

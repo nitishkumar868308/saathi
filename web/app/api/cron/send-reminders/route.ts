@@ -121,7 +121,7 @@ export async function POST(request: Request) {
 
       if (phone) {
         try {
-          const res = await sendReminderWhatsApp(phone, r.title, label, r.note);
+          const res = await sendReminderWhatsApp(phone, r.title, label, r.note, r.user_id);
           if (res.sent) wa++;
         } catch (e) {
           errors.push(`wa ${r.id}: ${String(e)}`);
@@ -135,6 +135,7 @@ export async function POST(request: Request) {
             label,
             profile.language,
             r.note,
+            r.user_id,
           );
           if (res.sent) mail++;
         } catch (e) {
@@ -143,13 +144,24 @@ export async function POST(request: Request) {
       }
     }
 
-    // Mark notified (dobara na bheje) — channel fail ho tab bhi.
-    await fetch(`${SUPABASE_URL}/rest/v1/reminders?id=eq.${r.id}`, {
-      method: "PATCH",
+    // Bhej diya — ab aage badho.
+    //
+    // ⚠️ Pehle yahan seedha `notified_at = now` PATCH hota tha. Roz wale
+    // reminder ("gym subah 6, 90 din tak") me wo ghaatak tha: pehli subah
+    // notified_at bhar jaata aur query usse dobara kabhi uthati hi nahi —
+    // reminder ek hi baar aake chup ho jaata tha.
+    //
+    // `advance_reminder` dono soorat sambhalta hai: ek baar wale me wahi purana
+    // notified_at, aur roz wale me remind_at agle din pe sarka ke notified_at
+    // saaf — taaki kal subah wapas due ho jaye. Agla din nikaalne ka hisaab
+    // wahi SQL function karta hai jo app ka "ho gaya" button use karta hai,
+    // isliye dono kabhi alag din par nahi ja sakte.
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_reminder`, {
+      method: "POST",
       headers: sbHeaders({ Prefer: "return=minimal" }),
-      body: JSON.stringify({ notified_at: nowIso }),
+      body: JSON.stringify({ p_id: r.id, p_sent_at: nowIso }),
       cache: "no-store",
-    }).catch((e) => errors.push(`mark ${r.id}: ${String(e)}`));
+    }).catch((e) => errors.push(`advance ${r.id}: ${String(e)}`));
   }
 
   return NextResponse.json({

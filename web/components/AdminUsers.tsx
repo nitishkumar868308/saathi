@@ -14,6 +14,7 @@ import {
   FileText,
 } from "lucide-react";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import CopyButton from "@/components/CopyButton";
 import Loader from "@/components/Loader";
 import { useAdminT } from "@/lib/i18n/admin";
 
@@ -458,7 +459,7 @@ function Detail({ id }: { id: string }) {
       {/* Left: facts */}
       <div className="space-y-2.5">
         <h4 className="text-xs font-bold uppercase tracking-wider text-ink-soft">{d.details}</h4>
-        <DetailRow label={d.referralCode} value={detail.referral_code ?? "—"} mono />
+        <DetailRow label={d.referralCode} value={detail.referral_code ?? "—"} mono copyable />
         <DetailRow
           label={d.cameFromCode}
           value={
@@ -570,18 +571,30 @@ function DetailRow({
   label,
   value,
   mono = false,
+  /** Support ko aksar ye value kisi ko bhejni hoti hai — tab copy icon do. */
+  copyable = false,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  copyable?: boolean;
 }) {
+  const canCopy = copyable && !!value && value !== "—";
   return (
     <div className="flex items-baseline justify-between gap-3 text-sm">
       <span className="shrink-0 text-ink-soft">{label}</span>
-      <span
-        className={`min-w-0 truncate text-right font-semibold text-ink ${mono ? "tracking-wider" : ""}`}
-      >
-        {value}
+      <span className="flex min-w-0 items-center justify-end gap-1.5">
+        <span
+          className={`min-w-0 truncate text-right font-semibold text-ink ${mono ? "tracking-wider" : ""}`}
+        >
+          {value}
+        </span>
+        {canCopy && (
+          <CopyButton
+            value={value}
+            className="shrink-0 rounded-lg p-1 text-ink-soft transition hover:bg-cream-deep/50 hover:text-terracotta"
+          />
+        )}
       </span>
     </div>
   );

@@ -1,44 +1,58 @@
 import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  StyleSheet,
-  Alert,
-  Modal,
-  Platform,
-} from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 
 import { colors } from "@/theme/colors";
 import { UserAvatar } from "@/components/user-avatar";
+import { ConfirmModal } from "@/components/confirm-modal";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { isSupabaseConfigured } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
-import { getPlan, WEB_URL } from "@/lib/plan";
+import { getPlan } from "@/lib/plan";
 import { useOffers } from "@/lib/use-offers";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
 import { useUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { PermissionModal } from "@/components/permission-modal";
+import { ALERT_MODES, alertUser, useAlertMode, type AlertMode } from "@/lib/alert-mode";
+
+/**
+ * "You" tab — account, plan aur settings.
+ *
+ * ⚠️ Pehle yahan har cheez apna alag card thi: membership ka apna, referral ka
+ * apna, referral-code ka apna — teen alag-alag box, teenon ke beech 22px ki
+ * khaali jagah. Screen bikhri hui lagti thi (item 13).
+ *
+ * Ab teen saaf hisse hain: upar aap (photo + naam), phir plan, phir settings —
+ * har hissa apne heading ke neeche EK card me. Aankh ko teen cheezein dikhti
+ * hain, dus nahi.
+ */
 
 type RowId =
+  | "profile"
+  | "membership"
+  | "refer"
+  | "refer_code"
   | "saathi_name"
-  | "notifications"
   | "reminders_reliable"
+  | "alert_mode"
   | "language"
   | "privacy"
-  | "delete_all"
+  | "contact"
   | "help"
   | "about";
 
-type Row = { id: RowId; icon: string; label: string; tint?: string };
+type Row = {
+  id: RowId;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  /** Row ke daayin taraf chhota sa haal (jaise chuni hui bhasha). */
+  value?: string;
+};
 
 export default function Settings() {
   const { session, rewardsVersion } = useAuth();
@@ -58,42 +72,62 @@ export default function Settings() {
   const [langOpen, setLangOpen] = useState(false);
   const [refModal, setRefModal] = useState(false);
   const [permModal, setPermModal] = useState(false);
+  const [logoutAsk, setLogoutAsk] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
+  // Ring / vibrate / silent — device par local, server par kuch nahi jaata.
+  const [alertMode, setAlertModePref] = useAlertMode();
+
+  const ALERT_COPY: Record<AlertMode, { label: string; sub: string; icon: keyof typeof Ionicons.glyphMap }> = {
+    ring: { label: s.alertRing, sub: s.alertRingSub, icon: "volume-high" },
+    vibrate: { label: s.alertVibrate, sub: s.alertVibrateSub, icon: "phone-portrait" },
+    silent: { label: s.alertSilent, sub: s.alertSilentSub, icon: "notifications-off" },
+  };
 
   const groups: { title: string; rows: Row[] }[] = [
+    {
+      title: s.groupAccount,
+      rows: [
+        { id: "membership", icon: "ribbon-outline", label: s.membership },
+        ...(offers.referralsEnabled
+          ? ([
+              {
+                id: "refer",
+                icon: "gift-outline",
+                label: tpl(s.referRow, { d: offers.referralDays }),
+              },
+              { id: "refer_code", icon: "pricetag-outline", label: s.referralCodeRow },
+            ] as Row[])
+          : []),
+      ],
+    },
     {
       title: s.groupSaathi,
       rows: [
         { id: "saathi_name", icon: "happy-outline", label: s.saathiName },
-        { id: "notifications", icon: "notifications-outline", label: s.notifications },
-        // Sirf Android — battery optimization se reminders reliable banane ke liye.
-        ...(Platform.OS === "android"
-          ? [
-              {
-                id: "reminders_reliable" as RowId,
-                icon: "battery-charging-outline",
-                label: rel.settingsRow,
-              },
-            ]
-          : []),
+        // ⚠️ Pehle yahan DO rows thi — "Notifications" aur "Reminders reliable
+        //    banao" — aur dono bilkul wahi ek modal kholti thi. User ko lagta
+        //    tha do alag settings hain (item 14). Ab ek hi row hai.
+        { id: "reminders_reliable", icon: "notifications-outline", label: rel.settingsRow },
+        {
+          id: "alert_mode",
+          icon: "volume-medium-outline",
+          label: s.alertMode,
+          value: ALERT_COPY[alertMode].label,
+        },
         {
           id: "language",
           icon: "language-outline",
-          label: `${s.language} · ${LOCALE_META[locale].native}`,
+          label: s.language,
+          value: LOCALE_META[locale].native,
         },
-      ],
-    },
-    {
-      title: s.groupPrivacy,
-      rows: [
-        { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
-        // Delete-all-data abhi band — baad me chahiye to yeh row wapas enable karo.
-        // { id: "delete_all", icon: "trash-outline", label: s.deleteAll, tint: "#B23B3B" },
       ],
     },
     {
       title: s.groupMore,
       rows: [
+        { id: "contact", icon: "mail-outline", label: t.contact.row },
         { id: "help", icon: "help-circle-outline", label: s.help },
+        { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
         { id: "about", icon: "information-circle-outline", label: s.about },
       ],
     },
@@ -109,6 +143,7 @@ export default function Settings() {
   }, [rewardsVersion]);
 
   async function logout() {
+    setLogoutAsk(false);
     try {
       await signOut();
       // Logout ke baad language select screen — waha se login pe jaayega.
@@ -118,50 +153,29 @@ export default function Settings() {
     }
   }
 
-  async function openUrl(path: string) {
-    try {
-      await WebBrowser.openBrowserAsync(`${WEB_URL}${path}`);
-    } catch {
-      toast.show(s.linkFailed, "error");
-    }
-  }
-
-  /** Sirf apna data (documents + reminders) delete — account nahi. */
-  async function deleteAllData() {
-    Alert.alert(s.deleteTitle, s.deleteBody, [
-      { text: t.common.no, style: "cancel" },
-      {
-        text: s.deleteYes,
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const sb = supabase;
-            const uid = session?.user?.id;
-            if (!sb || !uid) throw new Error("no session");
-            await Promise.all([
-              sb.from("documents").delete().eq("user_id", uid),
-              sb.from("reminders").delete().eq("user_id", uid),
-            ]);
-            toast.show(s.deleted, "success");
-          } catch {
-            toast.show(s.deleteAll + " ✕", "error");
-          }
-        },
-      },
-    ]);
-  }
-
   function handleRow(id: RowId) {
     switch (id) {
+      case "profile":
       case "saathi_name":
         // Naam + details ek hi jagah.
         router.push("/profile-details" as never);
         return;
-      case "notifications":
+      case "membership":
+        router.push("/membership" as never);
+        return;
+      case "refer":
+        router.push("/referral" as never);
+        return;
+      case "refer_code":
+        setRefModal(true);
+        return;
       case "reminders_reliable":
-        // Dono rows ab wahi setup modal kholti hain — notification, exact alarm,
-        // battery aur OEM auto-start ek hi jagah, status ke saath.
+        // Notification, exact alarm, full-screen alert, battery aur OEM
+        // auto-start — sab ek hi jagah, status ke saath.
         setPermModal(true);
+        return;
+      case "alert_mode":
+        setAlertOpen(true);
         return;
       case "language":
         setLangOpen(true);
@@ -169,8 +183,8 @@ export default function Settings() {
       case "privacy":
         router.push("/privacy" as never);
         return;
-      case "delete_all":
-        deleteAllData();
+      case "contact":
+        router.push("/contact" as never);
         return;
       case "help":
         router.push("/help" as never);
@@ -187,22 +201,53 @@ export default function Settings() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile card */}
-        <View style={styles.profile}>
-          <View style={styles.pAvatar}>
+        {/* Aap — photo, naam, email. Poora card tappable hai.
+            Photo pehle 72px thi aur cut dikhti thi (item 5); ab 104px hai,
+            ek naram ring ke saath, aur poori bharti hai. */}
+        <Pressable
+          onPress={() => handleRow("profile")}
+          style={({ pressed }) => [styles.profile, pressed && { opacity: 0.92 }]}
+        >
+          <View style={styles.avatarRing}>
             <UserAvatar
               uri={avatarUrl}
               name={name}
               seed={session?.user?.id}
-              size={72}
-              radius={26}
+              size={104}
+              radius={36}
             />
+            <View style={styles.avatarEdit}>
+              <Ionicons name="camera" size={14} color={colors.white} />
+            </View>
           </View>
-          <Text style={styles.pName}>{name}</Text>
-          <Text style={styles.pSub}>{session?.user?.email ?? ""}</Text>
-        </View>
+          <Text style={styles.pName} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={styles.pSub} numberOfLines={1}>
+            {session?.user?.email ?? ""}
+          </Text>
+          <View style={styles.editChip}>
+            <Ionicons name="create-outline" size={13} color={colors.terracotta} />
+            <Text style={styles.editChipText}>{s.editProfile}</Text>
+          </View>
+        </Pressable>
 
-        {/* Plan / Saathi Plus — sabse upar */}
+        {/* Profile adhoora ho to ek nudge — sabse upar, taaki dikhe. */}
+        {!profileComplete && (
+          <Pressable
+            onPress={() => handleRow("profile")}
+            style={({ pressed }) => [styles.nudge, pressed && { opacity: 0.92 }]}
+          >
+            <Ionicons name="alert-circle" size={20} color={colors.terracotta} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nudgeTitle}>{s.completeTitle}</Text>
+              <Text style={styles.nudgeSub}>{s.completeSub}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.terracotta} />
+          </Pressable>
+        )}
+
+        {/* Plan */}
         <Pressable
           onPress={() => router.push("/upgrade" as never)}
           style={({ pressed }) => [styles.planCard, pressed && { opacity: 0.92 }]}
@@ -217,59 +262,8 @@ export default function Settings() {
           <Ionicons name="chevron-forward" size={20} color="rgba(247,242,233,0.7)" />
         </Pressable>
 
-        {/* Profile complete karo — nudge (adhoora ho to) */}
-        {!profileComplete && (
-          <Pressable
-            onPress={() => router.push("/profile-details" as never)}
-            style={({ pressed }) => [styles.nudge, pressed && { opacity: 0.92 }]}
-          >
-            <Ionicons name="alert-circle" size={20} color={colors.terracotta} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.nudgeTitle}>{s.completeTitle}</Text>
-              <Text style={styles.nudgeSub}>{s.completeSub}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.terracotta} />
-          </Pressable>
-        )}
-
-        {/* Meri membership */}
-        <Pressable
-          onPress={() => router.push("/membership" as never)}
-          style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
-        >
-          <Ionicons name="ribbon-outline" size={20} color={colors.terracotta} />
-          <Text style={styles.detailsText}>{s.membership}</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.line} />
-        </Pressable>
-
-        {/* Refer & Earn — referral (band ho to row hi nahi) */}
-        {offers.referralsEnabled && (
-          <Pressable
-            onPress={() => router.push("/referral" as never)}
-            style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
-          >
-            <Ionicons name="gift-outline" size={20} color={colors.terracotta} />
-            <Text style={styles.detailsText}>
-              {tpl(s.referRow, { d: offers.referralDays })}
-            </Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.line} />
-          </Pressable>
-        )}
-
-        {/* Kisi ka referral code baad me daalne ke liye */}
-        {offers.referralsEnabled && (
-          <Pressable
-            onPress={() => setRefModal(true)}
-            style={({ pressed }) => [styles.detailsRow, pressed && { opacity: 0.9 }]}
-          >
-            <Ionicons name="pricetag-outline" size={20} color={colors.terracotta} />
-            <Text style={styles.detailsText}>{s.referralCodeRow}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.line} />
-          </Pressable>
-        )}
-
         {groups.map((g) => (
-          <View key={g.title} style={{ marginTop: 22 }}>
+          <View key={g.title} style={styles.group}>
             <Text style={styles.groupTitle}>{g.title}</Text>
             <View style={styles.card}>
               {g.rows.map((r, i) => (
@@ -282,15 +276,14 @@ export default function Settings() {
                     pressed && { backgroundColor: colors.creamDeep },
                   ]}
                 >
-                  <Ionicons
-                    name={r.icon as any}
-                    size={20}
-                    color={r.tint ?? colors.inkSoft}
-                  />
-                  <Text style={[styles.rowLabel, r.tint && { color: r.tint }]}>
+                  <View style={styles.rowIcon}>
+                    <Ionicons name={r.icon} size={18} color={colors.terracotta} />
+                  </View>
+                  <Text style={styles.rowLabel} numberOfLines={1}>
                     {r.label}
                   </Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.line} />
+                  {!!r.value && <Text style={styles.rowValue}>{r.value}</Text>}
+                  <Ionicons name="chevron-forward" size={17} color={colors.line} />
                 </Pressable>
               ))}
             </View>
@@ -298,7 +291,7 @@ export default function Settings() {
         ))}
 
         <Pressable
-          onPress={logout}
+          onPress={() => setLogoutAsk(true)}
           style={({ pressed }) => [styles.logout, pressed && { opacity: 0.85 }]}
         >
           <Ionicons name="log-out-outline" size={20} color="#B23B3B" />
@@ -310,8 +303,79 @@ export default function Settings() {
 
       <ReferralCodeModal visible={refModal} onClose={() => setRefModal(false)} />
 
-      {/* Reminder reliability — notification, exact alarm, battery, auto-start */}
+      {/* Reminder reliability — notification, exact alarm, full-screen alert,
+          battery, auto-start. Ek hi jagah (item 14). */}
       <PermissionModal visible={permModal} onClose={() => setPermModal(false)} />
+
+      <ConfirmModal
+        visible={logoutAsk}
+        title={s.logout}
+        confirmLabel={s.logout}
+        cancelLabel={t.common.cancel}
+        icon="log-out"
+        destructive
+        onConfirm={logout}
+        onCancel={() => setLogoutAsk(false)}
+      />
+
+      {/* Alert kaise sunayi de — ring / vibrate / silent (item 6).
+          "Sun ke dekho" jaan-boojh ke hai: awaaz ek aisi cheez hai jise padh ke
+          nahi, sun ke hi chuna ja sakta hai. */}
+      <Modal
+        visible={alertOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAlertOpen(false)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setAlertOpen(false)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{s.alertMode}</Text>
+            <Text style={styles.sheetSub}>{s.alertModeSub}</Text>
+
+            {ALERT_MODES.map((m) => {
+              const active = alertMode === m;
+              const copy = ALERT_COPY[m];
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    setAlertModePref(m);
+                    // Turant sunao — chunte hi pata chal jaaye ki kya hoga.
+                    void alertUser();
+                  }}
+                  style={[styles.alertOpt, active && styles.alertOptActive]}
+                >
+                  <View style={[styles.alertIcon, active && styles.alertIconActive]}>
+                    <Ionicons
+                      name={copy.icon}
+                      size={19}
+                      color={active ? colors.white : colors.terracotta}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.alertLabel, active && { color: colors.terracotta }]}>
+                      {copy.label}
+                    </Text>
+                    <Text style={styles.alertSub}>{copy.sub}</Text>
+                  </View>
+                  {active && (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.terracotta} />
+                  )}
+                </Pressable>
+              );
+            })}
+
+            <Pressable
+              onPress={() => void alertUser()}
+              style={({ pressed }) => [styles.alertTest, pressed && { opacity: 0.85 }]}
+            >
+              <Ionicons name="play" size={16} color={colors.terracotta} />
+              <Text style={styles.alertTestText}>{s.alertTest}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Bhasha picker */}
       <Modal
@@ -358,26 +422,58 @@ export default function Settings() {
   );
 }
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.cream },
-  content: { padding: 20, paddingBottom: 40 },
-  profile: { alignItems: "center", paddingVertical: 12 },
-  pAvatar: {
-    height: 72,
-    width: 72,
+  content: { padding: 20, paddingBottom: 40, ...CONTENT },
+
+  profile: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
+  avatarRing: {
+    height: 112,
+    width: 112,
+    borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 26,
-    backgroundColor: colors.terracotta,
-    overflow: "hidden",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
-  pAvatarImg: { height: 72, width: 72, borderRadius: 26 },
+  avatarEdit: {
+    position: "absolute",
+    right: 2,
+    bottom: 2,
+    height: 30,
+    width: 30,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.terracotta,
+    borderWidth: 2,
+    borderColor: colors.cream,
+  },
+  pName: { marginTop: 14, fontSize: 22, fontWeight: "800", color: colors.ink },
+  pSub: { marginTop: 3, fontSize: 14, color: colors.inkSoft },
+  editChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+  },
+  editChipText: { fontSize: 12.5, fontWeight: "700", color: colors.terracotta },
+
   nudge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginTop: 14,
-    borderRadius: 16,
+    marginTop: 20,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(194,90,55,0.3)",
     backgroundColor: "rgba(194,90,55,0.07)",
@@ -386,57 +482,34 @@ const styles = StyleSheet.create({
   },
   nudgeTitle: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
   nudgeSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
-  pName: { marginTop: 12, fontSize: 22, fontWeight: "700", color: colors.ink },
-  pSub: { marginTop: 2, fontSize: 14, color: colors.inkSoft },
-  statusChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginTop: 12,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  statusDot: { height: 7, width: 7, borderRadius: 4 },
-  statusText: { fontSize: 12.5, fontWeight: "600" },
-  detailsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 22,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-  },
-  detailsText: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
+
   planCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    marginTop: 22,
-    borderRadius: 20,
+    marginTop: 20,
+    borderRadius: 22,
     padding: 16,
     backgroundColor: colors.ink,
   },
   planIcon: {
-    height: 44,
-    width: 44,
-    borderRadius: 15,
+    height: 46,
+    width: 46,
+    borderRadius: 16,
     backgroundColor: colors.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
-  planTitle: { fontSize: 15.5, fontWeight: "700", color: colors.white },
+  planTitle: { fontSize: 15.5, fontWeight: "800", color: colors.white },
   planSub: { marginTop: 2, fontSize: 12.5, color: "rgba(247,242,233,0.65)" },
+
+  group: { marginTop: 26 },
   groupTitle: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12.5,
+    fontWeight: "800",
     color: colors.inkSoft,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     marginBottom: 10,
     marginLeft: 4,
   },
@@ -450,14 +523,24 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    gap: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.line },
-  rowLabel: { flex: 1, fontSize: 15, color: colors.ink },
+  rowIcon: {
+    height: 36,
+    width: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "rgba(194,90,55,0.09)",
+  },
+  rowLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
+  rowValue: { fontSize: 13.5, color: colors.inkSoft, fontWeight: "600" },
+
   logout: {
-    marginTop: 24,
+    marginTop: 28,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -470,11 +553,12 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: "#B23B3B", fontWeight: "700", fontSize: 15 },
   version: {
-    marginTop: 20,
+    marginTop: 18,
     textAlign: "center",
     fontSize: 13,
     color: colors.inkSoft,
   },
+
   sheetBackdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.5)",
@@ -510,7 +594,44 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   langOptActive: { borderColor: colors.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
+
+  alertOpt: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginTop: 10,
+  },
+  alertOptActive: { borderColor: colors.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
+  alertIcon: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "rgba(194,90,55,0.10)",
+  },
+  alertIconActive: { backgroundColor: colors.terracotta },
+  alertLabel: { fontSize: 15.5, fontWeight: "700", color: colors.ink },
+  alertSub: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: colors.inkSoft },
+  alertTest: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    marginTop: 16,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.06)",
+  },
+  alertTestText: { fontSize: 14.5, fontWeight: "700", color: colors.terracotta },
   langNative: { fontSize: 16.5, fontWeight: "700", color: colors.ink },
   langSub: { fontSize: 13, color: colors.inkSoft, marginLeft: 10 },
 });
-

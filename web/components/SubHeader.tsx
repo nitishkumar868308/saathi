@@ -29,13 +29,19 @@ export default function SubHeader() {
 
   const links = [
     { href: "/", label: t.nav.home },
+    { href: "/blog", label: t.nav.blog },
     { href: "/about", label: t.nav.about },
     { href: "/contact", label: t.nav.contact },
   ];
 
+  // Blog ke andar ke page (/blog/koi-post) par bhi "Blog" hi active dikhna
+  // chahiye — warna post kholte hi nav se rishta hi toot jaata hai.
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+
   const linkCls = (href: string) =>
     `rounded-full px-3 py-2 text-sm font-semibold transition ${
-      pathname === href
+      isActive(href)
         ? "bg-terracotta/10 text-terracotta"
         : "text-ink-soft hover:bg-cream-deep/50 hover:text-ink"
     }`;
@@ -83,7 +89,7 @@ export default function SubHeader() {
                 key={l.href}
                 href={l.href}
                 className={`rounded-xl px-4 py-3 text-[15px] font-semibold transition ${
-                  pathname === l.href
+                  isActive(l.href)
                     ? "bg-terracotta/10 text-terracotta"
                     : "text-ink hover:bg-cream-deep/50"
                 }`}

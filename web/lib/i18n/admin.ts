@@ -46,6 +46,7 @@ export type AdminDict = {
     analytics: string;
     message: string;
     usage: string;
+    spend: string;
     documents: string;
     reviews: string;
     logs: string;
@@ -58,6 +59,7 @@ export type AdminDict = {
     | "pricing"
     | "users"
     | "usage"
+    | "spend"
     | "documents"
     | "reviews"
     | "logs"
@@ -85,6 +87,29 @@ export type AdminDict = {
     noMatch: string;
     errGeneric: string;
     network: string;
+    /** Bhejne se pehle kis-kis ko — list + selection (item 8). */
+    picked: string;
+    pickedHint: string;
+    listTitle: string;
+    searchPh: string;
+    selectAll: string;
+    clearAll: string;
+    onlyInactive: string;
+    activeTag: string;
+    inactiveTag: string;
+    selectedN: string; // {n}
+    noneSelected: string;
+    listFailed: string;
+    users: string;
+    /** Email / phone notification / dono (item 8). */
+    channelTitle: string;
+    chEmail: string;
+    chPush: string;
+    chBoth: string;
+    pushOff: string;
+    /** {sent} {devices} */
+    pushDone: string;
+    pushNone: string;
   };
   contacts: {
     countMsg: string; // {n}
@@ -315,6 +340,7 @@ const en: AdminDict = {
     analytics: "Analytics",
     message: "Message",
     usage: "Usage",
+    spend: "AI & WhatsApp",
     documents: "Documents",
     reviews: "Reviews",
     logs: "Logs",
@@ -330,6 +356,7 @@ const en: AdminDict = {
     pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. Users see their country's price + currency by IP." },
     users: { title: "Users", sub: "Who's on which plan, when they joined, and how active they are." },
     usage: { title: "Usage", sub: "Who uses how much — documents, reminders, chats. And who not at all." },
+    spend: { title: "AI & WhatsApp", sub: "How much we are actually consuming — Gemini tokens, WhatsApp messages and emails." },
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
     reviews: { title: "Reviews & Ratings", sub: "Reviews from the app — rating, text, and permission to show on the website." },
     logs: { title: "Logs & Issues", sub: "What broke in app/web — full stack + context. New errors also go to email." },
@@ -353,6 +380,26 @@ const en: AdminDict = {
     noMatch: " No matching users found.",
     errGeneric: "Something went wrong while sending.",
     network: "Network error — try again.",
+    picked: "Pick people",
+    pickedHint: "Choose exactly who gets this email — nobody else does.",
+    listTitle: "Who gets it",
+    searchPh: "Search by name or email…",
+    selectAll: "Select all shown",
+    clearAll: "Clear",
+    onlyInactive: "Inactive only",
+    activeTag: "Active",
+    inactiveTag: "Inactive",
+    selectedN: "{n} selected",
+    noneSelected: "Pick at least one person.",
+    listFailed: "Could not load the user list.",
+    users: "users",
+    channelTitle: "How should it reach them?",
+    chEmail: "Email",
+    chPush: "Phone notification",
+    chBoth: "Both",
+    pushOff: "Firebase isn't set up yet — see FIREBASE-SETUP.md.",
+    pushDone: "{sent} notifications delivered to {devices} devices.",
+    pushNone: "Nobody in this list has the app installed yet.",
   },
   contacts: {
     countMsg: "{n} messages",
@@ -512,6 +559,7 @@ const hi: AdminDict = {
     analytics: "एनालिटिक्स",
     message: "मैसेज",
     usage: "उपयोग",
+    spend: "AI और WhatsApp",
     documents: "डॉक्युमेंट्स",
     reviews: "रिव्यूज़",
     logs: "लॉग्स",
@@ -527,6 +575,7 @@ const hi: AdminDict = {
     pricing: { title: "देश अनुसार प्राइसिंग", sub: "Base × multiplier × conversion rate. IP से यूज़र को उसके देश का प्राइस + करेंसी दिखता है।" },
     users: { title: "यूज़र्स", sub: "कौन किस प्लान पर है, कब जुड़ा, और कितना एक्टिव है।" },
     usage: { title: "उपयोग", sub: "कौन कितना उपयोग करता है — डॉक्युमेंट्स, रिमाइंडर, चैट। और कौन बिलकुल नहीं।" },
+    spend: { title: "AI और WhatsApp", sub: "हमारा कितना इस्तेमाल हो रहा है — Gemini टोकन, WhatsApp मैसेज और ईमेल।" },
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
     reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़ — रेटिंग, टेक्स्ट, और वेबसाइट पर दिखाने की अनुमति।" },
     logs: { title: "लॉग्स और इशू", sub: "ऐप/वेब में क्या टूटा — पूरा stack + context. नए errors ईमेल पर भी जाते हैं।" },
@@ -550,6 +599,26 @@ const hi: AdminDict = {
     noMatch: " कोई मैचिंग यूज़र नहीं मिला।",
     errGeneric: "भेजते समय दिक्कत आई।",
     network: "नेटवर्क एरर — दोबारा ट्राई करें।",
+    picked: "खुद चुनें",
+    pickedHint: "जिन्हें चुनेंगे सिर्फ़ उन्हीं को ईमेल जाएगा — और किसी को नहीं।",
+    listTitle: "किसे जाएगा",
+    searchPh: "नाम या ईमेल से खोजें…",
+    selectAll: "दिख रहे सब चुनें",
+    clearAll: "हटाएँ",
+    onlyInactive: "सिर्फ़ inactive",
+    activeTag: "एक्टिव",
+    inactiveTag: "Inactive",
+    selectedN: "{n} चुने गए",
+    noneSelected: "कम से कम एक यूज़र चुनें।",
+    listFailed: "यूज़र लिस्ट लोड नहीं हुई।",
+    users: "यूज़र्स",
+    channelTitle: "कैसे पहुँचे?",
+    chEmail: "ईमेल",
+    chPush: "फ़ोन नोटिफ़िकेशन",
+    chBoth: "दोनों",
+    pushOff: "Firebase अभी सेट नहीं है — FIREBASE-SETUP.md देखें।",
+    pushDone: "{devices} डिवाइस में से {sent} पर नोटिफ़िकेशन पहुँची।",
+    pushNone: "इस लिस्ट में अभी किसी ने ऐप इंस्टॉल नहीं की।",
   },
   contacts: {
     countMsg: "{n} मैसेज",
@@ -710,6 +779,7 @@ const hinglish: AdminDict = {
     analytics: "Analytics",
     message: "Message",
     usage: "Usage",
+    spend: "AI & WhatsApp",
     documents: "Documents",
     reviews: "Reviews",
     logs: "Logs",
@@ -725,6 +795,7 @@ const hinglish: AdminDict = {
     pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. IP se user ko uske desh ka price + currency dikhta hai." },
     users: { title: "Users", sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai." },
     usage: { title: "Usage", sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi." },
+    spend: { title: "AI & WhatsApp", sub: "Humara kitna istemaal ho raha hai — Gemini token, WhatsApp message aur email." },
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
     reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews — rating, text, aur website pe dikhane ki anumati." },
     logs: { title: "Logs & Issues", sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain." },
@@ -748,6 +819,26 @@ const hinglish: AdminDict = {
     noMatch: " Koi matching user nahi mila.",
     errGeneric: "Bhejne me dikkat aayi.",
     network: "Network error — dobara try karo.",
+    picked: "Khud chuno",
+    pickedHint: "Jinhe chunoge sirf unhi ko email jaayega — aur kisi ko nahi.",
+    listTitle: "Kise jaayega",
+    searchPh: "Naam ya email se dhoondho…",
+    selectAll: "Dikh rahe sab chuno",
+    clearAll: "Hatao",
+    onlyInactive: "Sirf inactive",
+    activeTag: "Active",
+    inactiveTag: "Inactive",
+    selectedN: "{n} chune gaye",
+    noneSelected: "Kam se kam ek user chuno.",
+    listFailed: "User list load nahi hui.",
+    users: "users",
+    channelTitle: "Kaise pahunche?",
+    chEmail: "Email",
+    chPush: "Phone notification",
+    chBoth: "Dono",
+    pushOff: "Firebase abhi set nahi hai — FIREBASE-SETUP.md dekho.",
+    pushDone: "{devices} device me se {sent} par notification pahunch gayi.",
+    pushNone: "Is list me abhi kisi ne app install nahi ki.",
   },
   contacts: {
     countMsg: "{n} message",

@@ -21,7 +21,7 @@ import { shareDocuments } from "@/lib/share";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { ConfirmModal } from "@/components/confirm-modal";
-import { Pagination, usePaged } from "@/components/pagination";
+import { Pagination, usePaged, PAGE_SIZE } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -113,7 +113,8 @@ export default function Documents() {
   });
 
   // 10 per page — filter badle to page 1 pe wapas.
-  const { page, setPage, pageCount, pageItems } = usePaged(list, 10, filter);
+  // Poore app me ek hi page size (7) — pagination.tsx me PAGE_SIZE.
+  const { page, setPage, pageCount, pageItems } = usePaged(list, PAGE_SIZE, filter);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>

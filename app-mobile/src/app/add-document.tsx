@@ -24,6 +24,7 @@ import { checkReferralQualification } from "@/lib/plan";
 import { ocrImage } from "@/lib/ocr";
 import { scanDocumentAI } from "@/lib/ai";
 import { logEvent } from "@/lib/analytics";
+import { markFirstDocument } from "@/lib/reviews";
 import { isValidDate } from "@/utils/expiry";
 import { extractExpiry } from "@/utils/extract-expiry";
 import { detectDocType, guessName } from "@/utils/detect-doc";
@@ -165,6 +166,8 @@ export default function AddDocument() {
       logEvent("document_added", { type: doc.type });
       // Referral reward unlock ho sakta hai (document + reminder dono hone pe).
       checkReferralQualification().catch(() => {});
+      // Review popup ka padav — document + reminder dono ho jaayein to poochho.
+      markFirstDocument().catch(() => {});
       toast.show(notifOk ? d.added : d.addedNoNotif, notifOk ? "success" : "info");
       router.back();
     } catch (e) {

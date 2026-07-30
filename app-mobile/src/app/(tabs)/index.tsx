@@ -151,13 +151,20 @@ export default function Home() {
             </Text>
             <Text style={styles.sub}>{h.briefLabel}</Text>
           </View>
-          <Pressable onPress={() => router.push("/profile-details" as never)}>
+          {/* Header ka avatar 46px tha — photo itni chhoti thi ki chehra
+              pehchana hi nahi jaata tha (item 5). 56px par saaf dikhta hai
+              aur naram ring se cut hua nahi lagta. */}
+          <Pressable
+            onPress={() => router.push("/profile-details" as never)}
+            style={styles.avatarRing}
+            hitSlop={8}
+          >
             <UserAvatar
               uri={avatarUrl}
               name={fullName}
               seed={session?.user?.id}
-              size={46}
-              radius={16}
+              size={56}
+              radius={19}
             />
           </Pressable>
         </View>
@@ -328,13 +335,15 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 28, fontWeight: "700", color: colors.ink },
   sub: { marginTop: 3, fontSize: 15, color: colors.inkSoft },
-  avatar: {
-    height: 46,
-    width: 46,
+  avatarRing: {
+    height: 62,
+    width: 62,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   briefCard: {
     marginTop: 20,

@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { router, useFocusEffect } from "expo-router";
 
 import { colors } from "@/theme/colors";
@@ -64,6 +65,23 @@ export default function Referral() {
     }
   }
 
+  /**
+   * Code/link clipboard me.
+   *
+   * Share sheet har baar kholna bhaari lagta hai — aksar user ko bas code
+   * chipkana hota hai (WhatsApp me, ya kisi ko bol ke). Isliye code aur link
+   * dono ke saath ek tap wala copy hai.
+   */
+  async function copy(value: string, doneMsg: string) {
+    if (!value) return;
+    try {
+      await Clipboard.setStringAsync(value);
+      toast.show(doneMsg, "success");
+    } catch {
+      toast.show(t.loadError, "error");
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
@@ -89,11 +107,34 @@ export default function Referral() {
 
           {unlocked ? (
             <>
-              {/* Code */}
+              {/* Code — dikhta bhi hai, ek tap me copy bhi ho jaata hai. */}
               <Text style={styles.label}>{t.yourCode}</Text>
-              <View style={styles.codeBox}>
+              <Pressable
+                onPress={() => copy(info?.code ?? "", t.copiedCode)}
+                disabled={!info?.code}
+                style={({ pressed }) => [styles.codeBox, pressed && { opacity: 0.85 }]}
+              >
                 <Text style={styles.code}>{info?.code ?? "—"}</Text>
-              </View>
+                <View style={styles.copyChip}>
+                  <Ionicons name="copy-outline" size={15} color={colors.terracotta} />
+                  <Text style={styles.copyChipText}>{t.copyCode}</Text>
+                </View>
+              </Pressable>
+
+              {/* Link — WhatsApp me bhejne ke liye aksar poora link chahiye hota hai. */}
+              <Text style={styles.label}>{t.yourLink}</Text>
+              <Pressable
+                onPress={() => copy(link, t.copiedLink)}
+                disabled={!info?.code}
+                style={({ pressed }) => [styles.linkBox, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.linkText} numberOfLines={1}>
+                  {link}
+                </Text>
+                <View style={styles.linkCopyBtn}>
+                  <Ionicons name="copy-outline" size={17} color={colors.white} />
+                </View>
+              </Pressable>
 
               <Pressable onPress={share} disabled={!info?.code} style={styles.shareBtn}>
                 <Ionicons name="share-social" size={18} color={colors.white} />
@@ -264,6 +305,40 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   code: { fontSize: 28, fontWeight: "800", letterSpacing: 4, color: colors.terracotta },
+  copyChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.35)",
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  copyChipText: { fontSize: 12.5, fontWeight: "700", color: colors.terracotta },
+  linkBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 6,
+  },
+  linkText: { flex: 1, fontSize: 13.5, fontWeight: "600", color: colors.inkSoft },
+  linkCopyBtn: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 13,
+    backgroundColor: colors.terracotta,
+  },
   shareBtn: {
     marginTop: 16,
     flexDirection: "row",
