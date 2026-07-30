@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, Plus, Save, Search } from "lucide-react";
 
 import Loader from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
 
 /**
@@ -44,6 +45,21 @@ export default function AdminSeo() {
   const [savingPath, setSavingPath] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [newPath, setNewPath] = useState("");
+  const [query, setQuery] = useState("");
+
+  // Har page ka apna bada card hai — 20 pages matlab 20 lambi cards ek page par.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = pages ?? [];
+    if (!q) return list;
+    return list.filter(
+      (p) =>
+        p.path.toLowerCase().includes(q) ||
+        (p.title ?? "").toLowerCase().includes(q),
+    );
+  }, [pages, query]);
+
+  const pg = usePagination(filtered, 5, query);
 
   const load = useCallback(async () => {
     setError("");
@@ -151,7 +167,29 @@ export default function AdminSeo() {
         </button>
       </div>
 
-      {pages.map((p) => {
+      {/* Filter — path ya title se */}
+      {pages.length > 5 && (
+        <div className="relative">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft"
+          />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={sh.searchPh}
+            className="w-full rounded-2xl border border-line bg-surface py-3 pl-10 pr-4 text-sm text-ink shadow-soft outline-none transition focus:border-terracotta"
+          />
+        </div>
+      )}
+
+      {pages.length > 0 && filtered.length === 0 && (
+        <p className="rounded-2xl border border-line bg-surface px-4 py-5 text-center text-sm text-ink-soft">
+          {sh.emptyFilter}
+        </p>
+      )}
+
+      {pg.pageItems.map((p) => {
         const titleLen = (p.title ?? "").length;
         const descLen = (p.description ?? "").length;
         return (
@@ -266,6 +304,16 @@ export default function AdminSeo() {
           </div>
         );
       })}
+
+      <Pagination
+        page={pg.page}
+        pageCount={pg.pageCount}
+        total={pg.total}
+        from={pg.from}
+        to={pg.to}
+        onPage={pg.setPage}
+        label={sh.pages}
+      />
     </div>
   );
 }

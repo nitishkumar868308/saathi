@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import Loader from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
 
 /**
@@ -132,6 +133,11 @@ export default function AdminAnalytics() {
   // Bar chart ki sabse oonchi line — baaki isi ke hisaab se scale hoti hain.
   const peak = Math.max(1, ...(summary?.daily ?? []).map((d) => Number(d.events)));
 
+  // Top screens aur journey — dono lambi list ban jaati hain. Hooks yahan,
+  // `if (!summary)` wale early return se PEHLE (React ka niyam).
+  const topPg = usePagination(summary?.top ?? [], 10, days);
+  const journeyPg = usePagination(journey ?? [], 15, userId);
+
   if (!summary) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -213,7 +219,7 @@ export default function AdminAnalytics() {
           <p className="px-5 py-10 text-center text-sm text-ink-soft">{sh.empty}</p>
         ) : (
           <ul className="divide-y divide-line/60">
-            {summary.top.map((row, i) => (
+            {topPg.pageItems.map((row, i) => (
               <li key={`${row.source}-${row.name}-${row.target}-${i}`} className="flex items-center gap-3 px-5 py-3">
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
@@ -232,6 +238,19 @@ export default function AdminAnalytics() {
               </li>
             ))}
           </ul>
+        )}
+        {summary.top.length > 0 && (
+          <div className="px-5 pb-4">
+            <Pagination
+              page={topPg.page}
+              pageCount={topPg.pageCount}
+              total={topPg.total}
+              from={topPg.from}
+              to={topPg.to}
+              onPage={topPg.setPage}
+              label={sh.pages}
+            />
+          </div>
         )}
       </div>
 
@@ -270,7 +289,7 @@ export default function AdminAnalytics() {
               <p className="py-8 text-center text-sm text-ink-soft">{a.noJourney}</p>
             ) : (
               <ol className="relative space-y-0 border-l border-line pl-5">
-                {journey.map((e) => (
+                {journeyPg.pageItems.map((e) => (
                   <li key={e.id} className="relative py-2.5">
                     <span
                       className={`absolute -left-[26px] top-4 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface ${
@@ -304,6 +323,19 @@ export default function AdminAnalytics() {
                   </li>
                 ))}
               </ol>
+            )}
+            {journey.length > 0 && (
+              <div className="mt-3">
+                <Pagination
+                  page={journeyPg.page}
+                  pageCount={journeyPg.pageCount}
+                  total={journeyPg.total}
+                  from={journeyPg.from}
+                  to={journeyPg.to}
+                  onPage={journeyPg.setPage}
+                  label={sh.events}
+                />
+              </div>
             )}
           </div>
         )}

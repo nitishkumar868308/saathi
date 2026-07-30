@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Plus, Trash2, Save, Globe, Check } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Save, Globe, Check, Search } from "lucide-react";
 import Loader from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
 
 type Row = {
@@ -35,6 +36,7 @@ export default function AdminPricing() {
   const [saved, setSaved] = useState(false);
   const [addCode, setAddCode] = useState("");
   const [bulkMult, setBulkMult] = useState("3");
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setError("");
@@ -64,6 +66,27 @@ export default function AdminPricing() {
     const have = new Set((rows ?? []).map((r) => r.country_code));
     return countries.filter((c) => !have.has(c.code));
   }, [rows, countries]);
+
+  /**
+   * ⚠️ Ye table 250+ desh ek saath dikhata tha — ek hi page par, bina search ke.
+   * Kisi ek desh ka multiplier badalna matlab minute bhar scroll karna.
+   *
+   * Hooks yahan (early return se PEHLE) hone chahiye — neeche `if (!rows)` wala
+   * return hai, aur uske baad hook call karna React ka niyam todta hai.
+   */
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = rows ?? [];
+    if (!q) return list;
+    return list.filter(
+      (r) =>
+        r.country_name.toLowerCase().includes(q) ||
+        r.country_code.toLowerCase().includes(q) ||
+        r.currency.toLowerCase().includes(q),
+    );
+  }, [rows, query]);
+
+  const pg = usePagination(filtered, 15, query);
 
   function patchRow(code: string, patch: Partial<Row>) {
     setSaved(false);
@@ -250,6 +273,20 @@ export default function AdminPricing() {
         </div>
       </div>
 
+      {/* Search — 250+ desh me se ek dhundhne ka aasan raasta */}
+      <div className="relative">
+        <Search
+          size={16}
+          className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft"
+        />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={sh.searchPh}
+          className="w-full rounded-2xl border border-line bg-surface py-3 pl-10 pr-4 text-sm text-ink shadow-soft outline-none transition focus:border-terracotta"
+        />
+      </div>
+
       {/* Rows */}
       <div className="overflow-x-auto rounded-3xl border border-line bg-surface shadow-soft">
         <table className="w-full min-w-[720px] text-left text-sm">
@@ -266,7 +303,7 @@ export default function AdminPricing() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {pg.pageItems.map((r) => {
               const monthly = roundPrice(base.monthly * r.multiplier * r.conversion_rate);
               const yearly = roundPrice(base.yearly * r.multiplier * r.conversion_rate);
               return (
@@ -346,6 +383,22 @@ export default function AdminPricing() {
           </tbody>
         </table>
       </div>
+
+      {filtered.length === 0 ? (
+        <p className="rounded-2xl border border-line bg-surface px-4 py-5 text-center text-sm text-ink-soft">
+          {sh.emptyFilter}
+        </p>
+      ) : (
+        <Pagination
+          page={pg.page}
+          pageCount={pg.pageCount}
+          total={pg.total}
+          from={pg.from}
+          to={pg.to}
+          onPage={pg.setPage}
+          label={sh.countries}
+        />
+      )}
 
       <div className="flex items-center gap-3">
         <button

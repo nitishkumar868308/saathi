@@ -37,6 +37,8 @@ type Recipient = {
   joinedAt: string | null;
   /** Kabhi ek reminder/document banaya? Warna "inactive". */
   active: boolean;
+  /** Is user ka koi phone register hai? Push sirf inhi tak ja sakti hai. */
+  hasDevice: boolean;
 };
 
 type Audience = "inactive" | "all" | "picked";
@@ -145,6 +147,28 @@ export default function AdminBroadcast() {
   /* ------------------------------ send ------------------------------ */
 
   const needsPick = audience === "picked";
+
+  /**
+   * Push kitno tak pahunchegi.
+   *
+   * ⚠️ Ye ginti bhejne se PEHLE dikhani zaroori hai. Warna admin "dono" chun ke
+   * bhejta hai, email chala jaata hai, notification kahin nahi jaati, aur uska
+   * karan sirf bhejne ke BAAD wale ek line me pata chalta hai.
+   */
+  const withApp = useMemo(
+    () => (users ?? []).filter((u) => u.hasDevice).length,
+    [users],
+  );
+  const pickedWithApp = useMemo(
+    () => (users ?? []).filter((u) => picked.has(u.id) && u.hasDevice).length,
+    [users, picked],
+  );
+  const wantsPush = channel !== "email";
+  const noDeviceWarning =
+    wantsPush &&
+    users !== null &&
+    (needsPick ? picked.size > 0 && pickedWithApp === 0 : withApp === 0);
+
   const canSend =
     subject.trim().length > 0 &&
     message.trim().length > 0 &&
@@ -314,6 +338,18 @@ export default function AdminBroadcast() {
                               </span>
                             )}
                           </span>
+                          {/* App hai ya nahi — push isi par tiki hai. */}
+                          <span
+                            title={u.hasDevice ? b.hasApp : b.noApp}
+                            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                              u.hasDevice
+                                ? "bg-terracotta/10 text-terracotta"
+                                : "bg-cream-deep text-ink-soft"
+                            }`}
+                          >
+                            <Smartphone size={11} />
+                            {u.hasDevice ? b.hasApp : b.noApp}
+                          </span>
                           <span
                             className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
                               u.active
@@ -374,6 +410,17 @@ export default function AdminBroadcast() {
         </div>
         {pushReady === false && (
           <p className="mt-2 text-xs font-semibold text-terracotta-dark">{b.pushOff}</p>
+        )}
+        {pushReady !== false && users !== null && (
+          <p className="mt-2 text-xs text-ink-soft">
+            {atpl(b.devicesSummary, { withApp, total: users.length })}
+          </p>
+        )}
+        {noDeviceWarning && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs font-semibold text-terracotta-dark">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+            {b.pushNoDevices}
+          </p>
         )}
 
         {/* Subject */}

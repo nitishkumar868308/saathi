@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { timed } from "./network";
+import { reportError } from "./report-error";
 
 /**
  * Saathi AI — sab kuch ek hi Supabase edge function `ai` se hota hai (Gemini pe).
@@ -97,6 +98,30 @@ async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
+ * Edge function ka ASLI karan nikalo.
+ *
+ * ⚠️ `supabase.functions.invoke` har fail par ek hi bemtlab ka message deta hai:
+ * "Edge Function returned a non-2xx status code". Asli baat — function deploy hi
+ * nahi hui, GEMINI_API_KEY nahi hai, Gemini ne 429 diya — response body me hoti
+ * hai, jo `error.context` (ek Response) me chhupi rehti hai. Bina isse padhe
+ * har AI fail ek jaisa dikhta hai aur kuch pata nahi chalta.
+ */
+async function describeError(e: unknown): Promise<unknown> {
+  const ctx = (e as { context?: unknown })?.context as Response | undefined;
+  if (!ctx || typeof ctx.text !== "function") return e;
+  const msg = e instanceof Error ? e.message : String(e);
+  try {
+    const text = (await ctx.text()).slice(0, 300);
+    // Status message me hi rakhte hain — `reportError` sirf Error ka `message`
+    // uthata hai, uske upar chipkaye fields nahi.
+    return new Error(text ? `${msg} [${ctx.status}] — ${text}` : `${msg} [${ctx.status}]`);
+  } catch {
+    // Body pehle hi padhi ja chuki hai — status hi kaafi hai.
+    return new Error(`${msg} [${ctx.status}]`);
+  }
+}
+
+/**
  * Ek AI call, do koshish.
  *
  * Dheeme net par pehli request aksar beech me toot jaati hai — aur wahi "AI kaam
@@ -125,6 +150,15 @@ async function callAi<T>(
       await new Promise((r) => setTimeout(r, 700));
     }
   }
+
+  // ⚠️ Har caller ka catch khaali tha (`catch { return null }`), isliye "AI kahin
+  // bhi kaam nahi kar raha" ka koi nishaan kahin nahi bachta tha — na app me, na
+  // admin > Logs me. Ab har fail apne asli message ke saath wahan dikhta hai.
+  reportError(
+    await describeError(lastErr),
+    { screen: "ai", action: String(body.task ?? "unknown") },
+    "warn",
+  );
   throw lastErr;
 }
 

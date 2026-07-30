@@ -179,6 +179,42 @@ type Dict = {
     rights: string;
     madeIn: string;
   };
+  /** /delete-account — Play Store ki data-deletion policy wala page. */
+  deleteAccount: {
+    badge: string;
+    heading: string;
+    sub: string;
+    inAppTitle: string;
+    inAppSub: string;
+    inAppSteps: string[];
+    webTitle: string;
+    webSub: string;
+    webTime: string;
+    deletedTitle: string;
+    deleted: string[];
+    keptTitle: string;
+    kept: string[];
+    formTitle: string;
+    formSub: string;
+    name: string;
+    namePlaceholder: string;
+    email: string;
+    emailPlaceholder: string;
+    reason: string;
+    reasonOptional: string;
+    reasonPlaceholder: string;
+    confirm: string;
+    submit: string;
+    sending: string;
+    doneTitle: string;
+    /** Template — {email} */
+    doneBody: string;
+    invalid: string;
+    needConfirm: string;
+    successToast: string;
+    errorToast: string;
+    orEmail: string;
+  };
   referral: {
     badge: string;
     heading: string;
@@ -597,6 +633,54 @@ const hinglish: Dict = {
     rights: "Sabhi adhikaar surakshit.",
     madeIn: "Made with ❤️ for you",
   },
+  deleteAccount: {
+    badge: "Account & data",
+    heading: "Apna account delete karein",
+    sub: "Ye page Apka Saathi (Android app) ke liye hai. Aap apna account aur uska saara data hamesha ke liye hata sakte ho — do raste hain, dono neeche likhe hain.",
+    inAppTitle: "1. App ke andar se",
+    inAppSub: "Sirf apna data (documents + reminders) hatana ho, account rehne dena ho:",
+    inAppSteps: [
+      "App khol ke sabse neeche 'You' tab par jao",
+      "Neeche 'More' section tak scroll karo",
+      "'Sab data delete' dabao aur confirm karo",
+    ],
+    webTitle: "2. Yahin se, poora account",
+    webSub: "Account khud bhi hatana ho to neeche wala form bharo. Hum aapke email par confirmation bhejenge aur 7 din ke andar sab kuch delete kar denge.",
+    webTime: "Zyada se zyada 7 din",
+    deletedTitle: "Kya delete hoga",
+    deleted: [
+      "Aapka account aur login (email/Google)",
+      "Profile — naam, photo, phone, address",
+      "Saare documents aur unki uploaded files",
+      "Saare reminders aur unka history",
+      "Saathi ke saath ki gayi chat",
+      "Referral data aur notification tokens",
+    ],
+    keptTitle: "Kya rakha jayega",
+    kept: [
+      "Payment / invoice records — tax aur accounting kanoon ke tehat rakhne padte hain. Inme aapke documents ya reminders ka content nahi hota, sirf payment ka record.",
+      "Anonymous usage counts jinme aapko pehchana nahi ja sakta.",
+    ],
+    formTitle: "Delete request bhejo",
+    formSub: "Wahi email daalo jisse aapka Saathi account bana hai — usi par hum confirmation bhejenge.",
+    name: "Aapka naam",
+    namePlaceholder: "Jaise: Nitish Kumar",
+    email: "Account ka email",
+    emailPlaceholder: "aap@example.com",
+    reason: "Wajah",
+    reasonOptional: "(optional)",
+    reasonPlaceholder: "Batana chaho to bata do — isse Saathi behtar banta hai.",
+    confirm: "Main samajhta/samajhti hoon ki mera account, documents aur reminders hamesha ke liye hat jaayenge — ye wapas nahi aayega.",
+    submit: "Delete request bhejo",
+    sending: "Request bhej rahe hain…",
+    doneTitle: "Request mil gayi 🙏",
+    doneBody: "Confirmation email {email} par bhej diya hai. Aapka account aur data 7 din ke andar hata diya jayega. Iraada badal jaye to usi email ka jawab de dena.",
+    invalid: "Naam aur sahi email dono chahiye.",
+    needConfirm: "Pehle neeche wala box tick karo.",
+    successToast: "Request mil gayi — confirmation email bhej diya hai.",
+    errorToast: "Request nahi gayi. Thodi der baad try karo.",
+    orEmail: "Form na chale to seedha likho:",
+  },
   referral: {
     badge: "Refer & Earn",
     heading: "Dost ko invite karo, dono ko Plus plan",
@@ -1011,6 +1095,54 @@ const hi: Dict = {
     rights: "सभी अधिकार सुरक्षित।",
     madeIn: "आपके लिए ❤️ से बना",
   },
+  deleteAccount: {
+    badge: "अकाउंट और डेटा",
+    heading: "अपना अकाउंट डिलीट करें",
+    sub: "यह पेज Apka Saathi (Android ऐप) के लिए है। आप अपना अकाउंट और उसका सारा डेटा हमेशा के लिए हटा सकते हैं — दो रास्ते हैं, दोनों नीचे लिखे हैं।",
+    inAppTitle: "1. ऐप के अंदर से",
+    inAppSub: "सिर्फ़ अपना डेटा (डॉक्युमेंट + रिमाइंडर) हटाना हो, अकाउंट रहने देना हो:",
+    inAppSteps: [
+      "ऐप खोलकर सबसे नीचे 'You' टैब पर जाएँ",
+      "नीचे 'More' सेक्शन तक स्क्रॉल करें",
+      "'सब डेटा डिलीट' दबाएँ और कन्फ़र्म करें",
+    ],
+    webTitle: "2. यहीं से, पूरा अकाउंट",
+    webSub: "अकाउंट भी हटाना हो तो नीचे वाला फ़ॉर्म भरें। हम आपके ईमेल पर कन्फ़र्मेशन भेजेंगे और 7 दिन के अंदर सब कुछ डिलीट कर देंगे।",
+    webTime: "ज़्यादा से ज़्यादा 7 दिन",
+    deletedTitle: "क्या डिलीट होगा",
+    deleted: [
+      "आपका अकाउंट और लॉगिन (ईमेल/Google)",
+      "प्रोफ़ाइल — नाम, फ़ोटो, फ़ोन, पता",
+      "सारे डॉक्युमेंट और उनकी अपलोड की गई फ़ाइलें",
+      "सारे रिमाइंडर और उनका हिस्ट्री",
+      "साथी के साथ की गई चैट",
+      "रेफ़रल डेटा और नोटिफ़िकेशन टोकन",
+    ],
+    keptTitle: "क्या रखा जाएगा",
+    kept: [
+      "पेमेंट / इनवॉइस रिकॉर्ड — टैक्स और अकाउंटिंग क़ानून के तहत रखने पड़ते हैं। इनमें आपके डॉक्युमेंट या रिमाइंडर का कंटेंट नहीं होता, सिर्फ़ पेमेंट का रिकॉर्ड।",
+      "ऐसे anonymous usage counts जिनसे आपको पहचाना नहीं जा सकता।",
+    ],
+    formTitle: "डिलीट रिक्वेस्ट भेजें",
+    formSub: "वही ईमेल डालें जिससे आपका साथी अकाउंट बना है — उसी पर हम कन्फ़र्मेशन भेजेंगे।",
+    name: "आपका नाम",
+    namePlaceholder: "जैसे: नितीश कुमार",
+    email: "अकाउंट का ईमेल",
+    emailPlaceholder: "aap@example.com",
+    reason: "वजह",
+    reasonOptional: "(वैकल्पिक)",
+    reasonPlaceholder: "बताना चाहें तो बता दें — इससे साथी बेहतर बनता है।",
+    confirm: "मैं समझता/समझती हूँ कि मेरा अकाउंट, डॉक्युमेंट और रिमाइंडर हमेशा के लिए हट जाएँगे — यह वापस नहीं आएगा।",
+    submit: "डिलीट रिक्वेस्ट भेजें",
+    sending: "रिक्वेस्ट भेज रहे हैं…",
+    doneTitle: "रिक्वेस्ट मिल गई 🙏",
+    doneBody: "कन्फ़र्मेशन ईमेल {email} पर भेज दिया है। आपका अकाउंट और डेटा 7 दिन के अंदर हटा दिया जाएगा। इरादा बदल जाए तो उसी ईमेल का जवाब दे दें।",
+    invalid: "नाम और सही ईमेल दोनों चाहिए।",
+    needConfirm: "पहले नीचे वाला बॉक्स टिक करें।",
+    successToast: "रिक्वेस्ट मिल गई — कन्फ़र्मेशन ईमेल भेज दिया है।",
+    errorToast: "रिक्वेस्ट नहीं गई। थोड़ी देर बाद कोशिश करें।",
+    orEmail: "फ़ॉर्म न चले तो सीधा लिखें:",
+  },
   referral: {
     badge: "रेफ़र करें और पाएँ",
     heading: "दोस्त को इनवाइट करें, दोनों को प्लस प्लान",
@@ -1424,6 +1556,54 @@ const en: Dict = {
     playstore: "Available on Play Store",
     rights: "All rights reserved.",
     madeIn: "Made with ❤️ for you",
+  },
+  deleteAccount: {
+    badge: "Account & data",
+    heading: "Delete your account",
+    sub: "This page is for Apka Saathi (Android app). You can permanently remove your account and all of its data — there are two ways, both are explained below.",
+    inAppTitle: "1. From inside the app",
+    inAppSub: "If you only want to remove your data (documents + reminders) and keep the account:",
+    inAppSteps: [
+      "Open the app and go to the 'You' tab at the bottom",
+      "Scroll down to the 'More' section",
+      "Tap 'Delete all data' and confirm",
+    ],
+    webTitle: "2. Right here, the whole account",
+    webSub: "To remove the account itself, fill in the form below. We will send a confirmation to your email and delete everything within 7 days.",
+    webTime: "7 days at most",
+    deletedTitle: "What gets deleted",
+    deleted: [
+      "Your account and login (email/Google)",
+      "Profile — name, photo, phone, address",
+      "All documents and their uploaded files",
+      "All reminders and their history",
+      "Your chats with Saathi",
+      "Referral data and notification tokens",
+    ],
+    keptTitle: "What we must keep",
+    kept: [
+      "Payment / invoice records — tax and accounting law requires us to keep these. They contain no document or reminder content, only the payment record.",
+      "Anonymous usage counts that cannot identify you.",
+    ],
+    formTitle: "Send a delete request",
+    formSub: "Use the same email your Saathi account was created with — that is where the confirmation goes.",
+    name: "Your name",
+    namePlaceholder: "e.g. Nitish Kumar",
+    email: "Account email",
+    emailPlaceholder: "you@example.com",
+    reason: "Reason",
+    reasonOptional: "(optional)",
+    reasonPlaceholder: "Tell us if you like — it helps make Saathi better.",
+    confirm: "I understand that my account, documents and reminders will be permanently removed — this cannot be undone.",
+    submit: "Send delete request",
+    sending: "Sending your request…",
+    doneTitle: "Request received 🙏",
+    doneBody: "A confirmation email has been sent to {email}. Your account and data will be removed within 7 days. Changed your mind? Just reply to that email.",
+    invalid: "We need your name and a valid email.",
+    needConfirm: "Please tick the box below first.",
+    successToast: "Request received — confirmation email sent.",
+    errorToast: "Could not send the request. Please try again shortly.",
+    orEmail: "If the form does not work, write to us directly:",
   },
   referral: {
     badge: "Refer & Earn",

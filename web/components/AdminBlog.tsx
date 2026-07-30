@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Check, Plus, Save, Trash2, Eye, EyeOff } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Check, Plus, Save, Trash2, Eye, EyeOff, Search } from "lucide-react";
 
 import Loader from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
 
 /**
@@ -60,6 +61,19 @@ export default function AdminBlog() {
   const [editing, setEditing] = useState<Post | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Blog badhta hi jaata hai — poori list ek saath dikhane ka koi faayda nahi.
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = posts ?? [];
+    if (!q) return list;
+    return list.filter(
+      (p) => p.title.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q),
+    );
+  }, [posts, query]);
+
+  const pg = usePagination(filtered, 10, query);
 
   const load = useCallback(async () => {
     setError("");
@@ -157,11 +171,28 @@ export default function AdminBlog() {
           </button>
         </div>
 
+        {posts.length > 10 && (
+          <div className="relative border-b border-line px-5 py-3">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-8 top-1/2 -translate-y-1/2 text-ink-soft"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={sh.searchPh}
+              className="w-full rounded-xl border border-line bg-cream/40 py-2 pl-8 pr-3 text-sm text-ink outline-none focus:border-terracotta"
+            />
+          </div>
+        )}
+
         {!posts.length ? (
           <p className="px-5 py-10 text-center text-sm text-ink-soft">{b.noPosts}</p>
+        ) : !filtered.length ? (
+          <p className="px-5 py-10 text-center text-sm text-ink-soft">{sh.emptyFilter}</p>
         ) : (
           <ul className="divide-y divide-line/60">
-            {posts.map((p) => (
+            {pg.pageItems.map((p) => (
               <li key={p.slug} className="flex items-center gap-3 px-5 py-3">
                 <span
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
@@ -192,6 +223,20 @@ export default function AdminBlog() {
               </li>
             ))}
           </ul>
+        )}
+
+        {filtered.length > 0 && (
+          <div className="px-5 pb-4">
+            <Pagination
+              page={pg.page}
+              pageCount={pg.pageCount}
+              total={pg.total}
+              from={pg.from}
+              to={pg.to}
+              onPage={pg.setPage}
+              label={sh.posts}
+            />
+          </div>
         )}
       </div>
 

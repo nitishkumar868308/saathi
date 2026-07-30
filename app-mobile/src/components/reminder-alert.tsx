@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, Animated, Easing } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Modal,
+  Animated,
+  Easing,
+  AppState,
+  type AppStateStatus,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import notifee, { EventType, type Notification } from "@notifee/react-native";
@@ -8,7 +18,7 @@ import { colors } from "@/theme/colors";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { alertUser, stopAlert } from "@/lib/alert-mode";
 import { completeReminder } from "@/lib/reminders";
-import { cancelReminder, scheduleReminderSeries } from "@/lib/notifications";
+import { cancelReminder, scheduleReminderSeries, takePendingAlert } from "@/lib/notifications";
 import { acknowledgeDocument, renewDocument } from "@/lib/doc-ack";
 import { documentFollowUp, type DocFollowUp } from "@/lib/ai";
 import { listDocuments } from "@/lib/documents";
@@ -90,9 +100,21 @@ export function ReminderAlertHost() {
     // Cold-start: app band tha, notification/full-screen se khula.
     notifee.getInitialNotification().then((initial) => show(initial?.notification));
 
+    // Background me aayi notification — full-screen intent app ko saamne le
+    // aata hai par uska koi foreground event nahi aata. `onBackgroundEvent`
+    // usko rakh deta hai, hum yahan uthate hain.
+    const showPending = () => {
+      void takePendingAlert().then(show);
+    };
+    showPending();
+    const appSub = AppState.addEventListener("change", (s: AppStateStatus) => {
+      if (s === "active") showPending();
+    });
+
     return () => {
       alive = false;
       unsub();
+      appSub.remove();
     };
   }, []);
 

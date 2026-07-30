@@ -49,6 +49,16 @@ async function activeUserIds(): Promise<Set<string>> {
   return active;
 }
 
+/** Jin users ka kam se kam ek phone register hai — unhi tak push ja sakti hai. */
+async function usersWithDevice(): Promise<Set<string>> {
+  const rows = await sbGet<{ user_id: string | null }>(
+    "device_tokens?select=user_id",
+  ).catch(() => [] as { user_id: string | null }[]);
+  const out = new Set<string>();
+  rows.forEach((r) => r.user_id && out.add(r.user_id));
+  return out;
+}
+
 /**
  * Bhejne se PEHLE poori list dikhane ke liye (item 8).
  *
@@ -67,9 +77,14 @@ export async function GET() {
   }
 
   try {
-    const [profiles, active] = await Promise.all([
+    const [profiles, active, withDevice] = await Promise.all([
       sbGet<Profile>("profiles?select=id,email,full_name,language,created_at&order=created_at.desc"),
       activeUserIds(),
+      // ⚠️ Ye pehle nahi aata tha, aur usi wajah se sabse uljhan wala sawaal
+      // bina jawab ke reh jaata tha: "email to gaya, notification kyun nahi?"
+      // Jawab hamesha yahi hota hai — us user ka koi phone register hi nahi
+      // hai. Ab bhejne se PEHLE dikh jaata hai.
+      usersWithDevice(),
     ]);
 
     // Bina email wale bhej hi nahi sakte — list me dikhana bhi galat sandesh
@@ -83,6 +98,7 @@ export async function GET() {
         language: p.language ?? null,
         joinedAt: p.created_at ?? null,
         active: active.has(p.id),
+        hasDevice: withDevice.has(p.id),
       }));
 
     // UI ko batana zaroori hai ki push ka option dikhaye ya nahi. Bina Firebase

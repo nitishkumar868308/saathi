@@ -272,7 +272,11 @@
       "Bash(node scripts/gen-tz-country.mjs)",
       "Bash(sed -i 's|^console.log\\(`\\\\${entries.length} zones|console.log\\(`${entries.length} zones \\(${aliasCount} purane naam bhi\\)|' scripts/gen-tz-country.mjs)",
       "Bash(grep -n \"^\\\\s*//\\\\|{/\\\\*\" /d/my-app/app-mobile/src/app/profile-details.tsx)",
-      "Bash(grep -n \"delete\\\\|Delete\\\\|/\\\\* \\\\|{/\\\\*\" /d/my-app/app-mobile/src/app/\\\\\\(tabs\\\\\\)/settings.tsx)"
+      "Bash(grep -n \"delete\\\\|Delete\\\\|/\\\\* \\\\|{/\\\\*\" /d/my-app/app-mobile/src/app/\\\\\\(tabs\\\\\\)/settings.tsx)",
+      "Bash(grep -rn \"replaceAll\\\\|\\\\.replace\\(/\\\\\\\\\\\\\\\\{\" /d/my-app/web/components/*.tsx)",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{JSON.parse\\(s\\).forEach\\(f=>f.messages.forEach\\(m=>console.log\\(f.filePath.split\\('src'\\)[1]+':'+m.line+' '+m.ruleId\\)\\)\\)}\\)\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const r=JSON.parse\\(s\\);r.forEach\\(f=>{if\\(f.messages.length\\)console.log\\(f.filePath.split\\('src'\\)[1],'->',f.messages.length,'|',[...new Set\\(f.messages.map\\(m=>m.ruleId\\)\\)].join\\(', '\\)\\)}\\);console.log\\('TOTAL:',r.reduce\\(\\(n,f\\)=>n+f.messages.length,0\\)\\)}\\)\")",
+      "Bash(git --no-pager diff -- web/components/AdminBroadcast.tsx web/app/api/admin/notify/route.ts web/app/globals.css)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

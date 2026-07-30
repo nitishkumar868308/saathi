@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import notifee, { AndroidImportance, AndroidVisibility } from "@notifee/react-native";
 
 import { supabase } from "./supabase";
+import { reportError } from "./report-error";
 
 /**
  * Push notification (FCM) — admin panel se aane wali khabar (item 8).
@@ -51,17 +52,35 @@ export function isPushAvailable(): boolean {
 // bhejna bekaar ka network hai.
 let lastSaved: string | null = null;
 
+/**
+ * Token server ko do.
+ *
+ * ⚠️ Yahan do bug the aur dono chup-chaap the:
+ *
+ * 1. `supabase.rpc()` fail hone par THROW nahi karta — wo `{ data, error }`
+ *    lautata hai. Purana code sirf try/catch lagata tha, isliye har server-side
+ *    fail (RPC hi na bani ho, RLS, session na ho) bina awaaz ke gum ho jaata.
+ * 2. Fail hone ke baad bhi `lastSaved = token` set ho jaata tha — matlab us
+ *    session me dobara koshish hoti hi nahi thi.
+ *
+ * Natija: `device_tokens` khaali reh jaati thi aur admin panel se bheji gayi
+ * notification kisi ko nahi milti thi ("kisi ne app install nahi ki" wala
+ * message), jabki asli wajah kuch aur hoti thi. Ab fail admin > Logs me dikhta
+ * hai aur agli koshish bhi hoti hai.
+ */
 async function saveToken(token: string): Promise<void> {
   if (!token || token === lastSaved || !supabase) return;
   try {
-    await supabase.rpc("save_device_token", {
+    const { error } = await supabase.rpc("save_device_token", {
       p_token: token,
       p_platform: Platform.OS,
     });
+    if (error) throw error;
     lastSaved = token;
-  } catch {
-    // Best-effort. Token na save ho to sirf admin ki push nahi pahunchegi —
-    // app ka apna kuch nahi tootta.
+  } catch (e) {
+    // `lastSaved` jaan-boojh ke set NAHI karte — agla token refresh ya agla
+    // login phir se koshish karega.
+    reportError(e, { screen: "push", action: "save_device_token" }, "warn");
   }
 }
 
@@ -84,8 +103,11 @@ export function registerPushToken(): () => void {
     try {
       const token = await messaging().getToken();
       if (alive) await saveToken(token);
-    } catch {
-      /* Firebase configure nahi hai ya permission nahi — chhod do */
+    } catch (e) {
+      // Firebase configure nahi hai ya permission nahi. Pehle ye bilkul chup
+      // tha — isliye "notification kyun nahi aayi" ka jawab kahin nahi milta
+      // tha. Ab kam se kam Logs me dikhta hai.
+      reportError(e, { screen: "push", action: "get_token" }, "warn");
     }
   })();
 

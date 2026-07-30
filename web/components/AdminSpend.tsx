@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bot, MessageCircle, Mail, RefreshCw } from "lucide-react";
 import { SkeletonRows } from "@/components/Loader";
+import Pagination, { usePagination } from "@/components/admin/Pagination";
 
 /**
  * "AI & WhatsApp" — humara kitna istemaal ho raha hai (item 3).
@@ -118,6 +119,10 @@ export default function AdminSpend() {
 
   const hasAny = rows.length > 0;
 
+  // Har service × kind ka apna row — services badhne par ye table lambi hoti
+  // jaati hai. Range badle to page 1 par wapas.
+  const pg = usePagination(rows, 12, range);
+
   return (
     <div className="mt-6">
       {/* Range + refresh */}
@@ -216,7 +221,7 @@ export default function AdminSpend() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {pg.pageItems.map((r) => (
                   <tr key={`${r.service}-${r.kind}`} className="border-b border-line/60 last:border-0">
                     <td className="px-5 py-3 font-semibold text-ink">{r.service}</td>
                     <td className="px-5 py-3 text-ink-soft">{r.kind}</td>
@@ -236,6 +241,17 @@ export default function AdminSpend() {
                 ))}
               </tbody>
             </table>
+            <div className="px-5 pb-4">
+              <Pagination
+                page={pg.page}
+                pageCount={pg.pageCount}
+                total={pg.total}
+                from={pg.from}
+                to={pg.to}
+                onPage={pg.setPage}
+                label="rows"
+              />
+            </div>
           </div>
         )}
       </div>

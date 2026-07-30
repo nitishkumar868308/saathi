@@ -9,12 +9,15 @@ import {
   Animated,
   Easing,
   AppState,
+  useWindowDimensions,
   type AppStateStatus,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors } from "@/theme/colors";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { syncNotifications } from "@/lib/notifications";
 import {
   checkReadiness,
   requestStep,
@@ -53,6 +56,21 @@ export function PermissionModal({
   const [busy, setBusy] = useState<StepKey | null>(null);
   const scale = useRef(new Animated.Value(0.94)).current;
 
+  /**
+   * ⚠️ Card ki koi height limit nahi thi aur list ki `maxHeight: 380` fix thi.
+   * Chhoti screen par poora card screen se bahar nikal jaata tha: upar ka icon
+   * status bar ke peeche chala jaata, aur "Baad me" button aakhri card ke upar
+   * chadh jaata tha. Sabse buri baat — battery aur auto-start wale steps neeche
+   * chhup jaate the, isliye user "sab allow kar diya" samajh ke chala jaata aur
+   * reminder phir bhi late aata.
+   *
+   * Ab card screen (minus safe area) se bada ho hi nahi sakta, aur beech wali
+   * list jitni jagah bache utni me scroll karti hai.
+   */
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const maxCardHeight = Math.max(320, height - insets.top - insets.bottom - 48);
+
   const refresh = useCallback(async () => {
     setState(await checkReadiness());
   }, []);
@@ -88,6 +106,19 @@ export function PermissionModal({
     // Notification permission in-app dialog hai — AppState change nahi aata.
     await refresh();
     setBusy(null);
+
+    // ⚠️ Ye missing tha, aur isi wajah se sabse aam shikayat aati thi:
+    // "sab allow kar diya, phir bhi notification nahi aayi."
+    //
+    // `syncNotifications()` permission na hone par shuru me hi lautaa deta hai.
+    // Yaani permission se PEHLE bane reminders ka koi alarm laga hi nahi hota.
+    // Permission milne par pehle kuch bhi dobara sync nahi karta tha — notif
+    // ka dialog in-app hai, isliye AppState "active" bhi nahi aata. Reminder
+    // chup-chaap bina alarm ke pada rehta tha.
+    //
+    // Exact-alarm ke baad bhi sync zaroori hai: pehle se lage inexact alarms
+    // ab exact ban jaate hain.
+    if (key === "notif" || key === "alarm") void syncNotifications();
   }
 
   const steps = (state?.steps ?? []).filter((s) => s.supported);
@@ -106,9 +137,9 @@ export function PermissionModal({
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
-          <View style={styles.card}>
+          <View style={[styles.card, { maxHeight: maxCardHeight }]}>
             <View style={styles.iconWrap}>
               <Ionicons
                 name={allOk ? "checkmark-circle" : "alarm"}
@@ -131,7 +162,11 @@ export function PermissionModal({
               </View>
             )}
 
-            <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.list}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            >
               {steps.map((s) => (
                 <View
                   key={s.key}
@@ -193,13 +228,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(46,40,35,0.55)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 22,
+    paddingHorizontal: 18,
   },
   cardWrap: { width: "100%", maxWidth: 440 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 28,
-    padding: 24,
+    padding: 22,
     borderWidth: 1,
     borderColor: colors.line,
     shadowColor: "#000",
@@ -244,7 +279,10 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   stepKey: { borderColor: colors.terracotta, borderWidth: 1.5 },
-  list: { marginTop: 16, maxHeight: 380 },
+  // flexShrink: card ki maxHeight lagne par sirf yahi hissa chhota hota hai —
+  // heading upar aur button neeche hamesha dikhte rehte hain.
+  list: { marginTop: 14, flexShrink: 1 },
+  listContent: { paddingBottom: 2 },
   step: {
     flexDirection: "row",
     alignItems: "center",
@@ -277,7 +315,7 @@ const styles = StyleSheet.create({
   },
   allowText: { fontSize: 12.5, fontWeight: "800", color: colors.white },
   cta: {
-    marginTop: 6,
+    marginTop: 12,
     height: 50,
     borderRadius: 16,
     alignItems: "center",

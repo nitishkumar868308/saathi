@@ -6,12 +6,15 @@ import notifee, {
   AndroidVisibility,
   AndroidCategory,
   AuthorizationStatus,
+  EventType,
   TriggerType,
+  type Notification,
   type TimestampTrigger,
 } from "@notifee/react-native";
 
 import { listReminders } from "./reminders";
 import { listDocuments } from "./documents";
+import { reportError } from "./report-error";
 import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionaries";
 
 /**
@@ -28,11 +31,57 @@ import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionar
  * ⚠️ Native module — Expo Go me nahi chalta. Dev/prod build (EAS) chahiye.
  */
 
-// Background event handler — notifee ise chahta hai (warna warning). Full-screen
-// alert OS khud dikhata hai; press par app khulta hai aur getInitialNotification /
-// foreground event modal dikha deta hai, isliye yahan kuch karne ki zaroorat nahi.
+/** App band/background me aayi notification — resume par modal dikhane ke liye. */
+const PENDING_ALERT_KEY = "saathi-pending-alert";
+/** Itni purani notification ka modal ab dikhana bhadda lagta hai. */
+const PENDING_ALERT_MAX_AGE_MS = 30 * 60_000;
+
+/**
+ * Background event handler — notifee ise chahta hai (warna warning).
+ *
+ * ⚠️ Ye pehle khaali tha, is soch ke saath ki "getInitialNotification aur
+ * foreground event kaafi hain". Wo ek soorat me galat tha, aur wahi sabse aam
+ * soorat hai: app BACKGROUND me ho (band nahi), phone locked ho, aur full-screen
+ * intent MainActivity ko saamne le aaye. Tab —
+ *   • `getInitialNotification()` null hai (app cold-start hua hi nahi), aur
+ *   • `onForegroundEvent` ka DELIVERED aa chuka hota hai jab app peeche thi,
+ *     yaani wo background event tha aur yahan chup-chaap gir jaata tha.
+ * Natija: screen jaagti thi, app khulti thi, par reminder ka bada alert kabhi
+ * nahi aata tha.
+ *
+ * Ab notification yahan rakh dete hain aur app saamne aate hi `reminder-alert`
+ * ise utha ke modal dikha deta hai.
+ */
 if (Platform.OS !== "web") {
-  notifee.onBackgroundEvent(async () => {});
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type !== EventType.DELIVERED && type !== EventType.PRESS) return;
+    const n = detail.notification;
+    if (!n?.id) return;
+    try {
+      await AsyncStorage.setItem(
+        PENDING_ALERT_KEY,
+        JSON.stringify({ at: Date.now(), notification: n }),
+      );
+    } catch {
+      /* best-effort */
+    }
+  });
+}
+
+/** Background me rakhi gayi notification lo aur hata do (ek hi baar dikhe). */
+export async function takePendingAlert(): Promise<Notification | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ALERT_KEY);
+    if (!raw) return null;
+    await AsyncStorage.removeItem(PENDING_ALERT_KEY);
+    const saved = JSON.parse(raw) as { at?: number; notification?: Notification };
+    if (!saved?.notification) return null;
+    // Ghanton purani notification ka modal kholna user ko chaunka deta hai.
+    if (!saved.at || Date.now() - saved.at > PENDING_ALERT_MAX_AGE_MS) return null;
+    return saved.notification;
+  } catch {
+    return null;
+  }
 }
 
 /** Notification text user ki chuni bhasha me. */
@@ -104,45 +153,73 @@ async function schedule(
   kind: "reminder" | "expiry" = "reminder",
 ): Promise<boolean> {
   if (when.getTime() <= Date.now()) return false;
+
+  const notification = {
+    id,
+    title,
+    body,
+    data: { kind, body, title, id },
+    android: {
+      channelId: CHANNEL_ID,
+      importance: AndroidImportance.HIGH,
+      category: AndroidCategory.ALARM,
+      // Lock screen par alarm-jaisa poora popup:
+      fullScreenAction: { id: "default" },
+      pressAction: { id: "default" },
+      sound: "default",
+      autoCancel: true,
+    },
+    ios: {
+      sound: "default",
+      interruptionLevel: "timeSensitive" as const,
+    },
+  };
+
+  const trigger = (type: AlarmType): TimestampTrigger => ({
+    type: TriggerType.TIMESTAMP,
+    timestamp: when.getTime(),
+    // ⚠️ Pehle yahan sirf `{ allowWhileIdle: true }` tha. Wo notifee ka
+    // deprecated flag hai aur alarm ko SET_AND_ALLOW_WHILE_IDLE banata hai —
+    // yaani **inexact**. Android aise alarms ko ~10 min ki window me doosre
+    // alarms ke saath batch karta hai, isliye 8:36 wala reminder 8:38 pe 8:39
+    // wale ke saath ek jhund me aata tha. SET_EXACT_AND_ALLOW_WHILE_IDLE se
+    // alarm doze me bhi theek us minute par bajta hai.
+    alarmManager: { type },
+  });
+
   try {
     await ensureChannel();
-    const trigger: TimestampTrigger = {
-      type: TriggerType.TIMESTAMP,
-      timestamp: when.getTime(),
-      // ⚠️ Pehle yahan sirf `{ allowWhileIdle: true }` tha. Wo notifee ka
-      // deprecated flag hai aur alarm ko SET_AND_ALLOW_WHILE_IDLE banata hai —
-      // yaani **inexact**. Android aise alarms ko ~10 min ki window me doosre
-      // alarms ke saath batch karta hai, isliye 8:36 wala reminder 8:38 pe 8:39
-      // wale ke saath ek jhund me aata tha. SET_EXACT_AND_ALLOW_WHILE_IDLE se
-      // alarm doze me bhi theek us minute par bajta hai.
-      alarmManager: { type: AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE },
-    };
     await notifee.createTriggerNotification(
-      {
-        id,
-        title,
-        body,
-        data: { kind, body, title, id },
-        android: {
-          channelId: CHANNEL_ID,
-          importance: AndroidImportance.HIGH,
-          category: AndroidCategory.ALARM,
-          // Lock screen par alarm-jaisa poora popup:
-          fullScreenAction: { id: "default" },
-          pressAction: { id: "default" },
-          sound: "default",
-          autoCancel: true,
-        },
-        ios: {
-          sound: "default",
-          interruptionLevel: "timeSensitive",
-        },
-      },
-      trigger,
+      notification,
+      trigger(AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE),
     );
     return true;
-  } catch {
-    return false;
+  } catch (exactErr) {
+    /**
+     * ⚠️ Exact alarm ki permission (SCHEDULE_EXACT_ALARM) na ho to notifee
+     * yahan THROW karta hai — aur purana code use chup-chaap nigal ke `false`
+     * lauta deta tha. Natija: reminder ka alarm lagta hi nahi tha, kahin koi
+     * error bhi nahi dikhta tha, aur user ko lagta tha app hi toot gayi.
+     *
+     * Der se aana, na aane se behtar hai. Isliye ab inexact alarm par gir
+     * jaate hain (~10 min ki window me bajega) aur permission modal user se
+     * exact-alarm maang hi raha hai.
+     */
+    try {
+      await notifee.createTriggerNotification(
+        notification,
+        trigger(AlarmType.SET_AND_ALLOW_WHILE_IDLE),
+      );
+      reportError(
+        exactErr,
+        { screen: "notifications", action: "schedule_exact", id, kind, fallback: "inexact" },
+        "warn",
+      );
+      return true;
+    } catch (e) {
+      reportError(e, { screen: "notifications", action: "schedule", id, kind });
+      return false;
+    }
   }
 }
 
@@ -291,7 +368,9 @@ export async function syncNotifications(): Promise<void> {
     for (const d of documents) {
       await scheduleDocumentExpiry(d.id, d.name, d.expiry);
     }
-  } catch {
-    /* best-effort */
+  } catch (e) {
+    // Sync toota to har reminder ka alarm miss hota hai — sabse mehnga chup
+    // rehne wala fail. Pehle ye poora catch khaali tha.
+    reportError(e, { screen: "notifications", action: "sync" }, "warn");
   }
 }

@@ -6,9 +6,21 @@
   html {
     scroll-behavior: smooth;
   }
+  /**
+   * ⚠️ Yahan `overflow-x-hidden` MAT lagana.
+   *
+   * `overflow-x: hidden` browser ko `overflow-y: auto` maanne par majboor karta
+   * hai — yaani html/body khud ek scroll container ban jaate hain. Uske andar
+   * ki har `position: sticky` cheez chipakna band kar deti hai: admin ka
+   * sidebar page ke saath upar chala jaata tha, aur SubHeader bhi tik nahi
+   * raha tha.
+   *
+   * `clip` bilkul wahi kaam karta hai (bahar nikla hua content kaat deta hai)
+   * par scroll container nahi banata — isliye sticky theek chalti hai.
+   */
   html,
   body {
-    @apply overflow-x-hidden;
+    @apply overflow-x-clip;
   }
   body {
     @apply bg-cream text-ink font-sans antialiased;

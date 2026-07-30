@@ -114,9 +114,18 @@ export function reportError(
       p_platform: Platform.OS,
       p_app_version: APP_VERSION,
     }),
-  ).catch(() => {
-    /* best-effort */
-  });
+  )
+    .then(({ error }) => {
+      // ⚠️ `rpc()` fail par throw nahi karta — `{ error }` lautata hai. Isliye
+      // logging khud toot jaye (RPC hi na ho, grant na ho) to admin > Logs
+      // hamesha ke liye khaali rehti aur kisi ko bhanak bhi na lagti. Server
+      // par ise bhej nahi sakte (wahi raasta toota hai), par logcat me dikha
+      // dena kaafi hai — build me `adb logcat` se turant pata chal jaata hai.
+      if (error) console.warn("[report-error] log_app_error failed:", error.message);
+    })
+    .catch(() => {
+      /* best-effort */
+    });
 }
 
 /**

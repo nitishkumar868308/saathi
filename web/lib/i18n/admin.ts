@@ -110,6 +110,14 @@ export type AdminDict = {
     /** {sent} {devices} */
     pushDone: string;
     pushNone: string;
+    /** Us user ke phone par app hai — push ja sakti hai. */
+    hasApp: string;
+    /** App nahi mili — sirf email jayega. */
+    noApp: string;
+    /** {withApp} {total} — bhejne se pehle saaf dikhe ki push kitno tak jayegi. */
+    devicesSummary: string;
+    /** Push chuna par ek bhi device nahi — pehle hi bata do. */
+    pushNoDevices: string;
   };
   contacts: {
     countMsg: string; // {n}
@@ -143,6 +151,14 @@ export type AdminDict = {
       loadFailed: string;
       emptyFilter: string;
       empty: string;
+      /** Har lambi list ke upar search box. */
+      searchPh: string;
+      /* Pagination ke "X–Y / Z ___" wale nouns. */
+      countries: string;
+      posts: string;
+      pages: string;
+      rows: string;
+      events: string;
       total: string;
       free: string;
       plus: string;
@@ -400,6 +416,11 @@ const en: AdminDict = {
     pushOff: "Firebase isn't set up yet — see FIREBASE-SETUP.md.",
     pushDone: "{sent} notifications delivered to {devices} devices.",
     pushNone: "Nobody in this list has the app installed yet.",
+    hasApp: "App",
+    noApp: "No app",
+    devicesSummary: "{withApp} of {total} users have the app — only they can get a notification.",
+    pushNoDevices:
+      "None of the selected users has the app registered — the notification will reach nobody. Email will still go.",
   },
   contacts: {
     countMsg: "{n} messages",
@@ -416,6 +437,9 @@ const en: AdminDict = {
       loadFailed: "Could not load", emptyFilter: "Nothing matches this filter.",
       empty: "Nothing here yet.", total: "Total", free: "Free", plus: "Plus",
       expired: "Expired",
+      searchPh: "Search…",
+      countries: "countries", posts: "posts", pages: "pages",
+      rows: "rows", events: "events",
     },
     rewards: {
       totalUsers: "Total users", referrals: "Referrals", rewarded: "Rewarded",
@@ -619,6 +643,11 @@ const hi: AdminDict = {
     pushOff: "Firebase अभी सेट नहीं है — FIREBASE-SETUP.md देखें।",
     pushDone: "{devices} डिवाइस में से {sent} पर नोटिफ़िकेशन पहुँची।",
     pushNone: "इस लिस्ट में अभी किसी ने ऐप इंस्टॉल नहीं की।",
+    hasApp: "ऐप है",
+    noApp: "ऐप नहीं",
+    devicesSummary: "{total} में से {withApp} यूज़र के पास ऐप है — नोटिफ़िकेशन सिर्फ़ उन्हीं तक जाएगी।",
+    pushNoDevices:
+      "चुने हुए किसी भी यूज़र का फ़ोन रजिस्टर नहीं है — नोटिफ़िकेशन किसी तक नहीं पहुँचेगी। ईमेल फिर भी जाएगा।",
   },
   contacts: {
     countMsg: "{n} मैसेज",
@@ -635,6 +664,9 @@ const hi: AdminDict = {
       loadFailed: "लोड नहीं हुआ", emptyFilter: "इस फ़िल्टर में कुछ नहीं।",
       empty: "अभी कुछ नहीं।", total: "कुल", free: "फ्री", plus: "प्लस",
       expired: "खत्म",
+      searchPh: "खोजें…",
+      countries: "देश", posts: "पोस्ट", pages: "पेज",
+      rows: "पंक्तियाँ", events: "इवेंट",
     },
     rewards: {
       totalUsers: "कुल यूज़र", referrals: "रेफरल", rewarded: "रिवॉर्ड मिला",
@@ -839,6 +871,11 @@ const hinglish: AdminDict = {
     pushOff: "Firebase abhi set nahi hai — FIREBASE-SETUP.md dekho.",
     pushDone: "{devices} device me se {sent} par notification pahunch gayi.",
     pushNone: "Is list me abhi kisi ne app install nahi ki.",
+    hasApp: "App hai",
+    noApp: "App nahi",
+    devicesSummary: "{total} me se {withApp} user ke paas app hai — notification sirf unhi tak jayegi.",
+    pushNoDevices:
+      "Chune hue kisi bhi user ka phone register nahi hai — notification kisi tak nahi jayegi. Email phir bhi jayega.",
   },
   contacts: {
     countMsg: "{n} message",
@@ -855,6 +892,9 @@ const hinglish: AdminDict = {
       loadFailed: "Load nahi hua", emptyFilter: "Is filter me kuch nahi.",
       empty: "Abhi kuch nahi.", total: "Total", free: "Free", plus: "Plus",
       expired: "Khatam",
+      searchPh: "Dhundo…",
+      countries: "countries", posts: "posts", pages: "pages",
+      rows: "rows", events: "events",
     },
     rewards: {
       totalUsers: "Total users", referrals: "Referrals", rewarded: "Rewarded",
