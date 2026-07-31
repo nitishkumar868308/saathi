@@ -10,12 +10,63 @@
 //   brief    → aaj ke data se chhota morning brief
 
 const KEY = Deno.env.get("GEMINI_API_KEY");
-// ⚠️ Fixed model naam (gemini-2.5-flash / -flash-lite) naye users ke liye band ho
-//    gaye the → 404 "no longer available to new users" → AI fail hoke static
-//    fallback pe chala jaata tha. Ab "-latest" alias use karte hain, jo hamesha
-//    current model pe point karta hai — aage bhi nahi tootega.
-const MODEL = "gemini-flash-lite-latest"; // chat, reminder, brief — sasta/fast
-const VISION_MODEL = "gemini-flash-latest"; // document reading — accurate
+// ── Model ka naam do baar tod chuka hai; dono baar alag tarah se ──────────
+//
+// ⚠️ Pehle: tay kiye hue naam (gemini-2.5-flash) naye users ke liye band kar
+//    diye gaye → 404 "no longer available to new users". Uska ilaaj "-latest"
+//    alias tha, is soch ke saath ki wo hamesha current model par point karega.
+//
+// ⚠️ Phir wahi ilaaj hi bimari ban gaya. 28 July tak sab theek chal raha tha, 31 July ko har call
+// 401 `ACCESS_TOKEN_TYPE_UNSUPPORTED` dene lagi — "is method ke liye API key
+// nahi, OAuth chahiye". Key wahi thi jo pehle chal rahi thi (24 July se badli
+// hi nahi). Yaani galti key ki nahi, MODEL ke naam ki thi: Google `-latest`
+// alias ko kabhi bhi aise tier par sarka deta hai jahan API key nahi chalti.
+//
+// Isliye ab teen cheezein:
+//   1. Model ka naam env se aa sakta hai — agle baar code badalna hi na pade.
+//   2. Ek FALLBACK model hai jo pakka API-key se chalta hai. Pehla mana kare to
+//      doosra apne aap chal jaata hai (`gemini()` neeche ye khud karta hai).
+//   3. `task: "health"` batata hai ki is key se kaun-kaun se model chalte hain.
+//
+// Env (optional): GEMINI_MODEL, GEMINI_VISION_MODEL, GEMINI_FALLBACK_MODELS
+//
+// ── Model kyun yahi ────────────────────────────────────────────────────────
+// Tarteeb: pehle TEZ aur SAHI, uske baad sasta.
+//
+//   chat/reminder → gemini-3.5-flash
+//        Bahut tez hai aur Google khud ise low-latency chat ke liye kehta hai.
+//        Yahi wo jagah hai jahan galti sabse mehngi padti hai: reminder ka din
+//        ya time galat samjha to alarm galat waqt bajta hai, aur user ko pata
+//        bhi nahi chalta. Isliye yahan flash-lite se thoda mehnga theek hai.
+//
+//   scan (vision) → gemini-3.6-flash
+//        Document padhna sabse nazuk kaam hai — ek galat expiry date poore
+//        reminder ko galat din par le jaati hai. Ye multimodal me sabse accha
+//        hai, aur token bhi kam kharch karta hai (yaani 3.5 Flash se sasta bhi).
+const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash";
+const VISION_MODEL = Deno.env.get("GEMINI_VISION_MODEL") ?? "gemini-3.6-flash";
+
+/**
+ * Jab upar wala model API key se mana kar de — ye chain ek-ek karke try hoti hai.
+ *
+ * ⚠️ Yahan `-latest` alias JAAN-BOOJH KE nahi hai. Wahi poore outage ki jad tha:
+ * `gemini-flash-lite-latest` chal raha tha, phir Google ne alias ko aise tier
+ * par sarka diya jahan API key nahi chalti, aur ek raat me har call 401 dene
+ * lagi — bina hamare kuch badle. Tay kiye hue (pinned) version aise nahi
+ * sarakte.
+ *
+ * ⚠️ Aur `gemini-2.0-flash` bhi mat daalna — wo 1 June 2026 ko band ho chuka hai.
+ *
+ * `gemini-2.5-flash` isliye hai ki wo alag generation ka stable model hai:
+ * 3.x family me ek saath kuch gadbad ho jaye to bhi ye chalta rahega. Sasta bhi
+ * sabse zyada hai — fallback ka kaam bachana hai, shaan dikhana nahi.
+ */
+const FALLBACK_MODELS = (
+  Deno.env.get("GEMINI_FALLBACK_MODELS") ?? "gemini-3.5-flash-lite,gemini-2.5-flash"
+)
+  .split(",")
+  .map((m) => m.trim())
+  .filter(Boolean);
 
 // Supabase auto-injects ye edge functions me.
 const SB_URL = Deno.env.get("SUPABASE_URL");
@@ -141,18 +192,66 @@ async function gemini(opts: {
       ...(opts.json ? { responseMimeType: "application/json" } : {}),
     },
   };
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+
+  /**
+   * Model ne API key se mana kar diya — pakke wale model par chale jao.
+   *
+   * ⚠️ Ye 401/403 "key galat hai" NAHI hai. Google ye tab deta hai jab MODEL
+   * API-key se chalne wale tier me na ho. Aur `-latest` alias kabhi bhi udhar
+   * sarak sakta hai — bina kisi khabar ke, bina kuch badle. Exactly yahi 28-31
+   * July ke beech hua tha: ek din sab chal raha tha, agle din har call 401.
+   *
+   * Pehle iska koi ilaaj nahi tha — poora AI band pad jaata tha aur wajah kahin
+   * dikhti bhi nahi thi. Ab wo apne aap ek stable model par chala jaata hai.
+   */
+  /** Model ne mana kiya (key ne nahi) — tabhi agle model par jaana hai. */
+  const rejected = (r: Response) =>
+    r.status === 401 || r.status === 403 || r.status === 404;
+
+  let usedModel = opts.model;
+  if (rejected(res)) {
+    const why = (await res.clone().text()).slice(0, 200);
+    for (const alt of FALLBACK_MODELS) {
+      if (alt === opts.model) continue;
+      const tryRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${alt}:generateContent?key=${KEY}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      res = tryRes;
+      usedModel = alt;
+      if (tryRes.ok) {
+        // Chalu to ho gaya, par ye chup-chaap nahi hona chahiye — warna mahino
+        // tak pata hi nahi chalega ki asli model band pada hai aur app poore
+        // waqt ek doosre (aksar kamzor) model par chal rahi hai.
+        void logUsage("model_fallback", 0, true, opts.track?.userId ?? null, {
+          from: opts.model,
+          to: alt,
+          why,
+        });
+        break;
+      }
+      // Ye bhi mana kar gaya to agle par; kisi aur tarah ka fail ho to yahin
+      // ruk jao (retry se wo theek nahi hoga, sirf der lagegi).
+      if (!rejected(tryRes)) break;
+    }
+  }
+
   if (!res.ok) {
     const text = await res.text();
     if (opts.track) {
       // Fail bhi ginte hain — retry ka apna kharcha hota hai, aur "AI kaam nahi
       // kar raha" wali shikayat ka sabse pehla sabooot yahi hota hai.
       void logUsage(opts.track.kind, 0, false, opts.track.userId, {
-        model: opts.model,
+        model: usedModel,
         status: res.status,
       });
     }
@@ -167,7 +266,7 @@ async function gemini(opts: {
       true,
       opts.track.userId,
       {
-        model: opts.model,
+        model: usedModel,
         prompt: Number(um.promptTokenCount ?? 0),
         output: Number(um.candidatesTokenCount ?? 0),
       },
@@ -280,6 +379,104 @@ Deno.serve(async (req) => {
     return json({ error: "invalid body" }, 400);
   }
   const task = payload.task ?? "chat";
+
+  /**
+   * `task: "health"` — "AI kyun nahi chal raha?" ka jawab, ek call me.
+   *
+   * ⚠️ Ye isliye bana kyunki ek baar poora AI hafton band pada raha aur wajah
+   * dhoondhne me bahut waqt gaya. Har jagah se ek hi bemtlab line aati thi
+   * ("Edge Function returned a non-2xx status code"), aur asli baat — Gemini ne
+   * key hi nahi maani — kahin dikhti nahi thi.
+   *
+   * Yahan key KABHI nahi lautti, sirf uski shakal: kitni lambi hai, kis se shuru
+   * hoti hai, aur (sabse aam galti) kahin uske aage-peeche space/newline to
+   * nahi chipka. Dashboard me paste karte waqt newline chala jaana bahut aam hai
+   * aur usse Google ka jawab bilkul "key hi nahi bheji" jaisa ho jaata hai.
+   */
+  if (task === "health") {
+    const raw = KEY ?? "";
+    const trimmed = raw.trim();
+    const shape = {
+      present: !!raw,
+      length: raw.length,
+      // AI Studio ki key hamesha "AIza" se shuru hoti hai.
+      looksLikeAiStudioKey: trimmed.startsWith("AIza"),
+      hasSurroundingWhitespace: raw !== trimmed,
+      hasQuotes: /^["']|["']$/.test(trimmed),
+    };
+
+    if (!shape.present) {
+      return json({
+        ok: false,
+        shape,
+        problem: "GEMINI_API_KEY set hi nahi hai.",
+        fix: "Supabase → Edge Functions → Secrets me GEMINI_API_KEY daalo, phir `npx supabase functions deploy ai`.",
+      });
+    }
+
+    // Sabse halki call jo Google se ho sakti hai — model list. Isse pata chal
+    // jaata hai ki key chalti hai ya nahi, bina ek bhi token kharch kiye.
+    let status = 0;
+    let body = "";
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${trimmed}`,
+      );
+      status = res.status;
+      body = await res.text();
+    } catch (e) {
+      return json({ ok: false, shape, problem: `Google tak pahunch hi nahi paaye: ${e}` });
+    }
+
+    if (status === 200) {
+      // Kaun-kaun se model is key se generateContent kar sakte hain — yahi wo
+      // list hai jo "AI kyun band hua" ka jawab seedha de deti hai.
+      let usable: string[] = [];
+      try {
+        const parsed = JSON.parse(body || "{}");
+        usable = (parsed.models ?? [])
+          .filter((m: any) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
+          .map((m: any) => String(m.name ?? "").replace("models/", ""));
+      } catch {
+        /* list na mile to bhi key theek hai — wahi sabse zaroori baat hai */
+      }
+      return json({
+        ok: true,
+        shape,
+        configured: { chat: MODEL, vision: VISION_MODEL, fallbacks: FALLBACK_MODELS },
+        chatModelUsable: usable.length === 0 || usable.includes(MODEL),
+        visionModelUsable: usable.length === 0 || usable.includes(VISION_MODEL),
+        fallbacksUsable: FALLBACK_MODELS.filter((m) => usable.length === 0 || usable.includes(m)),
+        usable,
+        problem: null,
+        fix: null,
+      });
+    }
+
+    // Google ke do alag jawab, do bilkul alag ilaaj. Inhe ek jaisa dikhana hi
+    // wo galti thi jisme itna waqt gaya.
+    let problem = `Google ne ${status} diya.`;
+    let fix = "";
+    if (body.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED")) {
+      problem =
+        "Google is key ko API key maanta hi nahi — wo OAuth token maang raha hai. " +
+        "Matlab ye key AI Studio ki nahi hai (aksar Google Cloud / Vertex AI wali key hoti hai), " +
+        "ya value me space/newline chipka hai.";
+      fix =
+        "aistudio.google.com/apikey se NAYI key banao (wo 'AIza…' se shuru hoti hai), " +
+        "Supabase Secrets me bina kisi space/newline ke paste karo, phir `npx supabase functions deploy ai`.";
+    } else if (body.includes("API_KEY_INVALID")) {
+      problem = "Key ki shakal to theek hai par Google ke paas wo hai nahi (delete/rotate ho chuki).";
+      fix = "aistudio.google.com/apikey se nayi key banao aur Supabase Secrets me badal do.";
+    } else if (body.includes("SERVICE_DISABLED") || body.includes("PERMISSION_DENIED")) {
+      problem = "Key to hai, par us project me Generative Language API band hai.";
+      fix = "Google Cloud console me 'Generative Language API' enable karo.";
+    } else if (status === 429) {
+      problem = "Key theek hai — par abhi rate limit / quota khatam hai.";
+      fix = "Thodi der baad dobara dekho, ya billing/quota badhao.";
+    }
+    return json({ ok: false, shape, status, problem, fix, detail: body.slice(0, 400) });
+  }
 
   // Key nahi hai: chat stub-mode me chalta hai (message phir bhi record hota hai,
   // taaki referral ki "first chat" condition kaam kare). Baaki tasks bina key nahi.

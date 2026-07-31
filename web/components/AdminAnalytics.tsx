@@ -13,6 +13,7 @@ import {
 
 import Loader from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import DayChart from "@/components/admin/DayChart";
 import { useAdminT } from "@/lib/i18n/admin";
 
 /**
@@ -130,9 +131,6 @@ export default function AdminAnalytics() {
     };
   }, [summary]);
 
-  // Bar chart ki sabse oonchi line — baaki isi ke hisaab se scale hoti hain.
-  const peak = Math.max(1, ...(summary?.daily ?? []).map((d) => Number(d.events)));
-
   // Top screens aur journey — dono lambi list ban jaati hain. Hooks yahan,
   // `if (!summary)` wale early return se PEHLE (React ka niyam).
   const topPg = usePagination(summary?.top ?? [], 10, days);
@@ -187,27 +185,23 @@ export default function AdminAnalytics() {
         <Stat label={a.fromWeb} value={totals.web} />
       </div>
 
-      {/* Rozana — chhota bar chart. Har din ki oonchai peak ke hisaab se. */}
+      {/* Rozana — App aur Web ek doosre ke upar, paimane ke saath. */}
       <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
         <h3 className="font-display text-base font-semibold">{a.daily}</h3>
-        {!summary.daily.length ? (
-          <p className="py-10 text-center text-sm text-ink-soft">{sh.empty}</p>
-        ) : (
-          <div className="mt-5 flex h-40 items-end gap-1.5">
-            {summary.daily.map((d) => (
-              <div key={d.day} className="flex flex-1 flex-col items-center gap-1.5">
-                <div
-                  className="w-full rounded-t-md bg-terracotta/80 transition hover:bg-terracotta"
-                  style={{ height: `${(Number(d.events) / peak) * 100}%`, minHeight: 3 }}
-                  title={`${d.events} ${a.events} · ${d.sessions} ${a.sessions}`}
-                />
-                <span className="text-[10px] leading-none text-ink-soft">
-                  {fmtDay(d.day)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        <DayChart
+          rows={summary.daily}
+          labels={{
+            app: a.chartApp,
+            web: a.chartWeb,
+            total: a.chartTotal,
+            sessions: a.sessions,
+            users: a.peakUsers,
+            tableView: a.tableView,
+            chartView: a.chartView,
+            day: a.chartDay,
+            empty: sh.empty,
+          }}
+        />
       </div>
 
       {/* Top screens / pages */}

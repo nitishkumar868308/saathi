@@ -29,14 +29,19 @@ function fromNotification(n?: Notification | null): Alert | null {
   if (!n) return null;
   const data = (n.data ?? {}) as { kind?: string; body?: string; id?: string };
 
-  // ⚠️ Admin panel se aayi push ko yahan se guzarna hi nahi chahiye.
+  // ⚠️ Sirf reminder aur expiry ka hi full-screen alert khulna chahiye.
   //
-  // Wo koi "kaam" nahi hai, sirf ek khabar hai — uska koi reminder id nahi hota
-  // aur na hi koi document. Bina is guard ke wo neeche "reminder" maan li jaati
-  // aur user ko "Ye kaam ho gaya?" wala full-screen modal dikh jaata; "Ho gaya"
-  // dabate hi app ek jhoothe id par `complete_reminder` chala deti.
-  // Admin ki notification tray me hi theek hai.
-  if (data.kind === "admin") return null;
+  // Baaki har notification (admin ka broadcast, support ka jawab) ek khabar hai,
+  // koi "kaam" nahi — uska na koi reminder id hota hai na document. Bina is
+  // guard ke wo neeche reminder maan li jaati aur user ko "Ye kaam ho gaya?"
+  // wala modal dikh jaata; "Ho gaya" dabate hi app ek jhoothe id par
+  // `complete_reminder` chala deti.
+  //
+  // Pehle yahan sirf `kind === "admin"` roka jaata tha. Wo ek allow-list nahi
+  // block-list thi, aur usi wajah se support wali nayi notification (kind:
+  // "support") is guard se nikal jaati — har jawab par ek jhootha reminder
+  // alert. Ab ulta: jo pehchaane hue nahi hain, sab bahar.
+  if (data.kind !== "reminder" && data.kind !== "expiry") return null;
 
   return {
     // Reminder me id = reminder id; expiry me "doc:<id>:<lead>".
@@ -51,6 +56,23 @@ function fromNotification(n?: Notification | null): Alert | null {
 function docIdFrom(identifier: string): string | null {
   const m = identifier.match(/^doc:(.+):\d+$/);
   return m ? m[1] : null;
+}
+
+/**
+ * Notification id se ASLI reminder id.
+ *
+ * ⚠️ Roz/har-hafte wale reminder ke har occurrence ka apna notification id hota
+ * hai — pehla `<uuid>`, uske baad `<uuid>#1`, `<uuid>#2`… (`notifications.ts`
+ * ka `occId`). Ye suffix seedha server par bhej dena ek chupa hua bug tha:
+ * `complete_reminder("<uuid>#3")` kabhi chalta hi nahi (wo valid uuid hai hi
+ * nahi), aur `cancelReminder("<uuid>#3")` galat alarm dhoondhta tha.
+ *
+ * Yaani roz wale reminder me pehle din "Ho gaya" kaam karta tha, aur uske baad
+ * kisi bhi din nahi — server par kuch nahi jaata tha aur agle din wahi reminder
+ * phir aa jaata tha. Suffix yahan hata dete hain.
+ */
+function reminderIdFrom(identifier: string): string {
+  return identifier.split("#")[0];
 }
 
 /**
@@ -107,6 +129,28 @@ export function ReminderAlertHost() {
       void takePendingAlert().then(show);
     };
     showPending();
+
+    /**
+     * ⚠️ App BAND thi wali soorat me ek daud lagti hai.
+     *
+     * Notifee ka headless task (jo pending alert LIKHTA hai) aur app ka
+     * cold-start (jo use PADHTA hai) ek saath chalte hain. Upar wali ek hi
+     * koshish aksar likhne se pehle ho jaati thi — storage khaali milta tha,
+     * aur reminder ka bada alert kabhi dikhta hi nahi tha. AppState bhi kaam
+     * nahi aata: app pehle se "active" hai, isliye koi change event nahi aata.
+     *
+     * Isliye pehle kuch second thodi-thodi der me dobara dekhte hain. Alert
+     * mil gaya to loop wahin ruk jaata hai — koi bekaar ka kaam nahi.
+     */
+    const retries: ReturnType<typeof setTimeout>[] = [];
+    [400, 1000, 2000, 3500].forEach((ms) => {
+      retries.push(
+        setTimeout(() => {
+          if (alive && handledId.current === null) showPending();
+        }, ms),
+      );
+    });
+
     const appSub = AppState.addEventListener("change", (s: AppStateStatus) => {
       if (s === "active") showPending();
     });
@@ -115,6 +159,7 @@ export function ReminderAlertHost() {
       alive = false;
       unsub();
       appSub.remove();
+      retries.forEach(clearTimeout);
     };
   }, []);
 
@@ -181,7 +226,9 @@ export function ReminderAlertHost() {
    * time aata hai, usi par nayi alarm-khidki lag jaati hai.
    */
   function onDone() {
-    const id = alert?.kind === "reminder" ? alert.id : null;
+    // Roz wale reminder me notification id `<uuid>#3` jaisi hoti hai — server
+    // ko hamesha bina suffix wali asli id chahiye.
+    const id = alert?.kind === "reminder" ? reminderIdFrom(alert.id) : null;
     const title = alert?.body ?? "";
     dismiss();
     if (!id) return;

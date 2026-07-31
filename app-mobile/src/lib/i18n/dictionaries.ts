@@ -84,6 +84,10 @@ export type Dict = {
     unclear: string;
     micPermission: string;
     unavailable: string;
+    /** Aas-paas ka shor awaaz me dab gaya. */
+    tooNoisy: string;
+    /** Awaaz pahunchi hi nahi — bahut door se bola. */
+    tooQuiet: string;
   };
   phoneField: {
     placeholder: string;
@@ -563,6 +567,70 @@ export type Dict = {
     exportContact: string;
     settingsFailed: string;
   };
+  /**
+   * Support tickets — app se sawaal, admin se jawab, ek hi baatcheet me.
+   *
+   * ⚠️ "Contact" se alag hai: wo ek taraf ka message tha (bhej diya, aur bas).
+   * Yahan har sawaal ka apna number hai, jawab app me wapas aata hai, aur
+   * baatcheet chalti rehti hai.
+   */
+  support: {
+    title: string;
+    sub: string;
+    newBtn: string;
+    empty: string;
+    emptyHint: string;
+    newTitle: string;
+    subjectLabel: string;
+    subjectPh: string;
+    messageLabel: string;
+    messagePh: string;
+    send: string;
+    sending: string;
+    /** {no} — ticket number */
+    created: string;
+    createdHint: string;
+    stOpen: string;
+    stAnswered: string;
+    stClosed: string;
+    replyPh: string;
+    you: string;
+    team: string;
+    failed: string;
+    setupMissing: string;
+    tooShort: string;
+    loading: string;
+    waiting: string;
+  };
+  /**
+   * "Ye phone kisi aur ke naam par set hai" — chetavni.
+   *
+   * ⚠️ Ye rok nahi hai, samjhaana hai. Login chalta rahega. Baat sirf itni hai
+   * ki ek phone par Saathi ki poori taakat ek hi account ke saath chalti hai
+   * (notification ka token, alarm, referral) — aur pehle ye kahin likha hi nahi
+   * tha. Do log mahino tak samajh nahi paate the ki ek ke reminder kyun aana
+   * band ho gaye.
+   */
+  deviceOwner: {
+    title: string;
+    /** {name} {email} */
+    intro: string;
+    /** {email} — jab naam pata na ho */
+    introNoName: string;
+    notifTitle: string;
+    notifBody: string;
+    aiTitle: string;
+    aiBody: string;
+    rewardTitle: string;
+    rewardBody: string;
+    advice: string;
+    ok: string;
+    logout: string;
+    /** Login screen par chhoti si patti — login se PEHLE hi pata chal jaye. */
+    bannerTitle: string;
+    /** {who} — naam ya mask kiya hua email */
+    bannerBody: string;
+  };
 };
 
 /* ============================== HINGLISH ============================== */
@@ -627,6 +695,8 @@ const hinglish: Dict = {
     unclear: "Awaaz saaf nahi aayi, dobara boliye",
     micPermission: "Mic permission chahiye",
     unavailable: "Voice available nahi hai is device pe",
+    tooNoisy: "Aas-paas shor bahut hai — phone muh ke paas laakar dobara boliye",
+    tooQuiet: "Awaaz nahi pahunchi — thoda paas se aur zor se boliye",
   },
   phoneField: {
     placeholder: "Phone number",
@@ -1080,6 +1150,56 @@ const hinglish: Dict = {
     exportContact: "Data export ke liye help se contact karo",
     settingsFailed: "Settings nahi khuli",
   },
+  support: {
+    title: "Support",
+    sub: "Koi dikkat ya sawaal? Yahan likho — har baat ka apna number milta hai aur jawab isi jagah aata hai.",
+    newBtn: "Naya sawaal",
+    empty: "Abhi koi ticket nahi",
+    emptyHint: "Kuch bhi poochho — dikkat, sujhav, ya bas ek sawaal. Hum jawab denge.",
+    newTitle: "Apni baat likhiye",
+    subjectLabel: "Kis baare me",
+    subjectPh: "Jaise: Reminder time par nahi aa raha",
+    messageLabel: "Poori baat",
+    messagePh: "Jitna detail me likhoge, utna jaldi hal nikalega.",
+    send: "Bhejo",
+    sending: "Bhej rahe hain…",
+    created: "Ticket ban gaya — {no}",
+    createdHint: "Ye number yaad rakhiye. Jawab yahan bhi aayega, email par bhi, aur phone par notification bhi.",
+    stOpen: "Jawab ka intezaar",
+    stAnswered: "Jawab aa gaya",
+    stClosed: "Band",
+    replyPh: "Aur kuch kehna hai?",
+    you: "Aap",
+    team: "Saathi team",
+    failed: "Bheja nahi ja saka. Net check karke dobara koshish karo.",
+    setupMissing: "Support abhi chalu nahi hua hai. Thodi der baad koshish kijiye.",
+    tooShort: "Thoda aur likhiye — kam se kam kuch shabd.",
+    loading: "Aa raha hai…",
+    waiting: "Hum aapki baat padh rahe hain — jawab jald aayega.",
+  },
+  deviceOwner: {
+    title: "Ye phone kisi aur ke naam par set hai",
+    intro:
+      "Saathi me ye phone {name} ({email}) ke liye set hai. Aap apni ID se login kar sakte ho — koi rok nahi. Par ek baat pehle jaan lo, kyunki baad me pata chalne par dono ka nuksaan hota hai.",
+    introNoName:
+      "Saathi me ye phone {email} ke liye set hai. Aap apni ID se login kar sakte ho — koi rok nahi. Par ek baat pehle jaan lo, kyunki baad me pata chalne par dono ka nuksaan hota hai.",
+    notifTitle: "Notification ek waqt me ek hi ID ki",
+    notifBody:
+      "Phone ka pata (token) ek samay me ek hi account se juda rehta hai. Aap login karoge to unke reminder ki notification is phone par aani band ho jayegi — aur aap logout karoge to aapki. Dono ek saath kabhi nahi chal sakti.",
+    aiTitle: "AI sirf usi ka data dekhta hai jo abhi login hai",
+    aiBody:
+      "Chat, document scan aur reminder samajhne wala Saathi aapke apne documents aur reminders par chalta hai. Is phone par jo pehle se rakha hai wo aapko nahi dikhega, aur aapka unhe nahi.",
+    rewardTitle: "Referral ka inaam ek phone par ek hi baar",
+    rewardBody:
+      "Ek device se refer ka reward sirf ek baar milta hai. Is phone par wo pehle hi liya ja chuka ho sakta hai — us soorat me aapko wo nahi milega, chahe code sahi ho.",
+    advice:
+      "Sabse achha yahi hai: apne phone par apni ID se login karo. Tabhi notification, AI aur baaki sab poori tarah aapke liye chalega.",
+    ok: "Samajh gaya, phir bhi chalu rakho",
+    logout: "Logout karo",
+    bannerTitle: "Ye phone pehle se set hai",
+    bannerBody:
+      "{who} ke liye. Doosri ID se login karoge to notification aur AI unke liye band ho jayenge — tap karke poori baat padho.",
+  },
 };
 
 /* ================================ HINDI ============================== */
@@ -1144,6 +1264,8 @@ const hi: Dict = {
     unclear: "आवाज़ साफ़ नहीं आई, दोबारा बोलिए",
     micPermission: "माइक permission चाहिए",
     unavailable: "इस डिवाइस पर voice available नहीं है",
+    tooNoisy: "आस-पास बहुत शोर है — फ़ोन मुँह के पास लाकर दोबारा बोलिए",
+    tooQuiet: "आवाज़ नहीं पहुँची — थोड़ा पास से और ज़ोर से बोलिए",
   },
   phoneField: {
     placeholder: "फ़ोन नंबर",
@@ -1596,6 +1718,56 @@ const hi: Dict = {
     exportContact: "डेटा एक्सपोर्ट के लिए help से संपर्क करें",
     settingsFailed: "सेटिंग्स नहीं खुलीं",
   },
+  support: {
+    title: "सपोर्ट",
+    sub: "कोई दिक़्क़त या सवाल? यहाँ लिखिए — हर बात का अपना नंबर मिलता है और जवाब इसी जगह आता है।",
+    newBtn: "नया सवाल",
+    empty: "अभी कोई टिकट नहीं",
+    emptyHint: "कुछ भी पूछिए — दिक़्क़त, सुझाव, या बस एक सवाल। हम जवाब देंगे।",
+    newTitle: "अपनी बात लिखिए",
+    subjectLabel: "किस बारे में",
+    subjectPh: "जैसे: रिमाइंडर समय पर नहीं आ रहा",
+    messageLabel: "पूरी बात",
+    messagePh: "जितना विस्तार से लिखेंगे, उतनी जल्दी हल निकलेगा।",
+    send: "भेजें",
+    sending: "भेज रहे हैं…",
+    created: "टिकट बन गया — {no}",
+    createdHint: "यह नंबर याद रखिए। जवाब यहाँ भी आएगा, ईमेल पर भी, और फ़ोन पर नोटिफ़िकेशन भी।",
+    stOpen: "जवाब का इंतज़ार",
+    stAnswered: "जवाब आ गया",
+    stClosed: "बंद",
+    replyPh: "और कुछ कहना है?",
+    you: "आप",
+    team: "साथी टीम",
+    failed: "भेजा नहीं जा सका। नेट देखकर दोबारा कोशिश करें।",
+    setupMissing: "सपोर्ट अभी चालू नहीं हुआ है। थोड़ी देर बाद कोशिश कीजिए।",
+    tooShort: "थोड़ा और लिखिए — कम से कम कुछ शब्द।",
+    loading: "आ रहा है…",
+    waiting: "हम आपकी बात पढ़ रहे हैं — जवाब जल्द आएगा।",
+  },
+  deviceOwner: {
+    title: "यह फ़ोन किसी और के नाम पर सेट है",
+    intro:
+      "साथी में यह फ़ोन {name} ({email}) के लिए सेट है। आप अपनी ID से लॉगिन कर सकते हैं — कोई रोक नहीं। पर एक बात पहले जान लीजिए, क्योंकि बाद में पता चलने पर नुक़सान दोनों का होता है।",
+    introNoName:
+      "साथी में यह फ़ोन {email} के लिए सेट है। आप अपनी ID से लॉगिन कर सकते हैं — कोई रोक नहीं। पर एक बात पहले जान लीजिए, क्योंकि बाद में पता चलने पर नुक़सान दोनों का होता है।",
+    notifTitle: "नोटिफ़िकेशन एक समय में एक ही ID की",
+    notifBody:
+      "फ़ोन का पता (टोकन) एक समय में एक ही अकाउंट से जुड़ा रहता है। आप लॉगिन करेंगे तो उनके रिमाइंडर की नोटिफ़िकेशन इस फ़ोन पर आनी बंद हो जाएगी — और आप लॉगआउट करेंगे तो आपकी। दोनों एक साथ कभी नहीं चल सकतीं।",
+    aiTitle: "AI सिर्फ़ उसी का डेटा देखता है जो अभी लॉगिन है",
+    aiBody:
+      "चैट, डॉक्यूमेंट स्कैन और रिमाइंडर समझने वाला साथी आपके अपने डॉक्यूमेंट और रिमाइंडर पर चलता है। इस फ़ोन में जो पहले से रखा है वह आपको नहीं दिखेगा, और आपका उन्हें नहीं।",
+    rewardTitle: "रेफ़रल का इनाम एक फ़ोन पर एक ही बार",
+    rewardBody:
+      "एक डिवाइस से रेफ़र का इनाम सिर्फ़ एक बार मिलता है। इस फ़ोन पर वह पहले ही लिया जा चुका हो सकता है — तब आपको वह नहीं मिलेगा, चाहे कोड सही हो।",
+    advice:
+      "सबसे अच्छा यही है: अपने फ़ोन पर अपनी ID से लॉगिन कीजिए। तभी नोटिफ़िकेशन, AI और बाक़ी सब पूरी तरह आपके लिए चलेगा।",
+    ok: "समझ गया, फिर भी चालू रखें",
+    logout: "लॉगआउट करें",
+    bannerTitle: "यह फ़ोन पहले से सेट है",
+    bannerBody:
+      "{who} के लिए। दूसरी ID से लॉगिन करेंगे तो नोटिफ़िकेशन और AI उनके लिए बंद हो जाएँगे — टैप करके पूरी बात पढ़िए।",
+  },
 };
 
 /* =============================== ENGLISH ============================= */
@@ -1660,6 +1832,8 @@ const en: Dict = {
     unclear: "Didn't catch that, please say it again",
     micPermission: "Mic permission needed",
     unavailable: "Voice isn't available on this device",
+    tooNoisy: "It's noisy around you — hold the phone closer and try again",
+    tooQuiet: "We couldn't hear you — speak a bit closer and louder",
   },
   phoneField: {
     placeholder: "Phone number",
@@ -2110,6 +2284,56 @@ const en: Dict = {
     linkFailed: "Couldn't open the link",
     exportContact: "For a data export, please reach out via Help",
     settingsFailed: "Couldn't open settings",
+  },
+  support: {
+    title: "Support",
+    sub: "Something not working, or just a question? Write here — every request gets its own number and the reply comes back to this same place.",
+    newBtn: "New request",
+    empty: "No tickets yet",
+    emptyHint: "Ask anything — a problem, a suggestion, or just a question. We'll reply.",
+    newTitle: "Tell us what's up",
+    subjectLabel: "What's it about",
+    subjectPh: "e.g. Reminders aren't arriving on time",
+    messageLabel: "The full story",
+    messagePh: "The more detail you give, the faster we can fix it.",
+    send: "Send",
+    sending: "Sending…",
+    created: "Ticket created — {no}",
+    createdHint: "Keep this number handy. The reply comes here, by email, and as a notification on your phone.",
+    stOpen: "Waiting for reply",
+    stAnswered: "Replied",
+    stClosed: "Closed",
+    replyPh: "Anything else?",
+    you: "You",
+    team: "Saathi team",
+    failed: "Couldn't send. Check your connection and try again.",
+    setupMissing: "Support isn't switched on yet. Please try again a little later.",
+    tooShort: "A few more words, please.",
+    loading: "Loading…",
+    waiting: "We're reading your message — a reply is on the way.",
+  },
+  deviceOwner: {
+    title: "This phone is set up for someone else",
+    intro:
+      "In Saathi, this phone is set up for {name} ({email}). You can still sign in with your own ID — nothing is blocked. But please read this first, because finding out later costs both of you.",
+    introNoName:
+      "In Saathi, this phone is set up for {email}. You can still sign in with your own ID — nothing is blocked. But please read this first, because finding out later costs both of you.",
+    notifTitle: "Notifications belong to one ID at a time",
+    notifBody:
+      "A phone's delivery address (its token) can belong to only one account at a time. Sign in here and their reminder notifications stop arriving on this phone — sign out and yours stop. The two can never run together.",
+    aiTitle: "The AI only sees whoever is signed in",
+    aiBody:
+      "Chat, document scanning and reminder understanding all work on your own documents and reminders. Whatever is already stored on this phone won't be visible to you, and yours won't be visible to them.",
+    rewardTitle: "One referral reward per phone",
+    rewardBody:
+      "A device can earn the referral reward only once. It may already have been claimed on this phone — in that case you won't get it, however valid your code is.",
+    advice:
+      "The best thing is simple: sign in with your own ID on your own phone. That's the only way notifications, the AI and everything else work fully for you.",
+    ok: "I understand, continue anyway",
+    logout: "Sign out",
+    bannerTitle: "This phone is already set up",
+    bannerBody:
+      "For {who}. Signing in with a different ID turns off their notifications and AI — tap to read why.",
   },
 };
 

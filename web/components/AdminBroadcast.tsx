@@ -12,9 +12,11 @@ import {
   Layers,
   CheckCircle2,
   AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 import Loader from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import AdminMessageReport from "@/components/AdminMessageReport";
 import { useAdminT, atpl } from "@/lib/i18n/admin";
 
 type Result = {
@@ -55,6 +57,57 @@ type Audience = "inactive" | "all" | "picked";
  * aur checkbox. Jo chuna hai bas usi ko jaata hai.
  */
 export default function AdminBroadcast() {
+  const t = useAdminT();
+  /**
+   * Do tab: bhejna, aur bhejne ke BAAD ka hisaab.
+   *
+   * Report ko alag section (left nav me apna item) banane ke bajaye yahin rakha
+   * hai — ye do kaam ek hi soch ke do hisse hain. Admin message bhejta hai aur
+   * turant dekhna chahta hai ki uska kya hua; do alag jagah jaana padta to wo
+   * dekhna hi nahi hota.
+   */
+  const [tab, setTab] = useState<"send" | "report">("send");
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="flex gap-2">
+        <TabBtn active={tab === "send"} onClick={() => setTab("send")}>
+          <Send size={15} /> {t.report.tabSend}
+        </TabBtn>
+        <TabBtn active={tab === "report"} onClick={() => setTab("report")}>
+          <BarChart3 size={15} /> {t.report.tabReport}
+        </TabBtn>
+      </div>
+      {tab === "send" ? <SendPanel /> : <AdminMessageReport />}
+    </div>
+  );
+}
+
+function TabBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-bold transition ${
+        active
+          ? "border-terracotta bg-terracotta/8 text-terracotta"
+          : "border-line bg-surface text-ink-soft hover:border-terracotta/40"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SendPanel() {
   const t = useAdminT();
   const b = t.broadcast;
   const [audience, setAudience] = useState<Audience>("inactive");

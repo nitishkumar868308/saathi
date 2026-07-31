@@ -41,6 +41,7 @@ export type AdminDict = {
   };
   nav: {
     users: string;
+    support: string;
     seo: string;
     blog: string;
     analytics: string;
@@ -65,6 +66,7 @@ export type AdminDict = {
     | "logs"
     | "contacts"
     | "message"
+    | "support"
     | "analytics"
     | "seo"
     | "blog",
@@ -118,6 +120,107 @@ export type AdminDict = {
     devicesSummary: string;
     /** Push chuna par ek bhi device nahi — pehle hi bata do. */
     pushNoDevices: string;
+  };
+  /**
+   * Bhejne ke BAAD ka hisaab — "Message users" ka doosra tab.
+   *
+   * Pehle bhejne ke baad kuch bacha hi nahi rehta tha: ek ginti dikhti thi aur
+   * screen band hote hi gayab. Ab har message ka nishaan rehta hai.
+   */
+  report: {
+    tabSend: string;
+    tabReport: string;
+    loading: string;
+    failed: string;
+    /** `supabase/message-tracking.sql` chalana baaki hai. */
+    needsMigration: string;
+    /** {n} — itni purani rows ke baad ka data report me nahi hai. */
+    truncated: string;
+    refresh: string;
+
+    /* summary cards */
+    cardEmail: string;
+    cardPush: string;
+    cardOpened: string;
+    cardClicked: string;
+    cardApp: string;
+    cardWeb: string;
+    cardIgnored: string;
+    /** Pixel/open ki seema — jhooth se bachne ke liye saaf likha jaata hai. */
+    accuracyNote: string;
+
+    /* per-user table */
+    usersTitle: string;
+    searchPh: string;
+    empty: string;
+    colUser: string;
+    colEmail: string;
+    colPush: string;
+    colOpened: string;
+    colClicked: string;
+    colWhere: string;
+    colLast: string;
+    /** {n} — "3 baar" */
+    timesN: string;
+    app: string;
+    web: string;
+    ignored: string;
+    never: string;
+    onlySent: string;
+    onlyOpened: string;
+    onlyIgnored: string;
+    allUsers: string;
+
+    /* batches */
+    batchesTitle: string;
+    colSubject: string;
+    colWhen: string;
+    colAudience: string;
+    colReach: string;
+    /** {opened} {sent} */
+    openedOfSent: string;
+
+    /* drill-down */
+    detailTitle: string;
+    detailLoading: string;
+    detailEmpty: string;
+    timeline: string;
+    evOpen: string;
+    evClick: string;
+    evPushOpen: string;
+    close: string;
+    stSent: string;
+    stSkipped: string;
+    stFailed: string;
+    chEmail: string;
+    chPush: string;
+  };
+  /** App se aaye support tickets aur unke jawab. */
+  support: {
+    loadFailed: string;
+    needsMigration: string;
+    empty: string;
+    pickOne: string;
+    searchPh: string;
+    tickets: string;
+    fAll: string;
+    stOpen: string;
+    stAnswered: string;
+    stClosed: string;
+    you: string;
+    them: string;
+    seen: string;
+    notSeen: string;
+    replyPh: string;
+    replyNote: string;
+    sendReply: string;
+    sending: string;
+    closeTicket: string;
+    /** {email} {push} */
+    sentNote: string;
+    sendFailed: string;
+    yes: string;
+    no: string;
   };
   contacts: {
     countMsg: string; // {n}
@@ -303,6 +406,13 @@ export type AdminDict = {
       userIdPh: string;
       showJourney: string;
       noJourney: string;
+      /** Rozana chart (App vs Web stacked columns). */
+      chartApp: string;
+      chartWeb: string;
+      chartTotal: string;
+      chartDay: string;
+      tableView: string;
+      chartView: string;
     };
     pricing: {
       basePrice: string;
@@ -350,6 +460,7 @@ const en: AdminDict = {
     error: "Something went wrong.",
   },
   nav: {
+    support: "Support",
     users: "Users",
     seo: "SEO",
     blog: "Blog",
@@ -365,6 +476,7 @@ const en: AdminDict = {
     rewards: "Rewards",
   },
   headings: {
+    support: { title: "Support", sub: "Questions raised from the app — read the whole thread and reply. Your reply reaches them in the app, by email and as a notification." },
     seo: { title: "SEO", sub: "Title, description and keywords for every page. Saving here updates the live site — no deploy needed." },
     blog: { title: "Blog", sub: "Write and edit posts. Published posts appear on the website and in the sitemap right away." },
     analytics: { title: "Analytics", sub: "Where people go on the website and in the app — and what one user actually did." },
@@ -421,6 +533,95 @@ const en: AdminDict = {
     devicesSummary: "{withApp} of {total} users have the app — only they can get a notification.",
     pushNoDevices:
       "None of the selected users has the app registered — the notification will reach nobody. Email will still go.",
+  },
+  report: {
+    tabSend: "Send",
+    tabReport: "Report",
+    loading: "Loading the report…",
+    failed: "Could not load the report.",
+    needsMigration:
+      "Tracking isn't set up yet. Run supabase/message-tracking.sql in the Supabase SQL editor — after that every message sent from here is tracked.",
+    truncated:
+      "Showing the most recent {n} deliveries only. Older ones are in the database but not on this screen.",
+    refresh: "Refresh",
+
+    cardEmail: "Emails sent",
+    cardPush: "Notifications sent",
+    cardOpened: "Opened",
+    cardClicked: "Clicked",
+    cardApp: "Went to the app",
+    cardWeb: "Went to the website",
+    cardIgnored: "Never opened",
+    accuracyNote:
+      "“Opened” comes from a tiny invisible image in the email, so it undercounts people who block images (common in Gmail) — a click always counts as an open too. Notifications only count as opened when the person taps them.",
+
+    usersTitle: "Person by person",
+    searchPh: "Search by name or email…",
+    empty: "Nothing sent yet — send a message from the Send tab.",
+    colUser: "Person",
+    colEmail: "Email",
+    colPush: "Notification",
+    colOpened: "Opened",
+    colClicked: "Clicked",
+    colWhere: "Went to",
+    colLast: "Last sent",
+    timesN: "{n}×",
+    app: "App",
+    web: "Web",
+    ignored: "Ignored",
+    never: "—",
+    onlySent: "Everyone",
+    onlyOpened: "Opened only",
+    onlyIgnored: "Ignored only",
+    allUsers: "people",
+
+    batchesTitle: "Every message you sent",
+    colSubject: "Subject",
+    colWhen: "When",
+    colAudience: "Audience",
+    colReach: "Reach",
+    openedOfSent: "{opened} of {sent} opened",
+
+    detailTitle: "Full history",
+    detailLoading: "Loading…",
+    detailEmpty: "Nothing sent to this person yet.",
+    timeline: "What they did",
+    evOpen: "Opened the email",
+    evClick: "Clicked a link",
+    evPushOpen: "Tapped the notification",
+    close: "Close",
+    stSent: "Sent",
+    stSkipped: "Not sent",
+    stFailed: "Failed",
+    chEmail: "Email",
+    chPush: "Notification",
+  },
+  support: {
+    loadFailed: "Could not load the tickets.",
+    needsMigration:
+      "Support isn't set up yet. Run supabase/support-tickets.sql in the Supabase SQL editor — after that every question raised in the app lands here.",
+    empty: "No tickets here.",
+    pickOne: "Pick a ticket on the left to read the whole conversation.",
+    searchPh: "Ticket no, subject, name or email…",
+    tickets: "tickets",
+    fAll: "All",
+    stOpen: "Open",
+    stAnswered: "Answered",
+    stClosed: "Closed",
+    you: "You",
+    them: "Them",
+    seen: "read",
+    notSeen: "not read yet",
+    replyPh: "Write your reply — it reaches them in the app, by email and as a notification.",
+    replyNote:
+      "Sending does three things: the reply appears in their app, an email goes out, and their phone gets a notification.",
+    sendReply: "Send reply",
+    sending: "Sending…",
+    closeTicket: "Close ticket",
+    sentNote: "Email sent: {email} · notification delivered to {push} devices.",
+    sendFailed: "Could not send the reply.",
+    yes: "yes",
+    no: "no",
   },
   contacts: {
     countMsg: "{n} messages",
@@ -537,6 +738,12 @@ const en: AdminDict = {
         "Paste a user ID from the Users tab to see every screen and button, in order — website and app together.",
       userIdPh: "User ID (UUID)", showJourney: "Show journey",
       noJourney: "No events recorded for this user yet.",
+      chartApp: "App",
+      chartWeb: "Website",
+      chartTotal: "Total",
+      chartDay: "Day",
+      tableView: "Table",
+      chartView: "Chart",
     },
     pricing: {
       basePrice: "Base price (INR)", monthly: "Monthly", yearly: "Yearly",
@@ -577,6 +784,7 @@ const hi: AdminDict = {
     error: "कुछ गड़बड़ हो गई।",
   },
   nav: {
+    support: "सपोर्ट",
     users: "यूज़र्स",
     seo: "SEO",
     blog: "ब्लॉग",
@@ -592,6 +800,7 @@ const hi: AdminDict = {
     rewards: "रिवॉर्ड्स",
   },
   headings: {
+    support: { title: "सपोर्ट", sub: "ऐप से आए सवाल — पूरी बातचीत पढ़िए और जवाब दीजिए। जवाब ऐप, ईमेल और नोटिफ़िकेशन तीनों जगह पहुँचता है।" },
     seo: { title: "SEO", sub: "हर पेज का टाइटल, डिस्क्रिप्शन और कीवर्ड। यहाँ सेव करते ही लाइव साइट पर लग जाता है — डिप्लॉय नहीं करना पड़ता।" },
     blog: { title: "ब्लॉग", sub: "पोस्ट लिखें और बदलें। पब्लिश्ड पोस्ट तुरंत वेबसाइट और sitemap दोनों में आ जाती है।" },
     analytics: { title: "एनालिटिक्स", sub: "लोग वेबसाइट और ऐप में कहाँ जाते हैं — और एक यूज़र ने क्या किया।" },
@@ -648,6 +857,96 @@ const hi: AdminDict = {
     devicesSummary: "{total} में से {withApp} यूज़र के पास ऐप है — नोटिफ़िकेशन सिर्फ़ उन्हीं तक जाएगी।",
     pushNoDevices:
       "चुने हुए किसी भी यूज़र का फ़ोन रजिस्टर नहीं है — नोटिफ़िकेशन किसी तक नहीं पहुँचेगी। ईमेल फिर भी जाएगा।",
+  },
+  report: {
+    tabSend: "भेजें",
+    tabReport: "रिपोर्ट",
+    loading: "रिपोर्ट आ रही है…",
+    failed: "रिपोर्ट नहीं आ पाई।",
+    needsMigration:
+      "ट्रैकिंग अभी चालू नहीं है। Supabase के SQL editor में supabase/message-tracking.sql चला दें — उसके बाद यहाँ से भेजा हर मैसेज ट्रैक होगा।",
+    truncated:
+      "सिर्फ़ पिछले {n} भेजे हुए मैसेज दिख रहे हैं। उससे पुराने डेटाबेस में हैं, पर इस स्क्रीन पर नहीं।",
+    refresh: "फिर से देखें",
+
+    cardEmail: "ईमेल भेजे",
+    cardPush: "नोटिफ़िकेशन भेजीं",
+    cardOpened: "खोले गए",
+    cardClicked: "क्लिक हुए",
+    cardApp: "ऐप पर गए",
+    cardWeb: "वेबसाइट पर गए",
+    cardIgnored: "कभी नहीं खोला",
+
+    accuracyNote:
+      "“खोला” ईमेल में लगी एक छोटी-सी अदृश्य तस्वीर से पता चलता है, इसलिए जो लोग तस्वीरें बंद रखते हैं (Gmail में आम है) उनकी गिनती कम रहती है — क्लिक को हमेशा खोलना भी माना जाता है। नोटिफ़िकेशन तभी “खुली” गिनी जाती है जब उस पर टैप हो।",
+
+    usersTitle: "एक-एक व्यक्ति",
+    searchPh: "नाम या ईमेल से खोजें…",
+    empty: "अभी तक कुछ नहीं भेजा — “भेजें” टैब से मैसेज भेजिए।",
+    colUser: "व्यक्ति",
+    colEmail: "ईमेल",
+    colPush: "नोटिफ़िकेशन",
+    colOpened: "खोला",
+    colClicked: "क्लिक",
+    colWhere: "कहाँ गए",
+    colLast: "आख़िरी बार",
+    timesN: "{n} बार",
+    app: "ऐप",
+    web: "वेब",
+    ignored: "अनदेखा",
+    never: "—",
+    onlySent: "सभी",
+    onlyOpened: "जिन्होंने खोला",
+    onlyIgnored: "जिन्होंने अनदेखा किया",
+    allUsers: "लोग",
+
+    batchesTitle: "आपके भेजे हुए सारे मैसेज",
+    colSubject: "विषय",
+    colWhen: "कब",
+    colAudience: "किसको",
+    colReach: "पहुँच",
+    openedOfSent: "{sent} में से {opened} ने खोला",
+
+    detailTitle: "पूरा इतिहास",
+    detailLoading: "आ रहा है…",
+    detailEmpty: "इस व्यक्ति को अभी तक कुछ नहीं भेजा गया।",
+    timeline: "इन्होंने क्या किया",
+    evOpen: "ईमेल खोला",
+    evClick: "लिंक पर क्लिक किया",
+    evPushOpen: "नोटिफ़िकेशन पर टैप किया",
+    close: "बंद करें",
+    stSent: "गया",
+    stSkipped: "नहीं गया",
+    stFailed: "फ़ेल",
+    chEmail: "ईमेल",
+    chPush: "नोटिफ़िकेशन",
+  },
+  support: {
+    loadFailed: "टिकट लोड नहीं हो पाए।",
+    needsMigration:
+      "सपोर्ट अभी चालू नहीं है। Supabase के SQL editor में supabase/support-tickets.sql चला दें — उसके बाद ऐप में पूछा गया हर सवाल यहाँ आएगा।",
+    empty: "यहाँ कोई टिकट नहीं।",
+    pickOne: "बाईं ओर से कोई टिकट चुनिए — पूरी बातचीत यहाँ खुलेगी।",
+    searchPh: "टिकट नंबर, विषय, नाम या ईमेल…",
+    tickets: "टिकट",
+    fAll: "सभी",
+    stOpen: "खुला",
+    stAnswered: "जवाब दिया",
+    stClosed: "बंद",
+    you: "आप",
+    them: "वे",
+    seen: "पढ़ लिया",
+    notSeen: "अभी पढ़ा नहीं",
+    replyPh: "अपना जवाब लिखिए — यह ऐप में, ईमेल पर और नोटिफ़िकेशन तीनों जगह पहुँचेगा।",
+    replyNote:
+      "भेजते ही तीन काम होते हैं: जवाब उनके ऐप में दिखता है, ईमेल जाता है, और फ़ोन पर नोटिफ़िकेशन आती है।",
+    sendReply: "जवाब भेजें",
+    sending: "भेज रहे हैं…",
+    closeTicket: "टिकट बंद करें",
+    sentNote: "ईमेल गया: {email} · नोटिफ़िकेशन {push} डिवाइस पर पहुँची।",
+    sendFailed: "जवाब नहीं भेजा जा सका।",
+    yes: "हाँ",
+    no: "नहीं",
   },
   contacts: {
     countMsg: "{n} मैसेज",
@@ -765,6 +1064,12 @@ const hi: AdminDict = {
         "Users टैब से यूज़र ID डालें — हर स्क्रीन और बटन क्रम से दिखेगा — वेबसाइट और ऐप दोनों।",
       userIdPh: "यूज़र ID (UUID)", showJourney: "सफ़र दिखाएँ",
       noJourney: "इस यूज़र का अभी कोई इवेंट नहीं।",
+      chartApp: "ऐप",
+      chartWeb: "वेबसाइट",
+      chartTotal: "कुल",
+      chartDay: "दिन",
+      tableView: "टेबल",
+      chartView: "चार्ट",
     },
     pricing: {
       basePrice: "बेस प्राइस (INR)", monthly: "मासिक", yearly: "सालाना",
@@ -805,6 +1110,7 @@ const hinglish: AdminDict = {
     error: "Kuch gadbad ho gayi.",
   },
   nav: {
+    support: "Support",
     users: "Users",
     seo: "SEO",
     blog: "Blog",
@@ -820,6 +1126,7 @@ const hinglish: AdminDict = {
     rewards: "Rewards",
   },
   headings: {
+    support: { title: "Support", sub: "App se aaye sawaal — poori baatcheet padhiye aur jawab dijiye. Jawab app, email aur notification teeno jagah pahunchta hai." },
     seo: { title: "SEO", sub: "Har page ka title, description aur keywords. Yahan save karte hi live site par lag jaata hai — deploy nahi karna padta." },
     blog: { title: "Blog", sub: "Post likho aur badlo. Published post turant website aur sitemap dono me aa jaati hai." },
     analytics: { title: "Analytics", sub: "Log website aur app me kahan jaate hain — aur ek user ne asal me kya kiya." },
@@ -876,6 +1183,95 @@ const hinglish: AdminDict = {
     devicesSummary: "{total} me se {withApp} user ke paas app hai — notification sirf unhi tak jayegi.",
     pushNoDevices:
       "Chune hue kisi bhi user ka phone register nahi hai — notification kisi tak nahi jayegi. Email phir bhi jayega.",
+  },
+  report: {
+    tabSend: "Bhejo",
+    tabReport: "Report",
+    loading: "Report aa rahi hai…",
+    failed: "Report nahi aa payi.",
+    needsMigration:
+      "Tracking abhi chalu nahi hai. Supabase ke SQL editor me supabase/message-tracking.sql chala do — uske baad yahan se bheja har message track hoga.",
+    truncated:
+      "Sirf pichhle {n} bheje hue message dikh rahe hain. Usse purane database me hain, par is screen par nahi.",
+    refresh: "Phir se dekho",
+
+    cardEmail: "Email bheje",
+    cardPush: "Notification bheji",
+    cardOpened: "Khole gaye",
+    cardClicked: "Click hue",
+    cardApp: "App par gaye",
+    cardWeb: "Website par gaye",
+    cardIgnored: "Kabhi nahi khola",
+    accuracyNote:
+      "“Khola” email me lagi ek chhoti si adrishya tasveer se pata chalta hai, isliye jo log tasveerein band rakhte hain (Gmail me aam hai) unki ginti kam rehti hai — click ko hamesha khulna bhi maan lete hain. Notification tabhi “khuli” ginti hai jab uspar tap ho.",
+
+    usersTitle: "Ek-ek banda",
+    searchPh: "Naam ya email se dhoondho…",
+    empty: "Abhi tak kuch nahi bheja — “Bhejo” tab se message bhejiye.",
+    colUser: "Banda",
+    colEmail: "Email",
+    colPush: "Notification",
+    colOpened: "Khola",
+    colClicked: "Click",
+    colWhere: "Kahan gaya",
+    colLast: "Aakhri baar",
+    timesN: "{n} baar",
+    app: "App",
+    web: "Web",
+    ignored: "Ignore",
+    never: "—",
+    onlySent: "Sab",
+    onlyOpened: "Jinhone khola",
+    onlyIgnored: "Jinhone ignore kiya",
+    allUsers: "log",
+
+    batchesTitle: "Aapke bheje hue saare message",
+    colSubject: "Subject",
+    colWhen: "Kab",
+    colAudience: "Kisko",
+    colReach: "Pahunch",
+    openedOfSent: "{sent} me se {opened} ne khola",
+
+    detailTitle: "Poora hisaab",
+    detailLoading: "Aa raha hai…",
+    detailEmpty: "Is bande ko abhi tak kuch nahi bheja gaya.",
+    timeline: "Isne kya kiya",
+    evOpen: "Email khola",
+    evClick: "Link par click kiya",
+    evPushOpen: "Notification par tap kiya",
+    close: "Band karo",
+    stSent: "Gaya",
+    stSkipped: "Nahi gaya",
+    stFailed: "Fail",
+    chEmail: "Email",
+    chPush: "Notification",
+  },
+  support: {
+    loadFailed: "Ticket load nahi ho paye.",
+    needsMigration:
+      "Support abhi chalu nahi hai. Supabase ke SQL editor me supabase/support-tickets.sql chala do — uske baad app me pucha gaya har sawaal yahan aayega.",
+    empty: "Yahan koi ticket nahi.",
+    pickOne: "Baayen se koi ticket chuniye — poori baatcheet yahan khulegi.",
+    searchPh: "Ticket number, subject, naam ya email…",
+    tickets: "ticket",
+    fAll: "Sab",
+    stOpen: "Khula",
+    stAnswered: "Jawab diya",
+    stClosed: "Band",
+    you: "Aap",
+    them: "Wo",
+    seen: "padh liya",
+    notSeen: "abhi padha nahi",
+    replyPh: "Apna jawab likhiye — ye app me, email par aur notification teeno jagah pahunchega.",
+    replyNote:
+      "Bhejte hi teen kaam hote hain: jawab unke app me dikhta hai, email jaata hai, aur phone par notification aati hai.",
+    sendReply: "Jawab bhejo",
+    sending: "Bhej rahe hain…",
+    closeTicket: "Ticket band karo",
+    sentNote: "Email gaya: {email} · notification {push} device par pahunchi.",
+    sendFailed: "Jawab nahi bheja ja saka.",
+    yes: "haan",
+    no: "nahi",
   },
   contacts: {
     countMsg: "{n} message",
@@ -992,6 +1388,12 @@ const hinglish: AdminDict = {
         "Users tab se user ID daalo — har screen aur button kram se dikhega, website aur app dono ka.",
       userIdPh: "User ID (UUID)", showJourney: "Safar dikhao",
       noJourney: "Is user ka abhi koi event nahi.",
+      chartApp: "App",
+      chartWeb: "Website",
+      chartTotal: "Kul",
+      chartDay: "Din",
+      tableView: "Table",
+      chartView: "Chart",
     },
     pricing: {
       basePrice: "Base price (INR)", monthly: "Monthly", yearly: "Yearly",

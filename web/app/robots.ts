@@ -12,7 +12,6 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com
  * Block sirf ye:
  *   /admin      — private dashboard
  *   /api        — JSON endpoints, inka koi search result nahi banta
- *   /checkout   — payment flow, har user ka apna
  *   /r/         — referral short links (har user ka alag, duplicate ka pahaad)
  *
  * `/referral` khud crawl ho sakta hai (usme apna `noindex` meta hai) — robots.txt
@@ -25,7 +24,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/api/", "/checkout", "/r/"],
+        disallow: ["/admin", "/api/", "/r/"],
       },
       // AI crawlers ko bhi allow — brand ka zikr in jawaabon me aana faayda hi hai.
       { userAgent: ["GPTBot", "ClaudeBot", "PerplexityBot"], allow: "/" },

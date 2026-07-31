@@ -22,6 +22,7 @@ import { savePendingReferral } from "@/lib/referral-pending";
 import { useOffers } from "@/lib/use-offers";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+import { deviceOwner, type DeviceOwner } from "@/lib/device";
 
 /** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
 function referralFromUrl(url: string | null): string | null {
@@ -40,8 +41,16 @@ function referralFromUrl(url: string | null): string | null {
 export default function Login() {
   const toast = useToast();
   const offers = useOffers();
-  const { login: l } = useT();
+  const { login: l, deviceOwner: d } = useT();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  /**
+   * Ye phone pehle se kisi ke naam par set hai kya.
+   *
+   * Login se pehle poochna zaroori hai: baad me batane par banda apni ID daal
+   * chuka hota hai, aur usi lamhe purane user ki notification band ho jaati hai.
+   * Fail ho to `null` — chetavni na dikhna login rokne se kahin behtar hai.
+   */
+  const [owner, setOwner] = useState<DeviceOwner | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,6 +59,19 @@ export default function Login() {
   const [refCode, setRefCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void deviceOwner().then((o) => {
+      // `isMe` yahan kabhi sach nahi hota (login screen par session hai hi
+      // nahi), par guard rakha hai — logout ke turant baad ka lamha bhi isi
+      // screen par guzarta hai.
+      if (alive && o && !o.isMe) setOwner(o);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Share-link (apkasaathi.com/r/CODE) se app khule to code apne aap bhar do.
   const url = Linking.useURL();
@@ -131,6 +153,21 @@ export default function Login() {
             {mode === "login" ? `${l.welcomeBack} 🙂` : l.signupTitle}
           </Text>
           <Text style={styles.sub}>{mode === "login" ? l.loginSub : l.signupSub}</Text>
+
+          {/* Ye phone pehle se kisi aur ke naam par set hai — login se PEHLE.
+              Poori baat login ke baad wale modal me hai; yahan sirf itna ki
+              banda galat phone par apni ID daalne se pehle ruk ke soch le. */}
+          {!!owner && (
+            <View style={styles.ownerNote}>
+              <Ionicons name="phone-portrait-outline" size={16} color={colors.terracotta} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ownerTitle}>{d.bannerTitle}</Text>
+                <Text style={styles.ownerBody}>
+                  {tpl(d.bannerBody, { who: owner.email ?? owner.name ?? "" })}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* name (signup only) */}
           {mode === "signup" && (
@@ -274,6 +311,20 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 30, fontWeight: "800", color: colors.ink },
   sub: { marginTop: 8, fontSize: 15, color: colors.inkSoft, lineHeight: 22 },
+  ownerNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginTop: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  ownerTitle: { fontSize: 13.5, fontWeight: "800", color: colors.ink },
+  ownerBody: { marginTop: 2, fontSize: 12.5, lineHeight: 18, color: colors.inkSoft },
   label: {
     marginTop: 20,
     marginBottom: 8,

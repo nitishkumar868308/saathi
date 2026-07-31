@@ -21,13 +21,10 @@ import { reportError } from "@/lib/report-error";
 import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
-import { ocrImage } from "@/lib/ocr";
 import { scanDocumentAI } from "@/lib/ai";
 import { logEvent } from "@/lib/analytics";
 import { markFirstDocument } from "@/lib/reviews";
 import { isValidDate } from "@/utils/expiry";
-import { extractExpiry } from "@/utils/extract-expiry";
-import { detectDocType, guessName } from "@/utils/detect-doc";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
@@ -93,7 +90,19 @@ export default function AddDocument() {
         let rName = "";
         let rExpiry: string | null = null;
 
-        // Pehle AI (Gemini vision) — document ko theek se samajhta hai.
+        /**
+         * Document sirf AI (Gemini vision) padhta hai.
+         *
+         * ⚠️ Yahan pehle ek local OCR fallback tha (OCR.space + keyword matching)
+         * jo AI fail hone par chal jaata tha. Wo hata diya gaya. Wajah: wo aksar
+         * galat naam aur galat expiry nikaalta tha, aur user ko wo bilkul AI ke
+         * jawab jaisa hi dikhta tha. Ek galat expiry date sabse mehngi galti hai
+         * — us document ka reminder galat din bajta hai, aur kisi ko pata bhi
+         * nahi chalta ki wo kahan se aayi thi.
+         *
+         * AI na chale to hum khaali chhod dete hain aur user khud bhar leta hai.
+         * Khaali khaana galat khaane se hamesha behtar hai.
+         */
         const ai = await scanDocumentAI(asset.base64, locale);
         if (ai && (ai.name || ai.expiry || (ai.type && ai.type !== "other"))) {
           rType = ai.type || "other";
@@ -101,14 +110,6 @@ export default function AddDocument() {
           rExpiry = ai.expiry && isValidDate(ai.expiry) ? ai.expiry : null;
           // AI ka poora samajh save karo (DB me jaayega).
           if (ai.summary) setSummary(ai.summary);
-        } else {
-          // Fallback: jab tak GEMINI_API_KEY set nahi / AI fail — local OCR.
-          const text = await ocrImage(asset.base64);
-          const det = detectDocType(text);
-          rType = det.type;
-          rName = det.name !== "Document" ? det.name : guessName(text);
-          const exp = extractExpiry(text);
-          rExpiry = exp || null;
         }
 
         setType(rType);

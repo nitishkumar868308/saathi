@@ -23,6 +23,7 @@ import {
   LineChart,
   PenLine,
   Wallet,
+  LifeBuoy,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
@@ -41,6 +42,7 @@ import AdminLogs from "@/components/AdminLogs";
 import AdminAnalytics from "@/components/AdminAnalytics";
 import AdminSeo from "@/components/AdminSeo";
 import AdminBlog from "@/components/AdminBlog";
+import AdminSupport from "@/components/AdminSupport";
 
 type ContactEntry = {
   name: string;
@@ -63,6 +65,7 @@ type Section =
   | "reviews"
   | "logs"
   | "contacts"
+  | "support"
   | "message";
 
 const NAV: { key: Section; icon: typeof Gift }[] = [
@@ -71,6 +74,7 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   { key: "seo", icon: Search },
   { key: "blog", icon: PenLine },
   { key: "message", icon: Megaphone },
+  { key: "support", icon: LifeBuoy },
   { key: "usage", icon: Activity },
   { key: "spend", icon: Wallet },
   { key: "documents", icon: FileText },
@@ -436,6 +440,7 @@ function Dashboard({
               {section === "pricing" && <AdminPricing />}
               {section === "users" && <AdminUsers />}
               {section === "message" && <AdminBroadcast />}
+              {section === "support" && <AdminSupport />}
               {section === "usage" && <AdminUsage />}
               {/* "Usage" = kaun user kitna active hai.
                   "AI & WhatsApp" = humara kitna kharcha ho raha hai (item 3). */}

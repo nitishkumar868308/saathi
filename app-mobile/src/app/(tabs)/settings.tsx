@@ -47,6 +47,7 @@ type RowId =
   | "language"
   | "privacy"
   | "contact"
+  | "support"
   | "help"
   | "about"
   | "delete_all";
@@ -134,6 +135,9 @@ export default function Settings() {
       title: s.groupMore,
       rows: [
         { id: "contact", icon: "mail-outline", label: t.contact.row },
+        // Support "Contact" ke theek neeche: dono ek hi zarurat ke do roop hain
+        // — ek taraf ka message, aur wo baat jiska jawab wapas aata hai.
+        { id: "support", icon: "help-buoy-outline", label: t.support.title },
         { id: "help", icon: "help-circle-outline", label: s.help },
         { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
         { id: "about", icon: "information-circle-outline", label: s.about },
@@ -217,6 +221,9 @@ export default function Settings() {
         return;
       case "contact":
         router.push("/contact" as never);
+        return;
+      case "support":
+        router.push("/support" as never);
         return;
       case "help":
         router.push("/help" as never);

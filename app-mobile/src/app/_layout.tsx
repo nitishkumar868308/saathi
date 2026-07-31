@@ -11,11 +11,12 @@ import { AuthProvider, useAuth } from "@/components/auth-provider";
 import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ReminderAlertHost } from "@/components/reminder-alert";
 import { ReviewPrompt } from "@/components/review-prompt";
+import { DeviceOwnerWarning } from "@/components/device-owner-warning";
 import { NetworkBanner } from "@/components/network-banner";
 import { NetAlertModal } from "@/components/net-alert-modal";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
-import { listenForegroundPush, registerPushToken } from "@/lib/push";
+import { listenForegroundPush, listenPushOpens, registerPushToken } from "@/lib/push";
 import { setAnalyticsUser, logScreen } from "@/lib/analytics";
 import { installGlobalErrorHandler } from "@/lib/report-error";
 
@@ -38,6 +39,8 @@ export default function RootLayout() {
             <ReminderAlertHost />
             {/* 1 hafte baad rating/review popup. */}
             <ReviewPrompt />
+            {/* Ye phone kisi aur ke naam par set hai — login ke baad ek baar. */}
+            <DeviceOwnerWarning />
           </ToastProvider>
         </AuthProvider>
       </LanguageProvider>
@@ -102,9 +105,13 @@ function RootNavigator() {
     if (!uid) return;
     const stopToken = registerPushToken();
     const stopForeground = listenForegroundPush();
+    // Tap ka hisaab — admin panel ki Report isi se banti hai ("kisne khola").
+    // Login ke baad hi, kyunki server ki RPC bina session ke kuch nahi likhti.
+    const stopOpens = listenPushOpens();
     return () => {
       stopToken();
       stopForeground();
+      stopOpens();
     };
   }, [uid]);
 
@@ -152,6 +159,7 @@ function RootNavigator() {
       <Stack.Screen name="auth" />
       <Stack.Screen name="add-document" options={{ presentation: "modal" }} />
       <Stack.Screen name="add-reminder" options={{ presentation: "modal" }} />
+      <Stack.Screen name="support" />
       <Stack.Screen name="onboarding" />
     </Stack>
   );

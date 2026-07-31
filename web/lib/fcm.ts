@@ -115,7 +115,18 @@ export type PushResult = {
   /** Ab kaam ke nahi — DB se hata dene chahiye (app uninstall / token expire). */
   deadTokens: string[];
   errors: string[];
+  /** Kis send row par kaam bana/bigda — tracking status isse bharta hai. */
+  bySend: Map<string, { sent: number; failed: number }>;
 };
+
+/**
+ * Ek phone ka pata + (agar tracking on hai to) uska `message_sends` row id.
+ *
+ * `sendId` isliye har token ke saath jaata hai, ek jagah nahi: ek hi user ke do
+ * phone ho sakte hain, aur dono ka tap ek hi row par ginna chahiye — par ek user
+ * ka tap doosre user ki row par kabhi nahi.
+ */
+export type PushTarget = { token: string; sendId?: string | null };
 
 /**
  * Ek token par push bhejo.
@@ -130,9 +141,10 @@ export type PushResult = {
  */
 async function sendOne(
   bearer: string,
-  token: string,
+  target: PushTarget,
   title: string,
   body: string,
+  extra?: Record<string, string>,
 ): Promise<"ok" | "dead" | string> {
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${PROJECT_ID}/messages:send`,
@@ -144,9 +156,22 @@ async function sendOne(
       },
       body: JSON.stringify({
         message: {
-          token,
+          token: target.token,
           notification: { title, body },
-          data: { kind: "admin", title, body },
+          // ⚠️ FCM ka `data` sirf strings leta hai — number/null daalte hi poori
+          // request 400 ho jaati hai aur ek bhi notification nahi jaati.
+          data: {
+            kind: "admin",
+            title,
+            body,
+            // Caller ka apna data (jaise support ticket ka id) — `kind` ko bhi
+            // badal sakta hai, isliye ye phaila ke aakhir me nahi, yahan aata
+            // hai aur neeche `...extra` use overwrite kar sakta hai.
+            ...(extra ?? {}),
+            // Notification par tap hone par app isi id se batata hai ki kisne
+            // khola (`record_push_open`). Tracking band ho to bhejte hi nahi.
+            ...(target.sendId ? { send_id: target.sendId } : {}),
+          },
           android: {
             // Doze me bhi turant pahunche — broadcast aksar zaroori baat hoti hai.
             priority: "HIGH",
@@ -192,38 +217,63 @@ const BATCH = 50;
  * hai. 50 ka jhund dono se bachata hai.
  */
 export async function sendPush(
-  tokens: string[],
+  targets: PushTarget[],
   title: string,
   body: string,
+  /**
+   * Notification ke saath jaane wala extra data — sirf strings.
+   *
+   * ⚠️ FCM ka `data` sirf string values leta hai. Number ya null daalte hi poori
+   * request 400 ho jaati hai aur ek bhi notification nahi jaati.
+   */
+  extra?: Record<string, string>,
 ): Promise<PushResult> {
-  const out: PushResult = { sent: 0, failed: 0, deadTokens: [], errors: [] };
-  if (!isFcmConfigured() || tokens.length === 0) return out;
+  const out: PushResult = {
+    sent: 0,
+    failed: 0,
+    deadTokens: [],
+    errors: [],
+    bySend: new Map(),
+  };
+  if (!isFcmConfigured() || targets.length === 0) return out;
+
+  /** Ek token ka natija us user ke send row par bhi gino. */
+  const tally = (t: PushTarget, ok: boolean) => {
+    if (!t.sendId) return;
+    const cur = out.bySend.get(t.sendId) ?? { sent: 0, failed: 0 };
+    if (ok) cur.sent++;
+    else cur.failed++;
+    out.bySend.set(t.sendId, cur);
+  };
 
   let bearer: string;
   try {
     bearer = await accessToken();
   } catch (e) {
     out.errors.push(String(e));
-    out.failed = tokens.length;
+    out.failed = targets.length;
+    targets.forEach((t) => tally(t, false));
     return out;
   }
 
-  for (let i = 0; i < tokens.length; i += BATCH) {
-    const slice = tokens.slice(i, i + BATCH);
+  for (let i = 0; i < targets.length; i += BATCH) {
+    const slice = targets.slice(i, i + BATCH);
     const results = await Promise.all(
       slice.map((t) =>
-        sendOne(bearer, t, title, body).catch((e) => String(e)),
+        sendOne(bearer, t, title, body, extra).catch((e) => String(e)),
       ),
     );
     results.forEach((r, idx) => {
-      if (r === "ok") out.sent++;
-      else if (r === "dead") {
-        out.failed++;
-        out.deadTokens.push(slice[idx]);
-      } else {
-        out.failed++;
-        if (out.errors.length < 5) out.errors.push(r);
+      const t = slice[idx];
+      if (r === "ok") {
+        out.sent++;
+        tally(t, true);
+        return;
       }
+      out.failed++;
+      tally(t, false);
+      if (r === "dead") out.deadTokens.push(t.token);
+      else if (out.errors.length < 5) out.errors.push(r);
     });
   }
 

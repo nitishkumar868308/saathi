@@ -97,3 +97,51 @@ export async function registerDevice(language?: string): Promise<DeviceInfo> {
     return { id, known: false, language: null };
   }
 }
+
+/* ---------------------------- device ka maalik ---------------------------- */
+
+export type DeviceOwner = {
+  /** Is phone par pehle kisi ne login kiya tha? */
+  claimed: boolean;
+  /** Wahi banda abhi login hai? (tab kuch dikhana nahi) */
+  isMe: boolean;
+  /** Sirf pehla naam — poora naam server bhejta hi nahi. */
+  name: string | null;
+  /** Mask kiya hua email — "ra*****@gmail.com". */
+  email: string | null;
+};
+
+/**
+ * Ye phone kiske naam par set hai.
+ *
+ * ⚠️ Ye rok nahi hai. Ek phone par doosra banda login kar sakta hai — par tab
+ * Saathi ki aadhi cheezein chup-chaap us doosre ke naam par chali jaati hain
+ * (notification ka token, alarm, referral). Pehle ye kahin likha hi nahi tha,
+ * isliye do log samajh nahi paate the ki ek ke reminder kyun aana band ho gaye.
+ *
+ * Login se PEHLE bhi chalti hai (anon RPC) — login screen par patti dikhane ke
+ * liye. Kuch bhi galat ho to `null`: chetavni na dikhna login rokne se behtar hai.
+ */
+export async function deviceOwner(): Promise<DeviceOwner | null> {
+  if (!supabase) return null;
+  try {
+    const id = await getDeviceId();
+    const { data, error } = await supabase.rpc("device_owner", { p_id: id });
+    if (error || !data) return null;
+    const d = data as {
+      claimed?: boolean;
+      is_me?: boolean;
+      name?: string | null;
+      email?: string | null;
+    };
+    if (!d.claimed) return null;
+    return {
+      claimed: true,
+      isMe: !!d.is_me,
+      name: d.name ?? null,
+      email: d.email ?? null,
+    };
+  } catch {
+    return null;
+  }
+}

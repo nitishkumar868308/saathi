@@ -3,6 +3,14 @@ import { isAuthed } from "@/lib/admin";
 import { sendMail, renderEmail, emailParagraph, escapeHtml } from "@/lib/email";
 import { isFcmConfigured, sendPush } from "@/lib/fcm";
 import { logServerError } from "@/lib/errors-server";
+import {
+  createBatch,
+  createSends,
+  markSend,
+  markSendsBulk,
+  trackedEmailBody,
+  type SendRow,
+} from "@/lib/message-track";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -110,20 +118,44 @@ export async function GET() {
   }
 }
 
-/** Chune hue users ke saare device tokens (ek user ke kai phone ho sakte hain). */
-async function tokensFor(userIds: string[]): Promise<string[]> {
+/**
+ * Chune hue users ke saare device tokens (ek user ke kai phone ho sakte hain).
+ *
+ * ⚠️ Ab `user_id` bhi laata hai. Pehle sirf token ki list thi, isliye ye kabhi
+ * pata nahi chalta tha ki kis token par kiska message gaya — aur usi wajah se
+ * notification ka koi per-user hisaab nahi ban sakta tha.
+ */
+async function tokensFor(userIds: string[]): Promise<{ token: string; userId: string }[]> {
   if (userIds.length === 0) return [];
-  const out = new Set<string>();
+  const seen = new Set<string>();
+  const out: { token: string; userId: string }[] = [];
   // PostgREST ka `in.(...)` URL me jaata hai — bahut lambi list URL todd deti
   // hai. 200 ke jhund me poochte hain.
   for (let i = 0; i < userIds.length; i += 200) {
     const slice = userIds.slice(i, i + 200);
-    const rows = await sbGet<{ token: string }>(
-      `device_tokens?select=token&user_id=in.(${slice.join(",")})`,
+    const rows = await sbGet<{ token: string; user_id: string | null }>(
+      `device_tokens?select=token,user_id&user_id=in.(${slice.join(",")})`,
     ).catch(() => []);
-    rows.forEach((r) => r.token && out.add(r.token));
+    rows.forEach((r) => {
+      if (!r.token || !r.user_id || seen.has(r.token)) return;
+      seen.add(r.token);
+      out.push({ token: r.token, userId: r.user_id });
+    });
   }
-  return Array.from(out);
+  return out;
+}
+
+/**
+ * Email ke do CTA button ka text — user ki apni bhasha me.
+ *
+ * Ye button sirf sajawat nahi hain: inhi se pata chalta hai ki user email se
+ * **app** par gaya ya **web** par. Ek hi link se ye kabhi pata nahi chal sakta.
+ */
+function emailCta(language: string | null | undefined): { app: string; web: string } {
+  if (language === "hi") return { app: "ऐप खोलें", web: "वेबसाइट देखें" };
+  if (language === "en") return { app: "Open the app", web: "Visit website" };
+  // Hinglish default — app ki apni default bhasha bhi yahi hai.
+  return { app: "App kholo", web: "Website dekho" };
 }
 
 /** FCM ne jo tokens "mare hue" bataye, unhe DB se hata do. */
@@ -224,6 +256,47 @@ export async function POST(request: Request) {
   let skipped = 0;
   const errors: string[] = [];
 
+  /**
+   * Tracking ke saare write yahan jama hote hain aur response se PEHLE await
+   * kiye jaate hain.
+   *
+   * ⚠️ Serverless function response bhejte hi maar diya jaata hai. `void promise`
+   * chhod dene par wo update aksar server tak pahunchta hi nahi — report me har
+   * row hamesha "sent" dikhti aur "kisko nahi gaya" ka sach kabhi save hi nahi
+   * hota.
+   */
+  const tracking: Promise<void>[] = [];
+
+  /* ---------------------------- tracking rows ---------------------------- */
+  //
+  // Bhejne se PEHLE rows banti hain — email ke andar us row ka id chahiye (pixel
+  // aur har link usi par tike hain). Ye poora hissa best-effort hai: batch na
+  // bane (migration na chali ho, Supabase down ho) to `batchId` null rehta hai
+  // aur mail bilkul waise hi jaata hai jaise pehle jaata tha, bas bina hisaab ke.
+
+  const batchId = await createBatch({
+    subject,
+    body: message,
+    channel,
+    audience: picked ? "picked" : audience,
+    total: targets.length,
+  });
+
+  const sendRows: SendRow[] = [];
+  if (batchId) {
+    if (wantsEmail) {
+      targets
+        .filter((p) => !!p.email)
+        .forEach((p) => sendRows.push({ userId: p.id, email: p.email, channel: "email" }));
+    }
+    if (wantsPush) {
+      targets.forEach((p) => sendRows.push({ userId: p.id, email: p.email, channel: "push" }));
+    }
+  }
+  const sendIds = batchId ? await createSends(batchId, sendRows) : new Map<string, string>();
+  const sendIdFor = (userId: string, ch: "email" | "push") =>
+    sendIds.get(`${userId}:${ch}`) ?? null;
+
   /* ------------------------------ email ------------------------------ */
 
   if (wantsEmail) {
@@ -232,19 +305,43 @@ export async function POST(request: Request) {
       .split(/\n{2,}/)
       .map((para) => emailParagraph(para.replace(/\n/g, "<br/>")))
       .join("");
-    const html = renderEmail(subject, inner, subject);
+    // Tracking off ho to purana raasta — ek hi HTML sab ke liye.
+    const plainHtml = renderEmail(subject, inner, subject);
+
+    // Status ek jaisa hone wali rows ko ek saath update karte hain (neeche) —
+    // per-row PATCH 1000 users par serverless function ka time kha jaata hai.
+    const mailed: string[] = [];
+    const notMailed: string[] = [];
 
     for (const p of targets) {
       if (!p.email) continue;
+      const sendId = sendIdFor(p.id, "email");
+      // Har user ka apna HTML banta hai kyunki pixel aur link me USI ka send id
+      // hota hai. Bina iske sab ka open ek hi row par ginta — aur "kisne khola"
+      // ka jawab hi khatam ho jaata.
+      const html = sendId
+        ? renderEmail(subject, trackedEmailBody(inner, sendId, emailCta(p.language)), subject)
+        : plainHtml;
       try {
         const res = await sendMail({ to: p.email, subject, html, fromName: "Apka Saathi" });
         if (res.sent) sent++;
         else skipped++;
+        if (sendId) (res.sent ? mailed : notMailed).push(sendId);
       } catch (e) {
         errors.push(`${p.email}: ${String(e)}`);
+        // Fail virle hote hain aur har ek ka apna karan hota hai — inhe alag se.
+        if (sendId) tracking.push(markSend(sendId, { status: "failed", error: String(e) }));
         void logServerError(e, { where: "admin/notify", step: "email", to: p.email });
       }
     }
+
+    tracking.push(markSendsBulk(mailed, { status: "sent" }));
+    tracking.push(
+      markSendsBulk(notMailed, {
+        status: "skipped",
+        error: "email bheja nahi ja saka (SMTP set nahi ya pata galat)",
+      }),
+    );
   }
 
   /* ------------------------------- push ------------------------------- */
@@ -254,11 +351,59 @@ export async function POST(request: Request) {
   if (wantsPush) {
     const tokens = await tokensFor(targets.map((p) => p.id)).catch((e) => {
       void logServerError(e, { where: "admin/notify", step: "device_tokens fetch" });
-      return [] as string[];
+      return [] as { token: string; userId: string }[];
     });
-    const res = await sendPush(tokens, subject, message);
+    const res = await sendPush(
+      tokens.map((t) => ({ token: t.token, sendId: sendIdFor(t.userId, "push") })),
+      subject,
+      message,
+    );
     push = { sent: res.sent, failed: res.failed, devices: tokens.length };
     errors.push(...res.errors);
+
+    // Har user ka push status uski apni row par. Jinke paas ek bhi phone nahi
+    // tha unki row "skipped" ho jaati hai — aur yahi wo jawab hai jo admin
+    // baar-baar poochta hai: "isko notification kyun nahi gayi?"
+    if (batchId) {
+      const noDevice: string[] = [];
+      const failedAll: string[] = [];
+      // devices ki ginti alag-alag hoti hai, isliye "gaya" wale ko ginti ke
+      // hisaab se jhund me baantte hain (aksar sab ke paas 1 hi phone hota hai).
+      const okByCount = new Map<number, string[]>();
+
+      for (const p of targets) {
+        const sendId = sendIdFor(p.id, "push");
+        if (!sendId) continue;
+        const tally = res.bySend.get(sendId);
+        if (!tally) {
+          noDevice.push(sendId);
+        } else if (tally.sent > 0) {
+          const n = tally.sent + tally.failed;
+          const list = okByCount.get(n) ?? [];
+          list.push(sendId);
+          okByCount.set(n, list);
+        } else {
+          failedAll.push(sendId);
+        }
+      }
+
+      tracking.push(
+        markSendsBulk(noDevice, {
+          status: "skipped",
+          error: "koi device token nahi (app install/login nahi)",
+          devices: 0,
+        }),
+      );
+      tracking.push(
+        markSendsBulk(failedAll, {
+          status: "failed",
+          error: "FCM ne sabhi device par mana kar diya",
+        }),
+      );
+      okByCount.forEach((ids, n) => {
+        tracking.push(markSendsBulk(ids, { status: "sent", devices: n, error: null }));
+      });
+    }
 
     // ⚠️ Ye logging pehle nahi thi, aur usi wajah se push fail hone par admin ko
     // kuch pata hi nahi chalta tha: error sirf HTTP response me jaata tha, aur
@@ -289,6 +434,11 @@ export async function POST(request: Request) {
     await dropDeadTokens(res.deadTokens);
   }
 
+  // Response ke baad function marr jaata hai — tracking ke writes yahin nipta lo.
+  await Promise.all(tracking).catch(() => {
+    /* tracking adhoori reh jaye to bhi message to ja hi chuka hai */
+  });
+
   return NextResponse.json({
     audience: picked ? "picked" : audience,
     channel,
@@ -296,6 +446,8 @@ export async function POST(request: Request) {
     sent,
     skipped,
     push,
+    // UI ise leke seedha "Report" tab me is bhejne ka hisaab khol sakta hai.
+    batchId,
     errors: errors.slice(0, 5),
   });
 }

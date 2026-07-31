@@ -496,9 +496,10 @@ export default function AddReminder() {
       </Pressable>
 
       {/* Sirf SAVE ke waqt blocking loader.
-          AI ka refine ab peeche chalta hai — uske liye form block karna galat
-          tha: local samajh to pehle hi bhar chuki hoti hai, aur user ko bekaar
-          rukna padta tha (item 8). Uska ishaara upar ki patli patti deti hai. */}
+          AI ki samajh peeche chalti hai — uske liye poora form block karna galat
+          hoga: user tab tak date/time khud bhi chun sakta hai, aur AI ka jawab
+          aate hi wo khaane apne aap bhar jaate hain. Uska ishaara upar ki patli
+          patti deti hai. */}
       <LoaderOverlay visible={saving} />
 
       <PermissionModal

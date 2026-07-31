@@ -74,6 +74,10 @@
       [
         "expo-build-properties",
         {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResources": true
+          },
           "ios": { "useFrameworks": "static" }
         }
       ]

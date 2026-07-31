@@ -6,9 +6,7 @@ import notifee, {
   AndroidVisibility,
   AndroidCategory,
   AuthorizationStatus,
-  EventType,
   TriggerType,
-  type Notification,
   type TimestampTrigger,
 } from "@notifee/react-native";
 
@@ -16,6 +14,11 @@ import { listReminders } from "./reminders";
 import { listDocuments } from "./documents";
 import { reportError } from "./report-error";
 import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionaries";
+// Background/headless handler ab `index.js` se sabse pehle lagta hai. Yahan se
+// sirf takePendingAlert aage bheja jaata hai (purane import na tootein).
+import { takePendingAlert } from "./notification-background";
+
+export { takePendingAlert };
 
 /**
  * Notifications — ab @notifee/react-native se.
@@ -30,59 +33,6 @@ import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionar
  *
  * ⚠️ Native module — Expo Go me nahi chalta. Dev/prod build (EAS) chahiye.
  */
-
-/** App band/background me aayi notification — resume par modal dikhane ke liye. */
-const PENDING_ALERT_KEY = "saathi-pending-alert";
-/** Itni purani notification ka modal ab dikhana bhadda lagta hai. */
-const PENDING_ALERT_MAX_AGE_MS = 30 * 60_000;
-
-/**
- * Background event handler — notifee ise chahta hai (warna warning).
- *
- * ⚠️ Ye pehle khaali tha, is soch ke saath ki "getInitialNotification aur
- * foreground event kaafi hain". Wo ek soorat me galat tha, aur wahi sabse aam
- * soorat hai: app BACKGROUND me ho (band nahi), phone locked ho, aur full-screen
- * intent MainActivity ko saamne le aaye. Tab —
- *   • `getInitialNotification()` null hai (app cold-start hua hi nahi), aur
- *   • `onForegroundEvent` ka DELIVERED aa chuka hota hai jab app peeche thi,
- *     yaani wo background event tha aur yahan chup-chaap gir jaata tha.
- * Natija: screen jaagti thi, app khulti thi, par reminder ka bada alert kabhi
- * nahi aata tha.
- *
- * Ab notification yahan rakh dete hain aur app saamne aate hi `reminder-alert`
- * ise utha ke modal dikha deta hai.
- */
-if (Platform.OS !== "web") {
-  notifee.onBackgroundEvent(async ({ type, detail }) => {
-    if (type !== EventType.DELIVERED && type !== EventType.PRESS) return;
-    const n = detail.notification;
-    if (!n?.id) return;
-    try {
-      await AsyncStorage.setItem(
-        PENDING_ALERT_KEY,
-        JSON.stringify({ at: Date.now(), notification: n }),
-      );
-    } catch {
-      /* best-effort */
-    }
-  });
-}
-
-/** Background me rakhi gayi notification lo aur hata do (ek hi baar dikhe). */
-export async function takePendingAlert(): Promise<Notification | null> {
-  try {
-    const raw = await AsyncStorage.getItem(PENDING_ALERT_KEY);
-    if (!raw) return null;
-    await AsyncStorage.removeItem(PENDING_ALERT_KEY);
-    const saved = JSON.parse(raw) as { at?: number; notification?: Notification };
-    if (!saved?.notification) return null;
-    // Ghanton purani notification ka modal kholna user ko chaunka deta hai.
-    if (!saved.at || Date.now() - saved.at > PENDING_ALERT_MAX_AGE_MS) return null;
-    return saved.notification;
-  } catch {
-    return null;
-  }
-}
 
 /** Notification text user ki chuni bhasha me. */
 async function notifDict() {

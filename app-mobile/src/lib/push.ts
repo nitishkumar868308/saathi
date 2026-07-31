@@ -1,8 +1,13 @@
 import { Platform } from "react-native";
-import notifee, { AndroidImportance, AndroidVisibility } from "@notifee/react-native";
+import notifee, {
+  AndroidImportance,
+  AndroidVisibility,
+  EventType,
+} from "@notifee/react-native";
 
 import { supabase } from "./supabase";
 import { reportError } from "./report-error";
+import { recordPushOpenFrom, routeFromPush } from "./message-track";
 
 /**
  * Push notification (FCM) — admin panel se aane wali khabar (item 8).
@@ -167,7 +172,24 @@ export function listenForegroundPush(): () => void {
         // `kind: admin` — reminder-alert host isse pehchaan ke apna full-screen
         // "kaam ho gaya?" wala modal NAHI kholta. Admin ka message sirf ek
         // khabar hai, koi kaam nahi.
-        data: { kind: "admin" },
+        //
+        // `send_id` aage bhejna zaroori hai: foreground me notification hum khud
+        // banate hain, aur agar ye id yahan chhoot jaye to us tap ka admin ki
+        // report me koi nishaan hi nahi banega.
+        // ⚠️ Server ka `data` jaisa ka taisa aage bhejna zaroori hai. Foreground
+        // me notification hum KHUD banate hain, isliye jo yahan nahi likha wo
+        // tap ke waqt hota hi nahi: `send_id` ke bina report me tap ka nishaan
+        // nahi banta, aur `ticket_id` ke bina support ka jawab tap karne par
+        // us baatcheet me khulta nahi.
+        data: {
+          kind: typeof msg?.data?.kind === "string" ? (msg.data.kind as string) : "admin",
+          ...(typeof msg?.data?.send_id === "string"
+            ? { send_id: msg.data.send_id as string }
+            : {}),
+          ...(typeof msg?.data?.ticket_id === "string"
+            ? { ticket_id: msg.data.ticket_id as string }
+            : {}),
+        },
         android: {
           channelId: CHANNEL_ID,
           importance: AndroidImportance.HIGH,
@@ -184,4 +206,83 @@ export function listenForegroundPush(): () => void {
   } catch {
     return () => {};
   }
+}
+
+/* ------------------------------ tap tracking ------------------------------ */
+
+/**
+ * "Notification par tap hua" — admin ki Report ke liye (kisne khola, kisne nahi).
+ *
+ * Ek hi tap TEEN alag raaston se aata hai, aur teeno zaroori hain — ek bhi
+ * chhoot jaye to us haalat wale saare users report me "ignore" dikhne lagenge:
+ *
+ *   1. App KHULI thi   — notification hum khud notifee se dikhate hain, isliye
+ *                        tap notifee ka foreground PRESS ban ke aata hai.
+ *   2. App PEECHE thi  — OS ne tray me dikhaya tha; Firebase ka
+ *                        `onNotificationOpenedApp` batata hai.
+ *   3. App BAND thi    — cold start; `getInitialNotification()` se milta hai.
+ *
+ * Dedupe `message-track.ts` me hai — cold-start par 2 aur 3 dono chal sakte hain.
+ *
+ * Login ke baad hi chalana chahiye: server ki RPC bina session ke kuch nahi
+ * likhti (`auth.uid()` par tiki hai).
+ */
+export function listenPushOpens(): () => void {
+  const stops: (() => void)[] = [];
+
+  /**
+   * Tap ka poora kaam: hisaab likho, aur jahan jaana ho wahan le jao.
+   *
+   * Router ko der se import karte hain (`require`) — is module ko headless/
+   * background me bhi chhua ja sakta hai, aur wahan expo-router ka top-level
+   * import bekaar ka bojh hai.
+   */
+  const handle = (data: unknown) => {
+    recordPushOpenFrom(data);
+    const to = routeFromPush(data);
+    if (!to) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { router } = require("expo-router");
+      router.push({ pathname: to.pathname, params: to.params });
+    } catch {
+      /* navigation abhi taiyaar nahi — notification phir bhi dikh chuki hai */
+    }
+  };
+
+  // 1. Foreground — humari apni dikhayi hui notification par tap.
+  try {
+    stops.push(
+      notifee.onForegroundEvent(({ type, detail }) => {
+        if (type !== EventType.PRESS) return;
+        handle(detail.notification?.data);
+      }),
+    );
+  } catch {
+    /* notifee na ho to chhod do */
+  }
+
+  const messaging = messagingModule();
+  if (!messaging) return () => stops.forEach((s) => s());
+
+  // 2. App background me thi.
+  try {
+    stops.push(
+      messaging().onNotificationOpenedApp((msg: any) => handle(msg?.data)),
+    );
+  } catch {
+    /* ignore */
+  }
+
+  // 3. App band thi — notification se hi khuli.
+  try {
+    messaging()
+      .getInitialNotification()
+      .then((msg: any) => handle(msg?.data))
+      .catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
+  return () => stops.forEach((s) => s());
 }

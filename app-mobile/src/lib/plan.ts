@@ -389,16 +389,13 @@ export async function markProfilePlus(expiresAt?: string | null): Promise<void> 
   await sb.from("profiles").update(patch).eq("id", uid);
 }
 
-/** Web Razorpay checkout URL (app in-app browser mein kholega). */
-export function buildCheckoutUrl(
-  plan: PlanId,
-  opts: { uid?: string; email?: string; name?: string; returnUrl?: string },
-): string {
-  const q = new URLSearchParams();
-  q.set("plan", plan);
-  if (opts.uid) q.set("uid", opts.uid);
-  if (opts.email) q.set("email", opts.email);
-  if (opts.name) q.set("name", opts.name);
-  if (opts.returnUrl) q.set("return", opts.returnUrl);
-  return `${WEB_URL}/checkout?${q.toString()}`;
-}
+/**
+ * ⚠️ Yahan pehle `buildCheckoutUrl()` tha — website ka Razorpay checkout kholne
+ * ke liye. Wo poora raasta hata diya gaya hai.
+ *
+ * Saathi Plus ek digital subscription hai, aur Play Store ki policy me aise
+ * saamaan ke liye Google ke apne billing ke alawa kuch nahi chal sakta. Ab
+ * kharidari app ke andar Play Billing se hoti hai (`lib/purchases.ts`), aur
+ * server ki taraf ka hissa `web/lib/play-billing.ts` me taiyaar rakha hai
+ * (abhi band).
+ */

@@ -649,6 +649,141 @@ export async function sendAccountDeletionEmails(
   ]);
 }
 
+/* --------------------------- support tickets --------------------------- */
+
+/** Ticket ka number — email me sabse upar, bade akshar me. */
+function ticketBadge(no: string): string {
+  return (
+    `<div style="display:inline-block;margin-bottom:14px;padding:7px 14px;border-radius:999px;` +
+    `background:${CREAM};border:1px solid #E5DBC9;font-size:13px;font-weight:700;` +
+    `letter-spacing:0.5px;color:${BRAND_DARK};font-family:monospace;">${escapeHtml(no)}</div>`
+  );
+}
+
+/** Quote block — jo likha gaya wo jaisa ka taisa. */
+function quote(text: string): string {
+  return (
+    `<div style="margin-top:14px;padding:16px;background:${CREAM};border-radius:14px;` +
+    `font-size:15px;line-height:1.6;color:${INK};white-space:pre-wrap;word-break:break-word;">` +
+    `${escapeHtml(text)}</div>`
+  );
+}
+
+/**
+ * Naya ticket — admin ko khabar, user ko rasid.
+ *
+ * User wale mail me ticket number sabse upar hai. Wahi ek cheez hai jo wo baad
+ * me phone par ya kisi aur mail me bata sakta hai; uske bina "maine kal ek
+ * message bheja tha" se aage baat hi nahi badhti.
+ */
+export async function sendNewTicketEmails(t: {
+  ticketNo: string;
+  subject: string;
+  message: string;
+  name: string | null;
+  email: string | null;
+}) {
+  const who = t.name || t.email || "User";
+
+  const adminHtml = renderEmail(
+    "Naya support ticket 🎫",
+    ticketBadge(t.ticketNo) +
+      `<table style="width:100%;font-size:15px;color:${INK};border-collapse:collapse;">
+        <tr><td style="padding:6px 0;color:${SOFT};width:80px;">Naam</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(who)}</td></tr>
+        <tr><td style="padding:6px 0;color:${SOFT};">Email</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(t.email ?? "—")}</td></tr>
+        <tr><td style="padding:6px 0;color:${SOFT};">Vishay</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(t.subject)}</td></tr>
+      </table>` +
+      quote(t.message),
+    `${t.ticketNo} — ${t.subject.slice(0, 80)}`,
+  );
+
+  const userHtml = renderEmail(
+    "Aapka ticket ban gaya 🎫",
+    ticketBadge(t.ticketNo) +
+      emailParagraph(
+        `Namaste ${escapeHtml(who)}, aapka sawaal hum tak pahunch gaya hai. Isse yaad rakhne ke liye upar wala number hai — baat karte waqt yahi bata dijiyega.`,
+      ) +
+      quote(t.message) +
+      emailParagraph(
+        `Jawab aate hi aapko email milega, aur app ke Support me bhi wahi baatcheet khul jaayegi.`,
+      ),
+    `${t.ticketNo} — hum jaldi jawab denge`,
+  );
+
+  const jobs = [
+    sendMail({
+      to: CONTACT_TO,
+      replyTo: t.email ?? undefined,
+      fromName: "Apka Saathi Support",
+      subject: `🎫 ${t.ticketNo} — ${t.subject}`,
+      html: adminHtml,
+    }),
+  ];
+  // Email na ho (virle, par possible) to user wala mail chhod dete hain — admin
+  // ko khabar phir bhi jaani chahiye.
+  if (t.email) {
+    jobs.push(
+      sendMail({
+        to: t.email,
+        fromName: "Apka Saathi",
+        subject: `Ticket ${t.ticketNo} — aapka sawaal mil gaya`,
+        html: userHtml,
+      }),
+    );
+  }
+  return Promise.all(jobs);
+}
+
+/** User ne usi ticket par kuch aur likha — sirf admin ko. */
+export async function sendTicketReplyToAdmin(t: {
+  ticketNo: string;
+  subject: string;
+  message: string;
+  name: string | null;
+  email: string | null;
+}) {
+  const html = renderEmail(
+    "Ticket par naya message 💬",
+    ticketBadge(t.ticketNo) +
+      emailParagraph(`${escapeHtml(t.name || t.email || "User")} ne likha:`) +
+      quote(t.message),
+    `${t.ticketNo} — naya message`,
+  );
+  return sendMail({
+    to: CONTACT_TO,
+    replyTo: t.email ?? undefined,
+    fromName: "Apka Saathi Support",
+    subject: `💬 ${t.ticketNo} — ${t.subject}`,
+    html,
+  });
+}
+
+/** Admin ne jawab diya — user ko email. */
+export async function sendTicketAnswerEmail(t: {
+  ticketNo: string;
+  subject: string;
+  answer: string;
+  name: string | null;
+  email: string;
+}) {
+  const html = renderEmail(
+    "Aapke ticket ka jawab 💬",
+    ticketBadge(t.ticketNo) +
+      emailParagraph(`Namaste ${escapeHtml(t.name || "")}, aapke sawaal ka jawab:`) +
+      quote(t.answer) +
+      emailParagraph(
+        `Aur kuch poochhna ho to app ke Support me isi baatcheet me likh dijiye — number wahi rahega.`,
+      ),
+    `${t.ticketNo} — jawab aa gaya`,
+  );
+  return sendMail({
+    to: t.email,
+    fromName: "Apka Saathi Support",
+    subject: `Ticket ${t.ticketNo} — jawab aa gaya`,
+    html,
+  });
+}
+
 export async function sendContactEmails(
   name: string,
   email: string,
