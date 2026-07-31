@@ -29,6 +29,7 @@ import { formatWhen } from "@/utils/parse-time";
 import { reportNetFailure, reportIfNetwork } from "@/lib/net-alert";
 import { markFirstReminder } from "@/lib/reviews";
 import { useToast } from "@/components/toast";
+import { emitDataChanged } from "@/lib/data-events";
 
 /** Chat ki ek line — saathi ki line ke saath tappable document chips ho sakti hain. */
 type DocRef = { id: string; name: string; uri: string; path: string };
@@ -77,6 +78,30 @@ function TypingBubble() {
 const CHAT_KEY_PREFIX = "saathi-chat:";
 const MAX_STORED = 60;
 
+/** Greeting ka tay id — history banate waqt isi se pehchana jaata hai. */
+const GREETING_ID = "1";
+
+/**
+ * Har message ka apna, kabhi na dohraaya jaane wala id.
+ *
+ * ⚠️ Pehle id `String(m.length + 1)` se banta tha — yaani "array me ye kaunsa
+ * number hai". Wo tab tak theek chalta hai jab tak chat kabhi kaati na jaye.
+ * Par har baar save karte waqt hum sirf aakhri 60 message rakhte hain
+ * (`MAX_STORED`). App dobara khulne par array 60 lamba hota hai jiske ids
+ * 61...120 tak ho sakte hain — aur agla naya message phir se id "61" le leta
+ * tha, jo pehle se maujood hai.
+ *
+ * Do message ka ek hi `key` React ke liye "ye wahi wala hai" ka matlab rakhta
+ * hai: wo purane bubble ko naye ke saath mila deta hai. Screen par uska natija
+ * yahi dikhta tha ki lambi chat me jawab galat jagah chipak jaata ya bubble
+ * gayab ho jaata.
+ */
+let msgSeq = 0;
+function newMsgId(): string {
+  msgSeq += 1;
+  return `m${Date.now().toString(36)}-${msgSeq}`;
+}
+
 /** Chat me ek turn ke liye zaroori sab kuch — retry isi se dobara chalta hai. */
 type Pending = { text: string; history: ChatTurn[] };
 
@@ -103,7 +128,7 @@ export default function Chat() {
   const [failedTurn, setFailedTurn] = useState<Pending | null>(null);
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
-      id: "1",
+      id: GREETING_ID,
       role: "saathi",
       text: tpl(ch.greeting, { name: name ? " " + name : "" }),
     },
@@ -188,10 +213,10 @@ export default function Chat() {
     setFailedTurn(null);
 
     const history: ChatTurn[] = messages
-      .filter((m) => m.id !== "1")
+      .filter((m) => m.id !== GREETING_ID)
       .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
 
-    setMessages((m) => [...m, { id: String(m.length + 1), role: "user", text: t }]);
+    setMessages((m) => [...m, { id: newMsgId(), role: "user", text: t }]);
     await ask({ text: t, history });
   }
 
@@ -232,7 +257,7 @@ export default function Chat() {
       const refs = matchDocs(reply + " " + turn.text, docs);
       setMessages((m) => [
         ...m,
-        { id: String(m.length + 1), role: "saathi", text: reply, docs: refs },
+        { id: newMsgId(), role: "saathi", text: reply, docs: refs },
       ]);
       if (action) await runAction(action);
     } finally {
@@ -270,6 +295,9 @@ export default function Chat() {
       }
       // Review popup ka padav — chat se bana reminder bhi ginta hai.
       markFirstReminder().catch(() => {});
+      // Home/Reminders tab khule pade hain — chat se bana reminder wahan bhi
+      // turant dikhna chahiye, tab badalne ka intezaar kiye bina.
+      emitDataChanged();
       return true;
     } catch (e) {
       if (e instanceof ReminderLimitError) {

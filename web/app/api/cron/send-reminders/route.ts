@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { sendReminderWhatsApp } from "@/lib/twilio";
+import {
+  PROFILE_SELECT,
+  toReminderProfile,
+  type ProfileRow,
+  type ReminderProfile,
+} from "@/lib/reminder-channels";
 import { sendReminderEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
@@ -77,22 +83,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "fetch failed" }, { status: 500 });
   }
 
-  // Per-user profile (email + bhasha) cache (N+1 avoid).
-  type Loc = "hinglish" | "hi" | "en";
-  const profileCache = new Map<string, { email: string | null; language: Loc }>();
+  // Per-user profile (email + bhasha + plan) cache (N+1 avoid).
+  const profileCache = new Map<string, ReminderProfile>();
   const phoneCache = new Map<string, string | null>();
 
-  async function getProfile(uid: string): Promise<{ email: string | null; language: Loc }> {
+  async function getProfile(uid: string): Promise<ReminderProfile> {
     const cached = profileCache.get(uid);
     if (cached) return cached;
-    const rows = await sbGet<{ email: string | null; language: string | null }>(
-      `profiles?id=eq.${uid}&select=email,language`,
+    const rows = await sbGet<ProfileRow>(
+      `profiles?id=eq.${uid}&select=${PROFILE_SELECT}`,
     ).catch(() => []);
-    const lang = rows[0]?.language;
-    const v = {
-      email: rows[0]?.email ?? null,
-      language: (lang === "hi" || lang === "en" || lang === "hinglish" ? lang : "hinglish") as Loc,
-    };
+    const v = toReminderProfile(rows[0]);
     profileCache.set(uid, v);
     return v;
   }
@@ -108,38 +109,64 @@ export async function POST(request: Request) {
 
   let wa = 0;
   let mail = 0;
+  /** Free plan wale — inka reminder bhi nikla, par email/WhatsApp Plus ka hai. */
+  let skippedFree = 0;
   const errors: string[] = [];
 
   for (const r of due) {
     const label = whenLabel(r);
 
     if (r.user_id) {
-      const [profile, phone] = await Promise.all([
-        getProfile(r.user_id),
-        getPhone(r.user_id),
-      ]);
+      const profile = await getProfile(r.user_id);
 
-      if (phone) {
-        try {
-          const res = await sendReminderWhatsApp(phone, r.title, label, r.note, r.user_id);
-          if (res.sent) wa++;
-        } catch (e) {
-          errors.push(`wa ${r.id}: ${String(e)}`);
+      /**
+       * Email aur WhatsApp SIRF Plus me.
+       *
+       * ⚠️ Pehle ye check tha hi nahi — har user ko email jaata tha, jabki
+       * pricing page par yahi Plus ka feature bech rahe hain. Free user ko
+       * phone ki notification tab bhi milti hai (wo free plan ka hissa hai);
+       * band sirf ye do raaste hote hain.
+       *
+       * ⚠️ Yahan `continue` MAT karna. Neeche wala `advance_reminder` HAR
+       * reminder par chalna zaroori hai — wahi remind_at ko agle din par
+       * sarkaata hai. Chhod dete to free user ka roz wala reminder pehle hi
+       * din par atak jaata aur phone ki notification bhi dobara kabhi na aati.
+       */
+      if (!profile.isPlus) {
+        skippedFree++;
+      } else {
+        const phone = await getPhone(r.user_id);
+        if (phone) {
+          try {
+            const res = await sendReminderWhatsApp(
+              phone,
+              r.title,
+              label,
+              r.note,
+              r.user_id,
+              // Email pehle se user ki bhasha me jaata tha, WhatsApp nahi — ek
+              // hi reminder do alag bhashaon me pahunchta tha.
+              profile.language,
+            );
+            if (res.sent) wa++;
+          } catch (e) {
+            errors.push(`wa ${r.id}: ${String(e)}`);
+          }
         }
-      }
-      if (profile.email) {
-        try {
-          const res = await sendReminderEmail(
-            profile.email,
-            r.title,
-            label,
-            profile.language,
-            r.note,
-            r.user_id,
-          );
-          if (res.sent) mail++;
-        } catch (e) {
-          errors.push(`mail ${r.id}: ${String(e)}`);
+        if (profile.email) {
+          try {
+            const res = await sendReminderEmail(
+              profile.email,
+              r.title,
+              label,
+              profile.language,
+              r.note,
+              r.user_id,
+            );
+            if (res.sent) mail++;
+          } catch (e) {
+            errors.push(`mail ${r.id}: ${String(e)}`);
+          }
         }
       }
     }
@@ -168,6 +195,9 @@ export async function POST(request: Request) {
     processed: due.length,
     whatsapp: wa,
     email: mail,
+    // Ye ginti dikhna zaroori hai: "email 0 kyun gaye" ka jawab yahin milta hai
+    // (free users the), warna lagta hai SMTP hi toot gaya.
+    skippedFreePlan: skippedFree,
     errors: errors.slice(0, 10),
   });
 }

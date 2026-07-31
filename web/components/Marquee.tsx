@@ -1,21 +1,19 @@
+"use client";
+
 import { FileClock } from "lucide-react";
 
-const docs = [
-  "Passport",
-  "Driving License",
-  "Car Insurance",
-  "FASTag",
-  "RC / PUC",
-  "LIC Premium",
-  "Aadhaar update",
-  "Gas connection",
-  "Warranty / AMC",
-  "Visa",
-  "Health Insurance",
-  "Subscription",
-];
+import { useT } from "@/lib/i18n/LanguageProvider";
 
+/**
+ * Chalti hui document-patti.
+ *
+ * ⚠️ Ye list pehle yahin hardcoded English thi. Hindi chunne par poore landing
+ * page me sirf yahi patti English rehti thi — bilkul beech me, sabse zyada
+ * dikhne wali jagah par.
+ */
 export default function Marquee() {
+  const { marquee: docs } = useT();
+
   return (
     <div className="relative flex overflow-hidden border-y border-line bg-surface/60 py-5">
       {/* edge fades */}

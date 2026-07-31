@@ -281,6 +281,39 @@ export async function documentFollowUp(
   }
 }
 
+/**
+ * Subah ka daily brief — Saathi apne shabdon me, aaj ke data se (Plus feature).
+ *
+ * ⚠️ Ye server par kab se bana pada tha (`task: "brief"`) par app ne use kabhi
+ * bulaya hi nahi. Home ka card ek fixed template line dikhata tha ("aapke {n}
+ * documents ko dhyan chahiye") — free aur Plus dono ko bilkul ek jaisi. Yaani
+ * "Subah ka daily brief" bech to rahe the, milta kisi ko nahi tha.
+ *
+ * Fail ho to null — home apni purani template line dikha deta hai. Brief ek
+ * upar wali cheez hai; uske liye screen kabhi khaali nahi rehni chahiye.
+ */
+export async function dailyBrief(
+  data: {
+    reminders: { title: string; when: string | null }[];
+    documents: { name: string; expiry: string | null }[];
+    today: string;
+  },
+  name?: string,
+  locale?: string,
+): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const d = await callAi<{ brief?: string } | null>(
+      { task: "brief", data, name, locale },
+      TASK_TIMEOUT_MS,
+    );
+    const brief = d?.brief?.trim();
+    return brief ? brief : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Document image ko AI se padho. */
 export type DocumentAI = {
   type: string;

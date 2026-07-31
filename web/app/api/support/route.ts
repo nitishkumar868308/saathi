@@ -8,6 +8,7 @@ import {
   type Ticket,
 } from "@/lib/support-server";
 import { sendNewTicketEmails, sendTicketReplyToAdmin } from "@/lib/email";
+import { localeForUser } from "@/lib/user-locale";
 import { logServerError } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
@@ -117,6 +118,9 @@ export async function POST(request: Request) {
       message,
       name: t?.name ?? null,
       email: t?.email ?? null,
+      // Rasid usi bhasha me jo user ne app me chuni hai — pehle ye hamesha
+      // Hinglish jaati thi, chahe user ki app poori Hindi ya English me ho.
+      locale: await localeForUser(uid),
     });
   } catch (e) {
     // Ticket ban chuka hai — user ko safal hi dikhega. Email ka fail sirf Logs

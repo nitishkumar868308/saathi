@@ -45,12 +45,22 @@ export async function initPurchases(appUserId?: string): Promise<void> {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getPlusPackages(): Promise<any[]> {
+/**
+ * Store ka ek package — humein iska sirf itna hissa chahiye.
+ *
+ * `priceString` wahi price hai jo Google Play sach me kaatega, pehle se user ke
+ * desh aur currency me ("₹99", "$1.99"). Upgrade screen isse tab dikhati hai
+ * jab Play chalu ho — taaki jo dikhe wahi kate.
+ */
+export type PurchasePackage = {
+  product?: { identifier?: string; priceString?: string };
+};
+
+export async function getPlusPackages(): Promise<PurchasePackage[]> {
   if (!purchasesAvailable()) return [];
   try {
     const offerings = await Purchases.getOfferings();
-    return offerings.current?.availablePackages ?? [];
+    return (offerings.current?.availablePackages ?? []) as PurchasePackage[];
   } catch {
     return [];
   }
@@ -68,8 +78,7 @@ export type PurchaseResult = {
  * Expiry zaroori hai: iske bina profile me plan_expires_at null reh jaata tha,
  * jise "hamesha ke liye Plus" maan liya jaata — cancel/refund ke baad bhi.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function purchasePlus(pkg: any): Promise<PurchaseResult> {
+export async function purchasePlus(pkg: PurchasePackage): Promise<PurchaseResult> {
   if (!purchasesAvailable()) throw new Error("purchases unavailable");
   const { customerInfo } = await Purchases.purchasePackage(pkg);
   const ent = customerInfo.entitlements.active[ENTITLEMENT];

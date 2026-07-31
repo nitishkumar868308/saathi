@@ -10,12 +10,20 @@ import {
   type Ticket,
   type TicketMessage,
 } from "@/lib/support-server";
-import { sendTicketAnswerEmail } from "@/lib/email";
+import { sendTicketAnswerEmail, type EmailLocale } from "@/lib/email";
+import { localeForUser } from "@/lib/user-locale";
 import { isFcmConfigured, sendPush } from "@/lib/fcm";
 import { logServerError } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Support ke jawab wali notification ka title — user ki bhasha me. */
+function ticketAnswerPushTitle(locale: EmailLocale, ticketNo: string): string {
+  if (locale === "hi") return `टिकट ${ticketNo} — जवाब आ गया`;
+  if (locale === "en") return `Ticket ${ticketNo} — we've replied`;
+  return `Ticket ${ticketNo} — jawab aa gaya`;
+}
 
 /**
  * Admin panel ka Support — saare ticket, aur unka jawab.
@@ -152,6 +160,10 @@ export async function POST(request: Request) {
 
   const notify: { email: boolean; push: number } = { email: false, push: 0 };
 
+  // Email aur notification dono usi bhasha me jaayein jo user ne app me chuni
+  // hai. Ek hi baar padho — dono jagah wahi chahiye.
+  const userLocale = await localeForUser(ticket.user_id);
+
   if (ticket.email) {
     try {
       await sendTicketAnswerEmail({
@@ -160,6 +172,7 @@ export async function POST(request: Request) {
         answer: reply,
         name: ticket.name,
         email: ticket.email,
+        locale: userLocale,
       });
       notify.email = true;
     } catch (e) {
@@ -173,7 +186,10 @@ export async function POST(request: Request) {
       if (tokens.length) {
         const res = await sendPush(
           tokens.map((token) => ({ token })),
-          `Ticket ${ticket.ticket_no} — jawab aa gaya`,
+          // ⚠️ Ye line hardcoded Hinglish thi — phone par aane wali notification
+          // hi wo pehli cheez hai jo user dekhta hai, aur wahi uski bhasha
+          // chhod deti thi.
+          ticketAnswerPushTitle(userLocale, ticket.ticket_no),
           reply.slice(0, 160),
           // Tap karte hi app usi baatcheet me khul jaati hai. Bina in do fields
           // ke user ko notification to dikhti, par jawab dhoondhne ke liye use

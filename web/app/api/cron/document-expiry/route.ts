@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { sendDocumentWhatsApp } from "@/lib/twilio";
 import { sendDocumentExpiryEmail } from "@/lib/email";
+import {
+  PROFILE_SELECT,
+  toReminderProfile,
+  type Loc,
+  type ProfileRow,
+  type ReminderProfile,
+} from "@/lib/reminder-channels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,8 +58,6 @@ async function sbGet<T>(query: string): Promise<T[]> {
   if (!res.ok) throw new Error(`supabase get failed: ${res.status}`);
   return (await res.json()) as T[];
 }
-
-type Loc = "hinglish" | "hi" | "en";
 
 type DueDoc = {
   id: string;
@@ -105,22 +110,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "fetch failed" }, { status: 500 });
   }
 
-  const profileCache = new Map<string, { email: string | null; language: Loc }>();
+  const profileCache = new Map<string, ReminderProfile>();
   const phoneCache = new Map<string, string | null>();
 
-  async function getProfile(uid: string): Promise<{ email: string | null; language: Loc }> {
+  async function getProfile(uid: string): Promise<ReminderProfile> {
     const cached = profileCache.get(uid);
     if (cached) return cached;
-    const rows = await sbGet<{ email: string | null; language: string | null }>(
-      `profiles?id=eq.${uid}&select=email,language`,
+    const rows = await sbGet<ProfileRow>(
+      `profiles?id=eq.${uid}&select=${PROFILE_SELECT}`,
     ).catch(() => []);
-    const lang = rows[0]?.language;
-    const v = {
-      email: rows[0]?.email ?? null,
-      language: (lang === "hi" || lang === "en" || lang === "hinglish"
-        ? lang
-        : "hinglish") as Loc,
-    };
+    const v = toReminderProfile(rows[0]);
     profileCache.set(uid, v);
     return v;
   }
@@ -156,6 +155,8 @@ export async function POST(request: Request) {
 
   let mail = 0;
   let wa = 0;
+  /** Free plan wale — inka expiry alert phone par gaya, email/WhatsApp Plus ka hai. */
+  let skippedFree = 0;
   const errors: string[] = [];
 
   for (const doc of docs) {
@@ -174,6 +175,24 @@ export async function POST(request: Request) {
 
     const dueIso = new Date(hit.moment).toISOString();
     const profile = await getProfile(doc.user_id);
+
+    /**
+     * Email aur WhatsApp SIRF Plus me — bilkul wahi niyam jo reminder cron me
+     * hai (`lib/reminder-channels.ts`).
+     *
+     * ⚠️ Yahan `continue` karna theek hai (reminder cron se ulta): us cron me
+     * neeche `advance_reminder` chalta hai jo har haal me chahiye. Yahan neeche
+     * sirf bhejna hi bacha hai — `claim()` bhi tabhi lagta hai jab sach me
+     * kuch bheja jaye, warna Plus lene ke baad us din ka alert "bhej diya"
+     * mark hoke chup-chaap gum ho jaata.
+     *
+     * Phone ki notification par koi asar nahi — wo app khud lagati hai
+     * (`scheduleDocumentExpiry`) aur free plan me chalti rehti hai.
+     */
+    if (!profile.isPlus) {
+      skippedFree++;
+      continue;
+    }
 
     // --- Email ---
     if (profile.email) {
@@ -203,7 +222,13 @@ export async function POST(request: Request) {
     if (!phone) continue;
     try {
       if (await claim(doc.id, dueIso, "whatsapp")) {
-        const res = await sendDocumentWhatsApp(phone, doc.name, whenLabel(hit.lead), doc.user_id);
+        const res = await sendDocumentWhatsApp(
+          phone,
+          doc.name,
+          whenLabel(hit.lead, profile.language),
+          doc.user_id,
+          profile.language,
+        );
         if (res.sent) wa++;
       }
     } catch (e) {
@@ -215,12 +240,31 @@ export async function POST(request: Request) {
     scanned: docs.length,
     email: mail,
     whatsapp: wa,
+    // "email 0 kyun gaye" ka jawab — free users the, SMTP kharab nahi hai.
+    skippedFreePlan: skippedFree,
     errors: errors.slice(0, 10),
   });
 }
 
 /** WhatsApp ke liye chhota label — template variable me yahi jaata hai. */
-function whenLabel(lead: number): string {
+/**
+ * "aaj" / "kal" / "3 din me" — user ki bhasha me.
+ *
+ * ⚠️ Ye pehle hamesha Hinglish tha, aur seedha WhatsApp message ke beech me
+ * chala jaata tha. Yaani Hindi wale user ko poora message Hindi me milta aur
+ * beech me "3 din me" Hinglish me.
+ */
+function whenLabel(lead: number, locale: Loc): string {
+  if (locale === "hi") {
+    if (lead === 0) return "आज";
+    if (lead === 1) return "कल";
+    return `${lead} दिन में`;
+  }
+  if (locale === "en") {
+    if (lead === 0) return "today";
+    if (lead === 1) return "tomorrow";
+    return `in ${lead} days`;
+  }
   if (lead === 0) return "aaj";
   if (lead === 1) return "kal";
   return `${lead} din me`;

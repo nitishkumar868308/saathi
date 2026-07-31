@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bot, MessageCircle, Mail, RefreshCw } from "lucide-react";
 import { SkeletonRows } from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import { useAdminT, atpl } from "@/lib/i18n/admin";
 
 /**
  * "AI & WhatsApp" — humara kitna istemaal ho raha hai (item 3).
@@ -26,39 +27,22 @@ type SpendRow = {
   last_at: string | null;
 };
 
-const RANGES = [
-  { key: "today", label: "Today" },
-  { key: "7", label: "7 days" },
-  { key: "30", label: "30 days" },
-  { key: "all", label: "All" },
-] as const;
+// ⚠️ Label ab yahan nahi rakhe ja sakte — wo bhasha ke saath badalte hain.
+// Sirf wahi cheezein bachi hain jo har bhasha me ek jaisi rehti hain: key,
+// icon aur rang.
+const RANGE_KEYS = ["today", "7", "30", "all"] as const;
+type RangeKey = (typeof RANGE_KEYS)[number];
 
-type RangeKey = (typeof RANGES)[number]["key"];
+const SERVICE_KEYS = ["gemini", "twilio", "email"] as const;
 
-const SERVICES = [
-  {
-    key: "gemini",
-    label: "AI (Gemini)",
-    icon: Bot,
-    /** Gemini me `units` = token; baaki me message/email ki ginti. */
-    unitLabel: "tokens",
-    tint: "bg-terracotta/10 text-terracotta",
-  },
-  {
-    key: "twilio",
-    label: "WhatsApp (Twilio)",
-    icon: MessageCircle,
-    unitLabel: "messages",
-    tint: "bg-sage/15 text-sage",
-  },
-  {
-    key: "email",
-    label: "Email (SMTP)",
-    icon: Mail,
-    unitLabel: "emails",
-    tint: "bg-amber-warm/15 text-amber-warm",
-  },
-] as const;
+const SERVICE_LOOK: Record<
+  (typeof SERVICE_KEYS)[number],
+  { icon: typeof Bot; tint: string }
+> = {
+  gemini: { icon: Bot, tint: "bg-terracotta/10 text-terracotta" },
+  twilio: { icon: MessageCircle, tint: "bg-sage/15 text-sage" },
+  email: { icon: Mail, tint: "bg-amber-warm/15 text-amber-warm" },
+};
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -78,6 +62,8 @@ function fmtWhen(iso: string | null): string {
 }
 
 export default function AdminSpend() {
+  const at = useAdminT();
+  const s = at.data.spend;
   const [rows, setRows] = useState<SpendRow[]>([]);
   const [range, setRange] = useState<RangeKey>("30");
   const [loading, setLoading] = useState(true);
@@ -119,6 +105,19 @@ export default function AdminSpend() {
 
   const hasAny = rows.length > 0;
 
+  const rangeLabel: Record<RangeKey, string> = {
+    today: s.today,
+    "7": s.days7,
+    "30": s.days30,
+    all: s.all,
+  };
+  /** Gemini me `units` = token; baaki me message/email ki ginti. */
+  const serviceCopy: Record<(typeof SERVICE_KEYS)[number], { label: string; unit: string }> = {
+    gemini: { label: s.aiLabel, unit: s.tokens },
+    twilio: { label: s.whatsappLabel, unit: s.messages },
+    email: { label: s.emailLabel, unit: s.emails },
+  };
+
   // Har service × kind ka apna row — services badhne par ye table lambi hoti
   // jaati hai. Range badle to page 1 par wapas.
   const pg = usePagination(rows, 12, range);
@@ -128,17 +127,17 @@ export default function AdminSpend() {
       {/* Range + refresh */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          {RANGES.map((r) => (
+          {RANGE_KEYS.map((key) => (
             <button
-              key={r.key}
-              onClick={() => setRange(r.key)}
+              key={key}
+              onClick={() => setRange(key)}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                range === r.key
+                range === key
                   ? "bg-terracotta text-white shadow-warm"
                   : "border border-line bg-surface text-ink-soft hover:text-ink"
               }`}
             >
-              {r.label}
+              {rangeLabel[key]}
             </button>
           ))}
         </div>
@@ -147,7 +146,7 @@ export default function AdminSpend() {
           className="inline-flex h-10 items-center gap-2 rounded-full border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
         >
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-          Refresh
+          {at.common.refresh}
         </button>
       </div>
 
@@ -160,8 +159,10 @@ export default function AdminSpend() {
 
       {/* Teen bade card — ek nazar me poora hisaab */}
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SERVICES.map(({ key, label, icon: Icon, unitLabel, tint }) => {
-          const s = byService.get(key);
+        {SERVICE_KEYS.map((key) => {
+          const { icon: Icon, tint } = SERVICE_LOOK[key];
+          const { label, unit } = serviceCopy[key];
+          const stat = byService.get(key);
           return (
             <div key={key} className="rounded-3xl border border-line bg-surface p-5">
               <div className="flex items-center gap-3">
@@ -172,22 +173,22 @@ export default function AdminSpend() {
               </div>
 
               <p className="mt-4 font-display text-3xl font-semibold tracking-tight">
-                {loading ? "—" : fmtNum(s?.units ?? 0)}
+                {loading ? "—" : fmtNum(stat?.units ?? 0)}
               </p>
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
-                {unitLabel}
+                {unit}
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-3 text-xs text-ink-soft">
                 <span>
-                  <b className="text-ink">{fmtNum(s?.calls ?? 0)}</b> calls
+                  <b className="text-ink">{fmtNum(stat?.calls ?? 0)}</b> {s.calls}
                 </span>
-                {!!s?.failures && (
+                {!!stat?.failures && (
                   <span className="font-semibold text-terracotta">
-                    {fmtNum(s.failures)} failed
+                    {fmtNum(stat.failures)} {s.failed}
                   </span>
                 )}
-                <span className="ml-auto">{fmtWhen(s?.last ?? null)}</span>
+                <span className="ml-auto">{fmtWhen(stat?.last ?? null)}</span>
               </div>
             </div>
           );
@@ -195,7 +196,7 @@ export default function AdminSpend() {
       </div>
 
       {/* Tod-ke — kaunse kaam se kitna laga */}
-      <h2 className="mt-9 font-display text-lg font-semibold">Breakdown</h2>
+      <h2 className="mt-9 font-display text-lg font-semibold">{s.breakdown}</h2>
       <div className="mt-3 overflow-hidden rounded-3xl border border-line bg-surface">
         {loading ? (
           <div className="p-5">
@@ -203,21 +204,19 @@ export default function AdminSpend() {
           </div>
         ) : !hasAny ? (
           <p className="p-6 text-sm text-ink-soft">
-            Abhi tak koi usage record nahi hui. Agar aapko yakeen hai ki AI/WhatsApp chal
-            raha hai, to Supabase me <code>supabase/service-usage.sql</code> run karna baaki
-            hai.
+            {atpl(s.nothingYet, { file: "supabase/service-usage.sql" })}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b border-line text-xs font-semibold uppercase tracking-wide text-ink-soft">
                 <tr>
-                  <th className="px-5 py-3">Service</th>
-                  <th className="px-5 py-3">What</th>
-                  <th className="px-5 py-3 text-right">Calls</th>
-                  <th className="px-5 py-3 text-right">Units</th>
-                  <th className="px-5 py-3 text-right">Failed</th>
-                  <th className="px-5 py-3 text-right">Last</th>
+                  <th className="px-5 py-3">{s.service}</th>
+                  <th className="px-5 py-3">{s.what}</th>
+                  <th className="px-5 py-3 text-right">{s.calls}</th>
+                  <th className="px-5 py-3 text-right">{s.units}</th>
+                  <th className="px-5 py-3 text-right">{s.failed}</th>
+                  <th className="px-5 py-3 text-right">{s.last}</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,7 +248,7 @@ export default function AdminSpend() {
                 from={pg.from}
                 to={pg.to}
                 onPage={pg.setPage}
-                label="rows"
+                label={s.rows}
               />
             </div>
           </div>

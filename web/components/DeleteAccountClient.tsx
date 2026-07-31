@@ -18,7 +18,7 @@ import BackHomeLink from "@/components/BackHomeLink";
 import DotsLoader from "@/components/DotsLoader";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useToast } from "@/components/Toast";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/offers";
 
 /**
@@ -31,7 +31,8 @@ import { tpl } from "@/lib/offers";
  * raha hai wo kam se kam apni bhasha me padh sake, ye zaroori hai.
  */
 export default function DeleteAccountClient() {
-  const { deleteAccount: t } = useT();
+  const { t: dict, locale } = useLanguage();
+  const t = dict.deleteAccount;
   const { toast } = useToast();
 
   const [name, setName] = useState("");
@@ -64,6 +65,9 @@ export default function DeleteAccountClient() {
           name: name.trim(),
           email: email.trim(),
           reason: reason.trim(),
+          // Account delete hone ki confirmation user ki apni bhasha me — yahi
+          // wo email hai jise wo sabse dhyan se padhta hai.
+          locale,
         }),
       });
       if (!res.ok) throw new Error("failed");

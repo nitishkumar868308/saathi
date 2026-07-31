@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import { getPosts } from "@/lib/blog-server";
+import BlogTeaserHead from "@/components/BlogTeaserHead";
 
 /**
  * Home page ka blog hissa — chhota sa, teen posts (item 1).
@@ -23,28 +24,8 @@ export default async function BlogTeaser() {
 
   return (
     <section className="container-page py-14 sm:py-20">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-            <BookOpen size={13} className="text-terracotta" />
-            Blog
-          </span>
-          <h2 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-            Padhne layak, kaam ki baatein
-          </h2>
-          <p className="mt-2 max-w-lg leading-relaxed text-ink-soft">
-            Documents, renewals, dawai aur bills — jo cheezein chupchaap expire ho
-            jaati hain, unke chhote practical guides.
-          </p>
-        </div>
-
-        <Link
-          href="/blog"
-          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-terracotta transition hover:gap-2.5 hover:border-terracotta/40"
-        >
-          Sab dekho <ArrowRight size={16} />
-        </Link>
-      </div>
+      {/* Text alag client component me — dekho `BlogTeaserHead`. */}
+      <BlogTeaserHead />
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {posts.map((p) => (

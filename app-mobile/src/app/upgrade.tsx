@@ -20,6 +20,7 @@ import {
   initPurchases,
   getPlusPackages,
   purchasePlus,
+  type PurchasePackage,
 } from "@/lib/purchases";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { logEvent } from "@/lib/analytics";
@@ -51,6 +52,22 @@ export default function Upgrade() {
   const [ipCode, setIpCode] = useState<string | null>(null);
   const [profileCode, setProfileCode] = useState<string | null>(null);
   const [showMismatch, setShowMismatch] = useState(false);
+
+  /**
+   * Store ke apne packages — inme Google Play ka ASLI, uske hisaab se local
+   * kiya hua price hota hai (`product.priceString`).
+   *
+   * ⚠️ Abhi Play Billing chalu nahi hai, isliye ye list khaali rehti hai aur
+   * screen par wahi country-pricing wala price dikhta hai jo `app_config` +
+   * admin panel se aata hai — bilkul waise hi jaise pehle tha.
+   *
+   * Ye isliye pehle se laga diya hai ki jis din Play chalu hoga, us din **jo
+   * price dikh raha hai wahi kata bhi jayega**. Warna wo din ek chhupa hua bug
+   * lekar aata: screen ₹99 dikhati aur Play Console apne configure kiye hue
+   * price par kaat leta. Ye sirf user ka bharosa todne wali baat nahi — Play
+   * ki policy bhi sahi price dikhana maangti hai, aur uspe app reject hoti hai.
+   */
+  const [pkgs, setPkgs] = useState<PurchasePackage[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -106,16 +123,44 @@ export default function Upgrade() {
   // bina user ko "Plus lo" dikhta rehta tha jabki uska Plus already chalu hai.
   useEffect(() => {
     refresh();
-    initPurchases(session?.user?.id);
+    let alive = true;
+    (async () => {
+      await initPurchases(session?.user?.id);
+      // Play band ho to ye khaali array deta hai — screen par kuch nahi badalta.
+      const list = await getPlusPackages().catch(() => []);
+      if (alive) setPkgs(list);
+    })();
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rewardsVersion]);
+
+  /** Chuni hui avadhi ka store package (Play chalu ho tabhi milta hai). */
+  function packageFor(wantYearly: boolean) {
+    const wanted: PlanId = wantYearly ? "plus_yearly" : "plus_monthly";
+    return (
+      pkgs.find((p) => String(p?.product?.identifier ?? "").includes(wanted)) ??
+      (pkgs.length === 1 ? pkgs[0] : null)
+    );
+  }
 
   // Price aur Free limits admin se (app_config) aate hain.
   const base = yearly ? offers.plusPriceYearly : offers.plusPriceMonthly;
   const period = yearly ? u.perYear : u.perMonth;
   // Country-wise local price (base × multiplier × conversion). Row na ho to ₹base.
   const sym = pricing?.symbol ?? "₹";
-  const priceLabel = `${sym}${localAmount(base, pricing).toLocaleString("en-IN")}`;
+  const localLabel = `${sym}${localAmount(base, pricing).toLocaleString("en-IN")}`;
+
+  /**
+   * Jo dikhega wahi kata jayega.
+   *
+   * Play chalu hone par store ka apna `priceString` hi sach hai — wo pehle se
+   * user ke desh aur currency me hota hai (₹, $, £ — sab). Play band ho (aaj)
+   * to hamesha ki tarah country-pricing wala label.
+   */
+  const storePrice = String(packageFor(yearly)?.product?.priceString ?? "").trim();
+  const priceLabel = storePrice || localLabel;
 
   const FREE_FEATURES = u.freeFeatures.map((f) =>
     tpl(f, { rem: offers.freeReminders, docs: offers.freeDocuments }),
@@ -154,12 +199,15 @@ export default function Upgrade() {
 
     setPaying(true);
     try {
-      const pkgs = await getPlusPackages();
+      // Taaza list lo (screen khule ko der ho sakti hai), par chunne ka niyam
+      // wahi ek — `packageFor`. Warna dikhaya hua price ek package ka hota aur
+      // kharida doosra jaata.
+      const fresh = await getPlusPackages();
+      if (fresh.length) setPkgs(fresh);
       const wanted: PlanId = yearly ? "plus_yearly" : "plus_monthly";
       const pkg =
-        pkgs.find((p) =>
-          String(p.product?.identifier ?? "").includes(wanted),
-        ) ?? pkgs[0];
+        fresh.find((p) => String(p?.product?.identifier ?? "").includes(wanted)) ??
+        (fresh.length === 1 ? fresh[0] : null);
       if (!pkg) {
         toast.show(u.noPlan, "error");
         return;

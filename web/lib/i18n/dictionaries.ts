@@ -269,6 +269,46 @@ type Dict = {
     modalCta: string;
     modalDismiss: string;
   };
+  /**
+   * Privacy aur Terms ka poora text.
+   *
+   * ⚠️ Ye pehle `app/privacy/page.tsx` aur `app/terms/page.tsx` me hardcoded
+   * Hinglish tha. App me yehi do page kab se teeno bhasha me hain — website
+   * par nahi the. Yaani jis user ne Hindi chuni hoti thi, use app me Hindi
+   * privacy policy dikhti thi aur website par Hinglish. Sabse bura wahi hai
+   * jahan bharose ki baat ho rahi ho.
+   */
+  legal: {
+    /** "Aakhri update: <month year>" ka label. */
+    lastUpdated: string;
+    privacyTitle: string;
+    privacy: { h: string; p: string }[];
+    termsTitle: string;
+    terms: { h: string; p: string }[];
+  };
+  /** Refer link se aaye naye user ka swagat page (/r/<code>). */
+  invite: {
+    heading: string;
+    /** Template — {d} din */
+    sub: string;
+    /** Template — {d} din — bold hissa `sub` ke andar. */
+    subStrong: string;
+    codeLabel: string;
+    copy: string;
+    copied: string;
+    download: string;
+    /** Template — {d} */
+    howTitle: string;
+    steps: string[];
+    /** Template — {d} */
+    footer: string;
+  };
+  /** Landing ki chalti hui document-patti. */
+  marquee: string[];
+  /** Landing ka blog teaser. */
+  blogTeaser: { kicker: string; heading: string; sub: string; seeAll: string };
+  /** "Inside the app" — screenshot strip. */
+  screenshots: { heading: string; sub: string };
 };
 
 const hinglish: Dict = {
@@ -731,6 +771,108 @@ const hinglish: Dict = {
     modalCta: "Play Store se download karo",
     modalDismiss: "Abhi nahi",
   },
+  legal: {
+    lastUpdated: "Aakhri update",
+    privacyTitle: "Privacy Policy",
+    privacy: [
+      {
+        h: "1. Hum kya collect karte hain",
+        p: "Sirf wahi jo Saathi ko kaam karne ke liye chahiye: aapka email (account ke liye), aur woh documents/reminders jo aap khud add karte ho. Bas itna hi.",
+      },
+      {
+        h: "2. Aapke documents",
+        p: "Aapke documents encrypted storage mein rakhe jaate hain. Hum unhe kisi third-party AI ke memory server par save nahi karte. Document padhne ke baad zaroori info (jaise expiry date) nikaal li jaati hai — baaki aapke control mein rehta hai.",
+      },
+      {
+        h: "3. Data kabhi bik-ta nahi",
+        p: "Hum aapka data kabhi kisi ko bechte ya rent par dete nahi. Koi ad-tracking nahi. Aapka data sirf aapki madad ke liye use hota hai.",
+      },
+      {
+        h: "4. Aapka control",
+        p: "Aap jab chaho apna data dekh, export ya delete kar sakte ho — ek tap mein. Account delete karne par aapka saara data hata diya jaata hai.",
+      },
+      {
+        h: "5. Email",
+        p: "Aapka email sirf account aur zaroori reminders/updates ke liye. Koi spam nahi — har email mein unsubscribe ka option hoga.",
+      },
+      {
+        h: "6. Sampark",
+        p: "Koi sawaal? info@apkasaathi.com par likho — hum khushi se madad karenge.",
+      },
+    ],
+    termsTitle: "Terms of Service",
+    terms: [
+      {
+        h: "1. Saathi kya hai",
+        p: "Saathi ek personal AI companion hai jo aapke documents, dates aur kaam yaad rakhta hai aur reminders bhejta hai. Service Android par uplabdh hai.",
+      },
+      {
+        h: "2. Aapki zimmedari",
+        p: "Aap sahi jaankari denge aur service ka istemaal kanooni tarike se karenge. Aapka account aur password aapki zimmedari hai.",
+      },
+      {
+        h: "3. Reminders",
+        p: "Saathi poori koshish karta hai ki reminders sahi time par pahunchein, par technical dikkat (network, device settings) ke kaaran kabhi delay ho sakta hai. Zaroori kaam ke liye Saathi ko ek madadgar samjho, akhri bharosa nahi.",
+      },
+      {
+        h: "4. Pricing",
+        p: "Core features hamesha free rahenge. Unlimited documents/reminders aur email + WhatsApp reminders ke liye Saathi Plus (paid) hai. Koi bhi charge pehle saaf bataya jayega.",
+      },
+      {
+        h: "5. Data aur privacy",
+        p: "Aapka data hamari Privacy Policy ke mutabik handle hota hai. Aap jab chaho apna data delete kar sakte ho.",
+      },
+      {
+        h: "6. Badlaav",
+        p: "In terms mein badlaav ho sakta hai. Bada badlaav hone par hum aapko email ya app ke through bata denge.",
+      },
+      {
+        h: "7. Sampark",
+        p: "Koi sawaal ya shikayat? info@apkasaathi.com par likho.",
+      },
+    ],
+  },
+  invite: {
+    heading: "Aapko Apka Saathi ka invite mila 🎉",
+    sub: "Is code se join karo — aapko aur aapke dost,",
+    subStrong: "dono ko {d} din ka Saathi Plus plan free",
+    codeLabel: "Referral code",
+    copy: "Code copy karo",
+    copied: "Copy ho gaya",
+    download: "App download karo",
+    howTitle: "{d} din kaise milenge",
+    steps: [
+      "App download karo — code apne aap bhar jaayega",
+      "Account banao",
+      "Apna pehla document add karo",
+      "Saathi se ek baar baat karo",
+    ],
+    footer: "Chaaron ho gaye — dono ko {d} din ka Saathi Plus plan. 🎉",
+  },
+  marquee: [
+    "Passport",
+    "Driving License",
+    "Car Insurance",
+    "FASTag",
+    "RC / PUC",
+    "LIC Premium",
+    "Aadhaar update",
+    "Gas connection",
+    "Warranty / AMC",
+    "Visa",
+    "Health Insurance",
+    "Subscription",
+  ],
+  blogTeaser: {
+    kicker: "Blog",
+    heading: "Padhne layak, kaam ki baatein",
+    sub: "Documents, renewals, dawai aur bills — jo cheezein chupchaap expire ho jaati hain, unke chhote practical guides.",
+    seeAll: "Sab dekho",
+  },
+  screenshots: {
+    heading: "App ke andar",
+    sub: "Documents, reminders aur roz ka brief — Hindi, English ya dono mila ke.",
+  },
 };
 
 const hi: Dict = {
@@ -808,28 +950,28 @@ const hi: Dict = {
     trust: ["100% प्राइवेट", "वॉइस + टेक्स्ट", "हिंदी + अंग्रेज़ी", "Android पहले"],
   },
   seo: {
-    heading: "à¤¸à¤¾à¤¥à¥ à¤à¤¿à¤¨-à¤à¤¿à¤¨ à¤à¥à¤à¤¼à¥à¤ à¤à¤¾ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤¦à¥à¤¤à¤¾ à¤¹à¥",
+    heading: "साथी किन-किन चीज़ों का रिमाइंडर देता है",
     intro:
-      "à¤à¤ à¤¹à¥ à¤à¤ª à¤®à¥à¤ à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤, à¤¦à¤µà¤¾à¤, à¤¬à¤¿à¤² à¤à¤° à¤°à¥à¤à¤¼ à¤à¥ à¤à¤¾à¤® â à¤¸à¤¬à¤à¤¾ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°à¥¤ à¤¹à¤¿à¤à¤¦à¥, à¤à¤à¤à¥à¤°à¥à¤à¤¼à¥ à¤¯à¤¾ à¤¦à¥à¤¨à¥à¤ à¤®à¤¿à¤²à¤¾à¤à¤°, à¤à¥à¤¸à¥ à¤à¤ª à¤¬à¥à¤²à¤¤à¥ à¤¹à¥à¤à¥¤",
+      "एक ही ऐप में डॉक्युमेंट, दवाई, बिल और रोज़ के काम — सबका रिमाइंडर। हिंदी, अंग्रेज़ी या दोनों मिलाकर, जैसे आप बोलते हैं।",
     blocks: [
       {
-        h: "à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤ à¤à¤à¥à¤¸à¤ªà¤¾à¤¯à¤°à¥ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°",
-        p: "à¤ªà¤¾à¤¸à¤ªà¥à¤°à¥à¤, à¤à¤§à¤¾à¤°, à¤¡à¥à¤°à¤¾à¤à¤µà¤¿à¤à¤ à¤²à¤¾à¤à¤¸à¥à¤à¤¸, à¤¬à¥à¤®à¤¾, FASTag â à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤ à¤à¥ à¤«à¤¼à¥à¤à¥ à¤¡à¤¾à¤²à¥à¤, à¤¸à¤¾à¤¥à¥ à¤à¤à¥à¤¸à¤ªà¤¾à¤¯à¤°à¥ à¤¡à¥à¤ à¤à¥à¤¦ à¤ªà¤¢à¤¼ à¤²à¥à¤¤à¤¾ à¤¹à¥ à¤à¤° 14 à¤¦à¤¿à¤¨, 3 à¤¦à¤¿à¤¨ à¤à¤° à¤à¤¸à¥ à¤¦à¤¿à¤¨ à¤¯à¤¾à¤¦ à¤¦à¤¿à¤²à¤¾ à¤¦à¥à¤¤à¤¾ à¤¹à¥à¥¤ à¤°à¤¿à¤¨à¥à¤¯à¥à¤à¤² à¤à¥ à¤²à¤¿à¤ à¤ªà¥à¤°à¤¾ à¤¸à¤®à¤¯ à¤®à¤¿à¤² à¤à¤¾à¤¤à¤¾ à¤¹à¥à¥¤",
+        h: "डॉक्युमेंट एक्सपायरी रिमाइंडर",
+        p: "पासपोर्ट, आधार, ड्राइविंग लाइसेंस, बीमा, FASTag — डॉक्युमेंट की फ़ोटो डालें, साथी एक्सपायरी डेट खुद पढ़ लेता है और 14 दिन, 3 दिन और उसी दिन याद दिला देता है। रिन्युअल के लिए पूरा समय मिल जाता है।",
       },
       {
-        h: "à¤¦à¤µà¤¾à¤ à¤à¤¾ à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°",
-        p: "à¤¦à¤µà¤¾à¤ à¤à¤¾ à¤¸à¤®à¤¯ à¤­à¥à¤²à¤¨à¤¾ à¤à¤® à¤¬à¤¾à¤¤ à¤¹à¥ â à¤à¤¼à¤¾à¤¸à¤à¤° à¤à¤¬ à¤à¤° à¤à¥ à¤à¤¿à¤¸à¥ à¤¬à¤¡à¤¼à¥ à¤à¥ à¤¦à¤µà¤¾à¤ à¤à¤ªà¤à¥ à¤¯à¤¾à¤¦ à¤°à¤à¤¨à¥ à¤¹à¥à¥¤ à¤¬à¥à¤²à¤à¤° à¤¯à¤¾ à¤²à¤¿à¤à¤à¤° à¤¸à¥à¤ à¤à¤°à¥à¤, à¤à¤° à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤®à¥à¤ à¤ªà¥à¤°à¤¾ à¤¨à¤¾à¤® à¤¦à¤¿à¤à¤¤à¤¾ à¤¹à¥ à¤¤à¤¾à¤à¤¿ à¤à¤²à¤à¤¨ à¤¨ à¤¹à¥ à¤à¤¿ à¤à¥à¤¨-à¤¸à¥ à¤¦à¤µà¤¾à¤ à¤¥à¥à¥¤",
+        h: "दवाई का रिमाइंडर",
+        p: "दवाई का समय भूलना आम बात है — ख़ासकर जब घर के किसी बड़े की दवाई आपको याद रखनी हो। बोलकर या लिखकर सेट करें, और रिमाइंडर में पूरा नाम दिखता है ताकि उलझन न हो कि कौन-सी दवाई थी।",
       },
       {
-        h: "à¤¬à¤¿à¤² à¤à¤° EMI à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤°",
-        p: "à¤¬à¤¿à¤à¤²à¥, à¤à¤¿à¤°à¤¾à¤¯à¤¾, EMI, à¤¸à¤¬à¥à¤¸à¤à¥à¤°à¤¿à¤ªà¥à¤¶à¤¨ â à¤²à¥à¤ à¤«à¤¼à¥à¤¸ à¤ªà¥à¤¸à¥ à¤à¥ à¤à¤®à¥ à¤¸à¥ à¤¨à¤¹à¥à¤, à¤¤à¤¾à¤°à¥à¤à¤¼ à¤¨à¤¿à¤à¤² à¤à¤¾à¤¨à¥ à¤¸à¥ à¤²à¤à¤¤à¥ à¤¹à¥à¥¤ à¤¸à¤¾à¤¥à¥ à¤¡à¥à¤¯à¥ à¤¡à¥à¤ à¤¸à¥ à¤ªà¤¹à¤²à¥ à¤¯à¤¾à¤¦ à¤¦à¤¿à¤²à¤¾ à¤¦à¥à¤¤à¤¾ à¤¹à¥, à¤à¤° à¤ªà¥à¤²à¤¸ à¤®à¥à¤ WhatsApp + à¤à¤®à¥à¤² à¤ªà¤° à¤­à¥à¥¤",
+        h: "बिल और EMI रिमाइंडर",
+        p: "बिजली, किराया, EMI, सब्सक्रिप्शन — लेट फ़ीस पैसे की कमी से नहीं, तारीख़ निकल जाने से लगती है। साथी ड्यू डेट से पहले याद दिला देता है, और प्लस में WhatsApp + ईमेल पर भी।",
       },
       {
-        h: "à¤°à¥à¤à¤¼ à¤à¥ à¤à¥à¤à¥ à¤à¤¾à¤®",
-        p: "“à¤à¤² à¤¸à¥à¤¬à¤¹ 8 à¤¬à¤à¥ à¤ªà¤¾à¤¨à¥ à¤à¤¾ à¤¬à¤¿à¤²” à¤à¥à¤¸à¤¾ à¤²à¤¿à¤ à¤¦à¥à¤ â à¤¸à¤¾à¤¥à¥ à¤¸à¤®à¤¯ à¤¸à¤®à¤à¤à¤° à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤²à¤à¤¾ à¤¦à¥à¤¤à¤¾ à¤¹à¥à¥¤ à¤²à¥à¤ à¤¸à¥à¤à¥à¤°à¥à¤¨ à¤ªà¤° à¤ªà¥à¤°à¤¾ à¤à¤²à¤°à¥à¤ à¤à¤¤à¤¾ à¤¹à¥, à¤à¤¸à¤²à¤¿à¤ à¤¨à¥à¤à¤¿à¤«à¤¼à¤¿à¤à¥à¤¶à¤¨ à¤®à¥à¤ à¤¦à¤¬à¤à¤° à¤à¥ à¤¨à¤¹à¥à¤ à¤à¤¾à¤¤à¤¾à¥¤",
+        h: "रोज़ के छोटे काम",
+        p: "“कल सुबह 8 बजे पानी का बिल” जैसा लिख दें — साथी समय समझकर रिमाइंडर लगा देता है। लॉक स्क्रीन पर पूरा अलर्ट आता है, इसलिए नोटिफ़िकेशन में दबकर खो नहीं जाता।",
       },
     ],
-    blogLink: "à¤°à¤¿à¤®à¤¾à¤à¤à¤¡à¤° à¤à¤° à¤¡à¥à¤à¥à¤¯à¥à¤®à¥à¤à¤ à¤ªà¤° à¤à¤¾à¤à¤¡ à¤ªà¤¢à¤¼à¥à¤",
+    blogLink: "रिमाइंडर और डॉक्युमेंट पर गाइड पढ़ें",
   },
   insight: {
     pre: "आप याद रखने की कोशिश करते रह जाते हैं।",
@@ -1011,7 +1153,7 @@ const hi: Dict = {
         tagline: "शुरू करने के लिए काफ़ी।",
         features: [
           "{docs} डॉक्युमेंट्स",
-          "{rem} active reminders",
+          "{rem} एक्टिव reminders",
           "एक्सपायरी reminders",
           "वॉइस & टेक्स्ट reminders",
         ],
@@ -1192,6 +1334,108 @@ const hi: Dict = {
       "प्लस सब्सक्रिप्शन और सारे फ़ीचर्स साथी ऐप के अंदर मिलते हैं। Play Store से ऐप डाउनलोड करें और सीधे ऐप से ही अपग्रेड करें — बिल्कुल सुरक्षित, Google Play के ज़रिए।",
     modalCta: "Play Store से डाउनलोड करें",
     modalDismiss: "अभी नहीं",
+  },
+  legal: {
+    lastUpdated: "आख़िरी अपडेट",
+    privacyTitle: "प्राइवेसी पॉलिसी",
+    privacy: [
+      {
+        h: "1. हम क्या इकट्ठा करते हैं",
+        p: "सिर्फ़ वही जो साथी को काम करने के लिए चाहिए: आपका ईमेल (अकाउंट के लिए), और वो डॉक्युमेंट्स/रिमाइंडर जो आप खुद जोड़ते हैं। बस इतना ही।",
+      },
+      {
+        h: "2. आपके डॉक्युमेंट्स",
+        p: "आपके डॉक्युमेंट्स एन्क्रिप्टेड स्टोरेज में रखे जाते हैं। हम उन्हें किसी थर्ड-पार्टी AI के मेमोरी सर्वर पर सेव नहीं करते। डॉक्युमेंट पढ़ने के बाद ज़रूरी जानकारी (जैसे एक्सपायरी डेट) निकाल ली जाती है — बाक़ी आपके कंट्रोल में रहता है।",
+      },
+      {
+        h: "3. डेटा कभी नहीं बिकता",
+        p: "हम आपका डेटा कभी किसी को बेचते या किराए पर नहीं देते। कोई ऐड-ट्रैकिंग नहीं। आपका डेटा सिर्फ़ आपकी मदद के लिए इस्तेमाल होता है।",
+      },
+      {
+        h: "4. आपका कंट्रोल",
+        p: "आप जब चाहें अपना डेटा देख, एक्सपोर्ट या डिलीट कर सकते हैं — एक टैप में। अकाउंट डिलीट करने पर आपका सारा डेटा हटा दिया जाता है।",
+      },
+      {
+        h: "5. ईमेल",
+        p: "आपका ईमेल सिर्फ़ अकाउंट और ज़रूरी रिमाइंडर/अपडेट के लिए। कोई स्पैम नहीं — हर ईमेल में अनसब्सक्राइब का विकल्प होगा।",
+      },
+      {
+        h: "6. संपर्क",
+        p: "कोई सवाल? info@apkasaathi.com पर लिखें — हम ख़ुशी से मदद करेंगे।",
+      },
+    ],
+    termsTitle: "सेवा की शर्तें",
+    terms: [
+      {
+        h: "1. साथी क्या है",
+        p: "साथी एक पर्सनल AI साथी है जो आपके डॉक्युमेंट्स, तारीख़ें और काम याद रखता है और रिमाइंडर भेजता है। यह सेवा Android पर उपलब्ध है।",
+      },
+      {
+        h: "2. आपकी ज़िम्मेदारी",
+        p: "आप सही जानकारी देंगे और सेवा का इस्तेमाल क़ानूनी तरीक़े से करेंगे। आपका अकाउंट और पासवर्ड आपकी ज़िम्मेदारी है।",
+      },
+      {
+        h: "3. रिमाइंडर",
+        p: "साथी पूरी कोशिश करता है कि रिमाइंडर सही समय पर पहुँचें, पर तकनीकी दिक़्क़त (नेटवर्क, डिवाइस सेटिंग्स) की वजह से कभी देर हो सकती है। ज़रूरी काम के लिए साथी को एक मददगार समझें, आख़िरी भरोसा नहीं।",
+      },
+      {
+        h: "4. क़ीमत",
+        p: "मुख्य फ़ीचर्स हमेशा फ्री रहेंगे। अनलिमिटेड डॉक्युमेंट्स/रिमाइंडर और ईमेल + WhatsApp रिमाइंडर के लिए साथी प्लस (पेड) है। कोई भी चार्ज पहले साफ़ बताया जाएगा।",
+      },
+      {
+        h: "5. डेटा और प्राइवेसी",
+        p: "आपका डेटा हमारी प्राइवेसी पॉलिसी के मुताबिक़ संभाला जाता है। आप जब चाहें अपना डेटा डिलीट कर सकते हैं।",
+      },
+      {
+        h: "6. बदलाव",
+        p: "इन शर्तों में बदलाव हो सकता है। बड़ा बदलाव होने पर हम आपको ईमेल या ऐप के ज़रिए बता देंगे।",
+      },
+      {
+        h: "7. संपर्क",
+        p: "कोई सवाल या शिकायत? info@apkasaathi.com पर लिखें।",
+      },
+    ],
+  },
+  invite: {
+    heading: "आपको Apka Saathi का इनवाइट मिला 🎉",
+    sub: "इस कोड से जुड़िए — आपको और आपके दोस्त,",
+    subStrong: "दोनों को {d} दिन का साथी प्लस प्लान फ्री",
+    codeLabel: "रेफरल कोड",
+    copy: "कोड कॉपी करें",
+    copied: "कॉपी हो गया",
+    download: "ऐप डाउनलोड करें",
+    howTitle: "{d} दिन कैसे मिलेंगे",
+    steps: [
+      "ऐप डाउनलोड करें — कोड अपने आप भर जाएगा",
+      "अकाउंट बनाएँ",
+      "अपना पहला डॉक्युमेंट जोड़ें",
+      "साथी से एक बार बात करें",
+    ],
+    footer: "चारों हो गए — दोनों को {d} दिन का साथी प्लस प्लान। 🎉",
+  },
+  marquee: [
+    "पासपोर्ट",
+    "ड्राइविंग लाइसेंस",
+    "कार इंश्योरेंस",
+    "FASTag",
+    "RC / PUC",
+    "LIC प्रीमियम",
+    "आधार अपडेट",
+    "गैस कनेक्शन",
+    "वारंटी / AMC",
+    "वीज़ा",
+    "हेल्थ इंश्योरेंस",
+    "सब्सक्रिप्शन",
+  ],
+  blogTeaser: {
+    kicker: "ब्लॉग",
+    heading: "पढ़ने लायक, काम की बातें",
+    sub: "डॉक्युमेंट्स, रिन्युअल, दवाई और बिल — जो चीज़ें चुपचाप एक्सपायर हो जाती हैं, उनकी छोटी प्रैक्टिकल गाइड।",
+    seeAll: "सब देखें",
+  },
+  screenshots: {
+    heading: "ऐप के अंदर",
+    sub: "डॉक्युमेंट्स, रिमाइंडर और रोज़ का ब्रीफ़ — हिंदी, अंग्रेज़ी या दोनों मिलाकर।",
   },
 };
 
@@ -1654,6 +1898,108 @@ const en: Dict = {
       "Plus and every feature live inside the Saathi app. Download it from the Play Store and upgrade right there — secure, through Google Play.",
     modalCta: "Download on Play Store",
     modalDismiss: "Not now",
+  },
+  legal: {
+    lastUpdated: "Last updated",
+    privacyTitle: "Privacy Policy",
+    privacy: [
+      {
+        h: "1. What we collect",
+        p: "Only what Saathi needs to work: your email (for the account), and the documents/reminders you add yourself. That's all.",
+      },
+      {
+        h: "2. Your documents",
+        p: "Your documents are kept in encrypted storage. We don't save them on any third-party AI's memory server. After reading a document we extract only what's needed (like the expiry date) — the rest stays under your control.",
+      },
+      {
+        h: "3. Your data is never sold",
+        p: "We never sell or rent your data to anyone. No ad tracking. Your data is used only to help you.",
+      },
+      {
+        h: "4. Your control",
+        p: "You can view, export or delete your data whenever you want — in one tap. Deleting your account removes all of it.",
+      },
+      {
+        h: "5. Email",
+        p: "Your email is used only for your account and the reminders/updates that matter. No spam — every email has an unsubscribe option.",
+      },
+      {
+        h: "6. Contact",
+        p: "Any questions? Write to info@apkasaathi.com — we're happy to help.",
+      },
+    ],
+    termsTitle: "Terms of Service",
+    terms: [
+      {
+        h: "1. What Saathi is",
+        p: "Saathi is a personal AI companion that remembers your documents, dates and tasks, and sends you reminders. The service is available on Android.",
+      },
+      {
+        h: "2. Your responsibility",
+        p: "You'll give accurate information and use the service lawfully. Your account and password are your responsibility.",
+      },
+      {
+        h: "3. Reminders",
+        p: "Saathi tries its best to deliver reminders on time, but technical issues (network, device settings) can sometimes delay them. For critical tasks, treat Saathi as a helper — not your last line of defence.",
+      },
+      {
+        h: "4. Pricing",
+        p: "Core features will always be free. Saathi Plus (paid) adds unlimited documents/reminders and email + WhatsApp reminders. Any charge is always made clear upfront.",
+      },
+      {
+        h: "5. Data and privacy",
+        p: "Your data is handled as described in our Privacy Policy. You can delete your data whenever you want.",
+      },
+      {
+        h: "6. Changes",
+        p: "These terms may change. If something important changes, we'll let you know by email or in the app.",
+      },
+      {
+        h: "7. Contact",
+        p: "Questions or complaints? Write to info@apkasaathi.com.",
+      },
+    ],
+  },
+  invite: {
+    heading: "You've been invited to Apka Saathi 🎉",
+    sub: "Join with this code — you and your friend",
+    subStrong: "both get {d} days of the Saathi Plus plan free",
+    codeLabel: "Referral code",
+    copy: "Copy code",
+    copied: "Copied",
+    download: "Download the app",
+    howTitle: "How to get your {d} days",
+    steps: [
+      "Download the app — the code fills in automatically",
+      "Create your account",
+      "Add your first document",
+      "Have one chat with Saathi",
+    ],
+    footer: "All four done — {d} days of Saathi Plus for both of you. 🎉",
+  },
+  marquee: [
+    "Passport",
+    "Driving licence",
+    "Car insurance",
+    "FASTag",
+    "RC / PUC",
+    "LIC premium",
+    "Aadhaar update",
+    "Gas connection",
+    "Warranty / AMC",
+    "Visa",
+    "Health insurance",
+    "Subscription",
+  ],
+  blogTeaser: {
+    kicker: "Blog",
+    heading: "Short reads that actually help",
+    sub: "Documents, renewals, medicines and bills — small practical guides to the things that quietly expire on you.",
+    seeAll: "See all",
+  },
+  screenshots: {
+    heading: "Inside the app",
+    sub: "Documents, reminders and a daily brief — in Hindi, English or a mix of both.",
   },
 };
 

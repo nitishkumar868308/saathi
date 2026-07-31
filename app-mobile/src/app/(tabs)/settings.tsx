@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Modal } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as Application from "expo-application";
 
 import { colors } from "@/theme/colors";
 import { UserAvatar } from "@/components/user-avatar";
@@ -347,7 +348,11 @@ export default function Settings() {
           <Text style={styles.logoutText}>{s.logout}</Text>
         </Pressable>
 
-        <Text style={styles.version}>{s.version} ❤️</Text>
+        {/* Version app.json se — hardcode karne par har release me purana ho
+            jaata tha (settings me "v0.1.0" dikhta raha jabki app 1.0.0 thi). */}
+        <Text style={styles.version}>
+          {tpl(s.version, { v: Application.nativeApplicationVersion ?? "1.0.0" })} ❤️
+        </Text>
       </ScrollView>
 
       <ReferralCodeModal visible={refModal} onClose={() => setRefModal(false)} />

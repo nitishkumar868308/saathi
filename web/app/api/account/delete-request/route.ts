@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { addContactMessage } from "@/lib/store";
 import { sendAccountDeletionEmails } from "@/lib/email";
+import { asLocale } from "@/lib/user-locale";
 
 export const runtime = "nodejs";
 
@@ -15,11 +16,14 @@ export async function POST(request: Request) {
   let name = "";
   let email = "";
   let reason = "";
+  // Website par chuni hui bhasha — confirmation usi me jaana chahiye.
+  let locale = asLocale(undefined);
   try {
     const body = await request.json();
     name = String(body?.name ?? "").trim();
     email = String(body?.email ?? "").trim();
     reason = String(body?.reason ?? "").trim();
+    locale = asLocale(body?.locale);
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
   console.log(`[delete-request] saved: ${name} <${email}>`);
 
   try {
-    await sendAccountDeletionEmails(name, email, reason);
+    await sendAccountDeletionEmails(name, email, reason, locale);
   } catch (err) {
     console.error("[delete-request] email failed:", err);
   }

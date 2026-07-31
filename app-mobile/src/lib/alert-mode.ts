@@ -97,6 +97,78 @@ function ttsLang(loc: Locale): string {
   return loc === "en" ? "en-IN" : "hi-IN";
 }
 
+/* ------------------------- achhi awaaz chunna ------------------------- */
+
+/**
+ * Phone me ek nahi, kai awaazein hoti hain — aur unme fark zameen-aasmaan ka
+ * hai.
+ *
+ * ⚠️ Pehle hum sirf `language` deke chhod dete the. Us soorat me system apni
+ * DEFAULT awaaz uthata hai, jo aksar sabse purani aur sabse robotic hoti hai
+ * (Android par kai phone me abhi bhi eSpeak-type awaaz default hai). User ne
+ * bilkul thik pakda: "lagta hai koi machine bol rahi hai" (item 3).
+ *
+ * Usi phone me aksar Google ki network/enhanced awaaz maujood hoti hai jo
+ * kaafi insaani lagti hai — bas use maangna padta hai. Isliye ab ek baar saari
+ * awaazein dekh ke sabse achhi chun lete hain, aur wahi har baar use hoti hai.
+ */
+
+/** Ek hi baar chunna hai — har alert par poori list padhna slow hai. */
+const voiceCache = new Map<string, string | null>();
+
+/** Jitna zyada number, utni insaani awaaz. */
+function voiceScore(v: Speech.Voice, lang: string): number {
+  const id = (v.identifier ?? "").toLowerCase();
+  const vLang = (v.language ?? "").toLowerCase().replace("_", "-");
+  let score = 0;
+
+  // Theek wahi desh ka lehja (hi-IN / en-IN) — "en-US" se kahin behtar baithta hai.
+  if (vLang === lang.toLowerCase()) score += 5;
+
+  // iOS: Enhanced/Premium awaazein alag se download hoti hain aur saaf behtar hain.
+  if (String(v.quality).toLowerCase() === "enhanced") score += 10;
+
+  // Android: "network" wali Google ki server-side awaaz sabse natural hai.
+  if (id.includes("network")) score += 8;
+  if (id.includes("premium") || id.includes("enhanced") || id.includes("neural")) score += 8;
+  // Google ka apna engine kisi bhi OEM ke default se behtar hota hai.
+  if (id.includes("com.google")) score += 3;
+
+  // ⚠️ Ye wahi purani robotic awaaz hai jisse bachna hai.
+  if (id.includes("espeak") || id.includes("pico")) score -= 20;
+
+  return score;
+}
+
+/**
+ * Is bhasha ke liye sabse achhi awaaz ka identifier — na mile to null (tab
+ * system apni default se hi bol lega, jo pehle hota hi tha).
+ */
+async function bestVoice(lang: string): Promise<string | null> {
+  const hit = voiceCache.get(lang);
+  if (hit !== undefined) return hit;
+
+  let chosen: string | null = null;
+  try {
+    const all = await Speech.getAvailableVoicesAsync();
+    const base = lang.split("-")[0].toLowerCase();
+    const pool = all.filter((v) =>
+      (v.language ?? "").toLowerCase().replace("_", "-").startsWith(base),
+    );
+    if (pool.length > 0) {
+      const best = pool.reduce((a, b) => (voiceScore(b, lang) > voiceScore(a, lang) ? b : a));
+      // Sirf tab chuno jab wo default se sach me behtar ho — warna system ko
+      // hi chunne do, wo device ke hisaab se theek hota hai.
+      if (voiceScore(best, lang) > 0) chosen = best.identifier ?? null;
+    }
+  } catch {
+    /* list na mile to default awaaz se hi kaam chalega */
+  }
+
+  voiceCache.set(lang, chosen);
+  return chosen;
+}
+
 async function savedLocale(): Promise<Locale> {
   try {
     const s = await AsyncStorage.getItem("saathi-locale");
@@ -125,9 +197,13 @@ export function setAlertUserName(name: string | null | undefined): void {
  * galat hoga.
  */
 export function greetingLine(): string {
+  // Comma jaan-boojh ke hai: full-stop par TTS poora ruk ke dobara shuru karta
+  // hai, jisse "Hello Nitish." aur "Notification From Apka Saathi." do alag
+  // announcement lagti thi — bilkul machine jaisi. Comma par wo halka sa rukta
+  // hai aur ek hi wakya lagta hai (item 3). Shabd wahi hain jo user ne maange the.
   return userName
-    ? `Hello ${userName}. Notification From Apka Saathi.`
-    : "Hello. Notification From Apka Saathi.";
+    ? `Hello ${userName}, notification from Apka Saathi.`
+    : "Hello, notification from Apka Saathi.";
 }
 
 /* ------------------------------ alert karo ------------------------------ */
@@ -157,18 +233,62 @@ export async function alertUser(message?: string): Promise<void> {
 
   try {
     const loc = await savedLocale();
+    const lang = ttsLang(loc);
     // Do alert pass-pass aayein to pehli awaaz kaat do — warna dono ek saath
     // bolti hain aur kuch samajh nahi aata.
     Speech.stop();
+
+    const voice = await bestVoice(lang);
+    // Greeting aur kaam — dono alag utterance hain, to error bhi dono par aa
+    // sakta hai. Fallback sirf EK baar bolna hai, warna user ko poori baat do
+    // baar sunayi degi.
+    let recovered = false;
+    const opts: Speech.SpeechOptions = {
+      language: lang,
+      // Ek zara si ooncha pitch awaaz ko "flat machine" jaisa hone se bachata
+      // hai; isse zyada karne par wo bachkani lagne lagti hai.
+      pitch: 1.03,
+      // 0.95 abhi bhi jaldbaazi me bolta tha — reminder ka kaam sun-ne se pehle
+      // hi nikal jaata tha. Itne par har shabd alag sunayi deta hai.
+      rate: 0.88,
+      ...(voice ? { voice } : {}),
+      // Network awaaz ke liye internet chahiye. Net na ho to wo chup-chaap fail
+      // ho jaati thi — yaani popup par bilkul sannata. Aise me system ki apni
+      // awaaz se dobara bol do; robotic sahi, chup se to behtar hai.
+      onError: () => {
+        if (recovered) return;
+        recovered = true;
+        // Wo awaaz is device par chali hi nahi — dobara mat chuno.
+        voiceCache.set(lang, null);
+        try {
+          Speech.stop();
+          Speech.speak(fullLine(message), { language: lang, pitch: 1.03, rate: 0.88 });
+        } catch {
+          /* ab kuch nahi ho sakta — vibrate to ho hi chuka hai */
+        }
+      },
+    };
+
+    /**
+     * Greeting aur kaam — do alag utterance me.
+     *
+     * ⚠️ Pehle dono ek hi line me jud ke jaate the ("…Apka Saathi. Dawai leni
+     * hai"), aur TTS use ek hi saans me bina ruke bol deta tha. Insaan aise
+     * nahi bolta, aur yahi sabse zyada "AI bol raha hai" wala ehsaas deta tha.
+     * Alag utterance ke beech engine khud ek swabhavik viraam leta hai.
+     */
+    Speech.speak(greetingLine(), opts);
     const body = message?.trim();
-    Speech.speak(body ? `${greetingLine()} ${body}` : greetingLine(), {
-      language: ttsLang(loc),
-      pitch: 1.0,
-      rate: 0.95, // thoda dheere — saaf samajh aaye
-    });
+    if (body) Speech.speak(body, opts);
   } catch {
     /* TTS na ho to vibrate se hi kaam chal jaayega */
   }
+}
+
+/** Fallback ke liye ek hi line — wahan do utterance ka jhanjhat nahi chahiye. */
+function fullLine(message?: string): string {
+  const body = message?.trim();
+  return body ? `${greetingLine()} ${body}` : greetingLine();
 }
 
 /** Popup band hua — bolna aur vibrate dono rok do. */

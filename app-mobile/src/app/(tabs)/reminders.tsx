@@ -26,6 +26,7 @@ import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+import { emitDataChanged, useDataChanged } from "@/lib/data-events";
 
 /** Ye reminder aaj hi bajega? (Home tab bhi bilkul yahi hisaab lagata hai.) */
 function isToday(iso: string | null): boolean {
@@ -52,26 +53,41 @@ export default function Reminders() {
   /** "Dekho" — poori detail ek saaf sheet me. */
   const [viewing, setViewing] = useState<Reminder | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setItems(await timed(listReminders()));
-    } catch (e) {
-      // Net ki dikkat ho to poore app wala popup + retry; warna hi toast.
-      if (!reportIfNetwork(e, "load", load)) {
-        reportError(e, { screen: "reminders", action: "load" });
-        toast.show(r0.title + " ✕", "error");
+  /**
+   * `silent` — list pehle se saamne hai, sirf taaza karni hai. Aise me skeleton
+   * dobara dikhana jhatka lagta hai (list gayab hoke wapas aati hai), isliye
+   * background refresh chup-chaap hota hai.
+   */
+  const load = useCallback(
+    async (silent = false) => {
+      try {
+        if (!silent) setLoading(true);
+        setItems(await timed(listReminders()));
+      } catch (e) {
+        // Net ki dikkat ho to poore app wala popup + retry; warna hi toast.
+        if (!reportIfNetwork(e, "load", load)) {
+          reportError(e, { screen: "reminders", action: "load" });
+          toast.show(r0.title + " ✕", "error");
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, [toast, r0.title]);
+    },
+    [toast, r0.title],
+  );
 
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load]),
   );
+
+  // Reminder ka alert modal is screen ke UPAR khulta hai — focus kabhi nahi
+  // jaata, isliye upar wala reload chalta hi nahi tha aur nipta hua reminder
+  // yahin pada rehta tha (item 2).
+  useDataChanged(() => {
+    void load(true);
+  });
 
   async function toggle(r: Reminder) {
     const next = !r.is_on;
@@ -89,6 +105,7 @@ export default function Reminders() {
       } else {
         await cancelReminder(r.id);
       }
+      emitDataChanged();
     } catch (e) {
       if (!reportIfNetwork(e, "save")) toast.show(r0.title + " ✕", "error");
       load();
@@ -122,7 +139,9 @@ export default function Reminders() {
         toast.show(r0.doneAll, "success");
       }
       setViewing(null);
-      load();
+      load(true);
+      // Home tab ka "Aaj" wala card bhi turant sudhar jaye.
+      emitDataChanged();
     } catch (e) {
       if (!reportIfNetwork(e, "save", () => markDone(r))) {
         toast.show(r0.title + " ✕", "error");
@@ -139,6 +158,7 @@ export default function Reminders() {
       await cancelReminder(r.id);
       setItems((prev) => prev.filter((x) => x.id !== r.id));
       toast.show(r0.deleted, "success");
+      emitDataChanged();
     } catch (e) {
       if (!reportIfNetwork(e, "save")) toast.show(c.delete + " ✕", "error");
     }

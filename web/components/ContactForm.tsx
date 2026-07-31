@@ -9,12 +9,12 @@ import BackHomeLink from "@/components/BackHomeLink";
 import DotsLoader from "@/components/DotsLoader";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { useToast } from "@/components/Toast";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
 type Status = "idle" | "loading";
 
 export default function ContactForm() {
-  const t = useT();
+  const { t, locale } = useLanguage();
   const c = t.contact;
   const { toast } = useToast();
 
@@ -42,6 +42,10 @@ export default function ContactForm() {
           name: name.trim(),
           email: email.trim(),
           message: message.trim(),
+          // Rasid wali email usi bhasha me jaaye jo user site par padh raha
+          // hai — server ke paas iske alawa jaanne ka koi raasta nahi (contact
+          // form bina login ke bhi bhara ja sakta hai).
+          locale,
         }),
       });
       if (!res.ok) throw new Error("failed");

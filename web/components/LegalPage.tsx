@@ -5,9 +5,12 @@ import BackHomeLink from "@/components/BackHomeLink";
 export default function LegalPage({
   title,
   sections,
+  /** "Aakhri update" — ye bhi bhasha ke saath badalta hai. */
+  lastUpdatedLabel = "Aakhri update",
 }: {
   title: string;
   sections: { h: string; p: string }[];
+  lastUpdatedLabel?: string;
 }) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-cream">
@@ -24,7 +27,7 @@ export default function LegalPage({
             {title}
           </h1>
           <p className="mt-3 text-sm text-ink-soft">
-            Aakhri update:{" "}
+            {lastUpdatedLabel}:{" "}
             {new Date().toLocaleDateString("en-IN", {
               year: "numeric",
               month: "long",

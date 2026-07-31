@@ -296,7 +296,43 @@ export async function cancelDocumentExpiry(docId: string): Promise<void> {
 
 /* -------------------------------- sync -------------------------------- */
 
-export async function syncNotifications(): Promise<void> {
+/**
+ * Aakhri poora sync kab hua, aur agar abhi chal raha hai to wahi promise.
+ *
+ * ⚠️ Ye do guard isliye hain kyunki `syncNotifications()` HAR BAAR app ke
+ * saamne aane par chalta hai (`_layout.tsx` ka AppState listener), aur ye
+ * function sasta bilkul nahi hai:
+ *
+ *   - do network call (reminders + documents), aur
+ *   - har repeat wale reminder par 28 native call — 14 purane cancel + 14 naye
+ *     schedule (`scheduleReminderSeries` pehle `cancelReminder` chalata hai).
+ *
+ * 30 reminder wale user ke liye wo ~800 native call ban jaate hain. Notification
+ * ke liye doosri app me jaakar wapas aana bilkul aam baat hai, aur us har chhoti
+ * si aawajaahi par poora hisaab dobara chalta tha — sasta phone wahin atak jaata
+ * tha, jabki 10 second me kuch badla hi nahi hota.
+ *
+ * Login/permission jaisi jagah par `force: true` chahiye — wahan sach me kuch
+ * badla hota hai.
+ */
+let lastSyncAt = 0;
+let syncInFlight: Promise<void> | null = null;
+const SYNC_MIN_GAP_MS = 60_000;
+
+export function syncNotifications(opts: { force?: boolean } = {}): Promise<void> {
+  // Ek hi sync do baar saath me chale to dono ek doosre ke alarm cancel karte
+  // hain — beech me kuch der ke liye reminder bina alarm ke reh jaata hai.
+  if (syncInFlight) return syncInFlight;
+  if (!opts.force && Date.now() - lastSyncAt < SYNC_MIN_GAP_MS) return Promise.resolve();
+
+  syncInFlight = runSync().finally(() => {
+    lastSyncAt = Date.now();
+    syncInFlight = null;
+  });
+  return syncInFlight;
+}
+
+async function runSync(): Promise<void> {
   try {
     if (!(await hasNotifPermission())) return;
 

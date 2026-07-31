@@ -86,7 +86,9 @@ function RootNavigator() {
   // banaye gaye data ke liye kabhi bani hi nahi thi.
   const uid = session?.user?.id;
   useEffect(() => {
-    if (uid) void syncNotifications();
+    // Login/user badla — yahan sach me sab kuch dobara lagana hai, throttle
+    // nahi lagna chahiye.
+    if (uid) void syncNotifications({ force: true });
     setAnalyticsUser(uid ?? null);
   }, [uid]);
 

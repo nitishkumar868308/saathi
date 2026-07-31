@@ -17,9 +17,10 @@ import notifee, { EventType, type Notification } from "@notifee/react-native";
 import { colors } from "@/theme/colors";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { alertUser, stopAlert } from "@/lib/alert-mode";
-import { completeReminder } from "@/lib/reminders";
+import { completeReminder, listReminders } from "@/lib/reminders";
 import { cancelReminder, scheduleReminderSeries, takePendingAlert } from "@/lib/notifications";
 import { acknowledgeDocument, renewDocument } from "@/lib/doc-ack";
+import { emitDataChanged } from "@/lib/data-events";
 import { documentFollowUp, type DocFollowUp } from "@/lib/ai";
 import { listDocuments } from "@/lib/documents";
 
@@ -235,13 +236,44 @@ export function ReminderAlertHost() {
     void (async () => {
       try {
         const next = await completeReminder(id);
-        if (next) await scheduleReminderSeries(id, title, new Date(next), null, null);
-        else await cancelReminder(id);
+        if (next) {
+          /**
+           * ⚠️ Yahan pehle `scheduleReminderSeries(id, title, next, null, null)`
+           * tha — yaani repeat ki jaankari GIRA di jaati thi aur sirf EK alarm
+           * lagta tha.
+           *
+           * Roz wale reminder me iska matlab ye tha: pehle 14 alarm lage hote
+           * the (REPEAT_WINDOW), aur "Ho gaya" dabate hi `scheduleReminderSeries`
+           * pehle purane saare cancel karta aur uske badle sirf ek naya lagata.
+           * Yaani full-screen alarm par "Ho gaya" dabana — jo sabse aam jagah hai
+           * — har baar khidki 14 se ghata ke 1 kar deta tha. Us ek ke baad user
+           * ke app kholne tak koi alarm bachta hi nahi tha.
+           *
+           * Reminders tab ka "Ho gaya" ye galti kabhi nahi karta tha, wo apne
+           * row ke repeat fields bhejta hai. Alert ke paas wo fields hote hi
+           * nahi (notification me sirf id aur text aata hai), isliye reminder
+           * padh ke wahi fields yahan bhi laga dete hain.
+           */
+          const row = (await listReminders().catch(() => [])).find((x) => x.id === id);
+          await scheduleReminderSeries(
+            id,
+            row?.title || title,
+            new Date(next),
+            row?.repeat_every_days ?? null,
+            row?.repeat_until ?? null,
+          );
+        } else await cancelReminder(id);
       } catch {
         // Net na ho to alarm to hata hi do — user ne kaam kar liya hai, usse
         // wahi notification dobara dena sabse chidhchida hoga. Server agli sync
         // par apne aap sahi ho jaayega.
         await cancelReminder(id).catch(() => {});
+      } finally {
+        // ⚠️ Modal poore app ke UPAR khulta hai — peeche wali screen ka focus
+        // kabhi jaata hi nahi, isliye `useFocusEffect` wala reload chalta hi
+        // nahi tha. Home par wahi nipta hua reminder tab tak dikhta rehta tha
+        // jab tak user kisi doosre tab pe ho aake na aa jaye (item 2).
+        emitDataChanged();
       }
     })();
   }
@@ -250,7 +282,7 @@ export function ReminderAlertHost() {
   function onDocDone() {
     stopAlert();
     const docId = alert ? docIdFrom(alert.id) : null;
-    if (docId) void renewDocument(docId);
+    if (docId) void renewDocument(docId).finally(emitDataChanged);
     setStep("done");
   }
 

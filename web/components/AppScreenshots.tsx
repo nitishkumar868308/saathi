@@ -1,6 +1,9 @@
+"use client";
+
 import Image from "next/image";
 
 import { SCREENSHOTS, hasScreenshots } from "@/lib/screenshots";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 /**
  * "Inside the app" — Play Store jaisa screenshot strip.
@@ -14,6 +17,7 @@ import { SCREENSHOTS, hasScreenshots } from "@/lib/screenshots";
  * inhi bade images se girti hai.
  */
 export default function AppScreenshots() {
+  const { screenshots: s } = useT();
   if (!hasScreenshots) return null;
 
   return (
@@ -26,12 +30,9 @@ export default function AppScreenshots() {
         id="screenshots-heading"
         className="font-display text-3xl font-semibold tracking-tight sm:text-4xl"
       >
-        Inside the app
+        {s.heading}
       </h2>
-      <p className="mt-3 max-w-xl leading-relaxed text-ink-soft">
-        Documents, reminders and a daily brief — in Hindi, English or a mix of
-        both.
-      </p>
+      <p className="mt-3 max-w-xl leading-relaxed text-ink-soft">{s.sub}</p>
 
       {/*
         Mobile par horizontal scroll, desktop par grid. Scroll-snap se har

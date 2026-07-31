@@ -600,11 +600,61 @@ export async function sendWelcomeEmail(
  * Admin ko turant pata chale (7 din ke andar poora karna hota hai) aur user ko
  * likhit confirmation mile ki request aa gayi hai.
  */
+/**
+ * Account delete request — user wali email ki copy, teeno bhasha me.
+ *
+ * ⚠️ Pehle ye poori email sirf Hinglish me thi. Jis user ne app me Hindi ya
+ * English chuni hoti thi, uske paas apne account ke delete hone ki sabse
+ * zaroori khabar ek aisi bhasha me pahunchti thi jo usne chuni hi nahi thi.
+ */
+const DELETE_REQ: Record<EmailLocale, {
+  title: string;
+  subject: string;
+  preheader: string;
+  /** {name} */
+  body: (name: string) => string;
+  changedMind: string;
+  team: string;
+}> = {
+  hinglish: {
+    title: "Delete request mil gayi 🗑️",
+    subject: "Aapki delete request mil gayi — Apka Saathi",
+    preheader: "Aapka account 7 din ke andar delete ho jayega",
+    body: (n) =>
+      `Namaste ${n}, aapki account delete karne ki request hum tak pahunch gayi hai. 7 din ke andar aapka account aur uska saara data — documents, reminders, profile — hamesha ke liye hata diya jayega.`,
+    changedMind:
+      "Agar ye request aapne nahi bheji, ya aap iraada badal chuke ho, to is email ka jawab de do — hum delete rok denge.",
+    team: "— Team Apka Saathi",
+  },
+  hi: {
+    title: "डिलीट रिक्वेस्ट मिल गई 🗑️",
+    subject: "आपकी डिलीट रिक्वेस्ट मिल गई — Apka Saathi",
+    preheader: "आपका अकाउंट 7 दिन के अंदर डिलीट हो जाएगा",
+    body: (n) =>
+      `नमस्ते ${n}, आपकी अकाउंट डिलीट करने की रिक्वेस्ट हम तक पहुँच गई है। 7 दिन के अंदर आपका अकाउंट और उसका सारा डेटा — डॉक्युमेंट्स, रिमाइंडर, प्रोफ़ाइल — हमेशा के लिए हटा दिया जाएगा।`,
+    changedMind:
+      "अगर यह रिक्वेस्ट आपने नहीं भेजी, या आपका इरादा बदल गया है, तो इस ईमेल का जवाब दे दीजिए — हम डिलीट रोक देंगे।",
+    team: "— टीम Apka Saathi",
+  },
+  en: {
+    title: "Delete request received 🗑️",
+    subject: "We received your delete request — Apka Saathi",
+    preheader: "Your account will be deleted within 7 days",
+    body: (n) =>
+      `Hi ${n}, we've received your request to delete your account. Within 7 days your account and all its data — documents, reminders, profile — will be permanently removed.`,
+    changedMind:
+      "If you didn't send this request, or you've changed your mind, just reply to this email — we'll stop the deletion.",
+    team: "— Team Apka Saathi",
+  },
+};
+
 export async function sendAccountDeletionEmails(
   name: string,
   email: string,
   reason: string,
+  locale: EmailLocale = "hinglish",
 ) {
+  const d = DELETE_REQ[locale] ?? DELETE_REQ.hinglish;
   const adminHtml = renderEmail(
     "Account delete karne ki request 🗑️",
     `<table style="width:100%;font-size:15px;color:${INK};border-collapse:collapse;">
@@ -621,15 +671,12 @@ export async function sendAccountDeletionEmails(
   );
 
   const userHtml = renderEmail(
-    "Delete request mil gayi 🗑️",
-    `${emailParagraph(
-      `Namaste ${escapeHtml(name)}, aapki account delete karne ki request hum tak pahunch gayi hai. 7 din ke andar aapka account aur uska saara data — documents, reminders, profile — hamesha ke liye hata diya jayega.`,
-    )}
-     ${emailParagraph(
-       "Agar ye request aapne nahi bheji, ya aap iraada badal chuke ho, to is email ka jawab de do — hum delete rok denge.",
-     )}
-     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">— Team Apka Saathi</p>`,
-    "Aapka account 7 din ke andar delete ho jayega",
+    d.title,
+    `${emailParagraph(d.body(escapeHtml(name)))}
+     ${emailParagraph(d.changedMind)}
+     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">${escapeHtml(d.team)}</p>`,
+    d.preheader,
+    locale,
   );
 
   return Promise.all([
@@ -642,7 +689,7 @@ export async function sendAccountDeletionEmails(
     }),
     sendMail({
       to: email,
-      subject: "Aapki delete request mil gayi — Apka Saathi",
+      subject: d.subject,
       html: userHtml,
       fromName: "Apka Saathi",
     }),
@@ -676,14 +723,89 @@ function quote(text: string): string {
  * me phone par ya kisi aur mail me bata sakta hai; uske bina "maine kal ek
  * message bheja tha" se aage baat hi nahi badhti.
  */
+/**
+ * Support wali teeno email (rasid, jawab) — user ki apni bhasha me.
+ *
+ * ⚠️ Ye sab pehle sirf Hinglish me jaati thi. Support wahi jagah hai jahan user
+ * pehle se pareshaan hota hai — wahan uski chuni hui bhasha chhod dena sabse
+ * bura waqt hai chhodne ka. Admin wali copy jaan-boojh ke Hinglish hi rehti
+ * hai: wo humare liye hai, user ke liye nahi.
+ */
+const TICKET: Record<EmailLocale, {
+  createdTitle: string;
+  /** {no} */
+  createdSubject: (no: string) => string;
+  /** {no} */
+  createdPreheader: (no: string) => string;
+  /** {who} */
+  createdBody: (who: string) => string;
+  createdOutro: string;
+  answerTitle: string;
+  /** {no} */
+  answerSubject: (no: string) => string;
+  /** {no} */
+  answerPreheader: (no: string) => string;
+  /** {name} — naam khaali bhi ho sakta hai */
+  answerIntro: (name: string) => string;
+  answerOutro: string;
+}> = {
+  hinglish: {
+    createdTitle: "Aapka ticket ban gaya 🎫",
+    createdSubject: (no) => `Ticket ${no} — aapka sawaal mil gaya`,
+    createdPreheader: (no) => `${no} — hum jaldi jawab denge`,
+    createdBody: (who) =>
+      `Namaste ${who}, aapka sawaal hum tak pahunch gaya hai. Isse yaad rakhne ke liye upar wala number hai — baat karte waqt yahi bata dijiyega.`,
+    createdOutro:
+      "Jawab aate hi aapko email milega, aur app ke Support me bhi wahi baatcheet khul jaayegi.",
+    answerTitle: "Aapke ticket ka jawab 💬",
+    answerSubject: (no) => `Ticket ${no} — jawab aa gaya`,
+    answerPreheader: (no) => `${no} — jawab aa gaya`,
+    answerIntro: (n) => (n ? `Namaste ${n}, aapke sawaal ka jawab:` : "Aapke sawaal ka jawab:"),
+    answerOutro:
+      "Aur kuch poochhna ho to app ke Support me isi baatcheet me likh dijiye — number wahi rahega.",
+  },
+  hi: {
+    createdTitle: "आपका टिकट बन गया 🎫",
+    createdSubject: (no) => `टिकट ${no} — आपका सवाल मिल गया`,
+    createdPreheader: (no) => `${no} — हम जल्दी जवाब देंगे`,
+    createdBody: (who) =>
+      `नमस्ते ${who}, आपका सवाल हम तक पहुँच गया है। इसे याद रखने के लिए ऊपर वाला नंबर है — बात करते वक़्त यही बता दीजिएगा।`,
+    createdOutro:
+      "जवाब आते ही आपको ईमेल मिलेगा, और ऐप के Support में भी वही बातचीत खुल जाएगी।",
+    answerTitle: "आपके टिकट का जवाब 💬",
+    answerSubject: (no) => `टिकट ${no} — जवाब आ गया`,
+    answerPreheader: (no) => `${no} — जवाब आ गया`,
+    answerIntro: (n) => (n ? `नमस्ते ${n}, आपके सवाल का जवाब:` : "आपके सवाल का जवाब:"),
+    answerOutro:
+      "और कुछ पूछना हो तो ऐप के Support में इसी बातचीत में लिख दीजिए — नंबर वही रहेगा।",
+  },
+  en: {
+    createdTitle: "Your ticket is open 🎫",
+    createdSubject: (no) => `Ticket ${no} — we got your question`,
+    createdPreheader: (no) => `${no} — we'll reply soon`,
+    createdBody: (who) =>
+      `Hi ${who}, your question has reached us. The number above is how we'll track it — please quote it whenever you write to us.`,
+    createdOutro:
+      "You'll get an email as soon as we reply, and the same conversation will be waiting in the app under Support.",
+    answerTitle: "A reply to your ticket 💬",
+    answerSubject: (no) => `Ticket ${no} — we've replied`,
+    answerPreheader: (no) => `${no} — we've replied`,
+    answerIntro: (n) => (n ? `Hi ${n}, here's our reply:` : "Here's our reply:"),
+    answerOutro:
+      "Anything else? Just write in the same conversation under Support in the app — the number stays the same.",
+  },
+};
+
 export async function sendNewTicketEmails(t: {
   ticketNo: string;
   subject: string;
   message: string;
   name: string | null;
   email: string | null;
+  locale?: EmailLocale;
 }) {
   const who = t.name || t.email || "User";
+  const c = TICKET[t.locale ?? "hinglish"] ?? TICKET.hinglish;
 
   const adminHtml = renderEmail(
     "Naya support ticket 🎫",
@@ -698,16 +820,13 @@ export async function sendNewTicketEmails(t: {
   );
 
   const userHtml = renderEmail(
-    "Aapka ticket ban gaya 🎫",
+    c.createdTitle,
     ticketBadge(t.ticketNo) +
-      emailParagraph(
-        `Namaste ${escapeHtml(who)}, aapka sawaal hum tak pahunch gaya hai. Isse yaad rakhne ke liye upar wala number hai — baat karte waqt yahi bata dijiyega.`,
-      ) +
+      emailParagraph(c.createdBody(escapeHtml(who))) +
       quote(t.message) +
-      emailParagraph(
-        `Jawab aate hi aapko email milega, aur app ke Support me bhi wahi baatcheet khul jaayegi.`,
-      ),
-    `${t.ticketNo} — hum jaldi jawab denge`,
+      emailParagraph(c.createdOutro),
+    c.createdPreheader(t.ticketNo),
+    t.locale ?? "hinglish",
   );
 
   const jobs = [
@@ -726,7 +845,7 @@ export async function sendNewTicketEmails(t: {
       sendMail({
         to: t.email,
         fromName: "Apka Saathi",
-        subject: `Ticket ${t.ticketNo} — aapka sawaal mil gaya`,
+        subject: c.createdSubject(t.ticketNo),
         html: userHtml,
       }),
     );
@@ -765,30 +884,66 @@ export async function sendTicketAnswerEmail(t: {
   answer: string;
   name: string | null;
   email: string;
+  locale?: EmailLocale;
 }) {
+  const locale = t.locale ?? "hinglish";
+  const c = TICKET[locale] ?? TICKET.hinglish;
   const html = renderEmail(
-    "Aapke ticket ka jawab 💬",
+    c.answerTitle,
     ticketBadge(t.ticketNo) +
-      emailParagraph(`Namaste ${escapeHtml(t.name || "")}, aapke sawaal ka jawab:`) +
+      emailParagraph(c.answerIntro(escapeHtml(t.name || ""))) +
       quote(t.answer) +
-      emailParagraph(
-        `Aur kuch poochhna ho to app ke Support me isi baatcheet me likh dijiye — number wahi rahega.`,
-      ),
-    `${t.ticketNo} — jawab aa gaya`,
+      emailParagraph(c.answerOutro),
+    c.answerPreheader(t.ticketNo),
+    locale,
   );
   return sendMail({
     to: t.email,
     fromName: "Apka Saathi Support",
-    subject: `Ticket ${t.ticketNo} — jawab aa gaya`,
+    subject: c.answerSubject(t.ticketNo),
     html,
   });
 }
+
+/** Contact form ki rasid — website par chuni gayi bhasha me. */
+const CONTACT: Record<EmailLocale, {
+  title: string;
+  subject: string;
+  preheader: string;
+  /** {name} */
+  body: (name: string) => string;
+  team: string;
+}> = {
+  hinglish: {
+    title: "Message mil gaya! 🙏",
+    subject: "Aapka message mil gaya — Apka Saathi",
+    preheader: "Hum jaldi hi jawab denge 🙏",
+    body: (n) => `Namaste ${n}, aapka message hum tak pahunch gaya hai. Hum jaldi hi jawab denge.`,
+    team: "— Team Apka Saathi",
+  },
+  hi: {
+    title: "मैसेज मिल गया! 🙏",
+    subject: "आपका मैसेज मिल गया — Apka Saathi",
+    preheader: "हम जल्दी ही जवाब देंगे 🙏",
+    body: (n) => `नमस्ते ${n}, आपका मैसेज हम तक पहुँच गया है। हम जल्दी ही जवाब देंगे।`,
+    team: "— टीम Apka Saathi",
+  },
+  en: {
+    title: "Message received! 🙏",
+    subject: "We got your message — Apka Saathi",
+    preheader: "We'll reply soon 🙏",
+    body: (n) => `Hi ${n}, your message has reached us. We'll get back to you shortly.`,
+    team: "— Team Apka Saathi",
+  },
+};
 
 export async function sendContactEmails(
   name: string,
   email: string,
   message: string,
+  locale: EmailLocale = "hinglish",
 ) {
+  const c = CONTACT[locale] ?? CONTACT.hinglish;
   const adminHtml = renderEmail(
     "Naya contact message 📩",
     `<table style="width:100%;font-size:15px;color:${INK};border-collapse:collapse;">
@@ -800,12 +955,11 @@ export async function sendContactEmails(
   );
 
   const userHtml = renderEmail(
-    "Message mil gaya! 🙏",
-    `${emailParagraph(
-      `Namaste ${escapeHtml(name)}, aapka message hum tak pahunch gaya hai. Hum jaldi hi jawab denge.`,
-    )}
-     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">— Team Apka Saathi</p>`,
-    "Hum jaldi hi jawab denge 🙏",
+    c.title,
+    `${emailParagraph(c.body(escapeHtml(name)))}
+     <p style="margin:0;font-size:15px;line-height:1.6;color:${SOFT};">${escapeHtml(c.team)}</p>`,
+    c.preheader,
+    locale,
   );
 
   return Promise.all([
@@ -818,7 +972,7 @@ export async function sendContactEmails(
     }),
     sendMail({
       to: email,
-      subject: "Aapka message mil gaya — Apka Saathi",
+      subject: c.subject,
       html: userHtml,
       fromName: "Apka Saathi",
     }),

@@ -114,6 +114,37 @@ async function recordChat(userId: string, userMsg: string, reply: string) {
   }
 }
 
+/**
+ * User ka Plus chalu hai?
+ *
+ * ⚠️ Daily brief Plus ka feature hai. App usse free plan par bulaati hi nahi,
+ * par sirf app par bharosa karna kaafi nahi: ye function har logged-in user ke
+ * liye khula hai, aur kisi bhi paid cheez ka darwaza sirf UI me band karna
+ * band karna nahi hota — wahan Gemini ka kharcha seedha hum par aata hai.
+ *
+ * Hisaab wahi jo app ka `getPlan()` aur cron ka `toReminderProfile()` lagate
+ * hain: plan 'plus' HO aur expiry nikli na ho (null = koi expiry nahi).
+ */
+async function isPlusUser(userId: string | null): Promise<boolean> {
+  if (!userId || !SB_URL || !SB_SERVICE) return false;
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/profiles?id=eq.${userId}&select=plan,plan_expires_at&limit=1`,
+      { headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` } },
+    );
+    if (!res.ok) return false;
+    const rows = await res.json();
+    const row = rows?.[0];
+    if (row?.plan !== "plus") return false;
+    const exp = row?.plan_expires_at;
+    return !exp || new Date(exp).getTime() > Date.now();
+  } catch {
+    // Plan padh hi na paaye to naa hi bolo — free ko paid feature dene se
+    // behtar hai Plus wale ko ek baar default line dikhna.
+    return false;
+  }
+}
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -552,23 +583,75 @@ Deno.serve(async (req) => {
           parts: [{ text: String(h.content ?? "") }],
         }));
 
+      const base = SAATHI_SYSTEM + langNote(payload.locale) + scope;
+      const contents: GeminiContent[] = [
+        ...history,
+        { role: "user", parts: [{ text: userMsg }] },
+      ];
+
       const raw = await gemini({
         model: MODEL,
-        system: SAATHI_SYSTEM + langNote(payload.locale) + scope + agentic + nameNote + ctx,
-        contents: [...history, { role: "user", parts: [{ text: userMsg }] }],
+        system: base + agentic + nameNote + ctx,
+        contents,
         json: true,
-        maxTokens: 700,
+        // ⚠️ 700 kam pad jaata tha. Naye (thinking) model pehle apna soch-vichaar
+        // likhte hain aur wo bhi isi budget me ginta hai — chhoti si "8 baje
+        // wake up" jaisi baat par bhi output budget khatam ho jaata tha aur
+        // `parts` KHAALI aata tha. Screen par uska matlab ek hi dikhta tha:
+        // "samajh nahi aaya" (item 1). Jagah kaafi rakho — chhote jawab me
+        // extra budget kharch hota hi nahi, wo sirf chhat hai.
+        maxTokens: 2048,
         track: { kind: "chat", userId: uid },
       });
 
       const parsed = parseJson(raw) ?? {};
-      // ⚠️ Model ka JSON toota ho to pehle yahan DECLINE line jaati thi — user ko
-      // lagta tha Saathi ne mana kar diya, jabki ye sirf ek parse fail tha.
-      // Ab saaf kehta hai "dobara bolo" (item 15).
-      const reply =
-        typeof parsed.reply === "string" && parsed.reply.trim()
-          ? parsed.reply.trim()
-          : retryLine(payload.locale);
+      let reply =
+        typeof parsed.reply === "string" && parsed.reply.trim() ? parsed.reply.trim() : "";
+
+      /**
+       * JSON aaya hi nahi (ya khaali aaya) — Saathi ko DOBARA mauka do, is baar
+       * bina JSON ke.
+       *
+       * ⚠️ Pehle yahan seedha ek RATTA-LAGAYA line chali jaati thi ("samajh nahi
+       * aaya, dobara bolo") — chahe user ne kitni bhi saaf baat kahi ho. "Wake
+       * me at 8am" par Saathi ko poochna chahiye tha "kis din?", aur milta tha
+       * ek bemtlab sa jawab (item 1). Galti user ki nahi thi: baat pahunch chuki
+       * thi, bas envelope toot gaya tha.
+       *
+       * Plain text me model kabhi khaali nahi lautata — koi JSON schema nibhane
+       * ka dabaav hi nahi hota. Action is turn me nahi banega, par baatcheet
+       * zinda rehti hai: Saathi khud sawaal poochh lega aur agle turn me sab
+       * detail milte hi action bhi bhej dega.
+       */
+      if (!reply) {
+        void logUsage("chat_empty_json", 0, false, uid, { rawHead: raw.slice(0, 200) });
+        const plain = await gemini({
+          model: MODEL,
+          system:
+            base +
+            nameNote +
+            ctx +
+            `\n\nAbhi ka local time: ${now}.` +
+            ` Seedha jawab do — koi JSON nahi, sirf chat ka message (1-2 line).` +
+            ` Agar user reminder/alarm maang raha hai aur din ya time saaf nahi hai,` +
+            ` to pyaar se wahi ek cheez poochho (jaise "kis din?" ya "kis time?").` +
+            ` Jo detail mil chuki hai wo dobara mat poochho.`,
+          contents,
+          // Pehli koshish khaali isi wajah se aayi thi ki budget chhota tha —
+          // dobara wahi galti karna bemtlab hoga.
+          maxTokens: 1024,
+          track: { kind: "chat_retry", userId: uid },
+        }).catch(() => "");
+        if (plain.trim()) {
+          reply = plain.trim();
+          // Is raaste par action nahi banta — agla turn use bana dega.
+          parsed.action = null;
+        }
+      }
+
+      // Dono koshishein gayin — tabhi ratta-lagayi line. Ye ab sach me aakhri
+      // sahara hai, pehla nahi.
+      if (!reply) reply = retryLine(payload.locale);
 
       // Action sanitize — sirf allowed shapes.
       let action: unknown = null;
@@ -615,7 +698,7 @@ summary:${langNote(payload.locale)}`;
           },
         ],
         json: true,
-        maxTokens: 400,
+        maxTokens: 1024,
         track: { kind: "scan", userId: uid },
       });
       return json(parseJson(text) ?? { type: "other", name: "", expiry: null, summary: "" });
@@ -654,10 +737,39 @@ REPEAT (bahut zaroori):
         system,
         contents: [{ role: "user", parts: [{ text: payload.text ?? "" }] }],
         json: true,
-        maxTokens: 300,
+        // ⚠️ Yahan 300 tha aur yahi wo jagah thi jahan LIKHA hua reminder aksar
+        // "samajh me nahi aaya" (item 4). Model pehle apna soch-vichaar likhta
+        // hai — wo bhi isi budget me ginta hai — aur budget khatam hote hi JSON
+        // aadha ya khaali aata tha. Uska natija screen par ek hi dikhta tha:
+        // din/time khaali, user ko sab khud bharna pada. Jawab chhota hi rehta
+        // hai; ye sirf chhat hai, kharcha nahi.
+        maxTokens: 1024,
         track: { kind: "reminder", userId: uid },
       });
-      const r = parseJson(text);
+      let r = parseJson(text);
+
+      /**
+       * Ek khaali/toota jawab poore reminder ko khaali chhod deta hai — aur us
+       * soorat me user ko din, time, sab khud bharna padta hai (item 4). Wo
+       * screen par bilkul aisa lagta hai jaise AI ne kuch samjha hi nahi.
+       *
+       * Model ka jawab har baar bilkul ek jaisa nahi hota, isliye ek chhoti si
+       * dobara-koshish yahan sach me bachaa leti hai. Sirf EK — usse zyada me
+       * user ka intezaar hi lamba hoga, aur pickers waise bhi maujood hain.
+       */
+      if (!r) {
+        void logUsage("reminder_empty_json", 0, false, uid, { head: text.slice(0, 200) });
+        const again = await gemini({
+          model: MODEL,
+          system,
+          contents: [{ role: "user", parts: [{ text: payload.text ?? "" }] }],
+          json: true,
+          maxTokens: 1024,
+          track: { kind: "reminder_retry", userId: uid },
+        }).catch(() => "");
+        r = parseJson(again);
+      }
+
       if (!r) {
         return json({
           title: payload.text ?? "",
@@ -712,7 +824,7 @@ REPEAT (bahut zaroori):
           },
         ],
         json: true,
-        maxTokens: 400,
+        maxTokens: 800,
         track: { kind: "docfollow", userId: uid },
       });
       const p = parseJson(text) ?? {};
@@ -725,14 +837,21 @@ REPEAT (bahut zaroori):
       });
     }
 
-    // 5. DAILY BRIEF
+    // 5. DAILY BRIEF — Plus only
     if (task === "brief") {
+      // App free plan par ye bulaati hi nahi, par darwaza yahan bhi band hona
+      // chahiye — warna "Plus feature" sirf UI ka vaada reh jaata hai.
+      if (!(await isPlusUser(uid))) {
+        return json({ brief: null, error: "plus required" }, 403);
+      }
       const nameNote = payload.name ? ` User ka naam "${payload.name}" hai — naam se greet karo.` : "";
       const reply = await gemini({
         model: MODEL,
         system: `${SAATHI_SYSTEM}${langNote(payload.locale)}${nameNote} User ke aaj ke data se ek chhota warm morning brief likho (2-3 line). Sirf brief text do.`,
         contents: [{ role: "user", parts: [{ text: JSON.stringify(payload.data ?? {}) }] }],
-        maxTokens: 300,
+        // Wahi baat jo chat/reminder me thi: model pehle soch-vichaar likhta hai
+        // aur wo bhi isi budget me ginta hai. 300 par jawab aksar khaali aata.
+        maxTokens: 1024,
         track: { kind: "brief", userId: uid },
       });
       return json({ brief: reply });

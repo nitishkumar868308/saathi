@@ -341,6 +341,34 @@ export type AdminDict = {
       loadingDetail: string;
       nothingHere: string;
     };
+    /**
+     * "AI & WhatsApp" tab.
+     *
+     * ⚠️ Ye poora tab akela reh gaya tha — baaki har admin screen language
+     * switcher ke saath badalti thi aur yahi ek angrezi me chipki rehti thi.
+     */
+    spend: {
+      today: string;
+      days7: string;
+      days30: string;
+      all: string;
+      aiLabel: string;
+      whatsappLabel: string;
+      emailLabel: string;
+      tokens: string;
+      messages: string;
+      emails: string;
+      calls: string;
+      failed: string;
+      breakdown: string;
+      /** {file} — SQL file ka naam. */
+      nothingYet: string;
+      service: string;
+      what: string;
+      units: string;
+      last: string;
+      rows: string;
+    };
     documents: {
       viewAll: string;
       byUser: string;
@@ -685,6 +713,15 @@ const en: AdminDict = {
       docsShort: "Docs", loadingDetail: "Loading full detail…",
       nothingHere: "Nothing matches this filter.",
     },
+    spend: {
+      today: "Today", days7: "7 days", days30: "30 days", all: "All",
+      aiLabel: "AI (Gemini)", whatsappLabel: "WhatsApp (Twilio)", emailLabel: "Email (SMTP)",
+      tokens: "tokens", messages: "messages", emails: "emails",
+      calls: "calls", failed: "failed", breakdown: "Breakdown",
+      nothingYet:
+        "No usage recorded yet. If you're sure AI/WhatsApp is running, you still need to run {file} in Supabase.",
+      service: "Service", what: "What", units: "Units", last: "Last", rows: "rows",
+    },
     documents: {
       viewAll: "All", byUser: "By user", inStorage: "In storage",
       uploaders: "Uploaders", totalSize: "Total size",
@@ -1010,6 +1047,15 @@ const hi: AdminDict = {
       docsShort: "डॉक्स", loadingDetail: "पूरा डिटेल ला रहे हैं…",
       nothingHere: "इस फ़िल्टर में कुछ नहीं।",
     },
+    spend: {
+      today: "आज", days7: "7 दिन", days30: "30 दिन", all: "सब",
+      aiLabel: "AI (Gemini)", whatsappLabel: "WhatsApp (Twilio)", emailLabel: "ईमेल (SMTP)",
+      tokens: "टोकन", messages: "मैसेज", emails: "ईमेल",
+      calls: "कॉल", failed: "फ़ेल", breakdown: "ब्रेकडाउन",
+      nothingYet:
+        "अभी तक कोई उपयोग रिकॉर्ड नहीं हुआ। अगर आपको यक़ीन है कि AI/WhatsApp चल रहा है, तो Supabase में {file} चलाना बाक़ी है।",
+      service: "सर्विस", what: "क्या", units: "यूनिट", last: "आख़िरी", rows: "रो",
+    },
     documents: {
       viewAll: "सारे", byUser: "यूज़र अनुसार", inStorage: "स्टोरेज में",
       uploaders: "अपलोड करने वाले", totalSize: "कुल साइज़",
@@ -1334,6 +1380,15 @@ const hinglish: AdminDict = {
       whatHappened: "Kya-kya hua", searchPh: "Email ya naam…",
       docsShort: "Docs", loadingDetail: "Poora detail la rahe hain…",
       nothingHere: "Is filter me kuch nahi.",
+    },
+    spend: {
+      today: "Aaj", days7: "7 din", days30: "30 din", all: "Sab",
+      aiLabel: "AI (Gemini)", whatsappLabel: "WhatsApp (Twilio)", emailLabel: "Email (SMTP)",
+      tokens: "token", messages: "message", emails: "email",
+      calls: "calls", failed: "fail", breakdown: "Breakdown",
+      nothingYet:
+        "Abhi tak koi usage record nahi hui. Agar aapko yakeen hai ki AI/WhatsApp chal raha hai, to Supabase me {file} run karna baaki hai.",
+      service: "Service", what: "Kya", units: "Units", last: "Aakhri", rows: "rows",
     },
     documents: {
       viewAll: "Saare", byUser: "User-wise", inStorage: "Storage me",

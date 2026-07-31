@@ -118,7 +118,12 @@ export function PermissionModal({
     //
     // Exact-alarm ke baad bhi sync zaroori hai: pehle se lage inexact alarms
     // ab exact ban jaate hain.
-    if (key === "notif" || key === "alarm") void syncNotifications();
+    //
+    // `force` zaroori hai: exact-alarm ke liye user Android settings me jaata
+    // hai, aur wapas aate hi AppState wala sync chal chukta hai. Bina force ke
+    // ye wala 60-second throttle me atak jaata — yaani permission mil to jaati
+    // par alarm phir bhi na lagte, jo bilkul wahi purani shikayat hai.
+    if (key === "notif" || key === "alarm") void syncNotifications({ force: true });
   }
 
   const steps = (state?.steps ?? []).filter((s) => s.supported);

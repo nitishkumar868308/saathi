@@ -102,6 +102,17 @@ export type Dict = {
     settingsRow: string;
     settingsRowSub: string;
     /* Permission modal — har step ki apni line */
+    /**
+     * ⚠️ `stepAllow` ("Allow") aur `stepAlarm` ("Alarms & reminders") teeno
+     * bhasha me JAAN-BOOJH KE English hain — ye anuvaad ka chhoota hua kaam
+     * nahi hai.
+     *
+     * Ye do Android ki APNI settings screen ke labels hain, jo user ko wahan
+     * jaake dhoondhne hote hain. App ki bhasha phone ki bhasha se alag hoti
+     * hai (bahut log app Hindi me rakhte hain aur phone English me). Inhe
+     * Hindi kar dene par instruction ulta bekaar ho jaata: screen par "Allow"
+     * likha hoga aur app kahegi "अनुमति दें" — user dhoondhta hi reh jayega.
+     */
     stepAllow: string;
     stepDone: string;
     stepNotif: string;
@@ -168,6 +179,15 @@ export type Dict = {
     briefStart: string;
     /** {name} */
     briefAllSet: string;
+    /**
+     * Free plan wale ke brief card ka upsell.
+     *
+     * Card gayab nahi karte — usme aaj ki asli baat (kitne documents ko dhyan
+     * chahiye) tab bhi dikhti hai. Neeche ek chhoti line batati hai ki Saathi
+     * ye khud likh ke de sakta hai, agar Plus ho.
+     */
+    briefPlusHook: string;
+    briefPlusCta: string;
     quickDoc: string;
     quickChat: string;
     attention: string;
@@ -553,6 +573,15 @@ export type Dict = {
     privacy: string;
     exportData: string;
     deleteAll: string;
+    /**
+     * Template — `{v}` me app ka ASLI version bharta hai (expo-application se).
+     *
+     * ⚠️ Pehle yahan "v0.1.0" seedha likha hua tha, jabki app kab ki 1.0.0 ho
+     * chuki thi. Settings me har user ko galat version dikhta tha — aur support
+     * me "aapke paas kaunsa version hai?" poochhne ka koi matlab hi nahi bachta
+     * tha. Hardcode karne par har release me ye dobara purana ho jaata; ab wo
+     * `app.json` se khud aata hai.
+     */
     help: string;
     about: string;
     logout: string;
@@ -775,6 +804,8 @@ const hinglish: Dict = {
       "Chalo shuru karein{name}! Pehla document add karo, main uski expiry sambhal lunga.",
     briefAllSet:
       "Sab set hai{name}! Koi document jald expire nahi ho raha. Relax karo.",
+    briefPlusHook: "Saathi Plus me har subah aapka apna brief — Saathi khud likh ke deta hai.",
+    briefPlusCta: "Plus dekho",
     quickDoc: "Document add",
     quickChat: "Saathi se baat",
     attention: "Dhyan dena hai",
@@ -1138,7 +1169,7 @@ const hinglish: Dict = {
     help: "Help & support",
     about: "About Us",
     logout: "Logout",
-    version: "Apka Saathi · v0.1.0 · Made in India",
+    version: "Apka Saathi · v{v} · Made in India",
     langAlertTitle: "Bhasha",
     langAlertBody: "Neeche se apni bhasha chuno — poora app usi me badal jayega.",
     deleteTitle: "Sab data delete karein?",
@@ -1312,7 +1343,7 @@ const hi: Dict = {
     showPassword: "पासवर्ड दिखाएँ",
     hidePassword: "पासवर्ड छुपाएँ",
     referralCode: "रेफ़रल कोड",
-    referralOptional: "optional",
+    referralOptional: "वैकल्पिक",
     referralPlaceholder: "दोस्त का कोड",
     referralHint:
       "रिवॉर्ड तब मिलेगा जब आप अपना पहला डॉक्युमेंट डालें और एक reminder सेट करें।",
@@ -1343,6 +1374,8 @@ const hi: Dict = {
     briefStart:
       "चलिए शुरू करें{name}! पहला डॉक्युमेंट डालिए, मैं उसकी एक्सपायरी सँभाल लूँगा।",
     briefAllSet: "सब सेट है{name}! कोई डॉक्युमेंट जल्द एक्सपायर नहीं हो रहा। रिलैक्स करें।",
+    briefPlusHook: "साथी प्लस में हर सुबह आपका अपना ब्रीफ़ — साथी खुद लिखकर देता है।",
+    briefPlusCta: "प्लस देखें",
     quickDoc: "डॉक्युमेंट जोड़ें",
     quickChat: "साथी से बात",
     attention: "ध्यान देना है",
@@ -1604,7 +1637,7 @@ const hi: Dict = {
     sourceReward: "रिवॉर्ड से",
   },
   referral: {
-    title: "Refer & Earn",
+    title: "रेफ़र करें और पाएँ",
     heroTitle: "दोनों को {d} दिन का प्लस प्लान FREE",
     heroSub:
       "आपका दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्युमेंट डाले और एक reminder सेट करे — दोनों को {d} दिन का साथी प्लस प्लान मिल जाएगा।",
@@ -1704,9 +1737,9 @@ const hi: Dict = {
     exportData: "मेरा डेटा export करें",
     deleteAll: "सब डेटा डिलीट",
     help: "हेल्प & support",
-    about: "About Us",
+    about: "हमारे बारे में",
     logout: "लॉगआउट",
-    version: "Apka Saathi · v0.1.0 · Made in India",
+    version: "Apka Saathi · v{v} · Made in India",
     langAlertTitle: "भाषा",
     langAlertBody: "नीचे से अपनी भाषा चुनें — पूरा app उसी में बदल जाएगा।",
     deleteTitle: "सब डेटा डिलीट करें?",
@@ -1910,6 +1943,8 @@ const en: Dict = {
       "Heads up{name} — {n} document(s) expiring soon. Take a look below, I'm keeping track.",
     briefStart: "Let's begin{name}! Add your first document and I'll handle its expiry.",
     briefAllSet: "All set{name}! Nothing expiring soon. Relax.",
+    briefPlusHook: "With Saathi Plus you get your own brief every morning — written by Saathi.",
+    briefPlusCta: "See Plus",
     quickDoc: "Add document",
     quickChat: "Chat with Saathi",
     attention: "Needs attention",
@@ -2273,7 +2308,7 @@ const en: Dict = {
     help: "Help & support",
     about: "About Us",
     logout: "Log out",
-    version: "Apka Saathi · v0.1.0 · Made in India",
+    version: "Apka Saathi · v{v} · Made in India",
     langAlertTitle: "Language",
     langAlertBody: "Pick your language below — the whole app switches to it.",
     deleteTitle: "Delete all data?",

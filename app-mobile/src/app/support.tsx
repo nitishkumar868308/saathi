@@ -7,7 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
-  Platform,
+  Keyboard,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -104,6 +104,21 @@ export default function Support() {
     // Khulte hi "padh liya" — admin ko dikhta hai ki jawab pahunch gaya.
     void markSeen(ticket.id);
   }, []);
+
+  /**
+   * Keyboard khula to aakhri message par aa jao.
+   *
+   * Keyboard ke liye list chhoti ho jaati hai par uska content nahi badalta,
+   * isliye `onContentSizeChange` nahi chalta — aur jis message ka jawab dena
+   * hai wahi upar khisak ke gayab ho jaata tha.
+   */
+  useEffect(() => {
+    if (view !== "thread") return;
+    const sub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => sub.remove();
+  }, [view]);
 
   // Notification par tap se aaye — us ticket ko dhoondh ke kholo.
   const deepLinked = useRef(false);
@@ -261,10 +276,9 @@ export default function Support() {
       )}
 
       {view === "new" && (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        // Yahan bhi wahi baat: Android par `undefined` behavior se keyboard
+        // message wale bade box ko dhak leta tha.
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
           <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.formTitle}>{s.newTitle}</Text>
 
@@ -306,13 +320,28 @@ export default function Support() {
       )}
 
       {view === "thread" && (
+        /**
+         * ⚠️ Yahan `behavior` Android par `undefined` tha — yaani Android par ye
+         * view kuch karti hi nahi thi. Wo sirf tab chalta hai jab window khud
+         * keyboard ke liye chhoti ho jaye (adjustResize), aur naye Android
+         * (edge-to-edge) me app poore screen par khinchti hai — window chhoti
+         * hoti hi nahi. Natija: keyboard khulte hi likhne ka box uske NEECHE
+         * chala jaata tha, user ko apna type kiya hua dikhta hi nahi tha
+         * (item 5).
+         *
+         * `padding` dono platform par ek jaisa chalta hai — ye keyboard ki
+         * unchai khud naapta hai (Saathi wali chat tab isi tarah kaam karti
+         * hai, aur wahan ye dikkat kabhi aayi hi nahi).
+         */
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
+          keyboardVerticalOffset={0}
         >
           <ScrollView
             ref={scrollRef}
             contentContainerStyle={styles.threadContent}
+            keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
           >
             {messages === null ? (
