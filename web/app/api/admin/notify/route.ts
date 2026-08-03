@@ -11,6 +11,8 @@ import {
   trackedEmailBody,
   type SendRow,
 } from "@/lib/message-track";
+import { translateConfigured, translateMessage, type Message } from "@/lib/translate";
+import type { Loc } from "@/lib/reminder-channels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -112,7 +114,14 @@ export async function GET() {
     // UI ko batana zaroori hai ki push ka option dikhaye ya nahi. Bina Firebase
     // env ke "Notification bhejo" button dikhana jhooth hoga — admin dabata aur
     // kuch jaata hi nahi.
-    return NextResponse.json({ users, pushReady: isFcmConfigured() });
+    // `translateReady` bhi yahin se: GEMINI_API_KEY na ho to UI me "user ki
+    // bhasha me bhejo" wala toggle dikhana jhooth hoga — admin use on rakhta
+    // aur message phir bhi ek hi bhasha me jaata.
+    return NextResponse.json({
+      users,
+      pushReady: isFcmConfigured(),
+      translateReady: translateConfigured(),
+    });
   } catch (e) {
     return NextResponse.json({ error: "fetch failed", detail: String(e) }, { status: 500 });
   }
@@ -158,6 +167,11 @@ function emailCta(language: string | null | undefined): { app: string; web: stri
   return { app: "App kholo", web: "Website dekho" };
 }
 
+/** `profiles.language` ka jo bhi ho — hamesha teen me se ek. */
+function toLoc(language: string | null | undefined): Loc {
+  return language === "hi" || language === "en" ? language : "hinglish";
+}
+
 /** FCM ne jo tokens "mare hue" bataye, unhe DB se hata do. */
 async function dropDeadTokens(tokens: string[]): Promise<void> {
   if (tokens.length === 0) return;
@@ -191,6 +205,8 @@ export async function POST(request: Request) {
     audience?: string;
     userIds?: unknown;
     channel?: string;
+    /** false = jaisa likha hai waisa hi bhejo, bina anuvaad ke. */
+    translate?: boolean;
   };
   try {
     body = await request.json();
@@ -252,6 +268,29 @@ export async function POST(request: Request) {
 
   targets = targets.slice(0, MAX_RECIPIENTS);
 
+  /* --------------------------- anuvaad (item) --------------------------- */
+  //
+  // ⚠️ Ab tak admin ka likha hua text JAISA KA WAISA sabko chala jaata tha.
+  // Har user ki bhasha `profiles.language` me pehle se padi thi — email ke CTA
+  // button (`emailCta`) tak usi se bante the — par message ka asli matn hamesha
+  // ek hi bhasha me jaata tha. Hindi chunne wale user ko email me button
+  // "ऐप खोलें" dikhta tha aur upar poora message English me.
+  //
+  // Ek hi call me sirf UTNI bhashayein maangte hain jitni is bhej me sach me
+  // chahiye: sab Hinglish wale hain to koi anuvaad hota hi nahi.
+  //
+  // Anuvaad fail ho jaye to `translateMessage` original hi lauta deta hai —
+  // isliye neeche kahin `null` handle karne ki zaroorat nahi, aur message kabhi
+  // rukta nahi.
+  const original: Message = { subject, message };
+  const wantsTranslate = body.translate !== false && translateConfigured();
+  const langs = Array.from(new Set(targets.map((p) => toLoc(p.language))));
+  const texts: Record<Loc, Message> = wantsTranslate
+    ? await translateMessage(original, langs)
+    : ({ hinglish: original, hi: original, en: original } as Record<Loc, Message>);
+  const textFor = (language: string | null | undefined): Message =>
+    texts[toLoc(language)] ?? original;
+
   let sent = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -300,13 +339,29 @@ export async function POST(request: Request) {
   /* ------------------------------ email ------------------------------ */
 
   if (wantsEmail) {
-    // Admin-composed message ko branded shell me daalo. Newlines -> paragraphs.
-    const inner = escapeHtml(message)
-      .split(/\n{2,}/)
-      .map((para) => emailParagraph(para.replace(/\n/g, "<br/>")))
-      .join("");
-    // Tracking off ho to purana raasta — ek hi HTML sab ke liye.
-    const plainHtml = renderEmail(subject, inner, subject);
+    /**
+     * Har bhasha ka apna HTML — ek baar bana ke rakh liya jaata hai.
+     *
+     * Pehle ye do line poore bhej me ek hi baar chalti thi (ek `inner`, ek
+     * `plainHtml`). Ab text bhasha ke hisaab se badalta hai, par bhashayein
+     * teen se zyada ho nahi sakti — isliye per-user dobara banane ke bajaye
+     * per-LANGUAGE ek baar. 1000 user par ye 1000 nahi, 3 baar chalta hai.
+     */
+    const shells = new Map<Loc, { inner: string; plain: string }>();
+    const shellFor = (loc: Loc) => {
+      const cached = shells.get(loc);
+      if (cached) return cached;
+      const text = texts[loc] ?? original;
+      // Admin-composed message ko branded shell me daalo. Newlines -> paragraphs.
+      const inner = escapeHtml(text.message)
+        .split(/\n{2,}/)
+        .map((para) => emailParagraph(para.replace(/\n/g, "<br/>")))
+        .join("");
+      // Tracking off ho to purana raasta — ek hi HTML us bhasha ke sab users ke liye.
+      const made = { inner, plain: renderEmail(text.subject, inner, text.subject) };
+      shells.set(loc, made);
+      return made;
+    };
 
     // Status ek jaisa hone wali rows ko ek saath update karte hain (neeche) —
     // per-row PATCH 1000 users par serverless function ka time kha jaata hai.
@@ -316,14 +371,26 @@ export async function POST(request: Request) {
     for (const p of targets) {
       if (!p.email) continue;
       const sendId = sendIdFor(p.id, "email");
+      const loc = toLoc(p.language);
+      const shell = shellFor(loc);
+      const text = texts[loc] ?? original;
       // Har user ka apna HTML banta hai kyunki pixel aur link me USI ka send id
       // hota hai. Bina iske sab ka open ek hi row par ginta — aur "kisne khola"
       // ka jawab hi khatam ho jaata.
       const html = sendId
-        ? renderEmail(subject, trackedEmailBody(inner, sendId, emailCta(p.language)), subject)
-        : plainHtml;
+        ? renderEmail(
+            text.subject,
+            trackedEmailBody(shell.inner, sendId, emailCta(p.language)),
+            text.subject,
+          )
+        : shell.plain;
       try {
-        const res = await sendMail({ to: p.email, subject, html, fromName: "Apka Saathi" });
+        const res = await sendMail({
+          to: p.email,
+          subject: text.subject,
+          html,
+          fromName: "Apka Saathi",
+        });
         if (res.sent) sent++;
         else skipped++;
         if (sendId) (res.sent ? mailed : notMailed).push(sendId);
@@ -353,11 +420,55 @@ export async function POST(request: Request) {
       void logServerError(e, { where: "admin/notify", step: "device_tokens fetch" });
       return [] as { token: string; userId: string }[];
     });
-    const res = await sendPush(
-      tokens.map((t) => ({ token: t.token, sendId: sendIdFor(t.userId, "push") })),
-      subject,
-      message,
-    );
+
+    /**
+     * Push bhi user ki apni bhasha me.
+     *
+     * ⚠️ `sendPush` ek hi title/body sab tokens par bhejta hai, isliye tokens ko
+     * BHASHA ke hisaab se baant ke bhejna padta hai. Teen se zyada jhund kabhi
+     * ho hi nahi sakte, aur har jhund apne aap me poora batch hai — yaani ek hi
+     * bhasha wale users ke liye ye pehle jaisa hi ek call hai.
+     *
+     * Pehle yahan email ka `subject`/`message` seedha jaata tha, isliye email
+     * user ki bhasha me pahunchta aur usi cheez ki notification kisi aur bhasha
+     * me — ek hi baat, do bhashayein, ek hi phone par.
+     */
+    const langOf = new Map(targets.map((p) => [p.id, toLoc(p.language)] as const));
+    const byLang = new Map<Loc, { token: string; sendId: string | null }[]>();
+    for (const t of tokens) {
+      const loc = langOf.get(t.userId) ?? "hinglish";
+      const list = byLang.get(loc) ?? [];
+      list.push({ token: t.token, sendId: sendIdFor(t.userId, "push") });
+      byLang.set(loc, list);
+    }
+
+    const res = {
+      sent: 0,
+      failed: 0,
+      deadTokens: [] as string[],
+      errors: [] as string[],
+      bySend: new Map<string, { sent: number; failed: number }>(),
+    };
+    // `Array.from` isliye ki tsconfig ka target Map ko seedha iterate karne
+    // nahi deta (downlevelIteration off hai) — poore repo ka target badalne se
+    // behtar hai yahan ek copy bana lena, list teen se lambi hoti hi nahi.
+    for (const [loc, list] of Array.from(byLang.entries())) {
+      const text = texts[loc] ?? original;
+      const part = await sendPush(list, text.subject, text.message);
+      res.sent += part.sent;
+      res.failed += part.failed;
+      res.deadTokens.push(...part.deadTokens);
+      res.errors.push(...part.errors);
+      // ⚠️ `bySend` ki keys send-row ki id hain, jo har user ki apni hai — do
+      // bhasha-jhund me ek hi id kabhi nahi aa sakti. Isliye seedha jodna safe
+      // hai; jodne ki bajaye replace karna bhi wahi natija deta, par yahan saaf
+      // rakhna behtar hai.
+      part.bySend.forEach((v, k) => {
+        const cur = res.bySend.get(k) ?? { sent: 0, failed: 0 };
+        res.bySend.set(k, { sent: cur.sent + v.sent, failed: cur.failed + v.failed });
+      });
+    }
+
     push = { sent: res.sent, failed: res.failed, devices: tokens.length };
     errors.push(...res.errors);
 

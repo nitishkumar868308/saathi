@@ -97,12 +97,32 @@ export async function POST(request: Request) {
     profileCache.set(uid, v);
     return v;
   }
+  /**
+   * Is user ka WhatsApp number — SIRF tab jab wo verify ho chuka ho.
+   *
+   * ⚠️ Pehle yahan sirf `phone` padha jaata tha, aur jo bhi likha ho wahi sach
+   * maan liya jaata tha. Ek digit ki galti ka natija ye hota tha ki reminder
+   * kisi AJNABI ke WhatsApp par jaata rehta — mahino tak, roz — aur asli user
+   * ko kabhi kuch nahi milta. Dono me se kisi ko wajah pata hi nahi chalti thi:
+   * bhejne wale ko "sent" dikhta tha aur paane wale ko koi reminder hi nahi.
+   *
+   * `phone_verified_at` tabhi bharta hai jab us number par SMS ka OTP pahunch ke
+   * wapas confirm ho chuka ho (`supabase/phone-verify.sql`). Number badalte hi
+   * DB ka trigger use null kar deta hai, isliye purana verification naye number
+   * par kabhi chipak nahi sakta.
+   *
+   * Iska seedha asar: jin purane users ne abhi tak verify nahi kiya, unka
+   * WhatsApp tab tak nahi jaayega. Email aur phone ki notification pehle ki
+   * tarah chalti rahengi — sirf wahi raasta rukta hai jahan galti kisi TEESRE
+   * banda tak pahunch jaati hai.
+   */
   async function getPhone(uid: string): Promise<string | null> {
     if (phoneCache.has(uid)) return phoneCache.get(uid) ?? null;
-    const rows = await sbGet<{ phone: string | null }>(
-      `user_details?user_id=eq.${uid}&select=phone`,
+    const rows = await sbGet<{ phone: string | null; phone_verified_at: string | null }>(
+      `user_details?user_id=eq.${uid}&select=phone,phone_verified_at`,
     ).catch(() => []);
-    const v = rows[0]?.phone ?? null;
+    const row = rows[0];
+    const v = row?.phone && row.phone_verified_at ? row.phone : null;
     phoneCache.set(uid, v);
     return v;
   }
@@ -147,6 +167,10 @@ export async function POST(request: Request) {
               // Email pehle se user ki bhasha me jaata tha, WhatsApp nahi — ek
               // hi reminder do alag bhashaon me pahunchta tha.
               profile.language,
+              // Greeting ka naam ("Namaste Nitish"). Naam na ho to twilio.ts
+              // bhasha ka aam shabd laga deta hai — khaali variable Meta reject
+              // kar deta hai, yaani us user ka reminder bilkul hi nahi jaata.
+              profile.name,
             );
             if (res.sent) wa++;
           } catch (e) {

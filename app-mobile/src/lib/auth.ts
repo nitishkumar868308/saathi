@@ -29,6 +29,19 @@ export async function signOut() {
   await client().auth.signOut();
 }
 
+/**
+ * Baaki SAB phones se logout — yahi phone chalu rehta hai.
+ *
+ * `scope: "others"` Supabase par is user ke doosre saare refresh token maar
+ * deta hai, apna wala chhod kar. Isi wajah se yahan `signOut()` (jo poora
+ * session uda deta hai) use nahi kiya ja sakta — user ko apne hi phone par
+ * dobara login karna padta, jo is button ka poora matlab hi ulta kar deta.
+ */
+export async function signOutOtherDevices() {
+  const { error } = await client().auth.signOut({ scope: "others" });
+  if (error) throw error;
+}
+
 function getParams(url: string): Record<string, string> {
   const out: Record<string, string> = {};
   const q = url.includes("#") ? url.split("#")[1] : url.split("?")[1];

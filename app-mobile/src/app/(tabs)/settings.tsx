@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as Application from "expo-application";
 
 import { colors } from "@/theme/colors";
@@ -19,6 +19,7 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
 import { useUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { PermissionModal } from "@/components/permission-modal";
+import { getLockState } from "@/lib/app-lock";
 import { ALERT_MODES, alertUser, useAlertMode, type AlertMode } from "@/lib/alert-mode";
 import { reportError } from "@/lib/report-error";
 
@@ -44,6 +45,7 @@ type RowId =
   | "refer_code"
   | "saathi_name"
   | "reminders_reliable"
+  | "app_lock"
   | "alert_mode"
   | "language"
   | "privacy"
@@ -84,6 +86,19 @@ export default function Settings() {
   const [logoutAsk, setLogoutAsk] = useState(false);
   const [deleteAsk, setDeleteAsk] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
+  /**
+   * App lock chalu hai ya nahi — sirf row ke daayin dikhane ke liye.
+   *
+   * `useFocusEffect` se padhte hain kyunki user lock wali screen se badal ke
+   * wapas aata hai; ek baar mount par padhne se yahan hamesha purana haal
+   * dikhta rehta.
+   */
+  const [lockOn, setLockOn] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      void getLockState().then((st) => setLockOn(st.enabled));
+    }, []),
+  );
   // Ring / vibrate / silent — device par local, server par kuch nahi jaata.
   const [alertMode, setAlertModePref] = useAlertMode();
 
@@ -118,6 +133,15 @@ export default function Settings() {
         //    banao" — aur dono bilkul wahi ek modal kholti thi. User ko lagta
         //    tha do alag settings hain (item 14). Ab ek hi row hai.
         { id: "reminders_reliable", icon: "notifications-outline", label: rel.settingsRow },
+        // App lock "Saathi" wale group me hai, "Account" me nahi — ye is PHONE
+        // ki setting hai, account ki nahi. PIN kabhi server par nahi jaata, aur
+        // logout karte hi lock hat jaata hai.
+        {
+          id: "app_lock",
+          icon: "finger-print-outline",
+          label: t.lock.title,
+          value: lockOn ? t.lock.savedOn.replace(" ✓", "") : undefined,
+        },
         {
           id: "alert_mode",
           icon: "volume-medium-outline",
@@ -196,6 +220,9 @@ export default function Settings() {
       case "saathi_name":
         // Naam + details ek hi jagah.
         router.push("/profile-details" as never);
+        return;
+      case "app_lock":
+        router.push("/app-lock" as never);
         return;
       case "membership":
         router.push("/membership" as never);

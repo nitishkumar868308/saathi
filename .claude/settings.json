@@ -316,11 +316,22 @@
       "Bash(sed -n '/task === \"brief\"/,/^    }/p' supabase/functions/ai/index.ts)",
       "Bash(sed -n '/^  home: {/,/^  };/p' app-mobile/src/lib/i18n/dictionaries.ts)",
       "Bash(deno check *)",
-      "Bash(npx --yes deno check supabase/functions/ai/index.ts)"
+      "Bash(npx --yes deno check supabase/functions/ai/index.ts)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(JSON.stringify\\(p.dependencies,null,1\\)\\)\")",
+      "Bash(setOk)",
+      "Bash(echo \"=== exit $? ===\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(JSON.stringify\\(p.scripts\\)\\)\")",
+      "Bash(npx prettier *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(p.dependencies['expo-local-authentication'], p.dependencies['expo-crypto']\\)\")",
+      "Bash(echo \"tsc=$?\")",
+      "Bash(echo \"MOBILE tsc=$?\")",
+      "Bash(echo \"WEB tsc=$?\")",
+      "Bash(grep -n \"\\\\\"rewards\\\\\" | \\\\\"pricing\\\\\"\\\\|type AdminSection\\\\|Record<\\\\s*$\" web/lib/i18n/admin.ts)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",
-      "D:\\my-app\\web"
+      "D:\\my-app\\web",
+      "\\tmp"
     ]
   }
 }

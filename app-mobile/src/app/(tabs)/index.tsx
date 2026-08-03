@@ -19,7 +19,8 @@ import { timed } from "@/lib/network";
 import { UserAvatar } from "@/components/user-avatar";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { listDocuments, type Document } from "@/lib/documents";
-import { listReminders, setReminderOn, type Reminder } from "@/lib/reminders";
+import { setReminderOn, type Reminder } from "@/lib/reminders";
+import { isPendingId, listRemindersWithPending } from "@/lib/reminder-outbox";
 import { hasBeenReferred } from "@/lib/plan";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
 import { cancelReminder } from "@/lib/notifications";
@@ -53,7 +54,7 @@ export default function Home() {
   const { session } = useAuth();
   const meta = session?.user?.user_metadata;
   const fullName = (meta?.full_name || meta?.name || firstName || "") as string;
-  const { home: h } = useT();
+  const { home: h, notes: nt, reminders: r0 } = useT();
   const { locale } = useLocale();
   const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
@@ -153,7 +154,11 @@ export default function Home() {
     async (isRefresh = false) => {
       try {
         if (!isRefresh) setLoading(true);
-        const [d, r] = await timed(Promise.all([listDocuments(), listReminders()]));
+        // `listRemindersWithPending` — kataar me pade (offline banaye) reminders
+        // bhi "Aaj" wali list me aane chahiye.
+        const [d, r] = await timed(
+          Promise.all([listDocuments(), listRemindersWithPending()]),
+        );
         setDocs(d);
         setToday(r.filter((x) => x.is_on && !x.is_paused && isToday(x.remind_at)));
         void loadBrief(d, r);
@@ -169,6 +174,18 @@ export default function Home() {
   );
 
   async function markDone(r: Reminder) {
+    /**
+     * ⚠️ Kataar me pada (offline banaya) reminder yahan bhi dikhta hai, par uski
+     * server wali row abhi bani hi nahi hai — `setReminderOn("local:…")` uuid
+     * cast par fail hota hai. Neeche wala `catch` use chup-chaap nigal leta tha,
+     * aur reminder list se HAT chuka hota tha: user ko lagta "ho gaya", phir
+     * agle refresh par wahi reminder wapas aa jaata. Reminders tab par yahi
+     * guard pehle se hai.
+     */
+    if (isPendingId(r.id)) {
+      toast.show(r0.pendingBusy, "info");
+      return;
+    }
     setToday((prev) => prev.filter((x) => x.id !== r.id));
     try {
       await setReminderOn(r.id, false);
@@ -336,6 +353,22 @@ export default function Home() {
               <Ionicons name="chatbubble-ellipses" size={20} color={colors.sage} />
             </View>
             <Text style={styles.actionText}>{h.quickChat}</Text>
+          </Pressable>
+
+          {/* Notes ko tab bar me nahi daala — wahan pehle se paanch tab hain aur
+              chhathe ka label Hindi me tab bar todd deta hai. Home se ek tap
+              par hona hi kaafi hai: note likhne wala aksar app kholta hi isi
+              kaam ke liye hai. */}
+          <Pressable
+            // `as never` — naya route hai, expo ke generated route types dev server
+            // chalne par hi banti hain (codebase idiom, jaise _layout.tsx me).
+            onPress={() => router.push("/notes" as never)}
+            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: "rgba(224,164,88,0.18)" }]}>
+              <Ionicons name="create" size={20} color={colors.amber} />
+            </View>
+            <Text style={styles.actionText}>{nt.title}</Text>
           </Pressable>
         </View>
 

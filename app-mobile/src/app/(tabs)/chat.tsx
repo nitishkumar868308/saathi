@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,9 +23,12 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { askSaathi, ChatTurn, ChatContext, type SaathiAction } from "@/lib/ai";
-import { listReminders, addReminder, ReminderLimitError } from "@/lib/reminders";
+import { ReminderLimitError } from "@/lib/reminders";
+import { listRemindersWithPending, saveReminder } from "@/lib/reminder-outbox";
 import { listDocuments, type Document } from "@/lib/documents";
 import { scheduleReminderSeries, ensureNotifPermission } from "@/lib/notifications";
+import { PermissionModal } from "@/components/permission-modal";
+import { reliabilityPromptShown } from "@/lib/reliability";
 import { formatWhen } from "@/utils/parse-time";
 import { reportNetFailure, reportIfNetwork } from "@/lib/net-alert";
 import { markFirstReminder } from "@/lib/reviews";
@@ -126,6 +130,8 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   /** Aakhri turn jo net ki wajah se fail hua — "Dobara bhejo" isi ko chalata hai. */
   const [failedTurn, setFailedTurn] = useState<Pending | null>(null);
+  /** Chat se pehla reminder banne par "reminder time pe aaye" wala setup. */
+  const [permModal, setPermModal] = useState(false);
   const [messages, setMessages] = useState<Msg[]>(() => [
     {
       id: GREETING_ID,
@@ -180,7 +186,7 @@ export default function Chat() {
 
   const refreshContext = useCallback(async () => {
     const [rem, docs] = await Promise.all([
-      listReminders().catch(() => []),
+      listRemindersWithPending().catch(() => []),
       listDocuments().catch(() => []),
     ]);
     ctxRef.current = {
@@ -275,7 +281,9 @@ export default function Chat() {
     try {
       const label = formatWhen(when, { today: c.today, tomorrow: c.tomorrow }, locale);
       const bucket = isSameDay(when, new Date()) ? "today" : "upcoming";
-      const r = await addReminder({
+      // `saveReminder` = net ho to server par, na ho to phone ki kataar me.
+      // Alarm dono soorat me lagta hai — usse internet chahiye hi nahi.
+      const r = await saveReminder({
         title,
         time_label: label,
         remind_at: when.toISOString(),
@@ -283,21 +291,52 @@ export default function Chat() {
         repeat_every_days: repeat?.everyDays ?? null,
         repeat_until: repeat?.until ?? null,
       });
+
+      /**
+       * ⚠️ Yahan chat "Add reminder" screen se poori tarah alag chal rahi thi,
+       * aur wahi is shikayat ki jad thi ki "chat se bana reminder kaam nahi
+       * karta".
+       *
+       * Pehle: permission na mile to `if (allowed)` chup-chaap schedule skip
+       * kar deta tha. Chat me Saathi phir bhi "reminder set kar diya" keh deta
+       * tha, koi toast nahi, koi popup nahi — reminder DB me pada rehta tha aur
+       * alarm kabhi lagta hi nahi. Add-reminder screen par yahi soorat toast +
+       * PermissionModal dono dikhati hai.
+       *
+       * Ab dono raaste ek jaise hain: sach batao (toast), aur pehli baar wo
+       * modal kholo jisme notification, exact-alarm, battery aur OEM auto-start
+       * — chaaron allow ho sakti hain. Android par exact-alarm/battery ke bina
+       * notification allow hone par bhi reminder ghanton late aata hai.
+       */
       const allowed = await ensureNotifPermission();
-      if (allowed) {
-        await scheduleReminderSeries(
+      const scheduled =
+        allowed &&
+        (await scheduleReminderSeries(
           r.id,
-          r.title,
+          title,
           when,
           repeat?.everyDays ?? null,
           repeat?.until ?? null,
-        );
+        ));
+      if (!scheduled) {
+        toast.show(allowed ? t.addReminder.savedNoNotif : t.addReminder.savedNeedPerm, "info");
+      } else if (r.pending) {
+        // Alarm lag gaya par server par jaana baaki hai — chat ka reply "set kar
+        // diya" keh chuka hai, isliye ye adhoora hissa alag se batana zaroori hai.
+        toast.show(t.addReminder.setOkOffline, "info");
       }
       // Review popup ka padav — chat se bana reminder bhi ginta hai.
       markFirstReminder().catch(() => {});
       // Home/Reminders tab khule pade hain — chat se bana reminder wahan bhi
       // turant dikhna chahiye, tab badalne ka intezaar kiye bina.
       emitDataChanged();
+
+      // Pehli baar reminder banne par reliability setup — bilkul waise hi jaise
+      // add-reminder screen par. Android par hamesha (permission mil bhi jaye to
+      // exact-alarm/battery/auto-start baaki rehte hain), iOS par sirf tab jab
+      // permission mili hi na ho.
+      const needsSetup = Platform.OS === "android" || !allowed;
+      if (needsSetup && !(await reliabilityPromptShown())) setPermModal(true);
       return true;
     } catch (e) {
       if (e instanceof ReminderLimitError) {
@@ -318,8 +357,27 @@ export default function Chat() {
     }
     if (action.type === "create_reminder") {
       const when = new Date(action.remind_at);
-      // Galat/past time — reply already samhaal chuka hai, chup-chaap chhod do.
-      if (isNaN(when.getTime()) || when.getTime() <= Date.now()) return;
+      /**
+       * ⚠️ Yahan pehle `return` tha — "reply already samhaal chuka hai" maan
+       * ke. Wo maan lena galat nikla, aur yahi wo soorat hai jise user "chat se
+       * reminder sahi se banta hi nahi" kehta hai: Saathi upar likh chuka hota
+       * hai "theek hai, yaad dila dunga", aur neeche action chup-chaap gir jaata
+       * hai. Kuch banta nahi, koi toast nahi, koi wajah nahi.
+       *
+       * Aisa hota kab hai — AI ne din to samajh liya par saal purana likh diya,
+       * ya "subah 7 baje" bola aur abhi 9 baj chuke hain (matlab kal wala 7
+       * chahiye tha). Dono me title bilkul theek hota hai; sirf time galat hota
+       * hai.
+       *
+       * Isliye ab wahi baat Add-reminder screen par bhej dete hain: title pehle
+       * se bhara milta hai, aur user ek tap me sahi time chun ke Save kar deta
+       * hai. Baat khoti nahi.
+       */
+      if (isNaN(when.getTime()) || when.getTime() <= Date.now()) {
+        toast.show(ch.reminderNeedsTime, "info");
+        router.push({ pathname: "/add-reminder", params: { text: action.title } });
+        return;
+      }
       const ok = await createReminder(action.title, when, {
         everyDays: action.repeat_every_days,
         until: action.repeat_until,
@@ -455,6 +513,10 @@ export default function Chat() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Chat se bana reminder time pe baje — notification, exact-alarm,
+          battery aur OEM auto-start, sab ek hi jagah se allow. */}
+      <PermissionModal visible={permModal} onClose={() => setPermModal(false)} />
     </SafeAreaView>
   );
 }

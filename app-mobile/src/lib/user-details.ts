@@ -35,6 +35,18 @@ export type UserDetails = {
   phone: string;
   phone_dial_code: string | null;
   phone_country: string | null;
+  /**
+   * Is number par SMS ka OTP pahunch ke confirm ho chuka — kab.
+   *
+   * `null` = number sirf LIKHA hua hai, saabit nahi. Ek digit galat ho to
+   * reminder ka WhatsApp kisi ajnabi ke paas jaata hai aur asli user ko kabhi
+   * kuch nahi milta — dono me se kisi ko wajah pata nahi chalti.
+   *
+   * ⚠️ Ye sirf server likhta hai (`mark_phone_verified`, service_role only).
+   * App se ise kabhi set mat karna — warna OTP ka koi matlab hi nahi bachta.
+   * Number badalte hi DB ka trigger ise apne aap `null` kar deta hai.
+   */
+  phone_verified_at?: string | null;
   address: string;
   gender: string;
   country_id: number | null;
@@ -153,8 +165,23 @@ export async function saveUserDetails(d: UserDetails): Promise<void> {
   const { data: u } = await sb.auth.getUser();
   const uid = u.user?.id;
   if (!uid) throw new Error("Login zaroori hai");
+
+  /**
+   * ⚠️ `phone_verified_at` yahan se KABHI nahi jaana chahiye.
+   *
+   * RLS user ko apni row update karne deta hai, isliye `...d` me ye column chala
+   * jaata to koi bhi apna number khud "verified" likh leta — aur poora OTP sirf
+   * ek dikhawa ban jaata. Wo column sirf server likhta hai
+   * (`mark_phone_verified`, service_role only), tab jab Twilio "approved" keh
+   * chuka ho.
+   *
+   * Number badla to DB ka trigger use apne aap `null` kar deta hai — yaani
+   * purana verification naye number par chipak nahi sakta.
+   */
+  const { phone_verified_at: _ignored, ...writable } = d;
+
   const { error } = await sb.from("user_details").upsert(
-    { user_id: uid, ...d, updated_at: new Date().toISOString() },
+    { user_id: uid, ...writable, updated_at: new Date().toISOString() },
     { onConflict: "user_id" },
   );
   if (error) throw error;
@@ -167,7 +194,14 @@ export async function saveUserDetails(d: UserDetails): Promise<void> {
     .updateUser({ data: { full_name: d.full_name, avatar_url: d.avatar_url } })
     .catch(() => {});
 
-  publish(d);
+  // Cache me sach wahi rakho jo DB me hua: number badla to verification gaya
+  // (trigger), warna jo pehle tha wahi. Seedha `d` publish karne par screen ko
+  // wo status dikhta jo caller ne bheja tha, jo galat ho sakta hai.
+  const phoneChanged = !!cached && cached.phone !== d.phone;
+  publish({
+    ...d,
+    phone_verified_at: phoneChanged ? null : (cached?.phone_verified_at ?? d.phone_verified_at ?? null),
+  });
 }
 
 export function isDetailsComplete(d: UserDetails | null): boolean {

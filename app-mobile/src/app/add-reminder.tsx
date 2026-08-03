@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
@@ -19,7 +19,8 @@ import DateTimePicker, {
 import { colors } from "@/theme/colors";
 import { LoaderOverlay, TopProgress } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
-import { addReminder, ReminderLimitError } from "@/lib/reminders";
+import { ReminderLimitError } from "@/lib/reminders";
+import { saveReminder } from "@/lib/reminder-outbox";
 import { checkReferralQualification } from "@/lib/plan";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { ensureNotifPermission, scheduleReminderSeries } from "@/lib/notifications";
@@ -68,7 +69,22 @@ export default function AddReminder() {
   const { locale } = useLocale();
   const bcp = locale === "hi" ? "hi-IN" : "en-IN";
 
-  const [title, setTitle] = useState("");
+  /**
+   * `?text=` — kisi doosri screen se aaya hua adhoora reminder.
+   *
+   * Abhi ek hi jagah se aata hai: chat. Jab Saathi reminder to samajh leta hai
+   * par time galat/beeta hua nikalta hai, tab wo action chup-chaap gira dena
+   * sabse bura option hai (chat keh chuki hoti hai "set kar diya", aur banta
+   * kuch nahi). Ab wahi baat yahan bhej di jaati hai, neeche wala AI-parse
+   * effect isi text par apne aap chal jaata hai, aur user sirf sahi time chun
+   * ke Save dabata hai.
+   */
+  const { text: prefill, noteId } = useLocalSearchParams<{
+    text?: string;
+    noteId?: string;
+  }>();
+
+  const [title, setTitle] = useState(typeof prefill === "string" ? prefill : "");
   // Saaf title (AI se bharta hai, user badal sakta hai).
   const [subject, setSubject] = useState("");
   // User ne title khud chhua? Tab AI usse overwrite na kare.
@@ -333,7 +349,17 @@ export default function AddReminder() {
       // User ka apna wakya bhi save karo — email/WhatsApp me title ke saath jaata
       // hai. Title AI ka chhota version hota hai ("Test"); note se user ko yaad
       // aa jaata hai ki baat kis baare me thi.
-      const r = await addReminder({
+      // ⚠️ `addReminder` (seedha Supabase insert) ki jagah `saveReminder`.
+      // Net na ho to ye reminder kataar me daal deta hai aur local id lauta deta
+      // hai — alarm neeche waise ka waisa lag jaata hai. Pehle yahan poora save
+      // fail ho jaata tha aur offline banaya reminder kahin bachta hi nahi tha,
+      // jabki alarm ko internet ki zaroorat hai hi nahi.
+      const r = await saveReminder({
+        // Note se aaya hai to us note se jod do — user ko dobara wahi reminder
+        // banane se rok deta hai (note par "reminder laga hai" dikh jaata hai).
+        // Offline soorat me ye kataar me bhi saath jaata hai aur sync ke baad
+        // jud jaata hai.
+        noteId: typeof noteId === "string" ? noteId : null,
         title: useTitle,
         note: raw && raw.toLowerCase() !== useTitle.toLowerCase() ? raw : null,
         time_label: finalLabel,
@@ -352,9 +378,18 @@ export default function AddReminder() {
       const allowed = await ensureNotifPermission();
       const scheduled =
         allowed &&
-        (await scheduleReminderSeries(r.id, r.title, useWhen, useEvery, useUntil));
+        (await scheduleReminderSeries(r.id, useTitle, useWhen, useEvery, useUntil));
+      // Offline banaya reminder: alarm lag chuka hai, bas server par jaana baaki
+      // hai. Ye do baatein alag hain aur user ko alag hi dikhni chahiye — warna
+      // wo "set ho gaya" padh ke doosre phone par dhoondhta hai aur nahi milta.
       toast.show(
-        scheduled ? a.setOk : allowed ? a.savedNoNotif : a.savedNeedPerm,
+        scheduled && r.pending
+          ? a.setOkOffline
+          : scheduled
+            ? a.setOk
+            : allowed
+              ? a.savedNoNotif
+              : a.savedNeedPerm,
         scheduled ? "success" : "info",
       );
       // Pehli baar reminder set hone pe reliability setup — ek hi baar.

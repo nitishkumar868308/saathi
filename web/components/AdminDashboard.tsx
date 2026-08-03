@@ -19,6 +19,7 @@ import {
   Globe,
   Bug,
   FileText,
+  NotebookPen,
   Megaphone,
   LineChart,
   PenLine,
@@ -37,6 +38,7 @@ import AdminUsage from "@/components/AdminUsage";
 import AdminSpend from "@/components/AdminSpend";
 import AdminBroadcast from "@/components/AdminBroadcast";
 import AdminDocuments from "@/components/AdminDocuments";
+import AdminNotes from "@/components/AdminNotes";
 import AdminPricing from "@/components/AdminPricing";
 import AdminLogs from "@/components/AdminLogs";
 import AdminAnalytics from "@/components/AdminAnalytics";
@@ -61,6 +63,7 @@ type Section =
   | "users"
   | "usage"
   | "spend"
+  | "notes"
   | "documents"
   | "reviews"
   | "logs"
@@ -77,6 +80,9 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   { key: "support", icon: LifeBuoy },
   { key: "usage", icon: Activity },
   { key: "spend", icon: Wallet },
+  // Notes documents ke theek upar — dono "user ka apna rakha hua" hain, aur
+  // admin unhe ek saath dekhta hai.
+  { key: "notes", icon: NotebookPen },
   { key: "documents", icon: FileText },
   { key: "reviews", icon: Star },
   { key: "logs", icon: Bug },
@@ -445,6 +451,7 @@ function Dashboard({
               {/* "Usage" = kaun user kitna active hai.
                   "AI & WhatsApp" = humara kitna kharcha ho raha hai (item 3). */}
               {section === "spend" && <AdminSpend />}
+              {section === "notes" && <AdminNotes />}
               {section === "documents" && <AdminDocuments />}
               {section === "reviews" && <AdminReviews />}
               {section === "logs" && <AdminLogs />}

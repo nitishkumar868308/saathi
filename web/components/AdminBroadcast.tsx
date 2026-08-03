@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   BarChart3,
+  Languages,
 } from "lucide-react";
 import Loader from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
@@ -120,6 +121,20 @@ function SendPanel() {
    * hi nahi. Isliye list ke saath hi ye bhi aata hai.
    */
   const [pushReady, setPushReady] = useState<boolean | null>(null);
+  /**
+   * Anuvaad chalu ho sakta hai? (web env me GEMINI_API_KEY hai ya nahi.)
+   *
+   * `pushReady` ki tarah hi `null` = abhi pata nahi. Key na ho to toggle band
+   * rehta hai — use on dikhana jhooth hoga, kyunki message phir bhi ek hi
+   * bhasha me jaata.
+   */
+  const [translateReady, setTranslateReady] = useState<boolean | null>(null);
+  /**
+   * Default ON. Wajah: har user ki bhasha `profiles.language` me pehle se padi
+   * hai aur email ke button tak usi se bante the — sirf asli matn hi ek hi
+   * bhasha me jaata tha. Wo ek galti thi, koi soch-samajh ke liya faisla nahi.
+   */
+  const [translate, setTranslate] = useState(true);
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -145,16 +160,19 @@ function SendPanel() {
         const body = (await res.json()) as {
           users?: Recipient[];
           pushReady?: boolean;
+          translateReady?: boolean;
           error?: string;
         };
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
         if (!alive) return;
         setUsers(body.users ?? []);
         setPushReady(!!body.pushReady);
+        setTranslateReady(!!body.translateReady);
       } catch {
         if (alive) {
           setListError(b.listFailed);
           setPushReady(false);
+          setTranslateReady(false);
         }
       }
     })();
@@ -244,6 +262,9 @@ function SendPanel() {
           // "picked" me audience ka koi matlab nahi — server bhi userIds aate hi
           // usse ignore kar deta hai. Bhejte hain sirf saaf-saaf rehne ke liye.
           audience: needsPick ? "all" : audience,
+          // Key hi na ho to server waise bhi anuvaad nahi karta — par saaf
+          // bhejna behtar hai, warna admin ko lagta hai on tha aur hua nahi.
+          translate: translate && translateReady !== false,
           ...(needsPick ? { userIds: Array.from(picked) } : {}),
         }),
       });
@@ -495,6 +516,34 @@ function SendPanel() {
           className="w-full resize-y rounded-2xl border border-line bg-cream/40 px-4 py-3 text-sm leading-relaxed text-ink outline-none focus:border-terracotta"
         />
         <p className="mt-2 text-xs text-ink-soft">{b.note}</p>
+
+        {/* Anuvaad — message box ke theek neeche, kyunki faisla usi text par hai
+            jo abhi-abhi likha gaya. Upar channel ke saath rakhne par ye ek aur
+            "setting" ban jaata aur kabhi padha hi nahi jaata. */}
+        <label
+          className={`mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition ${
+            translate && translateReady !== false
+              ? "border-terracotta bg-terracotta/[0.06]"
+              : "border-line bg-cream/30"
+          } ${translateReady === false ? "cursor-not-allowed opacity-60" : ""}`}
+        >
+          <input
+            type="checkbox"
+            checked={translate && translateReady !== false}
+            disabled={translateReady === false}
+            onChange={(e) => setTranslate(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[#C25A37]"
+          />
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+              <Languages size={15} className="shrink-0 text-terracotta" />
+              {b.translateTitle}
+            </span>
+            <span className="mt-1 block text-xs leading-relaxed text-ink-soft">
+              {translateReady === false ? b.translateOff : b.translateHint}
+            </span>
+          </span>
+        </label>
 
         {needsPick && picked.size === 0 && (
           <p className="mt-2 text-xs font-semibold text-terracotta-dark">{b.noneSelected}</p>

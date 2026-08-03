@@ -122,6 +122,41 @@ export type DeviceOwner = {
  * Login se PEHLE bhi chalti hai (anon RPC) — login screen par patti dikhane ke
  * liye. Kuch bhi galat ho to `null`: chetavni na dikhna login rokne se behtar hai.
  */
+export type OtherDevice = { platform: string | null; lastSeenAt: string | null };
+
+/**
+ * Mera account aur kitne phones par login hai (abhi wale ko chhod kar).
+ *
+ * ⚠️ `deviceOwner()` ka ulta sawaal. Wo poochta hai "is phone par koi aur tha
+ * kya"; ye poochta hai "main aur kahan-kahan login hoon". Doosre wale ka jawab
+ * kahin tha hi nahi — isliye ek hi ID se paanch phone par login karne par bhi
+ * kabhi kuch nahi dikhta tha, jabki reminder ke alarm har phone me alag lagte
+ * hain aur admin ka message har phone par jaata hai.
+ *
+ * Kuch bhi galat ho to `null` — chetavni na dikhna app rok dene se behtar hai.
+ */
+export async function otherDevices(): Promise<{ count: number; devices: OtherDevice[] } | null> {
+  if (!supabase) return null;
+  try {
+    const id = await getDeviceId();
+    const { data, error } = await supabase.rpc("my_other_devices", { p_id: id });
+    if (error || !data) return null;
+    const d = data as {
+      count?: number;
+      devices?: { platform?: string | null; last_seen_at?: string | null }[];
+    };
+    return {
+      count: d.count ?? 0,
+      devices: (d.devices ?? []).map((x) => ({
+        platform: x.platform ?? null,
+        lastSeenAt: x.last_seen_at ?? null,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function deviceOwner(): Promise<DeviceOwner | null> {
   if (!supabase) return null;
   try {

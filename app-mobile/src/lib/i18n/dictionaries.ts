@@ -304,6 +304,11 @@ export type Dict = {
     repeatOff: string;
     /** "Ho gaya" ke baad ka jawab. */
     doneToday: string;
+    /**
+     * Offline banaya reminder abhi server par jaana baaki hai — tab tak use
+     * on/off ya "ho gaya" nahi kiya ja sakta (uski row hi nahi bani).
+     */
+    pendingBusy: string;
     doneAll: string;
     doneBtn: string;
     doneBtnRepeat: string;
@@ -321,6 +326,12 @@ export type Dict = {
     save: string;
     askTime: string;
     setOk: string;
+    /**
+     * Offline banaya reminder — alarm lag gaya, server par jaana baaki hai.
+     *  se alag isliye hai ki wo "sab ho gaya" kehta hai; yahan ek kaam
+     * abhi baaki hai, aur user ko wo pata hona chahiye.
+     */
+    setOkOffline: string;
     savedNoNotif: string;
     savedNeedPerm: string;
     limitReached: string;
@@ -402,6 +413,11 @@ export type Dict = {
     /** AI tak baat nahi pahunchi, par local samajh se reminder ban gaya. */
     offlineReminderSet: string;
     reminderFailed: string;
+    /**
+     * AI ne baat to samajh li par time galat/beeta hua nikla — Add-reminder
+     * screen khul rahi hai, title pehle se bhara hua.
+     */
+    reminderNeedsTime: string;
   };
   upgrade: {
     title: string;
@@ -508,6 +524,36 @@ export type Dict = {
     phone: string;
     phoneError: string;
     phoneCountryUnknown: string;
+    /**
+     * Phone ka SMS OTP.
+     *
+     * ⚠️ Verified aur non-verified me farak saaf dikhna chahiye. Number sirf
+     * LIKHA hone par reminder ka WhatsApp ek digit ki galti se kisi ajnabi ke
+     * paas chala jaata hai, aur asli user ko kabhi kuch nahi milta — dono me se
+     * kisi ko wajah pata nahi chalti.
+     */
+    verifyCta: string;
+    verified: string;
+    verifyWhy: string;
+    /** {phone} */
+    otpTitle: string;
+    otpSub: string;
+    otpPh: string;
+    otpSubmit: string;
+    otpResend: string;
+    /** {s} — kitne second baad dobara bhej sakte hain. */
+    otpResendIn: string;
+    otpSending: string;
+    otpSent: string;
+    otpOk: string;
+    errBadNumber: string;
+    errRateLimited: string;
+    errTaken: string;
+    errWrongCode: string;
+    errExpired: string;
+    errNotConfigured: string;
+    errFailed: string;
+    errNetwork: string;
     address: string;
     addressPlaceholder: string;
     gender: string;
@@ -659,6 +705,124 @@ export type Dict = {
     bannerTitle: string;
     /** {who} — naam ya mask kiya hua email */
     bannerBody: string;
+  };
+
+  /**
+   * "Aapka account aur bhi phones par login hai" — `deviceOwner` ka ULTA.
+   *
+   * ⚠️ `deviceOwner` ek phone par do log ki baat karta hai. Ye ek account ke
+   * kai phone ki. Do alag sawaal hain, aur doosra kabhi poocha hi nahi jaata
+   * tha — isliye ek hi ID se kitne bhi phone par login karo, kuch dikhta hi
+   * nahi tha, jabki alarm har phone me alag lagte hain.
+   */
+  multiDevice: {
+    title: string;
+    /** {count} */
+    intro: string;
+    /** {count} === 1 wala roop — "ek aur phone" me ginti likhna bura lagta hai. */
+    introOne: string;
+    alarmTitle: string;
+    alarmBody: string;
+    notifTitle: string;
+    notifBody: string;
+    privacyTitle: string;
+    privacyBody: string;
+    advice: string;
+    ok: string;
+    /** Baaki sab phones se logout — sirf yahi phone chalu rahega. */
+    logoutOthers: string;
+    logoutOthersDone: string;
+    logoutOthersFailed: string;
+  };
+
+  /**
+   * Notes — jo baat yaad rakhni hai par jiska koi WAQT nahi.
+   *
+   * Reminder se fark saaf rakhna zaroori hai, warna do cheezein ek jaisi lagne
+   * lagti hain: reminder ka matlab "iska ek waqt hai", note ka matlab "ye baat
+   * bas bachi rehni chahiye". Pehle log bina waqt wali baat bhi ek jhoote
+   * reminder me daal dete the aur wo bina matlab ke bajta rehta tha.
+   */
+  notes: {
+    title: string;
+    /** Khaali list. */
+    empty: string;
+    emptyHint: string;
+    /** Naya note. */
+    add: string;
+    titlePh: string;
+    bodyPh: string;
+    /** Title na diya ho aur body bhi khaali ho — card par yahi dikhta hai. */
+    untitled: string;
+    pin: string;
+    unpin: string;
+    /** Note ko reminder me bhejo — Add-reminder screen khulti hai. */
+    toReminder: string;
+    /** Reminder me bhejne se pehle note me kuch likha hona chahiye. */
+    toReminderEmpty: string;
+    deleteAsk: string;
+    deleted: string;
+    saved: string;
+    saveFailed: string;
+    loadFailed: string;
+    /** {n} — kitne note hain. */
+    count: string;
+    countOne: string;
+    searchPh: string;
+    searchEmpty: string;
+    /**
+     * Is note ka reminder ban chuka hai.
+     *
+     * ⚠️ Bina iske user ko kabhi pata nahi chalta tha ki reminder LAG chuka hai,
+     * isliye wo aksar dobara laga deta tha aur ek hi baat ka alarm do baar
+     * bajta tha.
+     */
+    reminderOn: string;
+    /** Reminder bana to tha, par user ne use band kar diya. */
+    reminderOff: string;
+  };
+
+  /**
+   * App lock — biometric (fingerprint/face) + ek PIN uske peeche.
+   *
+   * ⚠️ PIN hamesha PEHLE set hota hai, biometric uske UPAR ek shortcut hai.
+   * Sirf biometric wala lock us din bekaar ho jaata hai jab ungli na padhe ya
+   * phone khud PIN maang le — aur tab user apne hi documents se bahar khada
+   * reh jaata hai.
+   */
+  lock: {
+    /** Settings me feature ka naam. */
+    title: string;
+    subtitle: string;
+    /** Lock screen par. */
+    unlockTitle: string;
+    unlockSub: string;
+    enterPin: string;
+    wrongPin: string;
+    useBiometric: string;
+    biometricPrompt: string;
+    /** Set/change karte waqt. */
+    setTitle: string;
+    setSub: string;
+    confirmTitle: string;
+    confirmSub: string;
+    mismatch: string;
+    changePin: string;
+    turnOff: string;
+    turnOffAsk: string;
+    turnOffBody: string;
+    /** Toggle rows. */
+    biometricRow: string;
+    biometricHint: string;
+    biometricNone: string;
+    savedOn: string;
+    savedOff: string;
+    saveFailed: string;
+    /** Signup ke turant baad ek baar poochte hain. */
+    offerTitle: string;
+    offerBody: string;
+    offerYes: string;
+    offerNo: string;
   };
 };
 
@@ -908,6 +1072,7 @@ const hinglish: Dict = {
     repeatForever: "Jab tak band na karo",
     repeatOff: "Sirf ek baar",
     doneToday: "Shabaash! Aaj ka ho gaya ✅ Kal phir yaad dila dunga.",
+    pendingBusy: "Ye reminder net aane par save hoga — tab tak badla nahi ja sakta. Alarm lag chuka hai.",
     doneAll: "Ho gaya! Ye reminder ab band kar diya ✅",
     doneBtn: "Ho gaya",
     doneBtnRepeat: "Aaj ka ho gaya",
@@ -925,6 +1090,7 @@ const hinglish: Dict = {
     save: "Reminder set karo",
     askTime: "Kab yaad dilaun? Date & time chuno",
     setOk: "Reminder set ✓ Time pe yaad dila dunga",
+    setOkOffline: "Reminder set ✓ Net aate hi save ho jayega",
     savedNoNotif: "Save ho gaya, par notification set nahi hui",
     savedNeedPerm: "Save ho gaya (notification permission do)",
     limitReached: "Free me 5 active reminders — unlimited ke liye Saathi Plus dekhein",
@@ -1002,6 +1168,7 @@ const hinglish: Dict = {
     retrySend: "Dobara bhejo",
     offlineReminderSet: "Net nahi tha, par maine reminder laga diya",
     reminderFailed: "Reminder ban nahi paaya",
+    reminderNeedsTime: "Time thoda check kar lo — bas ek tap me set ho jayega",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -1104,6 +1271,27 @@ const hinglish: Dict = {
     phone: "Phone number",
     phoneError: "Sahi phone number daalo",
     phoneCountryUnknown: "Is desh ka code nahi mila — code khud chun lo.",
+    verifyCta: "Verify karo",
+    verified: "Verified",
+    verifyWhy:
+      "Number verify karne par hi reminder ka WhatsApp aap tak pahunchega. Ek digit ki galti se wo kisi aur ke paas chala jaata hai.",
+    otpTitle: "{phone} par code bheja hai",
+    otpSub: "SMS me 6 ank ka code aaya hoga. Wahi yahan daal do.",
+    otpPh: "6 ank ka code",
+    otpSubmit: "Confirm karo",
+    otpResend: "Dobara bhejo",
+    otpResendIn: "Dobara bhejo ({s}s)",
+    otpSending: "Bhej rahe hain…",
+    otpSent: "Code bhej diya",
+    otpOk: "Number verify ho gaya ✓",
+    errBadNumber: "Ye number sahi nahi lag raha. Ek baar dekh lo.",
+    errRateLimited: "Bahut baar koshish ho chuki. Thodi der baad dobara.",
+    errTaken: "Ye number pehle se kisi aur account me verified hai.",
+    errWrongCode: "Code galat hai. Dobara dekho.",
+    errExpired: "Code purana ho gaya. Naya bhejo.",
+    errNotConfigured: "SMS abhi chalu nahi hua hai. Thodi der baad koshish karo.",
+    errFailed: "Nahi ho paya. Thodi der baad dobara koshish karo.",
+    errNetwork: "Net nahi mila. Connection check karke dobara koshish karo.",
     address: "Address",
     addressPlaceholder: "Ghar / office ka pata",
     gender: "Gender",
@@ -1230,6 +1418,83 @@ const hinglish: Dict = {
     bannerTitle: "Ye phone pehle se set hai",
     bannerBody:
       "{who} ke liye. Doosri ID se login karoge to notification aur AI unke liye band ho jayenge — tap karke poori baat padho.",
+  },
+  multiDevice: {
+    title: "Aapki ID aur phones par bhi login hai",
+    intro:
+      "Aapka account is phone ke alawa {count} aur phones par login hai. Koi rok nahi hai — par ek baat jaan lena zaroori hai, warna aage chal ke lagega ki app kharab hai.",
+    introOne:
+      "Aapka account is phone ke alawa ek aur phone par bhi login hai. Koi rok nahi hai — par ek baat jaan lena zaroori hai, warna aage chal ke lagega ki app kharab hai.",
+    alarmTitle: "Reminder ka alarm har phone me alag lagta hai",
+    alarmBody:
+      "Alarm phone ke andar set hota hai, server par nahi. Aapne yahan reminder ka time badla, to doosre phone par purana alarm tab tak wahi rahega jab tak wahan app khol nahi lete. Isi wajah se ek hi reminder do alag waqt par baj sakta hai.",
+    notifTitle: "Ek hi message har phone par jaayega",
+    notifBody:
+      "Reminder aur Saathi ke message aapke har logged-in phone par pahunchte hain. Do phone hain to do baar aayega — ye galti nahi hai, bas dono phone aapke naam par darj hain.",
+    privacyTitle: "Aapke documents har us phone par khule hain",
+    privacyBody:
+      "Jo phone login hai, uspar aapke saare documents aur reminders dikhte hain. Koi phone aapke paas nahi hai (ghar ka purana phone, bech diya hua phone) to use abhi hata dena behtar hai.",
+    advice:
+      "Jo phone ab aap use nahi karte, unhe yahin se logout kar do. Yahi phone chalta rahega — aapko dobara login nahi karna padega.",
+    ok: "Theek hai, rehne do",
+    logoutOthers: "Baaki sab phones se logout karo",
+    logoutOthersDone: "Ho gaya — ab sirf yahi phone login hai.",
+    logoutOthersFailed: "Nahi ho paya. Net check karke dobara koshish karo.",
+  },
+  notes: {
+    title: "Notes",
+    empty: "Abhi koi note nahi",
+    emptyHint:
+      "Bazaar ka saamaan, koi idea, gaadi ka number — jo baat yaad rakhni hai par jiska koi time nahi, wo yahan likh lo.",
+    add: "Naya note",
+    titlePh: "Title (chaho to)",
+    bodyPh: "Jo likhna hai likho…",
+    untitled: "Bina naam ka note",
+    pin: "Upar rakho",
+    unpin: "Upar se hatao",
+    toReminder: "Reminder me daalo",
+    toReminderEmpty: "Pehle kuch likho, phir reminder me daal sakte ho.",
+    deleteAsk: "Ye note delete kar dein?",
+    deleted: "Note delete ho gaya",
+    saved: "Note save ho gaya ✓",
+    saveFailed: "Note save nahi ho paaya",
+    loadFailed: "Notes aa nahi paaye",
+    count: "{n} notes",
+    countOne: "1 note",
+    searchPh: "Notes me dhoondho",
+    searchEmpty: "Is naam ka koi note nahi mila",
+    reminderOn: "Reminder laga hai",
+    reminderOff: "Reminder band hai",
+  },
+  lock: {
+    title: "App lock",
+    subtitle: "Fingerprint/face ya PIN ke bina Saathi na khule",
+    unlockTitle: "Saathi lock hai",
+    unlockSub: "Kholne ke liye apna PIN daalo",
+    enterPin: "PIN daalo",
+    wrongPin: "PIN galat hai",
+    useBiometric: "Fingerprint/face se kholo",
+    biometricPrompt: "Saathi kholne ke liye",
+    setTitle: "Naya PIN banao",
+    setSub: "4 ank ka PIN. Yahi Saathi kholne ke kaam aayega.",
+    confirmTitle: "Wahi PIN dobara",
+    confirmSub: "Pakka karne ke liye ek baar aur daal do.",
+    mismatch: "Dono PIN alag hain. Dobara koshish karo.",
+    changePin: "PIN badlo",
+    turnOff: "App lock band karo",
+    turnOffAsk: "App lock band kar dein?",
+    turnOffBody: "Uske baad Saathi bina PIN ke khulega — is phone par jo bhi hai, aapke documents dekh sakta hai.",
+    biometricRow: "Fingerprint / face se kholo",
+    biometricHint: "PIN phir bhi rahega — jab ungli na padhe tab wahi kaam aayega.",
+    biometricNone: "Is phone me fingerprint/face set nahi hai.",
+    savedOn: "App lock chalu ✓",
+    savedOff: "App lock band",
+    saveFailed: "Nahi ho paya. Dobara koshish karo.",
+    offerTitle: "Saathi ko lock kar lo?",
+    offerBody:
+      "Aapke documents is phone me rakhe hain. Ek PIN laga do — phone kisi aur ke haath lage to bhi wo unhe nahi khol payega. Fingerprint/face bhi laga sakte ho.",
+    offerYes: "Haan, lock lagao",
+    offerNo: "Abhi nahi",
   },
 };
 
@@ -1478,6 +1743,7 @@ const hi: Dict = {
     repeatForever: "जब तक बंद न करें",
     repeatOff: "सिर्फ़ एक बार",
     doneToday: "शाबाश! आज का हो गया ✅ कल फिर याद दिला दूँगा।",
+    pendingBusy: "यह रिमाइंडर नेट आने पर सेव होगा — तब तक बदला नहीं जा सकता। अलार्म लग चुका है।",
     doneAll: "हो गया! ये रिमाइंडर अब बंद कर दिया ✅",
     doneBtn: "हो गया",
     doneBtnRepeat: "आज का हो गया",
@@ -1495,6 +1761,7 @@ const hi: Dict = {
     save: "रिमाइंडर सेट करें",
     askTime: "कब याद दिलाऊँ? डेट & टाइम चुनें",
     setOk: "रिमाइंडर सेट ✓ समय पर याद दिला दूँगा",
+    setOkOffline: "रिमाइंडर सेट ✓ नेट आते ही सेव हो जाएगा",
     savedNoNotif: "सेव हो गया, पर notification सेट नहीं हुई",
     savedNeedPerm: "सेव हो गया (notification permission दें)",
     limitReached: "फ्री में 5 active रिमाइंडर — अनलिमिटेड के लिए साथी प्लस देखें",
@@ -1572,6 +1839,7 @@ const hi: Dict = {
     retrySend: "दोबारा भेजें",
     offlineReminderSet: "नेट नहीं था, फिर भी मैंने रिमाइंडर लगा दिया",
     reminderFailed: "रिमाइंडर बन नहीं पाया",
+    reminderNeedsTime: "समय एक बार देख लीजिए — बस एक टैप में सेट हो जाएगा",
   },
   upgrade: {
     title: "साथी प्लस",
@@ -1674,6 +1942,27 @@ const hi: Dict = {
     phone: "फ़ोन नंबर",
     phoneError: "सही फ़ोन नंबर डालें",
     phoneCountryUnknown: "इस देश का कोड नहीं मिला — कोड खुद चुन लें।",
+    verifyCta: "वेरिफ़ाई करें",
+    verified: "वेरिफ़ाइड",
+    verifyWhy:
+      "नंबर वेरिफ़ाई होने पर ही रिमाइंडर का WhatsApp आप तक पहुँचेगा। एक अंक की ग़लती से वह किसी और के पास चला जाता है।",
+    otpTitle: "{phone} पर कोड भेजा है",
+    otpSub: "SMS में 6 अंक का कोड आया होगा। वही यहाँ डाल दीजिए।",
+    otpPh: "6 अंक का कोड",
+    otpSubmit: "कन्फ़र्म करें",
+    otpResend: "दोबारा भेजें",
+    otpResendIn: "दोबारा भेजें ({s}s)",
+    otpSending: "भेज रहे हैं…",
+    otpSent: "कोड भेज दिया",
+    otpOk: "नंबर वेरिफ़ाई हो गया ✓",
+    errBadNumber: "यह नंबर सही नहीं लग रहा। एक बार देख लीजिए।",
+    errRateLimited: "बहुत बार कोशिश हो चुकी है। थोड़ी देर बाद दोबारा।",
+    errTaken: "यह नंबर पहले से किसी और अकाउंट में वेरिफ़ाइड है।",
+    errWrongCode: "कोड ग़लत है। दोबारा देखिए।",
+    errExpired: "कोड पुराना हो गया। नया भेजिए।",
+    errNotConfigured: "SMS अभी चालू नहीं हुआ है। थोड़ी देर बाद कोशिश कीजिए।",
+    errFailed: "नहीं हो पाया। थोड़ी देर बाद दोबारा कोशिश कीजिए।",
+    errNetwork: "नेट नहीं मिला। कनेक्शन देखकर दोबारा कोशिश कीजिए।",
     address: "पता",
     addressPlaceholder: "घर / ऑफ़िस का पता",
     gender: "लिंग",
@@ -1800,6 +2089,83 @@ const hi: Dict = {
     bannerTitle: "यह फ़ोन पहले से सेट है",
     bannerBody:
       "{who} के लिए। दूसरी ID से लॉगिन करेंगे तो नोटिफ़िकेशन और AI उनके लिए बंद हो जाएँगे — टैप करके पूरी बात पढ़िए।",
+  },
+  multiDevice: {
+    title: "आपकी ID और फ़ोनों पर भी लॉगिन है",
+    intro:
+      "आपका अकाउंट इस फ़ोन के अलावा {count} और फ़ोनों पर लॉगिन है। कोई रोक नहीं है — पर एक बात जान लेना ज़रूरी है, वरना आगे चलकर लगेगा कि ऐप ख़राब है।",
+    introOne:
+      "आपका अकाउंट इस फ़ोन के अलावा एक और फ़ोन पर भी लॉगिन है। कोई रोक नहीं है — पर एक बात जान लेना ज़रूरी है, वरना आगे चलकर लगेगा कि ऐप ख़राब है।",
+    alarmTitle: "रिमाइंडर का अलार्म हर फ़ोन में अलग लगता है",
+    alarmBody:
+      "अलार्म फ़ोन के अंदर सेट होता है, सर्वर पर नहीं। आपने यहाँ रिमाइंडर का समय बदला, तो दूसरे फ़ोन पर पुराना अलार्म तब तक वैसा ही रहेगा जब तक वहाँ ऐप खोल न लें। इसी वजह से एक ही रिमाइंडर दो अलग समय पर बज सकता है।",
+    notifTitle: "एक ही मैसेज हर फ़ोन पर जाएगा",
+    notifBody:
+      "रिमाइंडर और साथी के मैसेज आपके हर लॉगिन फ़ोन पर पहुँचते हैं। दो फ़ोन हैं तो दो बार आएगा — यह ग़लती नहीं है, बस दोनों फ़ोन आपके नाम पर दर्ज हैं।",
+    privacyTitle: "आपके डॉक्यूमेंट हर उस फ़ोन पर खुले हैं",
+    privacyBody:
+      "जो फ़ोन लॉगिन है, उस पर आपके सारे डॉक्यूमेंट और रिमाइंडर दिखते हैं। कोई फ़ोन आपके पास नहीं है (घर का पुराना फ़ोन, बेचा हुआ फ़ोन) तो उसे अभी हटा देना बेहतर है।",
+    advice:
+      "जो फ़ोन अब आप इस्तेमाल नहीं करते, उन्हें यहीं से लॉगआउट कर दीजिए। यही फ़ोन चलता रहेगा — आपको दोबारा लॉगिन नहीं करना पड़ेगा।",
+    ok: "ठीक है, रहने दीजिए",
+    logoutOthers: "बाक़ी सब फ़ोनों से लॉगआउट करें",
+    logoutOthersDone: "हो गया — अब सिर्फ़ यही फ़ोन लॉगिन है।",
+    logoutOthersFailed: "नहीं हो पाया। नेट देखकर दोबारा कोशिश कीजिए।",
+  },
+  notes: {
+    title: "नोट्स",
+    empty: "अभी कोई नोट नहीं",
+    emptyHint:
+      "बाज़ार का सामान, कोई आइडिया, गाड़ी का नंबर — जो बात याद रखनी है पर जिसका कोई समय नहीं, वह यहाँ लिख लीजिए।",
+    add: "नया नोट",
+    titlePh: "टाइटल (चाहें तो)",
+    bodyPh: "जो लिखना है लिखिए…",
+    untitled: "बिना नाम का नोट",
+    pin: "ऊपर रखें",
+    unpin: "ऊपर से हटाएँ",
+    toReminder: "रिमाइंडर में डालें",
+    toReminderEmpty: "पहले कुछ लिखिए, फिर रिमाइंडर में डाल सकते हैं।",
+    deleteAsk: "यह नोट डिलीट कर दें?",
+    deleted: "नोट डिलीट हो गया",
+    saved: "नोट सेव हो गया ✓",
+    saveFailed: "नोट सेव नहीं हो पाया",
+    loadFailed: "नोट्स आ नहीं पाए",
+    count: "{n} नोट्स",
+    countOne: "1 नोट",
+    searchPh: "नोट्स में ढूँढिए",
+    searchEmpty: "इस नाम का कोई नोट नहीं मिला",
+    reminderOn: "रिमाइंडर लगा है",
+    reminderOff: "रिमाइंडर बंद है",
+  },
+  lock: {
+    title: "ऐप लॉक",
+    subtitle: "फ़िंगरप्रिंट/फ़ेस या PIN के बिना साथी न खुले",
+    unlockTitle: "साथी लॉक है",
+    unlockSub: "खोलने के लिए अपना PIN डालिए",
+    enterPin: "PIN डालिए",
+    wrongPin: "PIN ग़लत है",
+    useBiometric: "फ़िंगरप्रिंट/फ़ेस से खोलें",
+    biometricPrompt: "साथी खोलने के लिए",
+    setTitle: "नया PIN बनाइए",
+    setSub: "4 अंक का PIN. यही साथी खोलने के काम आएगा।",
+    confirmTitle: "वही PIN दोबारा",
+    confirmSub: "पक्का करने के लिए एक बार और डाल दीजिए।",
+    mismatch: "दोनों PIN अलग हैं। दोबारा कोशिश कीजिए।",
+    changePin: "PIN बदलें",
+    turnOff: "ऐप लॉक बंद करें",
+    turnOffAsk: "ऐप लॉक बंद कर दें?",
+    turnOffBody: "उसके बाद साथी बिना PIN के खुलेगा — इस फ़ोन पर जो भी है, आपके डॉक्यूमेंट देख सकता है।",
+    biometricRow: "फ़िंगरप्रिंट / फ़ेस से खोलें",
+    biometricHint: "PIN फिर भी रहेगा — जब उँगली न पढ़े तब वही काम आएगा।",
+    biometricNone: "इस फ़ोन में फ़िंगरप्रिंट/फ़ेस सेट नहीं है।",
+    savedOn: "ऐप लॉक चालू ✓",
+    savedOff: "ऐप लॉक बंद",
+    saveFailed: "नहीं हो पाया। दोबारा कोशिश कीजिए।",
+    offerTitle: "साथी को लॉक कर लें?",
+    offerBody:
+      "आपके डॉक्यूमेंट इसी फ़ोन में रखे हैं। एक PIN लगा दीजिए — फ़ोन किसी और के हाथ लगे तो भी वह उन्हें नहीं खोल पाएगा। फ़िंगरप्रिंट/फ़ेस भी लगा सकते हैं।",
+    offerYes: "हाँ, लॉक लगाइए",
+    offerNo: "अभी नहीं",
   },
 };
 
@@ -2047,6 +2413,7 @@ const en: Dict = {
     repeatForever: "until you turn it off",
     repeatOff: "Just once",
     doneToday: "Nice one! Today's done ✅ I'll remind you again tomorrow.",
+    pendingBusy: "This reminder saves once you're back online — it can't be changed until then. The alarm is already set.",
     doneAll: "Done! I've switched this reminder off ✅",
     doneBtn: "Mark done",
     doneBtnRepeat: "Done for today",
@@ -2064,6 +2431,7 @@ const en: Dict = {
     save: "Set reminder",
     askTime: "When should I remind you? Pick date & time",
     setOk: "Reminder set ✓ I'll remind you on time",
+    setOkOffline: "Reminder set ✓ It will save once you're back online",
     savedNoNotif: "Saved, but the notification wasn't set",
     savedNeedPerm: "Saved (please allow notifications)",
     limitReached: "5 active reminders on Free — Saathi Plus for unlimited",
@@ -2141,6 +2509,7 @@ const en: Dict = {
     retrySend: "Send again",
     offlineReminderSet: "No internet, but I've set the reminder",
     reminderFailed: "Couldn't create the reminder",
+    reminderNeedsTime: "Just check the time — one tap and it's set",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -2243,6 +2612,27 @@ const en: Dict = {
     phone: "Phone number",
     phoneError: "Enter a valid phone number",
     phoneCountryUnknown: "No dial code found for this country — pick one yourself.",
+    verifyCta: "Verify",
+    verified: "Verified",
+    verifyWhy:
+      "WhatsApp reminders only reach you once the number is verified. One wrong digit and they go to a stranger instead.",
+    otpTitle: "Code sent to {phone}",
+    otpSub: "A 6-digit code should arrive by SMS. Type it here.",
+    otpPh: "6-digit code",
+    otpSubmit: "Confirm",
+    otpResend: "Send again",
+    otpResendIn: "Send again ({s}s)",
+    otpSending: "Sending…",
+    otpSent: "Code sent",
+    otpOk: "Number verified ✓",
+    errBadNumber: "That number doesn't look right. Please check it.",
+    errRateLimited: "Too many attempts. Please try again in a while.",
+    errTaken: "This number is already verified on another account.",
+    errWrongCode: "That code isn't right. Please check.",
+    errExpired: "That code has expired. Send a new one.",
+    errNotConfigured: "SMS isn't switched on yet. Please try again later.",
+    errFailed: "Couldn't do it. Please try again in a moment.",
+    errNetwork: "No connection. Check your network and try again.",
     address: "Address",
     addressPlaceholder: "Home / office address",
     gender: "Gender",
@@ -2369,6 +2759,83 @@ const en: Dict = {
     bannerTitle: "This phone is already set up",
     bannerBody:
       "For {who}. Signing in with a different ID turns off their notifications and AI — tap to read why.",
+  },
+  multiDevice: {
+    title: "Your ID is signed in on other phones too",
+    intro:
+      "Besides this phone, your account is signed in on {count} others. Nothing is blocked — but it's worth knowing this, otherwise the app will start looking broken.",
+    introOne:
+      "Besides this phone, your account is signed in on one other phone. Nothing is blocked — but it's worth knowing this, otherwise the app will start looking broken.",
+    alarmTitle: "Reminder alarms are set on each phone separately",
+    alarmBody:
+      "Alarms live inside the phone, not on the server. Change a reminder's time here and the other phone keeps the old alarm until you open the app there. That's why one reminder can ring at two different times.",
+    notifTitle: "The same message goes to every phone",
+    notifBody:
+      "Reminders and messages from Saathi reach every phone you're signed in on. Two phones means it arrives twice — that isn't a fault, both phones are registered to you.",
+    privacyTitle: "Your documents are open on every one of those phones",
+    privacyBody:
+      "Any signed-in phone shows all your documents and reminders. If a phone isn't with you any more — an old family handset, one you sold — it's better to remove it now.",
+    advice:
+      "Sign out the phones you no longer use, right here. This phone stays signed in — you won't have to log in again.",
+    ok: "That's fine, leave it",
+    logoutOthers: "Sign out all other phones",
+    logoutOthersDone: "Done — only this phone is signed in now.",
+    logoutOthersFailed: "Couldn't do it. Check your connection and try again.",
+  },
+  notes: {
+    title: "Notes",
+    empty: "No notes yet",
+    emptyHint:
+      "A shopping list, an idea, a car number — anything worth keeping that doesn't need a time. Write it here.",
+    add: "New note",
+    titlePh: "Title (optional)",
+    bodyPh: "Write whatever you need…",
+    untitled: "Untitled note",
+    pin: "Pin to top",
+    unpin: "Unpin",
+    toReminder: "Turn into a reminder",
+    toReminderEmpty: "Write something first, then you can turn it into a reminder.",
+    deleteAsk: "Delete this note?",
+    deleted: "Note deleted",
+    saved: "Note saved ✓",
+    saveFailed: "Couldn't save the note",
+    loadFailed: "Couldn't load your notes",
+    count: "{n} notes",
+    countOne: "1 note",
+    searchPh: "Search notes",
+    searchEmpty: "No note matches that",
+    reminderOn: "Reminder is set",
+    reminderOff: "Reminder is off",
+  },
+  lock: {
+    title: "App lock",
+    subtitle: "Saathi won't open without your fingerprint, face or PIN",
+    unlockTitle: "Saathi is locked",
+    unlockSub: "Enter your PIN to open it",
+    enterPin: "Enter PIN",
+    wrongPin: "That PIN isn't right",
+    useBiometric: "Use fingerprint / face",
+    biometricPrompt: "Unlock Saathi",
+    setTitle: "Create a PIN",
+    setSub: "A 4-digit PIN. This is what opens Saathi.",
+    confirmTitle: "Type it again",
+    confirmSub: "Once more, to be sure.",
+    mismatch: "Those two PINs don't match. Try again.",
+    changePin: "Change PIN",
+    turnOff: "Turn off app lock",
+    turnOffAsk: "Turn off app lock?",
+    turnOffBody: "After this Saathi opens without a PIN — anyone holding this phone can read your documents.",
+    biometricRow: "Unlock with fingerprint / face",
+    biometricHint: "Your PIN stays too — it's what you'll use when the sensor won't read.",
+    biometricNone: "No fingerprint or face is set up on this phone.",
+    savedOn: "App lock is on ✓",
+    savedOff: "App lock is off",
+    saveFailed: "Couldn't do it. Please try again.",
+    offerTitle: "Lock Saathi?",
+    offerBody:
+      "Your documents live on this phone. Set a PIN and nobody else can open them, even holding your phone. You can add fingerprint or face too.",
+    offerYes: "Yes, lock it",
+    offerNo: "Not now",
   },
 };
 

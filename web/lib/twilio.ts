@@ -15,9 +15,45 @@ const SID = process.env.TWILIO_ACCOUNT_SID;
 const TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const FROM = process.env.TWILIO_WHATSAPP_FROM;
 
-/** Meta se approved template SIDs (production ke liye). Sandbox me khaali. */
-const TEMPLATE_REMINDER = process.env.TWILIO_TEMPLATE_REMINDER_SID;
-const TEMPLATE_DOCUMENT = process.env.TWILIO_TEMPLATE_DOCUMENT_SID;
+/**
+ * Meta se approved template SIDs — HAR BHASHA KA APNA.
+ *
+ * ⚠️ Ye pehle ek-ek hi tha (`TWILIO_TEMPLATE_REMINDER_SID`), aur wahi ek sabko
+ * jaata tha. Natija ye tha ki ek hi reminder do alag bhashaon me pahunchta tha:
+ * email user ki chuni hui bhasha me nikalta tha aur WhatsApp hamesha Hinglish
+ * me. Code se text badla bhi nahi ja sakta — Meta-approved template ka poora
+ * text Twilio ke console me pada hota hai, sirf `{{1}}`/`{{2}}` bharte hain.
+ *
+ * Isliye Twilio par har kind ka har bhasha me alag template banta hai, aur uski
+ * SID yahan aati hai. Bina suffix wala (Hinglish) hi default hai — app ka
+ * default locale bhi wahi hai. Kisi bhasha ka SID na ho to wo Hinglish par gir
+ * jaata hai: galat bhasha me pahunchna bilkul na pahunchne se behtar hai.
+ *
+ * .env.local:
+ *   TWILIO_TEMPLATE_REMINDER_SID=HX...      # hinglish (default)
+ *   TWILIO_TEMPLATE_REMINDER_SID_HI=HX...
+ *   TWILIO_TEMPLATE_REMINDER_SID_EN=HX...
+ *   TWILIO_TEMPLATE_DOCUMENT_SID=HX...      # hinglish (default)
+ *   TWILIO_TEMPLATE_DOCUMENT_SID_HI=HX...
+ *   TWILIO_TEMPLATE_DOCUMENT_SID_EN=HX...
+ */
+const TEMPLATES = {
+  reminder: {
+    hinglish: process.env.TWILIO_TEMPLATE_REMINDER_SID,
+    hi: process.env.TWILIO_TEMPLATE_REMINDER_SID_HI,
+    en: process.env.TWILIO_TEMPLATE_REMINDER_SID_EN,
+  },
+  document: {
+    hinglish: process.env.TWILIO_TEMPLATE_DOCUMENT_SID,
+    hi: process.env.TWILIO_TEMPLATE_DOCUMENT_SID_HI,
+    en: process.env.TWILIO_TEMPLATE_DOCUMENT_SID_EN,
+  },
+} as const;
+
+function templateSid(kind: "reminder" | "document", locale: WaLocale): string | undefined {
+  const row = TEMPLATES[kind];
+  return row[locale] || row.hinglish;
+}
 
 export function twilioConfigured(): boolean {
   return Boolean(SID && TOKEN && FROM);
@@ -104,10 +140,13 @@ export function sendReminderWhatsApp(
   note?: string | null,
   userId?: string | null,
   locale: WaLocale = "hinglish",
+  /** User ka pehla naam — greeting me. Na ho to bhasha ka aam shabd lagta hai. */
+  userName?: string | null,
 ) {
-  return sendWhatsApp(to, reminderWhatsAppText(title, whenLabel, note, locale), {
-    templateSid: TEMPLATE_REMINDER,
-    variables: { "1": title, "2": whenLabel },
+  const who = greetingName(userName, locale);
+  return sendWhatsApp(to, reminderWhatsAppText(title, whenLabel, note, locale, who), {
+    templateSid: templateSid("reminder", locale),
+    variables: { "1": who, "2": title, "3": whenLabel },
     kind: "reminder",
     userId,
   });
@@ -120,13 +159,35 @@ export function sendDocumentWhatsApp(
   whenLabel: string,
   userId?: string | null,
   locale: WaLocale = "hinglish",
+  userName?: string | null,
 ) {
-  return sendWhatsApp(to, documentWhatsAppText(name, whenLabel, locale), {
-    templateSid: TEMPLATE_DOCUMENT,
-    variables: { "1": name, "2": whenLabel },
+  const who = greetingName(userName, locale);
+  return sendWhatsApp(to, documentWhatsAppText(name, whenLabel, locale, who), {
+    templateSid: templateSid("document", locale),
+    variables: { "1": who, "2": name, "3": whenLabel },
     kind: "document",
     userId,
   });
+}
+
+/**
+ * Greeting me kaunsa naam jaayega.
+ *
+ * ⚠️ Yahan kabhi khaali string nahi lautti, aur ye baat zaroori hai. Meta ka
+ * niyam saaf hai: template ka koi bhi variable khaali nahi ja sakta — khaali
+ * bhejte hi poori request reject ho jaati hai. Yaani jis user ne apna naam nahi
+ * bhara, uska reminder BILKUL hi nahi jaata (aur error kahin dikhta bhi nahi,
+ * kyunki Twilio use ek aam 400 me lauta deta hai).
+ *
+ * Isliye naam na hone par bhasha ka apna aam sambodhan lagta hai —
+ * "Namaste ji", "नमस्ते जी", "Hello there". Teeno bilkul swabhavik lagte hain.
+ */
+function greetingName(name: string | null | undefined, locale: WaLocale): string {
+  const clean = name?.trim();
+  // Pehla shabd hi kaafi — "Nitish Kumar" greeting me bhadda lagta hai. Cron
+  // pehle hi kaat ke bhejta hai; ye doosri jagah se aane wale callers ke liye.
+  if (clean) return clean.split(/\s+/)[0];
+  return (WA[locale] ?? WA.hinglish).fallbackName;
 }
 
 /**
@@ -136,15 +197,19 @@ export function sendDocumentWhatsApp(
  * user ki bhasha me nikalta tha. Ek hi reminder do alag bhashaon me pahunchta
  * tha — email Hindi me, WhatsApp Hinglish me.
  *
- * ⚠️ Ye sirf PLAIN-TEXT raaste par lagta hai (sandbox / jab tak template set
- * na ho). Production me Meta-approved template jaata hai, aur uska text Twilio
- * console me pada hota hai — code se badla hi nahi ja sakta. Har bhasha ka
- * apna template Twilio par approve karana padega, phir `TEMPLATE_REMINDER` /
- * `TEMPLATE_DOCUMENT` ko locale ke hisaab se chunna hoga.
+ * ⚠️ Ye sirf PLAIN-TEXT raaste par lagta hai (sandbox / jab tak us bhasha ka
+ * template set na ho). Production me Meta-approved template jaata hai, aur uska
+ * text Twilio console me pada hota hai — code se badla hi nahi ja sakta. Har
+ * bhasha ka apna template Twilio par approve hota hai; `templateSid()` upar
+ * locale ke hisaab se sahi SID chunta hai.
  */
 type WaLocale = "hinglish" | "hi" | "en";
 
 const WA: Record<WaLocale, {
+  /** "Namaste" / "नमस्ते" / "Hello" — naam se pehle. */
+  greeting: string;
+  /** Naam pata na ho to yahi lagta hai (khaali kabhi nahi ja sakta). */
+  fallbackName: string;
   reminderKicker: string;
   docKicker: string;
   /** {name} {when} */
@@ -153,6 +218,8 @@ const WA: Record<WaLocale, {
   footer: string;
 }> = {
   hinglish: {
+    greeting: "Namaste",
+    fallbackName: "ji",
     reminderKicker: "reminder",
     docKicker: "document reminder",
     docLine: (n, w) => `*${n}* ${w} expire ho raha hai.`,
@@ -160,6 +227,8 @@ const WA: Record<WaLocale, {
     footer: "Apka Saathi · jo kuch nahi bhoolta",
   },
   hi: {
+    greeting: "नमस्ते",
+    fallbackName: "जी",
     reminderKicker: "रिमाइंडर",
     docKicker: "डॉक्युमेंट रिमाइंडर",
     docLine: (n, w) => `*${n}* ${w} एक्सपायर हो रहा है।`,
@@ -167,6 +236,8 @@ const WA: Record<WaLocale, {
     footer: "Apka Saathi · जो कुछ नहीं भूलता",
   },
   en: {
+    greeting: "Hello",
+    fallbackName: "there",
     reminderKicker: "reminder",
     docKicker: "document reminder",
     docLine: (n, w) => `Your *${n}* expires ${w}.`,
@@ -181,6 +252,8 @@ export function reminderWhatsAppText(
   whenLabel: string,
   note?: string | null,
   locale: WaLocale = "hinglish",
+  /** Greeting me lagne wala naam — `greetingName()` se aata hai. */
+  who?: string,
 ): string {
   const c = WA[locale] ?? WA.hinglish;
   // Note tabhi jodo jab wo title se alag ho — warna ek hi baat do baar dikhti hai.
@@ -190,6 +263,7 @@ export function reminderWhatsAppText(
       : "";
   return (
     `🔔 *Apka Saathi* — ${c.reminderKicker}\n\n` +
+    `${c.greeting} ${who || c.fallbackName},\n\n` +
     `${title}\n\n` +
     extra +
     `🕐 ${whenLabel}\n\n` +
@@ -202,10 +276,12 @@ export function documentWhatsAppText(
   name: string,
   whenLabel: string,
   locale: WaLocale = "hinglish",
+  who?: string,
 ): string {
   const c = WA[locale] ?? WA.hinglish;
   return (
     `📄 *Apka Saathi* — ${c.docKicker}\n\n` +
+    `${c.greeting} ${who || c.fallbackName},\n\n` +
     `${c.docLine(name, whenLabel)}\n` +
     `${c.docNudge}\n\n` +
     `_${c.footer}_`

@@ -25,15 +25,28 @@ export type Loc = "hinglish" | "hi" | "en";
 export type ReminderProfile = {
   email: string | null;
   language: Loc;
+  /**
+   * Sirf PEHLA naam — WhatsApp ke "Namaste {{1}}" me yahi jaata hai.
+   *
+   * Poora naam ("Nitish Kumar") greeting me bhadda lagta hai; message dost ka
+   * nahi, daftar ka lagne lagta hai.
+   *
+   * Naam na ho to `null` — us soorat me `greetingName()` bhasha ke hisaab se
+   * ek aam shabd de deta hai. Khaali chhodna wahan chalta hi nahi: Meta khaali
+   * variable wala template REJECT kar deta hai, yaani us user ka poora reminder
+   * hi nahi jaata.
+   */
+  name: string | null;
   /** Plus chalu hai (aur expire nahi hua)? */
   isPlus: boolean;
 };
 
 /** `profiles` se ye columns maango — dono cron ke liye ek hi list. */
-export const PROFILE_SELECT = "email,language,plan,plan_expires_at";
+export const PROFILE_SELECT = "email,full_name,language,plan,plan_expires_at";
 
 export type ProfileRow = {
   email: string | null;
+  full_name: string | null;
   language: string | null;
   plan: string | null;
   plan_expires_at: string | null;
@@ -53,6 +66,8 @@ export function toReminderProfile(row: ProfileRow | undefined): ReminderProfile 
 
   return {
     email: row?.email ?? null,
+    // Pehla shabd hi naam maante hain — "Nitish Kumar" se "Nitish".
+    name: row?.full_name?.trim().split(/\s+/)[0] || null,
     language: (lang === "hi" || lang === "en" || lang === "hinglish" ? lang : "hinglish") as Loc,
     isPlus: row?.plan === "plus" && notExpired,
   };

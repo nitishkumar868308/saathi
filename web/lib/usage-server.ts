@@ -15,7 +15,12 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export type UsageService = "twilio" | "email";
+/**
+ * `gemini` yahan tab aaya jab admin ka message user ki bhasha me badalne laga
+ * (`lib/translate.ts`). Baaki Gemini ka hisaab edge function apne aap rakhta
+ * hai — ye wala web se nikalta hai, isliye yahin se ginna padta hai.
+ */
+export type UsageService = "twilio" | "email" | "gemini";
 
 export function logServiceUsage(
   service: UsageService,

@@ -11,13 +11,17 @@ import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
 import { reportIfNetwork } from "@/lib/net-alert";
 import {
-  listReminders,
   setReminderOn,
   deleteReminder,
   completeReminder,
   isRepeating,
   type Reminder,
 } from "@/lib/reminders";
+import {
+  isPendingId,
+  listRemindersWithPending,
+  removeFromOutbox,
+} from "@/lib/reminder-outbox";
 import { scheduleReminderSeries, cancelReminder } from "@/lib/notifications";
 import { repeatLine } from "@/lib/repeat-label";
 import { formatWhen } from "@/utils/parse-time";
@@ -62,7 +66,10 @@ export default function Reminders() {
     async (silent = false) => {
       try {
         if (!silent) setLoading(true);
-        setItems(await timed(listReminders()));
+        // Offline banaya reminder bhi yahan dikhna chahiye — alarm lag chuka
+        // hai, bas server par jaana baaki hai. Bina iske wo screen par gayab
+        // rehta tha aur user usi ko dobara bana deta tha.
+        setItems(await timed(listRemindersWithPending()));
       } catch (e) {
         // Net ki dikkat ho to poore app wala popup + retry; warna hi toast.
         if (!reportIfNetwork(e, "load", load)) {
@@ -90,6 +97,10 @@ export default function Reminders() {
   });
 
   async function toggle(r: Reminder) {
+    // Kataar me pada reminder — uski server wali row abhi bani hi nahi hai, to
+    // on/off kis par lagayein? Local nakal rakhna do alag sach bana deta hai.
+    // Alarm pehle se lag chuka hai, isliye rukna sirf kuch der ka hai.
+    if (isPendingId(r.id)) return toast.show(r0.pendingBusy, "info");
     const next = !r.is_on;
     setItems((prev) => prev.map((x) => (x.id === r.id ? { ...x, is_on: next } : x)));
     try {
@@ -123,6 +134,9 @@ export default function Reminders() {
    * reminder tha — dono soorat me reminder chup ho jaata hai.
    */
   async function markDone(r: Reminder) {
+    // "Ho gaya" ka hisaab server (`complete_reminder`) karta hai — aur uske liye
+    // row ka hona zaroori hai. Sync hone tak ruk jao.
+    if (isPendingId(r.id)) return toast.show(r0.pendingBusy, "info");
     try {
       const next = await completeReminder(r.id);
       if (next) {
@@ -153,6 +167,15 @@ export default function Reminders() {
     const r = toDelete;
     setToDelete(null);
     if (!r) return;
+    // Kataar wala reminder abhi sirf isi phone par hai — usse hatana poori tarah
+    // yahin ho sakta hai (server par jaane ki koi row hai hi nahi).
+    if (isPendingId(r.id)) {
+      await removeFromOutbox(r.id);
+      setItems((prev) => prev.filter((x) => x.id !== r.id));
+      toast.show(r0.deleted, "success");
+      emitDataChanged();
+      return;
+    }
     try {
       await deleteReminder(r.id);
       await cancelReminder(r.id);

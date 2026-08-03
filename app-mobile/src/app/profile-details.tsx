@@ -21,6 +21,7 @@ import {
 
 import { colors } from "@/theme/colors";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
+import { OtpModal } from "@/components/otp-modal";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -69,6 +70,18 @@ export default function ProfileDetails() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  /**
+   * Kaunsa number verify ho chuka hai — E.164 me, ya null.
+   *
+   * ⚠️ Yahan boolean rakhna galat hota. User verify karne ke baad number badal
+   * sakta hai, aur tab purana "Verified" ka tick naye (bilkul anjaane) number
+   * par chipak jaata. Isliye NUMBER yaad rakhte hain aur neeche usse abhi wale
+   * se milate hain. Server par bhi yahi baat trigger se pakki hoti hai — phone
+   * badalte hi `phone_verified_at` null ho jaata hai.
+   */
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  const [otpOpen, setOtpOpen] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
@@ -85,6 +98,9 @@ export default function ProfileDetails() {
             setPhoneCountry(existing.phone_country as CountryCode);
           if (existing.phone && existing.phone_dial_code) {
             setPhoneNational(existing.phone.replace(existing.phone_dial_code, ""));
+          }
+          if (existing.phone_verified_at && existing.phone) {
+            setVerifiedPhone(existing.phone);
           }
           if (existing.country_id) {
             setCountryId(existing.country_id);
@@ -194,6 +210,15 @@ export default function ProfileDetails() {
   // India wala check nahi.
   const phoneOk =
     phoneNational.length > 0 && isValidPhoneNumber(fullPhone, activeCountry);
+  /**
+   * Abhi screen par jo number hai, ye WAHI hai jo verify hua tha?
+   *
+   * E.164 me mila kar dekhte hain — user "9876543210" likhe ya "98765 43210",
+   * dono ek hi number hain. Bina normalize kiye ek space daal dene se "Verified"
+   * ka tick gayab ho jaata, jo user ko bilkul bekaar lagta.
+   */
+  const normalized = parsePhoneNumberFromString(fullPhone, activeCountry)?.number ?? fullPhone;
+  const verified = phoneOk && !!verifiedPhone && verifiedPhone === normalized;
   const valid =
     fullName.trim().length > 1 &&
     phoneOk &&
@@ -334,6 +359,30 @@ export default function ProfileDetails() {
               <Text style={styles.err}>{t.phoneError}</Text>
             )}
 
+            {/* Verify ka status + button.
+                Ye ek badi baat hai, isliye chhoti si nahi dikhti: number sirf
+                LIKHA hone par reminder ka WhatsApp ek digit ki galti se kisi
+                ajnabi ke paas chala jaata hai, aur asli user ko kabhi kuch nahi
+                milta — dono me se kisi ko wajah pata nahi chalti. */}
+            {phoneOk &&
+              (verified ? (
+                <View style={styles.verifiedRow}>
+                  <Ionicons name="checkmark-circle" size={17} color={colors.sage} />
+                  <Text style={styles.verifiedText}>{t.verified}</Text>
+                </View>
+              ) : (
+                <View style={styles.verifyBox}>
+                  <Text style={styles.verifyWhy}>{t.verifyWhy}</Text>
+                  <Pressable
+                    onPress={() => setOtpOpen(true)}
+                    style={({ pressed }) => [styles.verifyBtn, pressed && { opacity: 0.85 }]}
+                  >
+                    <Ionicons name="shield-checkmark" size={15} color={colors.white} />
+                    <Text style={styles.verifyBtnText}>{t.verifyCta}</Text>
+                  </Pressable>
+                </View>
+              ))}
+
             <Text style={styles.label}>{t.address}</Text>
             <TextInput
               style={[styles.input, { height: 72 }]}
@@ -381,6 +430,23 @@ export default function ProfileDetails() {
       )}
 
       {/* Save/photo-upload — beech me overlay loader, peeche form blocked. */}
+      {/* SMS ka 6-ank wala code. OTP app tak kabhi nahi aata — wo Twilio Verify
+          ke paas rehta hai; ye screen sirf user ka daala hua code server ko
+          deti hai. */}
+      <OtpModal
+        visible={otpOpen}
+        phone={normalized}
+        onClose={() => setOtpOpen(false)}
+        onVerified={() => {
+          setOtpOpen(false);
+          // Server ne is number ko is user ke naam par likh diya hai — screen
+          // ka status usi wakt sudhar jaana chahiye, save dabane ka intezaar
+          // kiye bina.
+          setVerifiedPhone(normalized);
+          toast.show(t.otpOk, "success");
+        }}
+      />
+
       <LoaderOverlay visible={saving || uploadingAvatar} />
     </SafeAreaView>
   );
@@ -450,6 +516,32 @@ const styles = StyleSheet.create({
   },
   lockedText: { flex: 1, fontSize: 15, color: colors.inkSoft },
   hint: { marginTop: 6, fontSize: 12.5, lineHeight: 17, color: colors.inkSoft },
+  // Verify ho chuka — chhota, shaant nishaan. Yahan kuch karna baaki nahi hai.
+  verifiedRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
+  verifiedText: { fontSize: 13.5, fontWeight: "700", color: colors.sage },
+  // Verify baaki hai — isse dikhna chahiye, kyunki bina iske WhatsApp reminder
+  // galat number par ja sakta hai aur kisi ko pata bhi nahi chalta.
+  verifyBox: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    padding: 13,
+  },
+  verifyWhy: { fontSize: 12.5, lineHeight: 19, color: colors.inkSoft },
+  verifyBtn: {
+    marginTop: 11,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: colors.terracotta,
+  },
+  verifyBtnText: { fontSize: 13.5, fontWeight: "800", color: colors.white },
   err: { marginTop: 6, fontSize: 13, color: colors.terracotta, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

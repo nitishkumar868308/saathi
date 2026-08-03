@@ -83,6 +83,20 @@ class AiTimeoutError extends Error {
   }
 }
 
+/**
+ * "Internet dheema" banner AI ke liye kab sach hai.
+ *
+ * ⚠️ Pehle yahan network.ts ka 4-second wala default lagta tha, aur wahi sabse
+ * zyada dohrayi jaane wali shikayat ki jad tha: "net bilkul theek hai, phir bhi
+ * slow-internet wala aa jaata hai". Baat seedhi hai — Gemini ko jawab BANANE me
+ * hi 5–15 second lagte hain. Wo intezaar network ka nahi, AI ke sochne ka hai,
+ * aur usse net ki dikkat batana galat hi tha.
+ *
+ * Ab threshold har call ke apne timeout se nikalta hai: 80% par pahunch gaye
+ * matlab ye request sach me marne wali hai — tabhi banner sach bolta hai.
+ */
+const SLOW_AT = 0.8;
+
 /** Promise ko time-box karo — der ho gayi to throw. */
 async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -90,8 +104,7 @@ async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
     timer = setTimeout(() => reject(new AiTimeoutError()), ms);
   });
   try {
-    // `timed` slow-internet banner ke liye — 4s+ lage to user ko pata chal jaye.
-    return await timed(Promise.race([work, guard]));
+    return await timed(Promise.race([work, guard]), Math.round(ms * SLOW_AT));
   } finally {
     if (timer) clearTimeout(timer);
   }

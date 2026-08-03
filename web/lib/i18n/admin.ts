@@ -48,6 +48,7 @@ export type AdminDict = {
     message: string;
     usage: string;
     spend: string;
+    notes: string;
     documents: string;
     reviews: string;
     logs: string;
@@ -61,6 +62,7 @@ export type AdminDict = {
     | "users"
     | "usage"
     | "spend"
+    | "notes"
     | "documents"
     | "reviews"
     | "logs"
@@ -120,6 +122,17 @@ export type AdminDict = {
     devicesSummary: string;
     /** Push chuna par ek bhi device nahi — pehle hi bata do. */
     pushNoDevices: string;
+    /**
+     * Message har user ki APNI bhasha me bhejo.
+     *
+     * Admin ek hi bhasha me likhta hai; bhejte waqt uska anuvaad ho jaata hai.
+     * Bina iske Hindi chunne wale user ko email ka button Hindi me dikhta tha
+     * aur upar poora message English me.
+     */
+    translateTitle: string;
+    translateHint: string;
+    /** GEMINI_API_KEY set hi nahi hai — toggle band rehta hai. */
+    translateOff: string;
   };
   /**
    * Bhejne ke BAAD ka hisaab — "Message users" ka doosra tab.
@@ -369,6 +382,33 @@ export type AdminDict = {
       last: string;
       rows: string;
     };
+    /**
+     * Notes ka haal — kisne kitne note banaye aur unme se kitno ka reminder bhi
+     * bana.
+     *
+     * ⚠️ Yahan kisi ka LIKHA HUA kabhi nahi dikhta (API use bhejti hi nahi).
+     * Note user ki sabse niji cheez hai; admin ka sawaal "feature chal raha hai
+     * ya nahi" hai, aur uska jawab ginti se mil jaata hai.
+     */
+    notes: {
+      title: string;
+      sub: string;
+      statNotes: string;
+      statWithReminder: string;
+      statUsers: string;
+      statLast7: string;
+      /** {pct} */
+      ofTotal: string;
+      perUser: string;
+      colUser: string;
+      colNotes: string;
+      colWithReminder: string;
+      colLast: string;
+      users: string;
+      empty: string;
+      privacyNote: string;
+      migrationMissing: string;
+    };
     documents: {
       viewAll: string;
       byUser: string;
@@ -496,6 +536,7 @@ const en: AdminDict = {
     message: "Message",
     usage: "Usage",
     spend: "AI & WhatsApp",
+    notes: "Notes",
     documents: "Documents",
     reviews: "Reviews",
     logs: "Logs",
@@ -513,6 +554,7 @@ const en: AdminDict = {
     users: { title: "Users", sub: "Who's on which plan, when they joined, and how active they are." },
     usage: { title: "Usage", sub: "Who uses how much — documents, reminders, chats. And who not at all." },
     spend: { title: "AI & WhatsApp", sub: "How much we are actually consuming — Gemini tokens, WhatsApp messages and emails." },
+    notes: { title: "Notes", sub: "Who writes notes, and how many turn into a reminder. What people write is never shown." },
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
     reviews: { title: "Reviews & Ratings", sub: "Reviews from the app — rating, text, and permission to show on the website." },
     logs: { title: "Logs & Issues", sub: "What broke in app/web — full stack + context. New errors also go to email." },
@@ -553,6 +595,11 @@ const en: AdminDict = {
     chEmail: "Email",
     chPush: "Phone notification",
     chBoth: "Both",
+    translateTitle: "Send in each user's own language",
+    translateHint:
+      "Write once, in any language. Before sending, the subject and message are translated into whatever language each user picked in the app — Hinglish, Hindi or English.",
+    translateOff:
+      "Translation is off — GEMINI_API_KEY isn't set in the web env. Everyone gets exactly what you type.",
     pushOff: "Firebase isn't set up yet — see FIREBASE-SETUP.md.",
     pushDone: "{sent} notifications delivered to {devices} devices.",
     pushNone: "Nobody in this list has the app installed yet.",
@@ -722,6 +769,26 @@ const en: AdminDict = {
         "No usage recorded yet. If you're sure AI/WhatsApp is running, you still need to run {file} in Supabase.",
       service: "Service", what: "What", units: "Units", last: "Last", rows: "rows",
     },
+    notes: {
+      title: "Notes",
+      sub: "Who is writing notes, and how many of those turned into a reminder.",
+      statNotes: "Notes",
+      statWithReminder: "With reminder",
+      statUsers: "People",
+      statLast7: "Last 7 days",
+      ofTotal: "{pct}% of all notes",
+      perUser: "Per person",
+      colUser: "Person",
+      colNotes: "Notes",
+      colWithReminder: "With reminder",
+      colLast: "Last activity",
+      users: "people",
+      empty: "Nobody has written a note yet.",
+      privacyNote:
+        "What people write in their notes is never shown here, and the API never sends it. Notes hold shopping lists, ideas, phone numbers, sometimes money. Counts and timestamps answer the question that matters — is the feature being used, and do notes turn into reminders.",
+      migrationMissing:
+        "Run supabase/notes.sql and supabase/notes-reminder-link.sql in the Supabase SQL editor first.",
+    },
     documents: {
       viewAll: "All", byUser: "By user", inStorage: "In storage",
       uploaders: "Uploaders", totalSize: "Total size",
@@ -829,6 +896,7 @@ const hi: AdminDict = {
     message: "मैसेज",
     usage: "उपयोग",
     spend: "AI और WhatsApp",
+    notes: "नोट्स",
     documents: "डॉक्युमेंट्स",
     reviews: "रिव्यूज़",
     logs: "लॉग्स",
@@ -846,6 +914,7 @@ const hi: AdminDict = {
     users: { title: "यूज़र्स", sub: "कौन किस प्लान पर है, कब जुड़ा, और कितना एक्टिव है।" },
     usage: { title: "उपयोग", sub: "कौन कितना उपयोग करता है — डॉक्युमेंट्स, रिमाइंडर, चैट। और कौन बिलकुल नहीं।" },
     spend: { title: "AI और WhatsApp", sub: "हमारा कितना इस्तेमाल हो रहा है — Gemini टोकन, WhatsApp मैसेज और ईमेल।" },
+    notes: { title: "नोट्स", sub: "कौन नोट लिखता है, और उनमें से कितनों का रिमाइंडर बनता है। लोग क्या लिखते हैं वह कभी नहीं दिखता।" },
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
     reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़ — रेटिंग, टेक्स्ट, और वेबसाइट पर दिखाने की अनुमति।" },
     logs: { title: "लॉग्स और इशू", sub: "ऐप/वेब में क्या टूटा — पूरा stack + context. नए errors ईमेल पर भी जाते हैं।" },
@@ -886,6 +955,11 @@ const hi: AdminDict = {
     chEmail: "ईमेल",
     chPush: "फ़ोन नोटिफ़िकेशन",
     chBoth: "दोनों",
+    translateTitle: "हर यूज़र की अपनी भाषा में भेजें",
+    translateHint:
+      "एक ही बार, किसी भी भाषा में लिखिए। भेजने से पहले सब्जेक्ट और मैसेज उसी भाषा में बदल जाते हैं जो यूज़र ने ऐप में चुनी है — हिंग्लिश, हिंदी या अंग्रेज़ी।",
+    translateOff:
+      "अनुवाद बंद है — web env में GEMINI_API_KEY सेट नहीं है। सबको वही जाएगा जो आप लिखेंगे।",
     pushOff: "Firebase अभी सेट नहीं है — FIREBASE-SETUP.md देखें।",
     pushDone: "{devices} डिवाइस में से {sent} पर नोटिफ़िकेशन पहुँची।",
     pushNone: "इस लिस्ट में अभी किसी ने ऐप इंस्टॉल नहीं की।",
@@ -1056,6 +1130,26 @@ const hi: AdminDict = {
         "अभी तक कोई उपयोग रिकॉर्ड नहीं हुआ। अगर आपको यक़ीन है कि AI/WhatsApp चल रहा है, तो Supabase में {file} चलाना बाक़ी है।",
       service: "सर्विस", what: "क्या", units: "यूनिट", last: "आख़िरी", rows: "रो",
     },
+    notes: {
+      title: "नोट्स",
+      sub: "कौन नोट लिख रहा है, और उनमें से कितनों का रिमाइंडर भी बना।",
+      statNotes: "नोट्स",
+      statWithReminder: "रिमाइंडर वाले",
+      statUsers: "लोग",
+      statLast7: "पिछले 7 दिन",
+      ofTotal: "सभी नोट्स का {pct}%",
+      perUser: "व्यक्ति के हिसाब से",
+      colUser: "व्यक्ति",
+      colNotes: "नोट्स",
+      colWithReminder: "रिमाइंडर वाले",
+      colLast: "आख़िरी गतिविधि",
+      users: "लोग",
+      empty: "अभी तक किसी ने नोट नहीं लिखा।",
+      privacyNote:
+        "लोग नोट में क्या लिखते हैं वह यहाँ कभी नहीं दिखता, और API उसे भेजती भी नहीं। नोट में बाज़ार की लिस्ट, आइडिया, फ़ोन नंबर, कभी पैसों का हिसाब होता है। जो सवाल असल में मायने रखता है — फ़ीचर इस्तेमाल हो रहा है या नहीं, और नोट से रिमाइंडर बनता है या नहीं — उसका जवाब गिनती और समय से मिल जाता है।",
+      migrationMissing:
+        "पहले Supabase SQL editor में supabase/notes.sql और supabase/notes-reminder-link.sql चलाइए।",
+    },
     documents: {
       viewAll: "सारे", byUser: "यूज़र अनुसार", inStorage: "स्टोरेज में",
       uploaders: "अपलोड करने वाले", totalSize: "कुल साइज़",
@@ -1164,6 +1258,7 @@ const hinglish: AdminDict = {
     message: "Message",
     usage: "Usage",
     spend: "AI & WhatsApp",
+    notes: "Notes",
     documents: "Documents",
     reviews: "Reviews",
     logs: "Logs",
@@ -1181,6 +1276,7 @@ const hinglish: AdminDict = {
     users: { title: "Users", sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai." },
     usage: { title: "Usage", sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi." },
     spend: { title: "AI & WhatsApp", sub: "Humara kitna istemaal ho raha hai — Gemini token, WhatsApp message aur email." },
+    notes: { title: "Notes", sub: "Kaun note likhta hai, aur unme se kitno ka reminder banta hai. Log kya likhte hain wo kabhi nahi dikhta." },
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
     reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews — rating, text, aur website pe dikhane ki anumati." },
     logs: { title: "Logs & Issues", sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain." },
@@ -1221,6 +1317,11 @@ const hinglish: AdminDict = {
     chEmail: "Email",
     chPush: "Phone notification",
     chBoth: "Dono",
+    translateTitle: "Har user ki apni bhasha me bhejo",
+    translateHint:
+      "Ek hi baar, kisi bhi bhasha me likho. Bhejne se pehle subject aur message usi bhasha me badal jaate hain jo user ne app me chuni hai — Hinglish, Hindi ya English.",
+    translateOff:
+      "Anuvaad band hai — web env me GEMINI_API_KEY set nahi hai. Sabko wahi jayega jo tum likhoge.",
     pushOff: "Firebase abhi set nahi hai — FIREBASE-SETUP.md dekho.",
     pushDone: "{devices} device me se {sent} par notification pahunch gayi.",
     pushNone: "Is list me abhi kisi ne app install nahi ki.",
@@ -1389,6 +1490,26 @@ const hinglish: AdminDict = {
       nothingYet:
         "Abhi tak koi usage record nahi hui. Agar aapko yakeen hai ki AI/WhatsApp chal raha hai, to Supabase me {file} run karna baaki hai.",
       service: "Service", what: "Kya", units: "Units", last: "Aakhri", rows: "rows",
+    },
+    notes: {
+      title: "Notes",
+      sub: "Kaun note likh raha hai, aur unme se kitno ka reminder bhi bana.",
+      statNotes: "Notes",
+      statWithReminder: "Reminder wale",
+      statUsers: "Log",
+      statLast7: "Pichhle 7 din",
+      ofTotal: "saare notes ka {pct}%",
+      perUser: "Har banda alag se",
+      colUser: "Banda",
+      colNotes: "Notes",
+      colWithReminder: "Reminder wale",
+      colLast: "Aakhri kaam",
+      users: "log",
+      empty: "Abhi tak kisi ne note nahi likha.",
+      privacyNote:
+        "Log note me kya likhte hain wo yahan kabhi nahi dikhta, aur API use bhejti bhi nahi. Note me bazaar ki list, idea, phone number, kabhi paise ka hisaab hota hai. Jo sawaal sach me matlab rakhta hai — feature chal raha hai ya nahi, aur note se reminder banta hai ya nahi — uska jawab ginti aur waqt se mil jaata hai.",
+      migrationMissing:
+        "Pehle Supabase SQL editor me supabase/notes.sql aur supabase/notes-reminder-link.sql chalao.",
     },
     documents: {
       viewAll: "Saare", byUser: "User-wise", inStorage: "Storage me",

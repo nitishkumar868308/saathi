@@ -54,11 +54,20 @@ const SLOW_MS = 4000;
 const FRESH_SUCCESS_MS = 10_000;
 
 /**
- * Kisi async kaam ko time karo. 4s se zyada laga to "dheema" flag on.
+ * Kisi async kaam ko time karo. Tay waqt se zyada laga to "dheema" flag on.
  * Jaldi ho gaya to flag off. Error waisa hi aage bhejta hai.
+ *
+ * `slowMs` badalna kab zaroori hai: 4 second ka default ek DB query ya file
+ * upload ke liye bana hai — wahan itni der matlab sach me net dheema hai.
+ *
+ * ⚠️ AI par yahi default lagana seedha jhooth tha. Gemini ka jawab banne me hi
+ * 5–15 second lagte hain, chahe net fibre ka ho. Isliye har AI call 4 second
+ * par "internet dheema" banner chala deti thi aur user baar-baar wahi shikayat
+ * karta tha ki "net theek hai phir bhi slow bolta hai". Intezaar network ka
+ * nahi, AI ke sochne ka tha. Caller ab apne kaam ka asli waqt bhejta hai.
  */
-export async function timed<T>(work: Promise<T>): Promise<T> {
-  const t = setTimeout(reportSlow, SLOW_MS);
+export async function timed<T>(work: Promise<T>, slowMs: number = SLOW_MS): Promise<T> {
+  const t = setTimeout(reportSlow, slowMs);
   try {
     const out = await work;
     clearTimeout(t);
