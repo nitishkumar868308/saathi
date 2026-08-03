@@ -14,7 +14,9 @@ import { colors } from "@/theme/colors";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
-import { getPlan, markProfilePlus, enforcePlanLimits, type PlanId } from "@/lib/plan";
+import { markProfilePlus, enforcePlanLimits, type PlanId } from "@/lib/plan";
+import { usePlan } from "@/lib/use-plan";
+import { refreshPlan } from "@/lib/plan-store";
 import {
   purchasesAvailable,
   initPurchases,
@@ -42,8 +44,17 @@ export default function Upgrade() {
   const { upgrade: u } = useT();
   const PLUS_FEATURES = u.plusFeatures;
   const [yearly, setYearly] = useState(true);
-  const [isPlus, setIsPlus] = useState(false);
-  const [loading, setLoading] = useState(true);
+  /**
+   * Plan ab poore app ke saanjhe store se aata hai, is screen ki apni copy se
+   * nahi.
+   *
+   * ⚠️ Pehle yahan `useState(false)` + apni `getPlan()` call thi. Do jagah do
+   * sach rakhne ka natija saaf tha: Play se kharidne ke baad ye screen "Plus
+   * chalu hai" dikhati thi, aur peeche baaki screens par "Plus lo" ka banner
+   * waise hi baitha rehta tha (unki apni copy purani thi). Ek hi store se dono
+   * ek saath badalte hain.
+   */
+  const { isPlus, loading } = usePlan();
   const [paying, setPaying] = useState(false);
 
   // Country-wise pricing (#11): IP se country → local price. Profile se mismatch
@@ -108,21 +119,12 @@ export default function Upgrade() {
     setPricing(row);
   }
 
-  async function refresh() {
-    try {
-      const p = await getPlan();
-      setIsPlus(p.isPlus);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoading(false);
-    }
-  }
-
   // rewardsVersion dep: first-N / referral grant background me hota hai. Iske
   // bina user ko "Plus lo" dikhta rehta tha jabki uska Plus already chalu hai.
+  // (Plan khud `usePlan()` sambhalta hai; yahan sirf store ko ek dhakka dete
+  // hain, taaki is screen par aate hi taaza jawab mile.)
   useEffect(() => {
-    refresh();
+    void refreshPlan();
     let alive = true;
     (async () => {
       await initPurchases(session?.user?.id);
@@ -219,7 +221,9 @@ export default function Upgrade() {
         // Plus wapas lete hi pehle se locked docs / paused reminders turant
         // unlock/unpause ho jaayein (warna agle session tak locked rehte the).
         await enforcePlanLimits();
-        await refresh();
+        // Saanjhe store ko taaza karo — ye screen AUR peeche khule saare tab,
+        // dono ek hi call se sahi ho jaate hain.
+        await refreshPlan();
         logEvent("plus_purchased", { plan: yearly ? "yearly" : "monthly" });
         toast.show(u.activated, "success");
       } else {

@@ -22,6 +22,7 @@ import { syncNotifications } from "@/lib/notifications";
 import { flushOutbox } from "@/lib/reminder-outbox";
 import { listenForegroundPush, listenPushOpens, registerPushToken } from "@/lib/push";
 import { setAnalyticsUser, logScreen } from "@/lib/analytics";
+import { usePlanForegroundRefresh } from "@/lib/plan-store";
 import { installGlobalErrorHandler } from "@/lib/report-error";
 
 // App start hote hi uncaught errors pakadna shuru.
@@ -191,6 +192,20 @@ function RootNavigator() {
     });
     return () => sub.remove();
   }, [uid]);
+
+  /**
+   * App wapas saamne aayi — plan bhi dobara poochho.
+   *
+   * ⚠️ Play Store ki kharidari app ke BAHAR poori hoti hai (Google ka sheet), aur
+   * uska webhook server par thodi der baad pahunchta hai. Pehle plan sirf app
+   * khulne par padha jaata tha, isliye kharidne ke turant baad wapas aane par
+   * user ka swagat wahi purana "Plus lo" banner karta tha — usi cheez ka jo usne
+   * abhi kharidi thi.
+   *
+   * Ek hi jagah (root) par, har screen se nahi — warna chaaron tab ek saath chaar
+   * call bhejte.
+   */
+  usePlanForegroundRefresh();
 
   // Har screen change ek event — admin panel ka "journey" isi se banta hai.
   // Ek hi jagah rakha hai taaki nayi screen add karne par kuch yaad na rakhna pade.

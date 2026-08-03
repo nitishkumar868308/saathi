@@ -138,7 +138,20 @@ export async function markReviewDone(): Promise<void> {
   }
 }
 
-/** Review DB me save karo (poora detail — admin me dikhega). */
+/**
+ * Review DB me save karo (poora detail — admin me dikhega, aur anumati ho to
+ * website par bhi).
+ *
+ * ⚠️ Pehle ye seedha `insert` tha, aur usse ek banda kai baar review de sakta
+ * tha. Popup ki "ek hi baar poochho" wali yaad AsyncStorage me rehti hai — wo
+ * app hatane par mit jaati hai, isliye reinstall ke baad wahi user dobara poocha
+ * jaata aur DB me doosri row ban jaati thi. Ab website par reviews dikhte hain,
+ * aur wahan ek hi aadmi ke do card sabse pehli cheez hai jise log dekh kar
+ * "fake reviews" kehte hain.
+ *
+ * Isliye ab: apni purani row ho to usse BADLO, warna nayi banao. Ek banda, ek
+ * raay — aur wo raay badalne ka haq bhi usi ke paas.
+ */
 export async function submitReview(input: {
   rating: number;
   text: string;
@@ -147,13 +160,35 @@ export async function submitReview(input: {
   if (!supabase) return false;
   try {
     const { data: u } = await supabase.auth.getUser();
-    if (!u.user?.id) return false;
-    const { error } = await supabase.from("reviews").insert({
-      user_id: u.user.id,
+    const uid = u.user?.id;
+    if (!uid) return false;
+
+    const row = {
       rating: input.rating,
       text: input.text.trim() || null,
       allow_display: input.allowDisplay,
-    });
+    };
+
+    // RLS apne aap sirf apni row dikhati hai, par `eq` phir bhi likhte hain —
+    // niyat code me dikhni chahiye, sirf policy me nahi.
+    const { data: mine } = await supabase
+      .from("reviews")
+      .select("id")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (mine?.id) {
+      const { error } = await supabase
+        .from("reviews")
+        .update(row)
+        .eq("id", mine.id)
+        .eq("user_id", uid);
+      return !error;
+    }
+
+    const { error } = await supabase.from("reviews").insert({ user_id: uid, ...row });
     return !error;
   } catch {
     return false;

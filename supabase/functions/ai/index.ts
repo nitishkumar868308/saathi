@@ -362,16 +362,31 @@ function langNote(locale?: string): string {
   }
 }
 
-/** Out-of-scope decline (locale-aware) — jab user app ke bahar ka sawaal pooche. */
+/**
+ * Out-of-scope decline (locale-aware) — jab user app ke bahar ka sawaal pooche.
+ *
+ * Do baatein jaan-boojh ke isi kram me:
+ *
+ *   1. Pehle maafi — "sorry". User ne kuch galat nahi kiya; usne ek seedha sawaal
+ *      poocha hai. Bina maafi ke ye line ek rok jaisi lagti hai, jawab jaisi nahi.
+ *   2. Phir ummeed — "ye feature abhi nahi hai, par bahut jald aa raha hai".
+ *      Sirf "nahi kar sakta" keh dena app ko chhota dikhata hai; ye batana ki
+ *      raasta band nahi, sirf abhi nahi, poori baat badal deta hai.
+ *
+ * ⚠️ Ye line model ko HUBAHU copy karne ko kahi jaati hai (neeche `scope` me).
+ * Pehle "yahi bhaav do" likha tha, aur uska natija ye hota tha ki model aadha
+ * jawab de deta aur aakhir me ye jod deta — yaani mana karne ke naam par duniya
+ * bhar ki baat ho jaati thi.
+ */
 function declineLine(locale?: string): string {
   switch (locale) {
     case "hi":
-      return "फ़िलहाल मैं सिर्फ़ आपके reminders, tasks और documents से जुड़ी बातों में मदद कर सकता हूँ। 🙂 बाक़ी सब भी बहुत जल्द ला रहे हैं!";
+      return "माफ़ करें, यह फ़ीचर अभी नहीं है — फ़िलहाल मैं सिर्फ़ आपके reminders, tasks और documents में मदद कर सकता हूँ। 🙂 बाक़ी सब भी बहुत जल्द आ रहा है!";
     case "en":
-      return "Right now I can only help with your reminders, tasks and documents. 🙂 Everything else is coming very soon!";
+      return "Sorry, that feature isn't here yet — right now I can only help with your reminders, tasks and documents. 🙂 Everything else is coming very soon!";
     case "hinglish":
     default:
-      return "Abhi main sirf aapke reminders, tasks aur documents se judi cheezon me madad kar sakta hoon. 🙂 Baaki sab bhi bahut jald aa raha hai!";
+      return "Sorry, ye feature abhi nahi hai — filhaal main sirf aapke reminders, tasks aur documents me madad kar sakta hoon. 🙂 Baaki sab bhi bahut jald aa raha hai!";
   }
 }
 
@@ -538,11 +553,39 @@ Deno.serve(async (req) => {
         : "";
       // Abhi ka LOCAL time (app naive-local ISO bhejti hai) — remind_at isse nikaalo.
       const now = payload.now ?? payload.context?.today ?? new Date().toISOString();
+      /**
+       * Saathi ka daayra — aur uske bahar ka jawab.
+       *
+       * ⚠️ Pehle yahan sirf "politely mana karo aur yahi bhaav do" likha tha, aur
+       * wo kaafi nahi tha. Model "bhaav" ko apni tarah samajhta tha: wo aksar
+       * pehle poora jawab de deta (Taj Mahal kahan hai, 17×23 kitna hota hai) aur
+       * uske baad ye line jod deta — yaani mana karne ke naam par duniya bhar ki
+       * baat ho jaati thi. Kabhi "main ek AI hoon" jaisi apni line likh deta, jo
+       * Saathi ki awaaz hi nahi hai.
+       *
+       * Ab teen cheezein badli hain:
+       *   1. Line HUBAHU copy karni hai — apne shabd nahi.
+       *   2. Us line ke aage-peeche kuch bhi nahi. Aadha jawab bhi jawab hai.
+       *   3. Kya "bahar" hai, uske saaf udaaharan — "general knowledge" jaisa
+       *      abstract shabd model ke liye kaafi nahi tha.
+       *
+       * Aur ek chhoot jaan-boojh ke: agar user pichhle turn ke reminder ka koi
+       * tukda bhej raha hai (ek shabd, ek time), wo BAHAR nahi hai. Wahi galti
+       * pehle sabse zyada nuksaan karti thi (neeche AGENTIC me poora likha hai).
+       */
       const scope =
         ` TUM SIRF is app "Apka Saathi" ke baare me madad karte ho: (a) user ke reminders, tasks, documents aur unki expiry/dates, (b) app kaise use karein,` +
-        ` (c) app khud kya hai — features aur Saathi Plus plan.` +
-        ` Agar user in se HATKE kuch pooche (general knowledge, duniya, news, math, coding, gossip, kuch bhi bahar ka), to jawab BILKUL mat do —` +
-        ` politely mana karo aur yahi bhaav do: "${declineLine(payload.locale)}".`;
+        ` (c) app khud kya hai — features, plan, price, referral, Saathi Plus.` +
+        `\n\nBAHAR KI BAAT — ye sab is app se bahar hai, aur inka jawab tum KABHI nahi dete:` +
+        ` general knowledge, itihaas, bhugol, science, news/current affairs, cricket/khel, mausam, share market/crypto,` +
+        ` math ya calculation, coding, translation, recipe, health/dawai ki salah, kanoon ya paisa ki salah, shayari/kahani/joke likhna,` +
+        ` kisi aur app/website ke baare me, aur apne (AI/model) baare me sawaal.` +
+        `\n⚠️ Aisi kisi bhi baat par tumhara reply BILKUL YE HONA CHAHIYE, hubahu, shabd-ba-shabd:` +
+        `\n"${declineLine(payload.locale)}"` +
+        `\nUske aage ya peeche kuch bhi MAT likho — na thoda sa jawab, na "par main itna bata deta hoon", na koi apni line.` +
+        ` Aadha jawab dena bhi jawab dena hai, aur wo saaf mana karne se bura hai.` +
+        ` action bhi null rakho.` +
+        `\n⚠️ Par ye rok us baat par NAHI lagti jo pichhle turn me tumne khud poochi thi (reminder ka kaam/din/time) — uska chhota jawab is app ki hi baat hai.`;
 
       // AGENTIC: chat se hi reminder ban jaaye — zaroori detail pucho, phir action do.
       const agentic =

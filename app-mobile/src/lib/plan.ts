@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { getUserDetails, isDetailsComplete } from "./user-details";
-import { getDeviceId } from "./device";
+import { getDeviceId, getHardwareId } from "./device";
 
 /**
  * Plan / subscription helpers.
@@ -125,15 +125,44 @@ export async function enforcePlanLimits(): Promise<void> {
 
 /**
  * Kisi ka referral code apply karo (signup ke turant baad).
- * Returns: 'applied' | 'invalid_code' | 'already_referred' | 'self' | 'disabled' | 'no_auth' | 'error'
+ *
+ * Device ki dono pehchaan saath jaati hain, aur ye zaroori hai — yahi wo jagah
+ * hai jahan "app hatao, nayi email banao, apna hi purana code daal do" wala
+ * raasta band hota hai. Server dekhta hai ki jisne code diya hai wo kabhi isi
+ * phone par tha kya, aur ho to `same_device` lauta deta hai.
+ *
+ * Code daalte hi mana kar dena jaan-boojh ke hai. Reward bahut baad me milta hai
+ * (document + reminder ke baad), aur tab tak user 15 din ka intezaar kar chuka
+ * hota — us waqt "nahi milega" kehna bahut bura lagta hai.
+ *
+ * Returns: 'applied' | 'invalid_code' | 'already_referred' | 'self' |
+ *          'same_device' | 'disabled' | 'no_auth' | 'error'
  */
 export async function applyReferralCode(code: string): Promise<string> {
   try {
-    const { data, error } = await client().rpc("apply_referral_code", {
+    const sb = client();
+    const [p_device_id, p_hardware_id] = await Promise.all([
+      getDeviceId().catch(() => null),
+      getHardwareId().catch(() => null),
+    ]);
+
+    const { data, error } = await sb.rpc("apply_referral_code", {
       p_code: code,
+      p_device_id,
+      p_hardware_id,
     });
-    if (error) return "error";
-    return (data as string) ?? "error";
+    if (!error) return (data as string) ?? "error";
+
+    /**
+     * Purana server — 3-arg wala version abhi deploy nahi hua
+     * (supabase/device-hardware.sql chalna baaki hai). Bina is fallback ke naye
+     * app par referral code lagna hi band ho jaata, jo is fix se kayi guna bura
+     * nuksaan hai. Device check nahi hoga, par reward ke waqt wahi check dobara
+     * lagta hai — isliye chhed khula nahi rehta.
+     */
+    const legacy = await sb.rpc("apply_referral_code", { p_code: code });
+    if (legacy.error) return "error";
+    return (legacy.data as string) ?? "error";
   } catch {
     return "error";
   }
@@ -160,24 +189,40 @@ export async function hasBeenReferred(): Promise<boolean> {
 /**
  * Referral reward check karo — ek document upload + ek reminder set, dono hone
  * pe dono users ko din milte hain. Best-effort, baar-baar call karna safe hai.
- * Returns: 'rewarded' | 'need_document' | 'need_reminder' | 'no_referral' | 'error'
+ *
+ * Device ki DO pehchaan jaati hain:
+ *
+ *   • install id — SecureStore ka UUID. App hatane par mit jaata hai.
+ *   • hardware id — is phone ka nishaan (hash). App hatane par bhi wahi rehta.
+ *
+ * ⚠️ Doosri ID kyun aayi: pehle sirf install id jaati thi, aur usse ye poora
+ * check bekaar tha. App uninstall karo → nayi install id → server ko naya phone
+ * dikhta → naya email + apna purana code = 15 din phir mil gaye, jitni baar
+ * chaaho. Mohar ek aisi ID par lagti thi jo agli baar maujood hi nahi hoti.
+ *
+ * Returns: 'rewarded' | 'need_document' | 'need_reminder' | 'no_referral' |
+ *          'same_device' | 'device_already_rewarded' | 'error'
  */
 export async function checkReferralQualification(): Promise<string> {
   try {
     const sb = client();
-    // Device ID bhi bhejo — ek phone se sirf ek baar reward mil sakta hai.
-    // Iske bina koi bhi naya email banake, apna hi code daal ke, usi phone se
-    // baar-baar 15-15 din le sakta tha.
-    const p_device_id = await getDeviceId().catch(() => null);
+    const [p_device_id, p_hardware_id] = await Promise.all([
+      getDeviceId().catch(() => null),
+      getHardwareId().catch(() => null),
+    ]);
 
     const { data, error } = await sb.rpc("check_referral_qualification", {
       p_device_id,
+      p_hardware_id,
     });
     if (!error) return (data as string) ?? "error";
 
-    // Purana server: 1-arg wala version abhi deploy nahi hua
-    // (supabase/devices-analytics.sql chalna baaki hai). Aise me 0-arg wale par
-    // gir jao — device check nahi hoga, par reward pipeline rukni nahi chahiye.
+    // Purana server: 2-arg wala version abhi deploy nahi hua
+    // (supabase/device-hardware.sql chalna baaki hai). Ek-ek seedhi neeche
+    // utarte hain — reward pipeline rukni nahi chahiye.
+    const oneArg = await sb.rpc("check_referral_qualification", { p_device_id });
+    if (!oneArg.error) return (oneArg.data as string) ?? "error";
+
     const legacy = await sb.rpc("check_referral_qualification");
     if (legacy.error) return "error";
     return (legacy.data as string) ?? "error";

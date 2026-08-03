@@ -9,11 +9,11 @@ import { colors } from "@/theme/colors";
 import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
-import { getPlan } from "@/lib/plan";
+import { usePlan } from "@/lib/use-plan";
 import { useOffers } from "@/lib/use-offers";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, tpl } from "@/lib/i18n/dictionaries";
@@ -66,7 +66,7 @@ type Row = {
 };
 
 export default function Settings() {
-  const { session, rewardsVersion } = useAuth();
+  const { session } = useAuth();
   const toast = useToast();
   const offers = useOffers();
   const t = useT();
@@ -79,7 +79,16 @@ export default function Settings() {
   const name = details?.full_name || meta?.full_name || meta?.name || s.account;
   const avatarUrl = details?.avatar_url ?? null;
   const profileComplete = detailsLoading || isDetailsComplete(details);
-  const [isPlus, setIsPlus] = useState(false);
+  /**
+   * Plan saanjhe store se — is screen ki apni copy se nahi.
+   *
+   * ⚠️ Pehle yahan apna `useState` + apni `getPlan()` call thi, aur wo sirf
+   * `rewardsVersion` par dobara chalti thi (yaani app khulne par). Beech session
+   * me Plus milne par — referral qualify hote hi, ya Play se kharidte hi — ye
+   * row "Saathi Plus lo" hi dikhati rehti thi. Ab saare screens ek hi jawab par
+   * chalte hain.
+   */
+  const { isPlus } = usePlan();
   const [langOpen, setLangOpen] = useState(false);
   const [refModal, setRefModal] = useState(false);
   const [permModal, setPermModal] = useState(false);
@@ -173,14 +182,6 @@ export default function Settings() {
     },
   ];
 
-  // rewardsVersion dep zaroori hai: first-N / referral grant login ke baad
-  // background me hota hai. Iske bina screen "Free" pe atki rehti thi.
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    getPlan()
-      .then((p) => setIsPlus(p.isPlus))
-      .catch(() => {});
-  }, [rewardsVersion]);
 
   async function logout() {
     setLogoutAsk(false);

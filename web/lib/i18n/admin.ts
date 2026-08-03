@@ -311,6 +311,24 @@ export type AdminDict = {
       websiteOk: string;
       filterAll: string;
       filterWebsite: string;
+      /** Website par abhi sach me kitne dikh rahe hain. */
+      liveOnSite: string;
+      /** Manzoori ka intezaar kar rahe hain — sabse pehla kaam. */
+      pendingCount: string;
+      filterPending: string;
+      filterApproved: string;
+      filterRejected: string;
+      /** Card ke badge. */
+      badgePending: string;
+      badgeApproved: string;
+      badgeRejected: string;
+      /** Buttons. */
+      approveBtn: string;
+      rejectBtn: string;
+      undoBtn: string;
+      statusFailed: string;
+      /** Jab user ne website par dikhane ki anumati hi na di ho. */
+      noPermissionNote: string;
     };
     logs: {
       today: string;
@@ -556,7 +574,7 @@ const en: AdminDict = {
     spend: { title: "AI & WhatsApp", sub: "How much we are actually consuming — Gemini tokens, WhatsApp messages and emails." },
     notes: { title: "Notes", sub: "Who writes notes, and how many turn into a reminder. What people write is never shown." },
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
-    reviews: { title: "Reviews & Ratings", sub: "Reviews from the app — rating, text, and permission to show on the website." },
+    reviews: { title: "Reviews & Ratings", sub: "Reviews from the app. A review reaches the website only when the user allowed it AND you approve it — nothing goes live on its own." },
     logs: { title: "Logs & Issues", sub: "What broke in app/web — full stack + context. New errors also go to email." },
     contacts: { title: "Contact messages", sub: "" },
     message: { title: "Message users", sub: "Email registered users — everyone or just inactive ones (who never used the app)." },
@@ -735,6 +753,14 @@ const en: AdminDict = {
       rating: "Rating", review: "Review", websiteAllowed: "Website allowed",
       totalReviews: "Total reviews", average: "Average", websiteOk: "Website OK",
       filterAll: "All", filterWebsite: "Website-allowed",
+      liveOnSite: "Live on site", pendingCount: "Waiting for you",
+      filterPending: "Pending", filterApproved: "Approved", filterRejected: "Rejected",
+      badgePending: "Waiting for approval",
+      badgeApproved: "Live on website",
+      badgeRejected: "Rejected",
+      approveBtn: "Approve", rejectBtn: "Reject", undoBtn: "Move back to pending",
+      statusFailed: "Could not change",
+      noPermissionNote: "User did not allow this on the website — it can never go live.",
     },
     logs: {
       today: "Today", sinceYesterday: "Since yesterday", totalErrors: "Total errors",
@@ -916,7 +942,7 @@ const hi: AdminDict = {
     spend: { title: "AI और WhatsApp", sub: "हमारा कितना इस्तेमाल हो रहा है — Gemini टोकन, WhatsApp मैसेज और ईमेल।" },
     notes: { title: "नोट्स", sub: "कौन नोट लिखता है, और उनमें से कितनों का रिमाइंडर बनता है। लोग क्या लिखते हैं वह कभी नहीं दिखता।" },
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
-    reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़ — रेटिंग, टेक्स्ट, और वेबसाइट पर दिखाने की अनुमति।" },
+    reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़। वेबसाइट पर रिव्यू तभी जाता है जब यूज़र ने अनुमति दी हो और आप मंज़ूरी दें — अपने आप कुछ लाइव नहीं होता।" },
     logs: { title: "लॉग्स और इशू", sub: "ऐप/वेब में क्या टूटा — पूरा stack + context. नए errors ईमेल पर भी जाते हैं।" },
     contacts: { title: "कॉन्टैक्ट मैसेज", sub: "" },
     message: { title: "यूज़र्स को मैसेज", sub: "रजिस्टर्ड यूज़र्स को ईमेल भेजें — सभी को या सिर्फ़ inactive (जिन्होंने कभी उपयोग नहीं किया)।" },
@@ -1096,6 +1122,14 @@ const hi: AdminDict = {
       rating: "रेटिंग", review: "रिव्यू", websiteAllowed: "वेबसाइट पर अनुमति",
       totalReviews: "कुल रिव्यू", average: "औसत", websiteOk: "वेबसाइट OK",
       filterAll: "सारे", filterWebsite: "वेबसाइट-अनुमति वाले",
+      liveOnSite: "साइट पर लाइव", pendingCount: "आपके इंतज़ार में",
+      filterPending: "बाक़ी", filterApproved: "मंज़ूर", filterRejected: "नामंज़ूर",
+      badgePending: "मंज़ूरी का इंतज़ार",
+      badgeApproved: "वेबसाइट पर लाइव",
+      badgeRejected: "नामंज़ूर",
+      approveBtn: "मंज़ूर करो", rejectBtn: "नामंज़ूर करो", undoBtn: "वापस बाक़ी में डालो",
+      statusFailed: "बदल नहीं पाया",
+      noPermissionNote: "यूज़र ने वेबसाइट पर दिखाने की अनुमति नहीं दी — यह कभी लाइव नहीं जा सकता।",
     },
     logs: {
       today: "आज", sinceYesterday: "कल से", totalErrors: "कुल एरर",
@@ -1278,7 +1312,7 @@ const hinglish: AdminDict = {
     spend: { title: "AI & WhatsApp", sub: "Humara kitna istemaal ho raha hai — Gemini token, WhatsApp message aur email." },
     notes: { title: "Notes", sub: "Kaun note likhta hai, aur unme se kitno ka reminder banta hai. Log kya likhte hain wo kabhi nahi dikhta." },
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
-    reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews — rating, text, aur website pe dikhane ki anumati." },
+    reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews. Website par review tabhi jaata hai jab user ne anumati di ho AUR aap manzoori dein — apne aap kuch live nahi hota." },
     logs: { title: "Logs & Issues", sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain." },
     contacts: { title: "Contact messages", sub: "" },
     message: { title: "Message users", sub: "Registered users ko email bhejo — sabhi ko ya sirf inactive (jinhone kabhi use nahi kiya)." },
@@ -1457,6 +1491,14 @@ const hinglish: AdminDict = {
       rating: "Rating", review: "Review", websiteAllowed: "Website allowed",
       totalReviews: "Total reviews", average: "Average", websiteOk: "Website OK",
       filterAll: "Saare", filterWebsite: "Website-allowed",
+      liveOnSite: "Site par live", pendingCount: "Aapke intezaar me",
+      filterPending: "Baaki", filterApproved: "Manzoor", filterRejected: "Namanzoor",
+      badgePending: "Manzoori ka intezaar",
+      badgeApproved: "Website par live",
+      badgeRejected: "Namanzoor",
+      approveBtn: "Manzoor karo", rejectBtn: "Namanzoor karo", undoBtn: "Wapas baaki me daalo",
+      statusFailed: "Badal nahi paya",
+      noPermissionNote: "User ne website par dikhane ki anumati nahi di — ye kabhi live nahi ja sakta.",
     },
     logs: {
       today: "Aaj", sinceYesterday: "Kal se", totalErrors: "Total errors",

@@ -199,21 +199,56 @@ export async function getUserDetail(uid: string): Promise<UserDetail | null> {
 
 /* ------------------------------ reviews ------------------------------ */
 
+/**
+ * Website par jaane ki manzoori ka darja.
+ *
+ * `pending` naya review ka default hai — kuch na karo to website par kuch bhi
+ * apne aap nahi jaata. Yahi poora point hai: moderation ka matlab hi ye hai ki
+ * default NA ho.
+ */
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
+export const REVIEW_STATUSES: readonly ReviewStatus[] = [
+  "pending",
+  "approved",
+  "rejected",
+] as const;
+
 export type AdminReview = {
   id: string;
   rating: number;
   text: string | null;
+  /**
+   * User ki ANUMATI — "website par dikhane do".
+   *
+   * Ye admin ka faisla NAHI hai, aur dono ko alag rakhna zaroori hai. Anumati
+   * sirf user de ya wapas le sakta hai (app se). Manzoori (`webStatus`) chhaanti
+   * hai. Website par review tabhi jaata hai jab DONO haan hon.
+   */
   allowDisplay: boolean;
+  webStatus: ReviewStatus;
+  /** Kab approve/reject hua. Pending par null. */
+  webStatusAt: string | null;
   createdAt: string;
   email: string | null;
   name: string | null;
 };
 
-/** Sab reviews (naye pehle) + user ka email/naam. Admin "Reviews" tab. */
+/**
+ * Sab reviews (naye pehle) + user ka email/naam. Admin "Reviews" tab.
+ *
+ * ⚠️ `select=*` jaan-boojh ke — column ginti karke NAHI. `web_status` naya column
+ * hai (supabase/reviews-public.sql). Use naam se maangte to jis setup me wo SQL
+ * abhi chala nahi hai, wahan PostgREST poori request 400 kar deta aur admin ka
+ * Reviews tab bilkul khul hi na paata — ek naye column ke liye ye bahut mehnga
+ * sauda hai. `*` me wo column ho to aa jaata hai, na ho to neeche default
+ * `pending` lag jaata — jo sahi bhi hai: SQL chale bina website par kuch nahi
+ * ja sakta.
+ */
 export async function getReviews(limit = 500): Promise<AdminReview[]> {
   assertConfigured();
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/reviews?select=id,user_id,rating,text,allow_display,created_at&order=created_at.desc&limit=${limit}`,
+    `${SUPABASE_URL}/rest/v1/reviews?select=*&order=created_at.desc&limit=${limit}`,
     { headers: headers(), cache: "no-store" },
   );
   if (!res.ok) await fail("reviews read (supabase/reviews.sql run kiya?)", res);
@@ -245,11 +280,45 @@ export async function getReviews(limit = 500): Promise<AdminReview[]> {
       rating: Number(r.rating ?? 0),
       text: (r.text as string) ?? null,
       allowDisplay: Boolean(r.allow_display),
+      webStatus: asReviewStatus(r.web_status),
+      webStatusAt: (r.web_status_at as string) ?? null,
       createdAt: String(r.created_at),
       email: prof?.email ?? null,
       name: prof?.name ?? null,
     };
   });
+}
+
+/** DB se aayi value ko bharose laayak darja banao. Kuch bhi ajeeb ho to pending. */
+function asReviewStatus(v: unknown): ReviewStatus {
+  return v === "approved" || v === "rejected" ? v : "pending";
+}
+
+/**
+ * Review approve / reject karo (admin ka faisla).
+ *
+ * User ki anumati (`allow_display`) yahan se KABHI nahi badalti — wo uski baat
+ * hai. Dono cheezein alag rehni chahiye, warna kal koi ye samajh nahi payega ki
+ * review website par nahi hai kyunki admin ne reject kiya tha, ya kyunki user ne
+ * anumati hi nahi di thi.
+ *
+ * `web_status_at` yahan se nahi bhejte — wo DB ka trigger khud bhar deta hai,
+ * taaki waqt hamesha server ka ho, admin ke laptop ka nahi.
+ */
+export async function setReviewStatus(id: string, status: ReviewStatus): Promise<void> {
+  assertConfigured();
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/reviews?id=eq.${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: headers({ Prefer: "return=minimal" }),
+      body: JSON.stringify({ web_status: status }),
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    await fail("review approve/reject (supabase/reviews-public.sql run kiya?)", res);
+  }
 }
 
 /* --------------------------- country pricing --------------------------- */

@@ -1,6 +1,8 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import * as Device from "expo-device";
+import * as Application from "expo-application";
+import * as Crypto from "expo-crypto";
 
 import { supabase } from "./supabase";
 
@@ -12,15 +14,44 @@ import { supabase } from "./supabase";
  *  2. Ek phone sirf EK BAAR referral reward le sake. Pehle naya email banake,
  *     apna hi code daal ke, usi phone se baar-baar 15-15 din liye ja sakte the.
  *
- * ID kaise banti hai: pehli baar ek random UUID banake SecureStore me rakh dete
- * hain. Ye logout/login aur app update se nahi jaata (uninstall se jaata hai —
- * isliye fingerprint alag se bhejte hain, taaki server ke paas ek doosra ishaara
- * bhi rahe).
+ * Do ID hain, aur dono ki zaroorat hai:
  *
- * ⚠️ Yahan koi advertising ID / IMEI nahi — Play Store policy safe.
+ *   • **install id** (`getDeviceId`) — pehli baar ek random UUID banake
+ *     SecureStore me rakh dete hain. Logout/login aur app update se nahi jaata.
+ *     Ye "is install" ki pehchaan hai.
+ *
+ *   • **hardware id** (`getHardwareId`) — is PHONE ki pehchaan, jo app hatane se
+ *     bhi nahi jaati.
+ *
+ * ⚠️ Doosri ID kyun aayi — yahi wo chhed tha jisse referral ka poora anti-fraud
+ * bekaar ho jaata tha. Android par SecureStore ka data app ke saath hi mit jaata
+ * hai. Yaani: app uninstall karo, dobara download karo, nayi email se signup
+ * karo, apna hi purana referral code daal do — server ko ek BILKUL NAYA device
+ * dikhta tha aur 15 din phir mil jaate the. Jitni baar chaaho. `devices` table
+ * me `referral_claimed_at` ki mohar lagti thi ek aisi ID par jo agli baar
+ * maujood hi nahi hoti.
+ *
+ * Hardware id kahan se: Android par `ANDROID_ID` (app-signing key + user +
+ * device ka jod — uninstall se nahi badalta, factory reset se badalta hai), iOS
+ * par `identifierForVendor`. Dono Play/App Store policy me fraud-prevention ke
+ * liye theek hain — ye advertising ID bhi nahi hai, IMEI bhi nahi.
+ *
+ * ⚠️ Aur wo asli ID server par KABHI nahi jaati — sirf uska SHA-256 hash. Hash
+ * se hum do install ko "wahi phone" keh sakte hain (bas itna hi chahiye), par
+ * hash se device ki pehchaan wapas nahi nikalti. Ek app-ka-apna salt bhi milta
+ * hai, taaki ye hash kisi doosre system ke hash se milaya na ja sake.
  */
 
 const KEY = "saathi-device-id";
+
+/**
+ * Hash me milaya jaane wala app ka apna salt.
+ *
+ * Iske bina hash sirf "SHA-256 of ANDROID_ID" hota, jo har us system me wahi
+ * nikalta jo yahi hisaab lagata ho. Salt use sirf Saathi ke liye maayne rakhne
+ * wala bana deta hai.
+ */
+const HW_SALT = "apka-saathi-device-v1";
 
 /** RFC-4122 v4 jaisa UUID, bina kisi native crypto ke. */
 function uuid(): string {
@@ -71,6 +102,73 @@ function fingerprint(): string {
     .slice(0, 120);
 }
 
+/* ------------------------ phone ki apni pehchaan ------------------------ */
+
+let memoHw: string | null = null;
+/**
+ * Ek hi baar poochho, phir wahi jawab.
+ *
+ * iOS wali call async hai aur app khulte hi do-teen jagah se ek saath poochi
+ * jaati hai (device_seen, referral check). Bina is promise-cache ke teen alag
+ * native call jaati thi aur teenon ka jawab aane tak teen alag "abhi pata nahi"
+ * raaste chal jaate the.
+ */
+let hwPromise: Promise<string | null> | null = null;
+
+/** Platform se aane wali asli hardware ID (hash se pehle). */
+async function rawHardwareId(): Promise<string | null> {
+  try {
+    if (Platform.OS === "android") {
+      // Sync hai. Emulator/kuch OEM par khaali ya "9774d56d682e549c" (ek jaana
+      // hua bekaar default) bhi aa sakta hai — usko ID maanna sabse bura hoga,
+      // kyunki tab hazaaron phone ek hi device lagte.
+      const id = Application.getAndroidId?.() ?? "";
+      const bad = !id || id.length < 8 || /^0+$/.test(id) || id === "9774d56d682e549c";
+      return bad ? null : id;
+    }
+    if (Platform.OS === "ios") {
+      // Apple isse `nil` de sakta hai jab phone restart ke baad ek baar bhi
+      // unlock na hua ho — tab jaan-boojh ke null, koi bana hua ID nahi.
+      const id = await Application.getIosIdForVendorAsync();
+      return id && id.length >= 8 ? id : null;
+    }
+  } catch {
+    /* module na chale (web/expo-go) — neeche null */
+  }
+  return null;
+}
+
+/**
+ * Is PHONE ki pehchaan ka hash — app hatane-dobara-daalne se bhi wahi.
+ *
+ * Asli ID kabhi na kabhi na mile (emulator, web, purana OEM) to `null` lauta
+ * dete hain, koi bana hua ID NAHI. Wajah: ek jhootha "stable" ID sabse mehnga
+ * hota — do bilkul alag phone ek jaise dikhne lagte aur asli user ka referral
+ * reward "device already rewarded" keh ke ruk jaata. Server null ko "pata nahi"
+ * maanta hai aur install-id wale purane raaste par chala jaata hai.
+ */
+export async function getHardwareId(): Promise<string | null> {
+  if (memoHw) return memoHw;
+  if (hwPromise) return hwPromise;
+  hwPromise = (async () => {
+    const raw = await rawHardwareId();
+    if (!raw) return null;
+    try {
+      const hash = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        `${HW_SALT}:${raw}`,
+      );
+      memoHw = hash;
+      return hash;
+    } catch {
+      // Hash na ban paaye to kuch NA bhejo. Asli ANDROID_ID bhejna sabse bura
+      // rasta hai — wo hum jaan-boojh ke server se door rakhte hain.
+      return null;
+    }
+  })();
+  return hwPromise;
+}
+
 export type DeviceInfo = { id: string; known: boolean; language: string | null };
 
 /**
@@ -83,15 +181,34 @@ export type DeviceInfo = { id: string; known: boolean; language: string | null }
 export async function registerDevice(language?: string): Promise<DeviceInfo> {
   const id = await getDeviceId();
   if (!supabase) return { id, known: false, language: null };
+  const hardware = await getHardwareId().catch(() => null);
   try {
     const { data, error } = await supabase.rpc("device_seen", {
       p_id: id,
       p_fingerprint: fingerprint(),
       p_platform: Platform.OS,
       p_language: language ?? null,
+      p_hardware_id: hardware,
     });
-    if (error || !data) return { id, known: false, language: null };
-    const d = data as { known?: boolean; language?: string | null };
+    if (!error && data) {
+      const d = data as { known?: boolean; language?: string | null };
+      return { id, known: !!d.known, language: d.language ?? null };
+    }
+    /**
+     * Purana server — `p_hardware_id` wala version abhi deploy nahi hua
+     * (supabase/device-hardware.sql chalna baaki hai). Postgres us call ko
+     * "function does not exist" keh ke mana kar deta hai, aur bina is fallback ke
+     * app ka pehla screen hi atak jaata: device kabhi register nahi hota, yaani
+     * language-select har baar dikhta rehta.
+     */
+    const legacy = await supabase.rpc("device_seen", {
+      p_id: id,
+      p_fingerprint: fingerprint(),
+      p_platform: Platform.OS,
+      p_language: language ?? null,
+    });
+    if (legacy.error || !legacy.data) return { id, known: false, language: null };
+    const d = legacy.data as { known?: boolean; language?: string | null };
     return { id, known: !!d.known, language: d.language ?? null };
   } catch {
     return { id, known: false, language: null };

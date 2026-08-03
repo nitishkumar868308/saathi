@@ -39,6 +39,9 @@ const COPY: Record<Locale, RefCopy> = {
       invalid_code: "Ye code sahi nahi lag raha — dobara check karo.",
       already_referred: "Aap pehle se referred ho — referral ek hi baar lagta hai.",
       self: "Apna hi code nahi laga sakte 🙂",
+      // Ek hi phone, do account. Baat saaf keh dena hi theek hai — warna user 15
+      // din ka intezaar karta rehta aur aakhir me use wajah bhi nahi milti.
+      same_device: "Ye code isi phone ke kisi account ka hai — referral do alag logon ke liye hai 🙂",
       disabled: "Referral abhi band hai.",
       no_auth: "Pehle login karo.",
       error: "Kuch gadbad ho gayi — thodi der baad try karo.",
@@ -56,6 +59,7 @@ const COPY: Record<Locale, RefCopy> = {
       invalid_code: "ये कोड सही नहीं लग रहा — दोबारा चेक करें।",
       already_referred: "आप पहले से रेफर्ड हैं — रेफरल एक ही बार लगता है।",
       self: "अपना ही कोड नहीं लगा सकते 🙂",
+      same_device: "यह कोड इसी फ़ोन के किसी अकाउंट का है — रेफरल दो अलग लोगों के लिए है 🙂",
       disabled: "रेफरल अभी बंद है।",
       no_auth: "पहले लॉगिन करें।",
       error: "कुछ गड़बड़ हो गई — थोड़ी देर बाद ट्राई करें।",
@@ -73,6 +77,7 @@ const COPY: Record<Locale, RefCopy> = {
       invalid_code: "That code doesn't look right — please check again.",
       already_referred: "You're already referred — a referral applies only once.",
       self: "You can't use your own code 🙂",
+      same_device: "This code belongs to an account on this same phone — a referral is for two different people 🙂",
       disabled: "Referrals are off right now.",
       no_auth: "Please log in first.",
       error: "Something went wrong — try again in a bit.",
@@ -102,7 +107,13 @@ export function ReferralCodeModal({
     setLoading(false);
     toast.show(copy.msg[res] ?? copy.msg.error, res === "applied" ? "success" : "info");
     // In cases me modal band kar do (dobara try karne layak nahi).
-    if (res === "applied" || res === "already_referred" || res === "self") {
+    if (
+      res === "applied" ||
+      res === "already_referred" ||
+      res === "self" ||
+      // Wahi phone hai — dobara try karne se kuch nahi badlega, sirf uljhan badhegi.
+      res === "same_device"
+    ) {
       setCode("");
       onClose();
     }

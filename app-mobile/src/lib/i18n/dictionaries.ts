@@ -88,6 +88,13 @@ export type Dict = {
     tooNoisy: string;
     /** Awaaz pahunchi hi nahi — bahut door se bola. */
     tooQuiet: string;
+    /**
+     * Button kaise chalta hai — dono tareeke ek line me.
+     *
+     * Ye likhna zaroori hai: hold-to-talk dikhta nahi hai, aur jo user use
+     * jaanta hi nahi wo kabhi try nahi karega.
+     */
+    micHint: string;
   };
   phoneField: {
     placeholder: string;
@@ -890,6 +897,7 @@ const hinglish: Dict = {
     unavailable: "Voice available nahi hai is device pe",
     tooNoisy: "Aas-paas shor bahut hai — phone muh ke paas laakar dobara boliye",
     tooQuiet: "Awaaz nahi pahunchi — thoda paas se aur zor se boliye",
+    micHint: "Mic dabaye rakho aur bolo — ya ek tap karo, phir tap se band",
   },
   phoneField: {
     placeholder: "Phone number",
@@ -1081,7 +1089,7 @@ const hinglish: Dict = {
     title: "Naya reminder",
     whatLabel: "Kya yaad dilaun?",
     whatPlaceholder: "Jaise: kal subah 8 baje mummy ko call karna",
-    micHint: "Mic dabake bolo — time bhi bol do, main samajh lunga",
+    micHint: "Mic dabaye rakho aur bolo (ya ek tap) — time bhi bol do, main samajh lunga",
     understood: "Samajh gaya",
     whenLabel: "Kab yaad dilaun?",
     pickDateTime: "Date & time chuno",
@@ -1562,6 +1570,7 @@ const hi: Dict = {
     unavailable: "इस डिवाइस पर voice available नहीं है",
     tooNoisy: "आस-पास बहुत शोर है — फ़ोन मुँह के पास लाकर दोबारा बोलिए",
     tooQuiet: "आवाज़ नहीं पहुँची — थोड़ा पास से और ज़ोर से बोलिए",
+    micHint: "माइक दबाए रखें और बोलें — या एक टैप करें, फिर टैप से बंद",
   },
   phoneField: {
     placeholder: "फ़ोन नंबर",
@@ -1752,7 +1761,7 @@ const hi: Dict = {
     title: "नया रिमाइंडर",
     whatLabel: "क्या याद दिलाऊँ?",
     whatPlaceholder: "जैसे: कल सुबह 8 बजे मम्मी को कॉल करना",
-    micHint: "माइक दबाकर बोलें — टाइम भी बोल दें, मैं समझ लूँगा",
+    micHint: "माइक दबाए रखें और बोलें (या एक टैप) — टाइम भी बोल दें, मैं समझ लूँगा",
     understood: "समझ गया",
     whenLabel: "कब याद दिलाऊँ?",
     pickDateTime: "डेट & टाइम चुनें",
@@ -2233,6 +2242,7 @@ const en: Dict = {
     unavailable: "Voice isn't available on this device",
     tooNoisy: "It's noisy around you — hold the phone closer and try again",
     tooQuiet: "We couldn't hear you — speak a bit closer and louder",
+    micHint: "Hold the mic and speak — or tap once, then tap to stop",
   },
   phoneField: {
     placeholder: "Phone number",
@@ -2422,7 +2432,7 @@ const en: Dict = {
     title: "New reminder",
     whatLabel: "What should I remind you about?",
     whatPlaceholder: "e.g. call mom tomorrow at 8am",
-    micHint: "Tap the mic and speak — say the time too, I'll understand",
+    micHint: "Hold the mic and speak (or tap once) — say the time too, I'll understand",
     understood: "Got it",
     whenLabel: "When should I remind you?",
     pickDateTime: "Pick date & time",

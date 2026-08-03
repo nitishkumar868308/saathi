@@ -236,8 +236,32 @@ export async function scheduleReminderSeries(
   // "90 din tak" — us din ke aakhir tak (us din ka reminder bhi jaata hai).
   const lastMs = until ? endOfDay(until) : null;
 
-  let any = false;
   const when = new Date(first);
+
+  /**
+   * Beete hue din chhod ke AGLI aane wali baari par pahunch jao.
+   *
+   * ⚠️ Ye chhoti si baat ek badi khamoshi ki jad thi. `first` wo pehla din hai jo
+   * reminder banate waqt tay hua tha, aur phone par wo purana pada reh sakta hai
+   * (server `remind_at` ko roz aage sarkaata hai, par app us badlaav ko tabhi
+   * padhti hai jab wo khule). Pehle loop seedha `first` se shuru hota tha, aur
+   * `schedule()` beete waqt par kuch nahi lagata (`when <= now` par false).
+   *
+   * Natija: agar user ne app 14 din se zyada na kholi ho, to poori khidki (14
+   * occurrences) beet chuki hoti thi — yaani EK BHI alarm nahi lagta tha. "Roz
+   * subah 6 baje dawai" wala reminder bilkul chup ho jaata, aur kahin koi error
+   * nahi dikhta. Reminder app me isse bura kuch nahi hota.
+   *
+   * Chhat isliye lagai hai ki `every = 1` aur `first` do saal purana ho to ye
+   * loop 700 baar ghoomta — kaam wahi hota, waqt bekaar jaata. 3000 kadam me 8
+   * saal (roz wala) nikal jaate hain; usse aage koi asli reminder nahi hota.
+   */
+  const nowMs = Date.now();
+  for (let guard = 0; guard < 3000 && when.getTime() <= nowMs; guard++) {
+    when.setDate(when.getDate() + every);
+  }
+
+  let any = false;
   for (let i = 0; i < REPEAT_WINDOW; i++) {
     if (lastMs !== null && when.getTime() > lastMs) break;
     if (await schedule(occId(id, i), n.reminderTitle, title, new Date(when), "reminder")) {

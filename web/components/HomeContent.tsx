@@ -35,6 +35,7 @@ import Footer from "@/components/Footer";
 import SubHeader from "@/components/SubHeader";
 import LandingReferralPopup from "@/components/LandingReferralPopup";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import type { PublicReview, ReviewStats } from "@/lib/reviews-server";
 
 const featureIcons = [FileClock, Sunrise, Mic, MessageCircleHeart, Lock];
 const featureAccents = [
@@ -63,8 +64,21 @@ const trustIcons = [ShieldCheck, Mic, MessageCircleHeart, Bell];
  * build/revalidate ke waqt HTML me chali jaati hain aur Google ko dikhti hain.
  * Client component ke andar async server component nahi chal sakta, isliye
  * `app/page.tsx` (server) usse banata hai aur yahan bhej deta hai.
+ *
+ * `reviews`/`reviewStats` bhi thik isi wajah se prop hain: asli reviews DB se
+ * aate hain aur Google ko dikhne chahiye, isliye wo server par padhe jaate hain
+ * (`app/page.tsx`). Khaali hon to Testimonials apne purane handwritten items
+ * dikha deta hai — section kabhi khaali nahi rehta.
  */
-export default function Home({ blog }: { blog?: React.ReactNode }) {
+export default function Home({
+  blog,
+  reviews = [],
+  reviewStats,
+}: {
+  blog?: React.ReactNode;
+  reviews?: PublicReview[];
+  reviewStats?: ReviewStats;
+}) {
   const t = useT();
 
   return (
@@ -424,7 +438,7 @@ export default function Home({ blog }: { blog?: React.ReactNode }) {
         <section className="bg-cream-deep/40 py-16 sm:py-28">
           <div className="container-page">
             <Reveal>
-              <Testimonials />
+              <Testimonials reviews={reviews} stats={reviewStats} />
             </Reveal>
           </div>
         </section>

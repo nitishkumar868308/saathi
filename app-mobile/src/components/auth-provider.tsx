@@ -16,6 +16,8 @@ import {
   enforcePlanLimits,
 } from "@/lib/plan";
 import { takePendingReferral } from "@/lib/referral-pending";
+import { clearPlanCache, getPlanSnapshot, refreshPlan } from "@/lib/plan-store";
+import { useDataChanged } from "@/lib/data-events";
 import { clearUserDetailsCache } from "@/lib/user-details";
 import { loadAlertMode, setAlertUserName } from "@/lib/alert-mode";
 import { sendWelcomeEmail } from "@/lib/welcome";
@@ -33,6 +35,15 @@ type AuthValue = {
   /** Dobara check karo (pull-to-refresh, upgrade ke baad, waghera). */
   refreshRewards: () => Promise<void>;
 };
+
+/**
+ * Do data-change ke beech kam se kam itni der.
+ *
+ * `emitDataChanged()` ek hi kaam par kai jagah se chalta hai (reminder bana +
+ * alarm laga + list refresh). 15 second ki chhut se reward ka check apna kaam
+ * turant kar leta hai aur server par ek hi call jaati hai.
+ */
+const RECHECK_GAP_MS = 15_000;
 
 const AuthContext = createContext<AuthValue>({
   session: null,
@@ -110,6 +121,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await runRewards(true);
   }, [runRewards]);
 
+  /**
+   * Naya document ya reminder bana — referral ab qualify ho sakta hai.
+   *
+   * ⚠️ Ye hissa poori reward pipeline ka sabse zaroori aur sabse missing tukda
+   * tha. Referral ka reward do shartein poori hone par milta hai: ek document
+   * upload + ek reminder set. Dono aksar user PEHLE SESSION me hi kar leta hai —
+   * par `runRewards` sirf app khulne par chalti thi (SIGNED_IN / INITIAL_SESSION).
+   * Yaani grant agli baar app kholne tak rukta tha, aur us beech user ke saamne
+   * "Plus lo" wala banner baitha rehta tha jabki uske 15 din ban chuke the.
+   *
+   * Yahan poori pipeline nahi chalate — sirf wo do call jo is lamhe maayne rakhti
+   * hain. Welcome email aur pending-code apply pehle ho chuke hote hain, aur unhe
+   * har document par dobara chalana bekaar hai.
+   *
+   * Version tabhi badhta hai jab sach me kuch mila. Warna har document/reminder
+   * par poora app dobara render hota — bina kisi wajah ke.
+   */
+  const recheck = useRef(false);
+  const lastRecheck = useRef(0);
+  const onDataChanged = useCallback(() => {
+    if (!supabase || recheck.current) return;
+
+    /**
+     * Do rok — dono zaroori hain, warna ye ek fizool RPC-pump ban jaata hai.
+     *
+     * 1. Plus pehle se chalu hai → paane ko kuch nahi. Referral ka reward ek hi
+     *    baar milta hai, aur uske baad har "reminder done" par do RPC bhejna
+     *    sirf kharcha hai.
+     * 2. Thodi der ki chhut — `emitDataChanged()` kai jagah se ek saath chalta
+     *    hai (reminder bana + alarm laga + list refresh), aur har call par
+     *    server tak jaana bekaar hai.
+     */
+    if (getPlanSnapshot().isPlus) return;
+    if (Date.now() - lastRecheck.current < RECHECK_GAP_MS) return;
+
+    recheck.current = true;
+    lastRecheck.current = Date.now();
+    void (async () => {
+      try {
+        const res = await checkReferralQualification().catch(() => "error");
+        await enforcePlanLimits().catch(() => {});
+        if (res === "rewarded") {
+          setRewardsVersion((v) => v + 1);
+        } else {
+          // Grant nahi hua par limits badal sakti hain (naya document lock hua ya
+          // khula) — plan ka sach dobara padh lena sasta hai aur screen ko sahi
+          // rakhta hai.
+          void refreshPlan();
+        }
+      } finally {
+        recheck.current = false;
+      }
+    })();
+  }, []);
+
+  useDataChanged(onDataChanged);
+
   useEffect(() => {
     if (!supabase) {
       setLoading(false);
@@ -134,6 +202,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         doneFor.current = null;
         // Profile cache saaf — agla user purane ka naam/photo na dekhe.
         clearUserDetailsCache();
+        // Aur plan bhi. Iske bina agla user ek pal ke liye pichhle wale ka plan
+        // dekh leta: free ko Plus wali screen, ya Plus wale ko upgrade banner.
+        clearPlanCache();
       }
     });
     return () => sub.subscription.unsubscribe();

@@ -326,7 +326,11 @@
       "Bash(echo \"tsc=$?\")",
       "Bash(echo \"MOBILE tsc=$?\")",
       "Bash(echo \"WEB tsc=$?\")",
-      "Bash(grep -n \"\\\\\"rewards\\\\\" | \\\\\"pricing\\\\\"\\\\|type AdminSection\\\\|Record<\\\\s*$\" web/lib/i18n/admin.ts)"
+      "Bash(grep -n \"\\\\\"rewards\\\\\" | \\\\\"pricing\\\\\"\\\\|type AdminSection\\\\|Record<\\\\s*$\" web/lib/i18n/admin.ts)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(grep -n \"fetch\\(\\\\`\\\\${SUPABASE_URL}\" -A 8 /d/my-app/web/app/api/cron/document-expiry/route.ts)",
+      "Bash(echo \"WEB TSC:$?\")",
+      "Bash(echo \"MOBILE TSC:$?\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

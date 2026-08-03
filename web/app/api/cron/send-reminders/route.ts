@@ -127,11 +127,65 @@ export async function POST(request: Request) {
     return v;
   }
 
+  /** Jo kuch bhi galat gaya — jawab me aata hai, taaki chup-chaap na rahe. */
+  const errors: string[] = [];
+
+  /**
+   * Reminder ko aage sarkao — aur agar wo na ho paaye to usse ROKO.
+   *
+   * ⚠️ Yahan pehle ek chup-chaap bug tha jo bahut mehnga pad sakta tha. Call aisi
+   * likhi thi: `fetch(...).catch(...)`. Par `fetch` sirf network toot-ne par
+   * reject karta hai — 404 ya 500 ek KAAMYAB promise hai. Yaani RPC ke fail hone
+   * par (SQL na chala ho, function ka naam/grant badla ho, ya ek 500) yahan kuch
+   * pata hi nahi chalta tha, `notified_at` null pada rehta tha, `remind_at` beet
+   * chuka hota tha — aur agle minute wahi reminder DOBARA due nikal aata tha.
+   *
+   * Cron har minute chalta hai. Iska matlab ek hi reminder par har minute ek
+   * WhatsApp aur ek email — ghanton tak, jab tak kisi ki nazar na pade. User ke
+   * liye ye "spam" hai, hamare liye Twilio ka bill, aur number block hone ka
+   * seedha raasta.
+   *
+   * Ab do parat:
+   *   1. `res.ok` sach me dekha jaata hai, aur fail admin ko dikhta hai.
+   *   2. Fail hone par `notified_at` seedha bhar dete hain. Isse roz wala reminder
+   *      us din ke baad ruk jaata hai (jo apne aap me theek nahi hai) — par ek
+   *      ruka hua reminder har minute bajne wale reminder se bahut behtar hai.
+   *      Wajah `errors` me chali jaati hai, isliye ye chup-chaap nahi hota.
+   */
+  async function advance(id: string): Promise<void> {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_reminder`, {
+        method: "POST",
+        headers: sbHeaders({ Prefer: "return=minimal" }),
+        body: JSON.stringify({ p_id: id, p_sent_at: nowIso }),
+        cache: "no-store",
+      });
+      if (res.ok) return;
+      errors.push(
+        `advance ${id}: HTTP ${res.status} (supabase/reminder-repeat.sql run kiya?)`,
+      );
+    } catch (e) {
+      errors.push(`advance ${id}: ${String(e)}`);
+    }
+
+    // Aakhri sahara — dobara-dobara bhejne se rok do.
+    try {
+      const stop = await fetch(`${SUPABASE_URL}/rest/v1/reminders?id=eq.${id}`, {
+        method: "PATCH",
+        headers: sbHeaders({ Prefer: "return=minimal" }),
+        body: JSON.stringify({ notified_at: nowIso }),
+        cache: "no-store",
+      });
+      if (!stop.ok) errors.push(`stop ${id}: HTTP ${stop.status}`);
+    } catch (e) {
+      errors.push(`stop ${id}: ${String(e)}`);
+    }
+  }
+
   let wa = 0;
   let mail = 0;
   /** Free plan wale — inka reminder bhi nikla, par email/WhatsApp Plus ka hai. */
   let skippedFree = 0;
-  const errors: string[] = [];
 
   for (const r of due) {
     const label = whenLabel(r);
@@ -207,12 +261,7 @@ export async function POST(request: Request) {
     // saaf — taaki kal subah wapas due ho jaye. Agla din nikaalne ka hisaab
     // wahi SQL function karta hai jo app ka "ho gaya" button use karta hai,
     // isliye dono kabhi alag din par nahi ja sakte.
-    await fetch(`${SUPABASE_URL}/rest/v1/rpc/advance_reminder`, {
-      method: "POST",
-      headers: sbHeaders({ Prefer: "return=minimal" }),
-      body: JSON.stringify({ p_id: r.id, p_sent_at: nowIso }),
-      cache: "no-store",
-    }).catch((e) => errors.push(`advance ${r.id}: ${String(e)}`));
+    await advance(r.id);
   }
 
   return NextResponse.json({
