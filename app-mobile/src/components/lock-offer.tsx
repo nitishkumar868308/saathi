@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, Modal, StyleSheet, Animated, Easing } from "react-native";
+import { View, Text, Pressable, Modal, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
 import { getLockState } from "@/lib/app-lock";
@@ -24,6 +24,8 @@ import { getLockState } from "@/lib/app-lock";
 const SEEN_PREFIX = "saathi-lock-offer-seen:";
 
 export function LockOffer() {
+  const tc = useColors();
+  const styles = useStyles();
   const { lock: l } = useT();
   const { session } = useAuth();
   const router = useRouter();
@@ -87,7 +89,7 @@ export function LockOffer() {
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
           <View style={styles.card}>
             <View style={styles.iconWrap}>
-              <Ionicons name="lock-closed" size={24} color={colors.terracotta} />
+              <Ionicons name="lock-closed" size={24} color={tc.terracotta} />
             </View>
             <Text style={styles.title}>{l.offerTitle}</Text>
             <Text style={styles.body}>{l.offerBody}</Text>
@@ -111,7 +113,7 @@ export function LockOffer() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -121,11 +123,11 @@ const styles = StyleSheet.create({
   },
   cardWrap: { width: "100%", maxWidth: 420 },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: 26,
     padding: 22,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 28,
@@ -140,17 +142,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.12)",
   },
-  title: { marginTop: 15, fontSize: 20, fontWeight: "800", color: colors.ink, lineHeight: 27 },
-  body: { marginTop: 9, fontSize: 14, lineHeight: 21, color: colors.inkSoft },
+  title: { marginTop: 15, fontSize: 20, fontWeight: "800", color: c.ink, lineHeight: 27 },
+  body: { marginTop: 9, fontSize: 14, lineHeight: 21, color: c.inkSoft },
   cta: {
     marginTop: 20,
     height: 50,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 15, fontWeight: "800", color: colors.white },
+  ctaText: { fontSize: 15, fontWeight: "800", color: c.white },
   ghost: {
     marginTop: 9,
     height: 46,
@@ -158,8 +160,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  ghostText: { fontSize: 14, fontWeight: "700", color: colors.inkSoft },
-});
+  ghostText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
+}));

@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Platform, Pressable, Animated, StyleSheet, View } from "react-native";
+import { Platform, Pressable, Animated, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
 } from "expo-speech-recognition";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -131,6 +131,8 @@ let ownerSeq = 0;
 const ownerReset = new Map<number, () => void>();
 
 export function VoiceButton({ onText }: { onText: (text: string) => void }) {
+  const tc = useColors();
+  const styles = useStyles();
   const toast = useToast();
   const { voice: v } = useT();
   const [listening, setListening] = useState(false);
@@ -470,7 +472,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
           <Ionicons
             name={listening ? "mic" : "mic-outline"}
             size={20}
-            color={listening ? colors.white : colors.terracotta}
+            color={listening ? tc.white : tc.terracotta}
           />
         </View>
       </Pressable>
@@ -478,7 +480,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   btn: {
     height: 48,
     width: 48,
@@ -486,16 +488,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.terracotta,
-    backgroundColor: colors.surface,
+    borderColor: c.terracotta,
+    backgroundColor: c.surface,
     overflow: "hidden",
   },
-  btnActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
+  btnActive: { backgroundColor: c.terracotta, borderColor: c.terracotta },
   level: {
     position: "absolute",
     height: 46,
     width: 46,
     borderRadius: 23,
-    backgroundColor: colors.white,
+    backgroundColor: c.white,
   },
-});
+}));

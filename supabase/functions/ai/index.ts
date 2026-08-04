@@ -592,8 +592,16 @@ Deno.serve(async (req) => {
         `\n\nAGENTIC REMINDER: Agar user kuch yaad dilane / reminder / alarm set karne ko kahe:` +
         ` 3 cheezein chahiye — (1) kaam kya (title), (2) kaunsa din, (3) kaun sa time.` +
         ` Jo missing ho wo pyaar se pucho (reply me, ek-do sawaal). Jab tak title AUR poora date+time na mile, action null rakho.` +
-        ` Sab clear hote hi action bharo: {"type":"create_reminder","title":"<saaf kaam, bina time-phrase>","remind_at":"<naive local ISO jaise 2026-07-27T20:00:00, bina Z ya offset>","repeat_every_days":<number ya null>,"repeat_until":"<YYYY-MM-DD ya null>"}.` +
-        ` Abhi ka local time: ${now}. Isi se remind_at nikaalo — "kal"=agla din, "subah 8"=08:00, "shaam 6"/"6 baje shaam"=18:00, "raat 9"=21:00, "dopahar 2"=14:00, "N minute/ghante baad"=abhi se aage.` +
+        ` Sab clear hote hi action bharo: {"type":"create_reminder","title":"<saaf kaam, bina time-phrase>","remind_at":"<naive local ISO jaise 2026-07-27T20:00:00, bina Z ya offset>","in_seconds":<number ya null>,"repeat_every_days":<number ya null>,"repeat_until":"<YYYY-MM-DD ya null>"}.` +
+        ` Abhi ka local time: ${now}. Isi se remind_at nikaalo — "kal"=agla din, "subah 8"=08:00, "shaam 6"/"6 baje shaam"=18:00, "raat 9"=21:00, "dopahar 2"=14:00.` +
+        // ⚠️ Relative waqt SERVER par mat ginno. Tumhara jawab banne me hi 5-20
+        //    second lagte hain, aur utni der me "30 second baad" wala time beet
+        //    chuka hota hai — app use "beeta hua time" maan ke gira deti thi.
+        //    Isliye relative par sirf GINTI do; app jawab milte hi khud jodegi.
+        `\nRELATIVE WAQT: "N second/minute/ghante baad" (ya "after N sec/min/hour", "abhi se N minute me") ho to` +
+        ` remind_at ko null rakho aur in_seconds me SECONDS ki ginti do — "30 second baad"=30, "5 minute baad"=300, "2 ghante baad"=7200.` +
+        ` Aise me din/time poochne ki zaroorat NAHI hai (din aaj hi hai, time abhi se ginna hai) — seedha action bhar do, bas title chahiye.` +
+        ` Absolute din/time bola ho to ulta karo: remind_at bharo aur in_seconds null rakho. Dono ek saath kabhi mat bharo.` +
         // ⚠️ Ye poora hissa isliye hai ki user "roz gym 6 baje, 90 din tak" bolta
         //    tha aur reminder sirf EK BAAR bajta tha. Repeat nikalna model ka
         //    kaam hai — app me koi keyword-matching nahi hai (aur honi bhi nahi
@@ -700,11 +708,24 @@ Deno.serve(async (req) => {
       let action: unknown = null;
       const a = parsed.action;
       if (a && typeof a === "object") {
-        if (a.type === "create_reminder" && typeof a.title === "string" && typeof a.remind_at === "string") {
+        // Reminder do me se EK tarah se aa sakta hai: absolute time, ya "ab se
+        // itne second baad". Relative wala client par gina jaata hai (waha se
+        // dekho: SaathiAction ka `in_seconds`), isliye yahan sirf ginti pass
+        // karni hai.
+        const absAt = typeof a.remind_at === "string" && a.remind_at.trim() ? a.remind_at : null;
+        const relRaw = Number(a.in_seconds);
+        // Upar ki chhat 24 ghante: usse aage relative maangna bemtlab hai (aur
+        // ek bada number aksar model ki galti hoti hai, user ki baat nahi).
+        const relSec =
+          Number.isFinite(relRaw) && relRaw > 0 && relRaw <= 86_400 ? Math.round(relRaw) : null;
+
+        if (a.type === "create_reminder" && typeof a.title === "string" && (absAt || relSec)) {
           action = {
             type: "create_reminder",
             title: a.title.trim(),
-            remind_at: a.remind_at,
+            // Dono kabhi saath nahi — relative ho to wahi jeetta hai.
+            remind_at: relSec ? null : absAt,
+            in_seconds: relSec,
             ...repeatFields(a),
           };
         } else if (a.type === "navigate" && a.to === "add_document") {

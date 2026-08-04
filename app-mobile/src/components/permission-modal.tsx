@@ -5,7 +5,6 @@ import {
   Pressable,
   Modal,
   ScrollView,
-  StyleSheet,
   Animated,
   Easing,
   AppState,
@@ -15,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { syncNotifications } from "@/lib/notifications";
 import {
@@ -51,6 +50,8 @@ export function PermissionModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const { reliability: r, common } = useT();
   const [state, setState] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState<StepKey | null>(null);
@@ -149,7 +150,7 @@ export function PermissionModal({
               <Ionicons
                 name={allOk ? "checkmark-circle" : "alarm"}
                 size={26}
-                color={allOk ? colors.sage : colors.terracotta}
+                color={allOk ? tc.sage : tc.terracotta}
               />
             </View>
 
@@ -162,7 +163,7 @@ export function PermissionModal({
                 ho to alag se upar bataate hain. */}
             {!allOk && steps.some((s) => s.key === "fsi" && !s.ok) && (
               <View style={styles.spotlight}>
-                <Ionicons name="sparkles" size={16} color={colors.terracotta} />
+                <Ionicons name="sparkles" size={16} color={tc.terracotta} />
                 <Text style={styles.spotlightText}>{r.fsiSpotlight}</Text>
               </View>
             )}
@@ -185,7 +186,7 @@ export function PermissionModal({
                     <Ionicons
                       name={s.ok ? "checkmark" : ICONS[s.key]}
                       size={17}
-                      color={s.ok ? colors.white : colors.terracotta}
+                      color={s.ok ? tc.white : tc.terracotta}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -227,7 +228,7 @@ export function PermissionModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -237,11 +238,11 @@ const styles = StyleSheet.create({
   },
   cardWrap: { width: "100%", maxWidth: 440 },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: 28,
     padding: 22,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 30,
@@ -260,10 +261,10 @@ const styles = StyleSheet.create({
     marginTop: 15,
     fontSize: 21,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 28,
   },
-  body: { marginTop: 8, fontSize: 14.5, lineHeight: 22, color: colors.inkSoft },
+  body: { marginTop: 8, fontSize: 14.5, lineHeight: 22, color: c.inkSoft },
   spotlight: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -281,9 +282,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontWeight: "600",
-    color: colors.ink,
+    color: c.ink,
   },
-  stepKey: { borderColor: colors.terracotta, borderWidth: 1.5 },
+  stepKey: { borderColor: c.terracotta, borderWidth: 1.5 },
   // flexShrink: card ki maxHeight lagne par sirf yahi hissa chhota hota hai —
   // heading upar aur button neeche hamesha dikhte rehte hain.
   list: { marginTop: 14, flexShrink: 1 },
@@ -294,8 +295,8 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     padding: 12,
     marginBottom: 9,
   },
@@ -308,25 +309,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.12)",
   },
-  stepIconDone: { backgroundColor: colors.sage },
-  stepTitle: { fontSize: 14.5, fontWeight: "700", color: colors.ink },
-  stepSub: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: colors.inkSoft },
-  stepOk: { fontSize: 12.5, fontWeight: "700", color: colors.sage },
+  stepIconDone: { backgroundColor: c.sage },
+  stepTitle: { fontSize: 14.5, fontWeight: "700", color: c.ink },
+  stepSub: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: c.inkSoft },
+  stepOk: { fontSize: 12.5, fontWeight: "700", color: c.sage },
   allowBtn: {
     borderRadius: 999,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  allowText: { fontSize: 12.5, fontWeight: "800", color: colors.white },
+  allowText: { fontSize: 12.5, fontWeight: "800", color: c.white },
   cta: {
     marginTop: 12,
     height: 50,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.ink,
+    backgroundColor: c.ink,
   },
-  ctaDone: { backgroundColor: colors.sage },
-  ctaText: { fontSize: 15.5, fontWeight: "800", color: colors.white },
-});
+  ctaDone: { backgroundColor: c.sage },
+  ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white },
+}));

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,7 +18,7 @@ import {
   type CountryCode,
 } from "libphonenumber-js";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { OtpModal } from "@/components/otp-modal";
 import { useToast } from "@/components/toast";
@@ -40,6 +39,8 @@ import {
 } from "@/lib/user-details";
 
 export default function ProfileDetails() {
+  const tc = useColors();
+  const styles = useStyles();
   const { profileDetails: t } = useT();
   const genders = [
     { key: "male", label: t.male },
@@ -264,7 +265,7 @@ export default function ProfileDetails() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <Ionicons name="chevron-back" size={22} color={tc.ink} />
         </Pressable>
         <Text style={styles.title}>{t.title}</Text>
         <View style={{ width: 22 }} />
@@ -283,7 +284,7 @@ export default function ProfileDetails() {
               <Pressable onPress={changePhoto} disabled={uploadingAvatar} style={styles.avatar}>
                 <UserAvatar uri={avatarUrl} name={fullName} size={92} radius={46} />
                 <View style={styles.avatarBadge}>
-                  <Ionicons name="camera" size={15} color={colors.white} />
+                  <Ionicons name="camera" size={15} color={tc.white} />
                 </View>
               </Pressable>
               <Text style={styles.avatarHint}>{t.photoHint}</Text>
@@ -295,7 +296,7 @@ export default function ProfileDetails() {
               value={fullName}
               onChangeText={setFullName}
               placeholder={t.fullNamePlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
             />
 
             {/* Email login se aata hai — badalna account todta hai, isliye
@@ -305,7 +306,7 @@ export default function ProfileDetails() {
               <Text style={styles.lockedText} numberOfLines={1}>
                 {email}
               </Text>
-              <Ionicons name="lock-closed" size={15} color={colors.inkSoft} />
+              <Ionicons name="lock-closed" size={15} color={tc.inkSoft} />
             </View>
             <Text style={styles.hint}>{t.emailLocked}</Text>
 
@@ -367,7 +368,7 @@ export default function ProfileDetails() {
             {phoneOk &&
               (verified ? (
                 <View style={styles.verifiedRow}>
-                  <Ionicons name="checkmark-circle" size={17} color={colors.sage} />
+                  <Ionicons name="checkmark-circle" size={17} color={tc.sage} />
                   <Text style={styles.verifiedText}>{t.verified}</Text>
                 </View>
               ) : (
@@ -377,7 +378,7 @@ export default function ProfileDetails() {
                     onPress={() => setOtpOpen(true)}
                     style={({ pressed }) => [styles.verifyBtn, pressed && { opacity: 0.85 }]}
                   >
-                    <Ionicons name="shield-checkmark" size={15} color={colors.white} />
+                    <Ionicons name="shield-checkmark" size={15} color={tc.white} />
                     <Text style={styles.verifyBtnText}>{t.verifyCta}</Text>
                   </Pressable>
                 </View>
@@ -389,7 +390,7 @@ export default function ProfileDetails() {
               value={address}
               onChangeText={setAddress}
               placeholder={t.addressPlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               multiline
             />
 
@@ -453,8 +454,8 @@ export default function ProfileDetails() {
 }
 
 // Simple inline select (chips-wrap). Chhoti lists ke liye theek.
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -463,18 +464,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   back: { padding: 4 },
-  title: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 18, fontWeight: "700", color: c.ink },
   content: { padding: 20, paddingBottom: 20 },
   avatarWrap: { alignItems: "center", marginBottom: 8 },
   avatar: {
     height: 92,
     width: 92,
     borderRadius: 46,
-    backgroundColor: colors.creamDeep,
+    backgroundColor: c.creamDeep,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
   avatarImg: { height: 92, width: 92, borderRadius: 46 },
   avatarBadge: {
@@ -484,41 +485,41 @@ const styles = StyleSheet.create({
     height: 30,
     width: 30,
     borderRadius: 15,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: colors.cream,
+    borderColor: c.cream,
   },
-  avatarHint: { marginTop: 10, fontSize: 13, color: colors.inkSoft },
+  avatarHint: { marginTop: 10, fontSize: 13, color: c.inkSoft },
   label: {
     marginTop: 18,
     marginBottom: 8,
     fontSize: 15,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
   input: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
   inputLocked: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: colors.creamDeep,
+    backgroundColor: c.creamDeep,
   },
-  lockedText: { flex: 1, fontSize: 15, color: colors.inkSoft },
-  hint: { marginTop: 6, fontSize: 12.5, lineHeight: 17, color: colors.inkSoft },
+  lockedText: { flex: 1, fontSize: 15, color: c.inkSoft },
+  hint: { marginTop: 6, fontSize: 12.5, lineHeight: 17, color: c.inkSoft },
   // Verify ho chuka — chhota, shaant nishaan. Yahan kuch karna baaki nahi hai.
   verifiedRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  verifiedText: { fontSize: 13.5, fontWeight: "700", color: colors.sage },
+  verifiedText: { fontSize: 13.5, fontWeight: "700", color: c.sage },
   // Verify baaki hai — isse dikhna chahiye, kyunki bina iske WhatsApp reminder
   // galat number par ja sakta hai aur kisi ko pata bhi nahi chalta.
   verifyBox: {
@@ -529,7 +530,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.07)",
     padding: 13,
   },
-  verifyWhy: { fontSize: 12.5, lineHeight: 19, color: colors.inkSoft },
+  verifyWhy: { fontSize: 12.5, lineHeight: 19, color: c.inkSoft },
   verifyBtn: {
     marginTop: 11,
     alignSelf: "flex-start",
@@ -539,23 +540,23 @@ const styles = StyleSheet.create({
     height: 40,
     paddingHorizontal: 16,
     borderRadius: 14,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  verifyBtnText: { fontSize: 13.5, fontWeight: "800", color: colors.white },
-  err: { marginTop: 6, fontSize: 13, color: colors.terracotta, fontWeight: "600" },
+  verifyBtnText: { fontSize: 13.5, fontWeight: "800", color: c.white },
+  err: { marginTop: 6, fontSize: 13, color: c.terracotta, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
-  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  chipText: { fontSize: 13.5, fontWeight: "600", color: colors.inkSoft },
-  chipTextActive: { color: colors.cream },
-  selectEmpty: { fontSize: 14, color: colors.inkSoft, fontStyle: "italic" },
+  chipActive: { backgroundColor: c.ink, borderColor: c.ink },
+  chipText: { fontSize: 13.5, fontWeight: "600", color: c.inkSoft },
+  chipTextActive: { color: c.cream },
+  selectEmpty: { fontSize: 14, color: c.inkSoft, fontStyle: "italic" },
   save: {
     margin: 20,
     marginTop: 8,
@@ -563,7 +564,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  saveText: { color: colors.white, fontWeight: "700", fontSize: 16 },
-});
+  saveText: { color: c.white, fontWeight: "700", fontSize: 16 },
+}));

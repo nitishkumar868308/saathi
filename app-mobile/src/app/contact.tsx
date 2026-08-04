@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -13,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
@@ -38,6 +37,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * likhni hai.
  */
 export default function Contact() {
+  const tc = useColors();
+  const styles = useStyles();
   const t = useT();
   const c = t.contact;
   const toast = useToast();
@@ -89,7 +90,7 @@ export default function Contact() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <Ionicons name="chevron-back" size={22} color={tc.ink} />
         </Pressable>
         <Text style={styles.title}>{c.title}</Text>
         <View style={{ width: 30 }} />
@@ -98,7 +99,7 @@ export default function Contact() {
       {sent ? (
         <View style={styles.doneWrap}>
           <View style={styles.doneIcon}>
-            <Ionicons name="checkmark" size={34} color={colors.white} />
+            <Ionicons name="checkmark" size={34} color={tc.white} />
           </View>
           <Text style={styles.doneTitle}>{c.sentTitle}</Text>
           <Text style={styles.doneBody}>{c.sentBody}</Text>
@@ -126,7 +127,7 @@ export default function Contact() {
               value={name}
               onChangeText={setName}
               placeholder={c.namePlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               style={styles.input}
             />
 
@@ -135,7 +136,7 @@ export default function Contact() {
               value={email}
               onChangeText={setEmail}
               placeholder={c.emailPlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -147,7 +148,7 @@ export default function Contact() {
               value={message}
               onChangeText={setMessage}
               placeholder={c.messagePlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               style={[styles.input, styles.textarea]}
               multiline
               textAlignVertical="top"
@@ -165,7 +166,7 @@ export default function Contact() {
               (pressed || sending || !canSend) && { opacity: 0.55 },
             ]}
           >
-            <Ionicons name="paper-plane" size={17} color={colors.white} />
+            <Ionicons name="paper-plane" size={17} color={tc.white} />
             <Text style={styles.sendText}>{sending ? c.sending : c.send}</Text>
           </Pressable>
         </KeyboardAvoidingView>
@@ -178,8 +179,8 @@ export default function Contact() {
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -189,25 +190,25 @@ const styles = StyleSheet.create({
     ...CONTENT,
   },
   back: { padding: 4 },
-  title: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 18, fontWeight: "700", color: c.ink },
   content: { padding: 20, ...CONTENT },
-  sub: { fontSize: 14.5, lineHeight: 21, color: colors.inkSoft },
+  sub: { fontSize: 14.5, lineHeight: 21, color: c.inkSoft },
   label: {
     marginTop: 20,
     marginBottom: 8,
     fontSize: 13.5,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
   input: {
     minHeight: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
   textarea: { minHeight: 140 },
@@ -218,10 +219,10 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
   sendFooter: { margin: 20, marginTop: 8, ...CONTENT },
-  sendText: { color: colors.white, fontWeight: "800", fontSize: 16 },
+  sendText: { color: c.white, fontWeight: "800", fontSize: 16 },
   doneWrap: {
     flex: 1,
     alignItems: "center",
@@ -236,16 +237,16 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.sage,
+    backgroundColor: c.sage,
     marginBottom: 6,
   },
-  doneTitle: { fontSize: 22, fontWeight: "800", color: colors.ink },
+  doneTitle: { fontSize: 22, fontWeight: "800", color: c.ink },
   doneBody: {
     fontSize: 15,
     lineHeight: 22,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     maxWidth: 300,
     marginBottom: 18,
   },
-});
+}));

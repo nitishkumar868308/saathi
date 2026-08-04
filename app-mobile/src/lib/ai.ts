@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { timed } from "./network";
+import { aiCallEnded, aiCallStarted, isReachable, reportOnline } from "./network";
 import { reportError } from "./report-error";
 
 /**
@@ -40,8 +40,26 @@ export type SaathiAction =
   | {
       type: "create_reminder";
       title: string;
-      /** Pehli baar kab. Aage ka hisaab client/server khud karte hain. */
-      remind_at: string;
+      /**
+       * Pehli baar kab — ABSOLUTE time ("kal subah 8 baje"). Aage ka hisaab
+       * client/server khud karte hain. Relative reminder me ye null hota hai.
+       */
+      remind_at: string | null;
+      /**
+       * "30 second baad", "5 minute baad" — ab se kitni der baad.
+       *
+       * ⚠️ Ye alag field isliye hai, aur yahi is file ka sabse zaroori design
+       * faisla hai: **relative waqt ka hisaab CLIENT par hona chahiye, server par
+       * nahi.** Server jis lamhe `remind_at` banata hai, wo lamha user tak
+       * pahunchte-pahunchte 5-20 second purana ho chuka hota hai (AI ko sochne me
+       * itna lagta hi hai). Absolute time par is der se kuch nahi bigadta, par
+       * relative par poora matlab hi badal jaata hai — "30 second baad" wala
+       * reminder aane se pehle hi beet chuka hota tha.
+       *
+       * Isliye: relative ho to server sirf GINTI bhejta hai, aur client jawab
+       * milte hi `Date.now() + in_seconds` nikaal leta hai.
+       */
+      in_seconds?: number | null;
       /** Roz wala reminder — kitne din baad dobara. null = ek hi baar. */
       repeat_every_days?: number | null;
       /** Aakhri din (YYYY-MM-DD) — "90 din tak". null = koi limit nahi. */
@@ -49,19 +67,42 @@ export type SaathiAction =
     }
   | { type: "navigate"; to: "add_document" };
 
+/**
+ * AI ka jawab kyun nahi aaya.
+ *
+ * ⚠️ Pehle yahan sirf ek `failed: boolean` tha, aur chat usse dekh ke seedha
+ * "internet ne saath nahi diya" wala POORI SCREEN ka popup khol deta tha — awaaz
+ * ke saath. Char bilkul alag cheezein ek hi shakl me dikhti thi: sach me offline
+ * hona, Gemini ka 429, `GEMINI_API_KEY` ka set na hona, aur AI ka der karna.
+ * Inme se teen ka internet se koi lena-dena hi nahi hai. Yahi wo "net theek hai
+ * phir bhi internet wala message aata hai" wali shikayat ki jad thi.
+ *
+ * Ab har fail ki apni wajah hoti hai, aur `offline` ke alawa kisi par bhi wo
+ * full-screen popup nahi khulta.
+ */
+export type AiFailure =
+  /** Probe bhi fail — internet sach me nahi hai. Sirf yahi popup ke laayak hai. */
+  | "offline"
+  /** 429/503 — Gemini ya edge function bhara hua hai. Net theek hai. */
+  | "busy"
+  /** Baaki server-side galti (key nahi, function deploy nahi, 5xx). Net theek hai. */
+  | "server"
+  /** Timeout, par probe pass — AI ne der ki, net ne nahi. */
+  | "slow";
+
 export type SaathiReply = {
   reply: string;
   action: SaathiAction | null;
   /**
-   * AI tak baat pahunchi hi nahi (net/timeout/server) — `reply` sirf fallback
-   * text hai, Saathi ka asli jawab nahi.
+   * AI tak baat pahunchi hi nahi — `reply` sirf fallback text hai, Saathi ka
+   * asli jawab nahi.
    *
-   * ⚠️ Ye flag isliye hai kyunki pehle dono cheezein ek jaisi dikhti thi: net
-   * fail hone par bhi wahi "main sirf reminders/documents me madad kar sakta
-   * hoon" wala message aata tha. User ko lagta tha Saathi ne mana kar diya,
-   * jabki asal me request pahunchi hi nahi thi (item 7 & 15).
+   * ⚠️ Ye isliye hai kyunki pehle dono cheezein ek jaisi dikhti thi: net fail
+   * hone par bhi wahi "main sirf reminders/documents me madad kar sakta hoon"
+   * wala message aata tha. User ko lagta tha Saathi ne mana kar diya, jabki
+   * asal me request pahunchi hi nahi thi (item 7 & 15).
    */
-  failed?: boolean;
+  failure?: AiFailure;
 };
 
 /**
@@ -75,39 +116,92 @@ export type SaathiReply = {
 const CHAT_TIMEOUT_MS = 25_000;
 const TASK_TIMEOUT_MS = 15_000;
 
-/** Timeout ka apna error — caller ise net-failure maan sakta hai. */
+/**
+ * Timeout ka apna error.
+ *
+ * ⚠️ Iska message pehle `"AI timeout — network"` tha — aur `net-alert.ts` ka
+ * `isNetworkError()` "timeout" aur "network" DONO par match karta hai. Yaani AI
+ * ka der se jawab dena definition se hi internet ki galti gina jaata tha, chahe
+ * net fibre ka ho. Ab message me wo shabd nahi hai, aur wajah `classify()` ek
+ * asli probe chala ke tay karta hai — shabd dekh ke nahi.
+ */
 class AiTimeoutError extends Error {
   constructor() {
-    super("AI timeout — network");
+    super("AI timeout");
     this.name = "AiTimeoutError";
   }
 }
 
-/**
- * "Internet dheema" banner AI ke liye kab sach hai.
- *
- * ⚠️ Pehle yahan network.ts ka 4-second wala default lagta tha, aur wahi sabse
- * zyada dohrayi jaane wali shikayat ki jad tha: "net bilkul theek hai, phir bhi
- * slow-internet wala aa jaata hai". Baat seedhi hai — Gemini ko jawab BANANE me
- * hi 5–15 second lagte hain. Wo intezaar network ka nahi, AI ke sochne ka hai,
- * aur usse net ki dikkat batana galat hi tha.
- *
- * Ab threshold har call ke apne timeout se nikalta hai: 80% par pahunch gaye
- * matlab ye request sach me marne wali hai — tabhi banner sach bolta hai.
- */
-const SLOW_AT = 0.8;
+/** AI ka fail, apni asli wajah ke saath. */
+class AiError extends Error {
+  constructor(
+    readonly kind: AiFailure,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AiError";
+  }
+}
 
-/** Promise ko time-box karo — der ho gayi to throw. */
+/** Kisi bhi error se AI ki wajah nikaalo (na mile to server-side maano). */
+function failureOf(e: unknown): AiFailure {
+  return e instanceof AiError ? e.kind : "server";
+}
+
+/**
+ * Promise ko time-box karo — der ho gayi to throw.
+ *
+ * ⚠️ Yahan pehle `timed()` lagta tha, yaani AI ka intezaar seedha "internet
+ * dheema" banner chala deta tha. Gemini ko jawab BANANE me hi 5-20 second lagte
+ * hain, chahe net fibre ka ho — wo intezaar network ka nahi, AI ke sochne ka
+ * hai. Pehle ise 80% threshold se dabaya gaya tha, par wo sirf number badalna
+ * tha: 25 second wali chat par banner ab bhi 20 second par aa jaata tha. Ab AI
+ * us banner ko chhoo hi nahi sakti (doosri parat `callAi` ka `aiCallStarted()`
+ * hai, jo doosri requests ko bhi rokta hai).
+ *
+ * `reportOnline()` phir bhi zaroori hai — jawab aa gaya matlab net chalu hai, aur
+ * usse OS ka jhoota "offline" flag turant kat jaata hai.
+ */
 async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const guard = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => reject(new AiTimeoutError()), ms);
   });
   try {
-    return await timed(Promise.race([work, guard]), Math.round(ms * SLOW_AT));
+    const out = await Promise.race([work, guard]);
+    reportOnline();
+    return out;
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/**
+ * Server ne jawab diya tha ya request pahunchi hi nahi?
+ *
+ * Status ka hona apne aap me ek badi khabar hai: iska matlab hai ki request
+ * server tak gayi AUR jawab wapas aaya — yaani **internet bilkul theek hai**,
+ * galti doosre chhor ki hai. `classify()` ka aadha kaam yahi batata hai.
+ */
+function statusOf(e: unknown): number | null {
+  const ctx = (e as { context?: unknown })?.context as Response | undefined;
+  return ctx && typeof ctx.status === "number" ? ctx.status : null;
+}
+
+/**
+ * Fail ki asli wajah — shabd dekh ke nahi, saboot dekh ke.
+ *
+ * ⚠️ Yahi wo jagah hai jiske na hone se poori shikayat paida hoti thi. Pehle har
+ * fail seedha "internet ne saath nahi diya" ban jaata tha. Ab:
+ *   - status mila     → server bola, net theek hai (429/503 = busy, baaki = server)
+ *   - status nahi mila → probe chalao. Probe pass = net theek hai; fail = offline.
+ */
+async function classify(e: unknown): Promise<AiFailure> {
+  const status = statusOf(e);
+  if (status !== null) return status === 429 || status === 503 ? "busy" : "server";
+  // Na status, na jawab — ya timeout, ya request nikli hi nahi. Net ko jaancho.
+  if (!(await isReachable())) return "offline";
+  return e instanceof AiTimeoutError ? "slow" : "server";
 }
 
 /**
@@ -118,6 +212,10 @@ async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
  * nahi hui, GEMINI_API_KEY nahi hai, Gemini ne 429 diya — response body me hoti
  * hai, jo `error.context` (ek Response) me chhupi rehti hai. Bina isse padhe
  * har AI fail ek jaisa dikhta hai aur kuch pata nahi chalta.
+ *
+ * ⚠️ Ye response ka body PADH leta hai, jo ek hi baar padha ja sakta hai —
+ * isliye `classify()` (jo sirf `status` dekhta hai) hamesha isse PEHLE chalna
+ * chahiye.
  */
 async function describeError(e: unknown): Promise<unknown> {
   const ctx = (e as { context?: unknown })?.context as Response | undefined;
@@ -135,51 +233,81 @@ async function describeError(e: unknown): Promise<unknown> {
 }
 
 /**
- * Ek AI call, do koshish.
+ * Ek AI call.
  *
- * Dheeme net par pehli request aksar beech me toot jaati hai — aur wahi "AI kaam
- * nahi kar raha" wali shikayat banti thi. Ek chhoti si dobara-koshish 90% aise
- * cases nikaal deti hai. Do se zyada nahi: usse user ka intezaar hi lamba hoga.
+ * **Dobara koshish sirf turant toote connection par.** Dheeme net par pehli
+ * request kabhi-kabhi seconds me hi toot jaati hai; wahan ek chhoti si retry
+ * sach me kaam bacha leti hai.
+ *
+ * ⚠️ Par pehle retry HAR fail par hoti thi — timeout par bhi. Timeout ka matlab
+ * hai hum pehle hi poore 25 second de chuke hain; 25 aur dena sazaa hai. Chat me
+ * iska seedha nateeja ye tha ki user 50+ second tak latka rehta tha, do baar
+ * "internet dheema" banner dekhta tha, aur aakhir me full-screen internet wala
+ * popup — jabki net bilkul theek tha. Ab timeout ya HTTP status wale fail par
+ * dobara nahi bhejte: dono ka matlab hai ki request pahunch chuki thi.
+ *
+ * `aiCallStarted/Ended` poore is call ke dauraan slow-banner band rakhta hai —
+ * app ki KISI bhi doosri request se bhi. Wahi cross-talk tha jisse "AI use karte
+ * hi internet slow ho jaata hai" wala ehsaas banta tha.
  */
 async function callAi<T>(
   body: Record<string, unknown>,
   timeoutMs: number,
 ): Promise<T> {
-  if (!supabase) throw new Error("supabase not configured");
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const { data, error } = await withTimeout(
-        supabase.functions.invoke("ai", { body }),
-        timeoutMs,
-      );
-      if (error) throw error;
-      return data as T;
-    } catch (e) {
-      lastErr = e;
-      // Aakhri koshish thi — aage error hi jayega.
-      if (attempt === 1) break;
-      // Thoda ruk ke dobara — turant retry usi toote connection par jaata hai.
-      await new Promise((r) => setTimeout(r, 700));
-    }
-  }
+  if (!supabase) throw new AiError("server", "supabase not configured");
 
-  // ⚠️ Har caller ka catch khaali tha (`catch { return null }`), isliye "AI kahin
-  // bhi kaam nahi kar raha" ka koi nishaan kahin nahi bachta tha — na app me, na
-  // admin > Logs me. Ab har fail apne asli message ke saath wahan dikhta hai.
-  reportError(
-    await describeError(lastErr),
-    { screen: "ai", action: String(body.task ?? "unknown") },
-    "warn",
-  );
-  throw lastErr;
+  aiCallStarted();
+  try {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, error } = await withTimeout(
+          supabase.functions.invoke("ai", { body }),
+          timeoutMs,
+        );
+        if (error) throw error;
+        return data as T;
+      } catch (e) {
+        lastErr = e;
+        // Aakhri koshish thi — aage error hi jayega.
+        if (attempt === 1) break;
+        // Server tak baat pahunch chuki thi (timeout ya status) — dobara bhejna
+        // sirf intezaar lamba karega, kaamyabi ka mauka nahi badhayega.
+        if (e instanceof AiTimeoutError || statusOf(e) !== null) break;
+        // Thoda ruk ke dobara — turant retry usi toote connection par jaata hai.
+        await new Promise((r) => setTimeout(r, 700));
+      }
+    }
+
+    const kind = await classify(lastErr);
+    // ⚠️ Har caller ka catch khaali tha (`catch { return null }`), isliye "AI kahin
+    // bhi kaam nahi kar raha" ka koi nishaan kahin nahi bachta tha — na app me, na
+    // admin > Logs me. Ab har fail apne asli message ke saath wahan dikhta hai.
+    const described = await describeError(lastErr);
+    reportError(described, { screen: "ai", action: String(body.task ?? "unknown") }, "warn");
+    throw new AiError(
+      kind,
+      described instanceof Error ? described.message : String(described),
+    );
+  } finally {
+    aiCallEnded();
+  }
 }
 
-/** Abhi ka LOCAL time naive ISO me (bina Z) — server isi se remind_at nikaalta hai. */
+/**
+ * Abhi ka LOCAL time naive ISO me (bina Z) — server isi se remind_at nikaalta hai.
+ *
+ * ⚠️ Seconds pehle hardcoded `:00` the, yaani AI ko hamesha ek aisa waqt milta
+ * tha jo 0-59 second PEECHE hota tha. Absolute time ("10:45 am") par isse kuch
+ * fark nahi padta, isliye ye kabhi pakda nahi gaya. Par har RELATIVE reminder
+ * utna hi jaldi baj jaata tha — aur "30 second baad" to bilkul hi kaam nahi
+ * karta tha: AI ka nikala hua time aane se pehle hi beet chuka hota tha, aur
+ * chat use "beeta hua time" maan ke Add-reminder screen par phenk deti thi.
+ */
 function localNowIso(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 /** Saathi se jawab lo. Network/config fail ho to bhi kuch na kuch lautata hai. */
@@ -190,7 +318,8 @@ export async function askSaathi(
   opts: AskOpts = {},
 ): Promise<SaathiReply> {
   const fallback = opts.fallback ?? STUB_REPLY;
-  if (!supabase) return { reply: fallback, action: null, failed: true };
+  // Key hi set nahi hai — ye setup ki galti hai, internet ki nahi.
+  if (!supabase) return { reply: fallback, action: null, failure: "server" };
   try {
     const d = await callAi<{ reply?: string; action?: SaathiAction | null } | null>(
       {
@@ -207,10 +336,10 @@ export async function askSaathi(
     const reply = d?.reply && d.reply.trim() ? d.reply : fallback;
     // Server ne jawab to diya — ye AI ki apni baat hai, net ki nahi.
     return { reply, action: d?.action ?? null };
-  } catch {
-    // Yahan pahunchna hamesha "baat pahunchi hi nahi" hai. `failed` se caller
-    // retry dikha deta hai — decline message nahi.
-    return { reply: fallback, action: null, failed: true };
+  } catch (e) {
+    // Yahan pahunchna hamesha "baat pahunchi hi nahi" hai. `failure` se caller
+    // sahi baat aur retry dikha deta hai — decline message nahi.
+    return { reply: fallback, action: null, failure: failureOf(e) };
   }
 }
 

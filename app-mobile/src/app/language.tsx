@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, Animated, Easing, StyleSheet } from "react-native";
+import { View, Text, Pressable, Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import SaathiLogo from "@/components/saathi-logo";
 import { useLocale } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, type Locale } from "@/lib/i18n/dictionaries";
@@ -31,6 +31,8 @@ const COPY = {
 };
 
 export default function LanguageSelect() {
+  const tc = useColors();
+  const styles = useStyles();
   const { locale, setLocale } = useLocale();
   const [picked, setPicked] = useState<Locale>(locale);
 
@@ -98,7 +100,7 @@ export default function LanguageSelect() {
                   <Text style={[styles.optSub, active && styles.optActiveSub]}>{meta.sub}</Text>
                 </View>
                 <View style={[styles.radio, active && styles.radioActive]}>
-                  {active && <Ionicons name="checkmark" size={15} color={colors.white} />}
+                  {active && <Ionicons name="checkmark" size={15} color={tc.white} />}
                 </View>
               </Pressable>
             );
@@ -112,7 +114,7 @@ export default function LanguageSelect() {
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.9 }]}
         >
           <Text style={styles.ctaText}>{COPY.continue}</Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.white} />
+          <Ionicons name="arrow-forward" size={18} color={tc.white} />
         </Pressable>
         <Text style={styles.note}>{COPY.note}</Text>
       </View>
@@ -120,8 +122,8 @@ export default function LanguageSelect() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream, justifyContent: "space-between" },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream, justifyContent: "space-between" },
   content: { paddingHorizontal: 26, paddingTop: 30 },
   hero: { alignItems: "center" },
   logoGlow: {
@@ -149,7 +151,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     fontSize: 27,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 34,
     textAlign: "center",
     letterSpacing: -0.4,
@@ -158,7 +160,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 15.5,
     lineHeight: 22,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
   choose: {
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.6,
     textTransform: "uppercase",
-    color: colors.inkSoft,
+    color: c.inkSoft,
   },
   options: { marginTop: 14, gap: 12 },
   opt: {
@@ -176,29 +178,29 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 18,
     paddingVertical: 16,
   },
   optActive: {
-    borderColor: colors.terracotta,
+    borderColor: c.terracotta,
     backgroundColor: "rgba(194,90,55,0.06)",
   },
-  optNative: { fontSize: 18, fontWeight: "700", color: colors.ink },
-  optActiveText: { color: colors.terracotta },
-  optSub: { marginTop: 2, fontSize: 13, color: colors.inkSoft },
-  optActiveSub: { color: colors.terracottaDark },
+  optNative: { fontSize: 18, fontWeight: "700", color: c.ink },
+  optActiveText: { color: c.terracotta },
+  optSub: { marginTop: 2, fontSize: 13, color: c.inkSoft },
+  optActiveSub: { color: c.terracottaDark },
   radio: {
     height: 26,
     width: 26,
     borderRadius: 13,
     borderWidth: 2,
-    borderColor: colors.line,
+    borderColor: c.line,
     alignItems: "center",
     justifyContent: "center",
   },
-  radioActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
+  radioActive: { backgroundColor: c.terracotta, borderColor: c.terracotta },
   footer: { paddingHorizontal: 26, paddingBottom: 20 },
   cta: {
     flexDirection: "row",
@@ -207,8 +209,8 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 56,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 17, fontWeight: "800", color: colors.white },
-  note: { marginTop: 12, textAlign: "center", fontSize: 13, color: colors.inkSoft },
-});
+  ctaText: { fontSize: 17, fontWeight: "800", color: c.white },
+  note: { marginTop: 12, textAlign: "center", fontSize: 13, color: c.inkSoft },
+}));

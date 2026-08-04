@@ -5,28 +5,46 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  // Theme `<html class="dark">` se badalti hai — user ka apna faisla OS ke
+  // faisle se upar rehna chahiye, isliye media-query wala mode nahi.
+  darkMode: "class",
   theme: {
     extend: {
+      /**
+       * Rang seedhe hex me NAHI hain — CSS variables me hain.
+       *
+       * ⚠️ Ye poore dark mode ka sabse zaroori faisla hai. Hex likhne par har
+       * component me `dark:` wala doosra class jodna padta: `bg-cream
+       * dark:bg-[#1A1714]`, aur wo bhi 50+ files me, har jagah. Ek bhi jagah
+       * chhoot jaati to dark mode me safed patti chamak jaati.
+       *
+       * Variables ke saath maujooda `bg-cream`, `text-ink`, `border-line` —
+       * sab apne aap dono theme me sahi rang le lete hain. Kisi component ko
+       * haath lagane ki zaroorat hi nahi padti.
+       *
+       * `<alpha-value>` isliye ki `bg-terracotta/12` jaisi opacity abhi bhi
+       * chale — wahi Tailwind us jagah asli alpha bhar deta hai.
+       */
       colors: {
         // Warm, cozy, premium — Dot (New Computer) inspired
         cream: {
-          DEFAULT: "#F7F2E9", // page background
-          deep: "#EFE7D6",
+          DEFAULT: "rgb(var(--c-cream) / <alpha-value>)", // page background
+          deep: "rgb(var(--c-cream-deep) / <alpha-value>)",
         },
-        surface: "#FFFCF6", // cards
+        surface: "rgb(var(--c-surface) / <alpha-value>)", // cards
         ink: {
-          DEFAULT: "#2E2823", // primary text (warm near-black)
-          soft: "#6B5F54", // muted text
+          DEFAULT: "rgb(var(--c-ink) / <alpha-value>)", // primary text
+          soft: "rgb(var(--c-ink-soft) / <alpha-value>)", // muted text
         },
         terracotta: {
-          DEFAULT: "#C25A37",
-          dark: "#A8492B",
+          DEFAULT: "rgb(var(--c-terracotta) / <alpha-value>)",
+          dark: "rgb(var(--c-terracotta-dark) / <alpha-value>)",
         },
         amber: {
-          warm: "#E0A458",
+          warm: "rgb(var(--c-amber-warm) / <alpha-value>)",
         },
-        sage: "#7C8A6B",
-        line: "#E5DBC9", // borders
+        sage: "rgb(var(--c-sage) / <alpha-value>)",
+        line: "rgb(var(--c-line) / <alpha-value>)", // borders
       },
       fontFamily: {
         display: ["var(--font-fraunces)", "Georgia", "serif"],

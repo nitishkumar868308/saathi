@@ -4,14 +4,13 @@ import {
   Text,
   Pressable,
   ScrollView,
-  StyleSheet,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { SkeletonList } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
@@ -30,6 +29,8 @@ import { tpl } from "@/lib/i18n/dictionaries";
 type Filter = "all" | "soon" | "expired";
 
 export default function Documents() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { documents: d, common: c } = useT();
@@ -73,7 +74,7 @@ export default function Documents() {
   async function runDelete(doc: Document) {
     setPendingDelete(null);
     try {
-      await deleteDocument(doc.id);
+      await deleteDocument(doc);
       // Warna delete kiye document ki expiry notification aati rehti.
       await cancelDocumentExpiry(doc.id);
       setDocs((prev) => prev.filter((x) => x.id !== doc.id));
@@ -129,11 +130,11 @@ export default function Documents() {
           {docs.length > 0 &&
             (selectMode ? (
               <Pressable onPress={exitSelect} hitSlop={8} style={styles.selBtn}>
-                <Ionicons name="close" size={20} color={colors.ink} />
+                <Ionicons name="close" size={20} color={tc.ink} />
               </Pressable>
             ) : (
               <Pressable onPress={() => setSelectMode(true)} hitSlop={8} style={styles.selBtn}>
-                <Ionicons name="checkmark-done-outline" size={20} color={colors.ink} />
+                <Ionicons name="checkmark-done-outline" size={20} color={tc.ink} />
               </Pressable>
             ))}
         </View>
@@ -174,15 +175,15 @@ export default function Documents() {
                 setRefreshing(true);
                 load(true);
               }}
-              tintColor={colors.terracotta}
-              colors={[colors.terracotta]}
+              tintColor={tc.terracotta}
+              colors={[tc.terracotta]}
             />
           }
         >
           {list.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="document-text-outline" size={28} color={colors.terracotta} />
+                <Ionicons name="document-text-outline" size={28} color={tc.terracotta} />
               </View>
               <Text style={styles.emptyTitle}>
                 {docs.length === 0 ? d.emptyTitle : d.emptyInCategory}
@@ -195,7 +196,7 @@ export default function Documents() {
                   onPress={() => router.push("/add-document")}
                   style={({ pressed }) => [styles.emptyBtn, pressed && { opacity: 0.9 }]}
                 >
-                  <Ionicons name="add" size={18} color={colors.white} />
+                  <Ionicons name="add" size={18} color={tc.white} />
                   <Text style={styles.emptyBtnText}>{d.addBtn}</Text>
                 </Pressable>
               )}
@@ -220,9 +221,15 @@ export default function Documents() {
                     router.push({
                       pathname: "/document-view",
                       params: {
+                        // `id` cache ki chaabi hai — iske bina offline file
+                        // dhoondhi hi nahi ja sakti.
+                        id: doc.id,
                         uri: doc.file_uri ?? "",
                         path: doc.file_path ?? "",
+                        mime: doc.mime_type ?? "",
                         name: doc.name,
+                        // Renewal guide isi se chunta hai.
+                        type: doc.type,
                       },
                     } as never);
                   }}
@@ -248,7 +255,7 @@ export default function Documents() {
               (pressed || selected.size === 0) && { opacity: 0.55 },
             ]}
           >
-            <Ionicons name="share-outline" size={18} color={colors.white} />
+            <Ionicons name="share-outline" size={18} color={tc.white} />
             <Text style={styles.shareBtnText}>{tpl(d.shareSelected, { n: selected.size })}</Text>
           </Pressable>
         </View>
@@ -257,7 +264,7 @@ export default function Documents() {
           onPress={() => router.push("/add-document")}
           style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
         >
-          <Ionicons name="add" size={28} color={colors.white} />
+          <Ionicons name="add" size={28} color={tc.white} />
         </Pressable>
       )}
 
@@ -278,8 +285,8 @@ export default function Documents() {
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   headerWrap: { ...CONTENT },
   header: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 16 },
   selBtn: {
@@ -288,26 +295,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
-  title: { fontSize: 26, fontWeight: "700", color: colors.ink },
-  sub: { marginTop: 4, fontSize: 14, color: colors.inkSoft },
+  title: { fontSize: 26, fontWeight: "700", color: c.ink },
+  sub: { marginTop: 4, fontSize: 14, color: c.inkSoft },
   chips: { flexDirection: "row", gap: 8, paddingHorizontal: 20, paddingTop: 16 },
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  chipText: { fontSize: 13.5, fontWeight: "600", color: colors.inkSoft },
-  chipTextActive: { color: colors.cream },
+  chipActive: { backgroundColor: c.ink, borderColor: c.ink },
+  chipText: { fontSize: 13.5, fontWeight: "600", color: c.inkSoft },
+  chipTextActive: { color: c.cream },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  centerText: { color: colors.inkSoft, fontSize: 14 },
+  centerText: { color: c.inkSoft, fontSize: 14 },
   list: { padding: 20, gap: 10, paddingBottom: 100, ...CONTENT },
   empty: { alignItems: "center", paddingVertical: 48, gap: 10 },
   emptyIcon: {
@@ -319,11 +326,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.10)",
     marginBottom: 4,
   },
-  emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
+  emptyTitle: { fontSize: 18, fontWeight: "600", color: c.ink },
   emptyBody: {
     fontSize: 14,
     lineHeight: 21,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     maxWidth: 280,
   },
@@ -333,29 +340,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 7,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     paddingHorizontal: 20,
     paddingVertical: 13,
   },
-  emptyBtnText: { color: colors.white, fontWeight: "700", fontSize: 14.5 },
+  emptyBtnText: { color: c.white, fontWeight: "700", fontSize: 14.5 },
   skeleton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 14,
     opacity: 0.65,
   },
-  skelIcon: { height: 44, width: 44, borderRadius: 14, backgroundColor: colors.line },
-  skelLine: { height: 12, borderRadius: 6, backgroundColor: colors.line },
+  skelIcon: { height: 44, width: 44, borderRadius: 14, backgroundColor: c.line },
+  skelLine: { height: 12, borderRadius: 6, backgroundColor: c.line },
   hint: {
     textAlign: "center",
     marginTop: 8,
     fontSize: 12,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     opacity: 0.7,
   },
   shareBar: {
@@ -364,9 +371,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
+    borderTopColor: c.line,
     ...CONTENT,
   },
   shareBtn: {
@@ -376,9 +383,9 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  shareBtnText: { color: colors.white, fontWeight: "700", fontSize: 15.5 },
+  shareBtnText: { color: c.white, fontWeight: "700", fontSize: 15.5 },
   fab: {
     position: "absolute",
     right: 20,
@@ -388,11 +395,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 20,
-    backgroundColor: colors.terracotta,
-    shadowColor: colors.terracotta,
+    backgroundColor: c.terracotta,
+    shadowColor: c.terracotta,
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-});
+}));

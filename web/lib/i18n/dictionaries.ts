@@ -21,6 +21,8 @@ export const LOCALE_META: Record<
 };
 
 type Dict = {
+  /** Light / dark / system ka toggle. */
+  theme: { label: string; light: string; dark: string; system: string };
   nav: {
     earlyAccess: string;
     home: string;
@@ -312,6 +314,7 @@ type Dict = {
 };
 
 const hinglish: Dict = {
+  theme: { label: "Theme", light: "Light", dark: "Dark", system: "Phone ke hisaab se" },
   nav: {
     earlyAccess: "Early access",
     home: "Home",
@@ -876,6 +879,7 @@ const hinglish: Dict = {
 };
 
 const hi: Dict = {
+  theme: { label: "थीम", light: "लाइट", dark: "डार्क", system: "फ़ोन के हिसाब से" },
   nav: {
     earlyAccess: "अर्ली एक्सेस",
     home: "होम",
@@ -1440,6 +1444,7 @@ const hi: Dict = {
 };
 
 const en: Dict = {
+  theme: { label: "Theme", light: "Light", dark: "Dark", system: "Match my device" },
   nav: {
     earlyAccess: "Early access",
     home: "Home",

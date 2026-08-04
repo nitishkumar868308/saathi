@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Modal } from "react-native";
+import { View, Text, ScrollView, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import * as Application from "expo-application";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
@@ -21,6 +21,8 @@ import { useUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { PermissionModal } from "@/components/permission-modal";
 import { getLockState } from "@/lib/app-lock";
 import { ALERT_MODES, alertUser, useAlertMode, type AlertMode } from "@/lib/alert-mode";
+import { THEME_MODES, useThemeMode, type ThemeMode } from "@/theme/theme";
+import { cacheSizeBytes, clearDocCache, clearFileCache, formatBytes } from "@/lib/doc-cache";
 import { reportError } from "@/lib/report-error";
 
 /**
@@ -47,7 +49,9 @@ type RowId =
   | "reminders_reliable"
   | "app_lock"
   | "alert_mode"
+  | "theme"
   | "language"
+  | "offline_docs"
   | "privacy"
   | "contact"
   | "support"
@@ -66,6 +70,8 @@ type Row = {
 };
 
 export default function Settings() {
+  const tc = useColors();
+  const styles = useStyles();
   const { session } = useAuth();
   const toast = useToast();
   const offers = useOffers();
@@ -95,6 +101,7 @@ export default function Settings() {
   const [logoutAsk, setLogoutAsk] = useState(false);
   const [deleteAsk, setDeleteAsk] = useState(false);
   const [alertOpen, setAlertOpen] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
   /**
    * App lock chalu hai ya nahi — sirf row ke daayin dikhane ke liye.
    *
@@ -110,6 +117,38 @@ export default function Settings() {
   );
   // Ring / vibrate / silent — device par local, server par kuch nahi jaata.
   const [alertMode, setAlertModePref] = useAlertMode();
+  // Light / dark / system — ye bhi is PHONE ki setting hai, account ki nahi.
+  const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
+
+  /**
+   * Offline documents kitni jagah le rahe hain. `null` = abhi naapa nahi.
+   *
+   * `useFocusEffect` isliye ki document delete karke wapas aane par ya
+   * background sync ke baad naya size dikhe — purana number jhoot bolta hai.
+   */
+  const [cacheSize, setCacheSize] = useState<number | null>(null);
+  const [clearAsk, setClearAsk] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      void cacheSizeBytes().then(setCacheSize);
+    }, []),
+  );
+
+  async function clearOfflineDocs() {
+    setClearAsk(false);
+    await clearFileCache();
+    setCacheSize(await cacheSizeBytes());
+    toast.show(s.offlineDocsCleared, "success");
+  }
+
+  const THEME_COPY: Record<
+    ThemeMode,
+    { label: string; sub: string; icon: keyof typeof Ionicons.glyphMap }
+  > = {
+    light: { label: s.themeLight, sub: s.themeLightSub, icon: "sunny" },
+    dark: { label: s.themeDark, sub: s.themeDarkSub, icon: "moon" },
+    system: { label: s.themeSystem, sub: s.themeSystemSub, icon: "phone-portrait" },
+  };
 
   const ALERT_COPY: Record<AlertMode, { label: string; sub: string; icon: keyof typeof Ionicons.glyphMap }> = {
     ring: { label: s.alertRing, sub: s.alertRingSub, icon: "volume-high" },
@@ -152,6 +191,12 @@ export default function Settings() {
           value: lockOn ? t.lock.savedOn.replace(" ✓", "") : undefined,
         },
         {
+          id: "theme",
+          icon: "contrast-outline",
+          label: s.theme,
+          value: THEME_COPY[themeMode].label,
+        },
+        {
           id: "alert_mode",
           icon: "volume-medium-outline",
           label: s.alertMode,
@@ -162,6 +207,15 @@ export default function Settings() {
           icon: "language-outline",
           label: s.language,
           value: LOCALE_META[locale].native,
+        },
+        // Offline documents phone ki jagah lete hain — user ko dikhna chahiye
+        // kitni, aur ek tap me khaali karne ka raasta bhi. Documents khud
+        // server par surakshit hain, isliye clear karna khatarnak nahi hai.
+        {
+          id: "offline_docs",
+          icon: "cloud-download-outline",
+          label: s.offlineDocs,
+          value: cacheSize === null ? undefined : formatBytes(cacheSize),
         },
       ],
     },
@@ -186,6 +240,10 @@ export default function Settings() {
   async function logout() {
     setLogoutAsk(false);
     try {
+      // ⚠️ Offline cache logout se PEHLE hataana zaroori hai — warna is phone
+      // par pichhle user ke documents (list aur files dono) pade rehte, aur
+      // agla user unhe offline dekh sakta tha.
+      await clearDocCache(session?.user?.id);
       await signOut();
       // Logout ke baad language select screen — waha se login pe jaayega.
       router.replace("/language" as never);
@@ -239,6 +297,9 @@ export default function Settings() {
         // auto-start — sab ek hi jagah, status ke saath.
         setPermModal(true);
         return;
+      case "theme":
+        setThemeOpen(true);
+        return;
       case "alert_mode":
         setAlertOpen(true);
         return;
@@ -247,6 +308,10 @@ export default function Settings() {
         return;
       case "privacy":
         router.push("/privacy" as never);
+        return;
+      case "offline_docs":
+        // Kuch cached hi nahi to confirm poochna bemtlab hai.
+        if (cacheSize) setClearAsk(true);
         return;
       case "contact":
         router.push("/contact" as never);
@@ -288,7 +353,7 @@ export default function Settings() {
               radius={36}
             />
             <View style={styles.avatarEdit}>
-              <Ionicons name="camera" size={14} color={colors.white} />
+              <Ionicons name="camera" size={14} color={tc.white} />
             </View>
           </View>
           <Text style={styles.pName} numberOfLines={1}>
@@ -298,7 +363,7 @@ export default function Settings() {
             {session?.user?.email ?? ""}
           </Text>
           <View style={styles.editChip}>
-            <Ionicons name="create-outline" size={13} color={colors.terracotta} />
+            <Ionicons name="create-outline" size={13} color={tc.terracotta} />
             <Text style={styles.editChipText}>{s.editProfile}</Text>
           </View>
         </Pressable>
@@ -309,12 +374,12 @@ export default function Settings() {
             onPress={() => handleRow("profile")}
             style={({ pressed }) => [styles.nudge, pressed && { opacity: 0.92 }]}
           >
-            <Ionicons name="alert-circle" size={20} color={colors.terracotta} />
+            <Ionicons name="alert-circle" size={20} color={tc.terracotta} />
             <View style={{ flex: 1 }}>
               <Text style={styles.nudgeTitle}>{s.completeTitle}</Text>
               <Text style={styles.nudgeSub}>{s.completeSub}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.terracotta} />
+            <Ionicons name="chevron-forward" size={18} color={tc.terracotta} />
           </Pressable>
         )}
 
@@ -324,7 +389,7 @@ export default function Settings() {
           style={({ pressed }) => [styles.planCard, pressed && { opacity: 0.92 }]}
         >
           <View style={styles.planIcon}>
-            <Ionicons name={isPlus ? "star" : "sparkles"} size={22} color={colors.white} />
+            <Ionicons name={isPlus ? "star" : "sparkles"} size={22} color={tc.white} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.planTitle}>{isPlus ? s.plusActive : s.plusLo}</Text>
@@ -344,14 +409,14 @@ export default function Settings() {
                   style={({ pressed }) => [
                     styles.row,
                     i < g.rows.length - 1 && styles.rowBorder,
-                    pressed && { backgroundColor: colors.creamDeep },
+                    pressed && { backgroundColor: tc.creamDeep },
                   ]}
                 >
                   <View style={[styles.rowIcon, r.danger && styles.rowIconDanger]}>
                     <Ionicons
                       name={r.icon}
                       size={18}
-                      color={r.danger ? DANGER : colors.terracotta}
+                      color={r.danger ? DANGER : tc.terracotta}
                     />
                   </View>
                   <Text
@@ -361,7 +426,7 @@ export default function Settings() {
                     {r.label}
                   </Text>
                   {!!r.value && <Text style={styles.rowValue}>{r.value}</Text>}
-                  <Ionicons name="chevron-forward" size={17} color={colors.line} />
+                  <Ionicons name="chevron-forward" size={17} color={tc.line} />
                 </Pressable>
               ))}
             </View>
@@ -388,6 +453,19 @@ export default function Settings() {
       {/* Reminder reliability — notification, exact alarm, full-screen alert,
           battery, auto-start. Ek hi jagah (item 14). */}
       <PermissionModal visible={permModal} onClose={() => setPermModal(false)} />
+
+      {/* Cached files hatana — documents server par surakshit hain, isliye ye
+          destructive nahi hai. Net aane par wo dobara utar jaayengi. */}
+      <ConfirmModal
+        visible={clearAsk}
+        title={s.offlineDocs}
+        message={s.offlineDocsClearAsk}
+        confirmLabel={s.offlineDocsClear}
+        cancelLabel={t.common.cancel}
+        icon="cloud-download"
+        onConfirm={clearOfflineDocs}
+        onCancel={() => setClearAsk(false)}
+      />
 
       <ConfirmModal
         visible={logoutAsk}
@@ -445,17 +523,17 @@ export default function Settings() {
                     <Ionicons
                       name={copy.icon}
                       size={19}
-                      color={active ? colors.white : colors.terracotta}
+                      color={active ? tc.white : tc.terracotta}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.alertLabel, active && { color: colors.terracotta }]}>
+                    <Text style={[styles.alertLabel, active && { color: tc.terracotta }]}>
                       {copy.label}
                     </Text>
                     <Text style={styles.alertSub}>{copy.sub}</Text>
                   </View>
                   {active && (
-                    <Ionicons name="checkmark-circle" size={22} color={colors.terracotta} />
+                    <Ionicons name="checkmark-circle" size={22} color={tc.terracotta} />
                   )}
                 </Pressable>
               );
@@ -465,9 +543,54 @@ export default function Settings() {
               onPress={() => void alertUser()}
               style={({ pressed }) => [styles.alertTest, pressed && { opacity: 0.85 }]}
             >
-              <Ionicons name="play" size={16} color={colors.terracotta} />
+              <Ionicons name="play" size={16} color={tc.terracotta} />
               <Text style={styles.alertTestText}>{s.alertTest}</Text>
             </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Theme picker — light / dark / phone ke hisaab se */}
+      <Modal
+        visible={themeOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setThemeOpen(false)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setThemeOpen(false)}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{s.theme}</Text>
+            <Text style={styles.sheetSub}>{s.themeSub}</Text>
+
+            {THEME_MODES.map((m) => {
+              const active = themeMode === m;
+              const copy = THEME_COPY[m];
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => setThemeMode(m)}
+                  style={[styles.alertOpt, active && styles.alertOptActive]}
+                >
+                  <View style={[styles.alertIcon, active && styles.alertIconActive]}>
+                    <Ionicons
+                      name={copy.icon}
+                      size={19}
+                      color={active ? tc.white : tc.terracotta}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.alertLabel, active && { color: tc.terracotta }]}>
+                      {copy.label}
+                    </Text>
+                    <Text style={styles.alertSub}>{copy.sub}</Text>
+                  </View>
+                  {active && (
+                    <Ionicons name="checkmark-circle" size={22} color={tc.terracotta} />
+                  )}
+                </Pressable>
+              );
+            })}
           </Pressable>
         </Pressable>
       </Modal>
@@ -495,7 +618,7 @@ export default function Settings() {
                   }}
                   style={[styles.langOpt, active && styles.langOptActive]}
                 >
-                  <Text style={[styles.langNative, active && { color: colors.terracotta }]}>
+                  <Text style={[styles.langNative, active && { color: tc.terracotta }]}>
                     {LOCALE_META[l].native}
                   </Text>
                   <Text style={styles.langSub}>{LOCALE_META[l].sub}</Text>
@@ -503,7 +626,7 @@ export default function Settings() {
                     <Ionicons
                       name="checkmark-circle"
                       size={22}
-                      color={colors.terracotta}
+                      color={tc.terracotta}
                       style={{ marginLeft: "auto" }}
                     />
                   )}
@@ -519,8 +642,8 @@ export default function Settings() {
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   content: { padding: 20, paddingBottom: 40, ...CONTENT },
 
   profile: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
@@ -530,9 +653,9 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
   avatarEdit: {
     position: "absolute",
@@ -543,12 +666,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     borderWidth: 2,
-    borderColor: colors.cream,
+    borderColor: c.cream,
   },
-  pName: { marginTop: 14, fontSize: 22, fontWeight: "800", color: colors.ink },
-  pSub: { marginTop: 3, fontSize: 14, color: colors.inkSoft },
+  pName: { marginTop: 14, fontSize: 22, fontWeight: "800", color: c.ink },
+  pSub: { marginTop: 3, fontSize: 14, color: c.inkSoft },
   editChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -561,7 +684,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 6,
   },
-  editChipText: { fontSize: 12.5, fontWeight: "700", color: colors.terracotta },
+  editChipText: { fontSize: 12.5, fontWeight: "700", color: c.terracotta },
 
   nudge: {
     flexDirection: "row",
@@ -575,8 +698,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 13,
   },
-  nudgeTitle: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
-  nudgeSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
+  nudgeTitle: { fontSize: 14.5, fontWeight: "800", color: c.ink },
+  nudgeSub: { marginTop: 2, fontSize: 12.5, color: c.inkSoft },
 
   planCard: {
     flexDirection: "row",
@@ -585,24 +708,24 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderRadius: 22,
     padding: 16,
-    backgroundColor: colors.ink,
+    backgroundColor: c.ink,
   },
   planIcon: {
     height: 46,
     width: 46,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
-  planTitle: { fontSize: 15.5, fontWeight: "800", color: colors.white },
+  planTitle: { fontSize: 15.5, fontWeight: "800", color: c.white },
   planSub: { marginTop: 2, fontSize: 12.5, color: "rgba(247,242,233,0.65)" },
 
   group: { marginTop: 26 },
   groupTitle: {
     fontSize: 12.5,
     fontWeight: "800",
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginBottom: 10,
@@ -611,8 +734,8 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     overflow: "hidden",
   },
   row: {
@@ -622,7 +745,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: c.line },
   rowIcon: {
     height: 36,
     width: 36,
@@ -632,8 +755,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.09)",
   },
   rowIconDanger: { backgroundColor: "rgba(178,59,59,0.10)" },
-  rowLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
-  rowValue: { fontSize: 13.5, color: colors.inkSoft, fontWeight: "600" },
+  rowLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: c.ink },
+  rowValue: { fontSize: 13.5, color: c.inkSoft, fontWeight: "600" },
 
   logout: {
     marginTop: 28,
@@ -652,7 +775,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
     textAlign: "center",
     fontSize: 13,
-    color: colors.inkSoft,
+    color: c.inkSoft,
   },
 
   sheetBackdrop: {
@@ -661,7 +784,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 22,
@@ -672,24 +795,24 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.line,
+    backgroundColor: c.line,
     marginBottom: 16,
   },
-  sheetTitle: { fontSize: 20, fontWeight: "800", color: colors.ink },
-  sheetSub: { marginTop: 4, fontSize: 13.5, color: colors.inkSoft, marginBottom: 14 },
+  sheetTitle: { fontSize: 20, fontWeight: "800", color: c.ink },
+  sheetSub: { marginTop: 4, fontSize: 13.5, color: c.inkSoft, marginBottom: 14 },
   langOpt: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginTop: 10,
   },
-  langOptActive: { borderColor: colors.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
+  langOptActive: { borderColor: c.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
 
   alertOpt: {
     flexDirection: "row",
@@ -697,13 +820,13 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
     paddingVertical: 13,
     marginTop: 10,
   },
-  alertOptActive: { borderColor: colors.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
+  alertOptActive: { borderColor: c.terracotta, backgroundColor: "rgba(194,90,55,0.06)" },
   alertIcon: {
     height: 40,
     width: 40,
@@ -712,9 +835,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  alertIconActive: { backgroundColor: colors.terracotta },
-  alertLabel: { fontSize: 15.5, fontWeight: "700", color: colors.ink },
-  alertSub: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: colors.inkSoft },
+  alertIconActive: { backgroundColor: c.terracotta },
+  alertLabel: { fontSize: 15.5, fontWeight: "700", color: c.ink },
+  alertSub: { marginTop: 2, fontSize: 12.5, lineHeight: 17, color: c.inkSoft },
   alertTest: {
     flexDirection: "row",
     alignItems: "center",
@@ -727,7 +850,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(194,90,55,0.3)",
     backgroundColor: "rgba(194,90,55,0.06)",
   },
-  alertTestText: { fontSize: 14.5, fontWeight: "700", color: colors.terracotta },
-  langNative: { fontSize: 16.5, fontWeight: "700", color: colors.ink },
-  langSub: { fontSize: 13, color: colors.inkSoft, marginLeft: 10 },
-});
+  alertTestText: { fontSize: 14.5, fontWeight: "700", color: c.terracotta },
+  langNative: { fontSize: 16.5, fontWeight: "700", color: c.ink },
+  langSub: { fontSize: 13, color: c.inkSoft, marginLeft: 10 },
+}));

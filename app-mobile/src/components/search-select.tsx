@@ -8,13 +8,12 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 
 type Item = { id: number; name: string };
 
@@ -39,6 +38,8 @@ export function SearchSelect({
   disabled?: boolean;
   onSelect: (id: number) => void;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const insets = useSafeAreaInsets();
@@ -67,7 +68,7 @@ export function SearchSelect({
         <Text style={[styles.rowText, !selected && styles.rowPlaceholder]} numberOfLines={1}>
           {selected ? selected.name : placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={18} color={colors.inkSoft} />
+        <Ionicons name="chevron-down" size={18} color={tc.inkSoft} />
       </Pressable>
 
       <Modal
@@ -92,18 +93,18 @@ export function SearchSelect({
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 14) }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.searchBox}>
-              <Ionicons name="search" size={18} color={colors.inkSoft} />
+              <Ionicons name="search" size={18} color={tc.inkSoft} />
               <TextInput
                 value={q}
                 onChangeText={setQ}
                 placeholder={searchPlaceholder}
-                placeholderTextColor={colors.inkSoft}
+                placeholderTextColor={tc.inkSoft}
                 autoFocus
                 style={styles.searchInput}
               />
               {q.length > 0 && (
                 <Pressable onPress={() => setQ("")} hitSlop={8}>
-                  <Ionicons name="close-circle" size={18} color={colors.inkSoft} />
+                  <Ionicons name="close-circle" size={18} color={tc.inkSoft} />
                 </Pressable>
               )}
             </View>
@@ -130,7 +131,7 @@ export function SearchSelect({
                       {item.name}
                     </Text>
                     {active && (
-                      <Ionicons name="checkmark" size={18} color={colors.terracotta} />
+                      <Ionicons name="checkmark" size={18} color={tc.terracotta} />
                     )}
                   </Pressable>
                 );
@@ -143,25 +144,25 @@ export function SearchSelect({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
   rowDisabled: { opacity: 0.5 },
-  rowText: { flex: 1, fontSize: 15, color: colors.ink, marginRight: 8 },
-  rowPlaceholder: { color: colors.inkSoft },
+  rowText: { flex: 1, fontSize: 15, color: c.ink, marginRight: 8 },
+  rowPlaceholder: { color: c.inkSoft },
 
   backdrop: { flex: 1, backgroundColor: "rgba(46,40,35,0.5)" },
   sheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     paddingHorizontal: 16,
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.line,
+    backgroundColor: c.line,
     marginBottom: 14,
   },
   searchBox: {
@@ -181,13 +182,13 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 10,
   },
-  searchInput: { flex: 1, fontSize: 15.5, color: colors.ink, padding: 0 },
+  searchInput: { flex: 1, fontSize: 15.5, color: c.ink, padding: 0 },
   opt: {
     flexDirection: "row",
     alignItems: "center",
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   optActive: { backgroundColor: "rgba(194,90,55,0.08)" },
-  optText: { fontSize: 15.5, color: colors.ink },
-  optTextActive: { color: colors.terracotta, fontWeight: "700" },
-  empty: { textAlign: "center", color: colors.inkSoft, paddingVertical: 24, fontSize: 14 },
-});
+  optText: { fontSize: 15.5, color: c.ink },
+  optTextActive: { color: c.terracotta, fontWeight: "700" },
+  empty: { textAlign: "center", color: c.inkSoft, paddingVertical: 24, fontSize: 14 },
+}));

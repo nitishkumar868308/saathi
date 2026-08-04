@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Switch } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useToast } from "@/components/toast";
 import { ConfirmModal } from "@/components/confirm-modal";
@@ -32,6 +32,8 @@ import {
 type Step = "idle" | "new" | "confirm";
 
 export default function AppLock() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { lock: l, common: c } = useT();
@@ -134,7 +136,7 @@ export default function AppLock() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Ionicons name="chevron-back" size={24} color={tc.ink} />
         </Pressable>
         <Text style={styles.title}>{l.title}</Text>
       </View>
@@ -147,7 +149,7 @@ export default function AppLock() {
                 <Ionicons
                   name={enabled ? "lock-closed" : "lock-open-outline"}
                   size={26}
-                  color={colors.terracotta}
+                  color={tc.terracotta}
                 />
               </View>
               <Text style={styles.heroTitle}>{l.title}</Text>
@@ -170,8 +172,8 @@ export default function AppLock() {
                     value={!!state?.biometricOn}
                     onValueChange={(v) => void toggleBiometric(v)}
                     disabled={!state?.biometricAvailable}
-                    trackColor={{ true: colors.terracotta, false: colors.line }}
-                    thumbColor={colors.white}
+                    trackColor={{ true: tc.terracotta, false: tc.line }}
+                    thumbColor={tc.white}
                   />
                 </View>
 
@@ -179,17 +181,17 @@ export default function AppLock() {
                   onPress={startSetup}
                   style={({ pressed }) => [styles.action, pressed && { opacity: 0.85 }]}
                 >
-                  <Ionicons name="keypad-outline" size={19} color={colors.ink} />
+                  <Ionicons name="keypad-outline" size={19} color={tc.ink} />
                   <Text style={styles.actionText}>{l.changePin}</Text>
-                  <Ionicons name="chevron-forward" size={17} color={colors.inkSoft} />
+                  <Ionicons name="chevron-forward" size={17} color={tc.inkSoft} />
                 </Pressable>
 
                 <Pressable
                   onPress={() => setAskOff(true)}
                   style={({ pressed }) => [styles.action, pressed && { opacity: 0.85 }]}
                 >
-                  <Ionicons name="lock-open-outline" size={19} color={colors.terracottaDark} />
-                  <Text style={[styles.actionText, { color: colors.terracottaDark }]}>
+                  <Ionicons name="lock-open-outline" size={19} color={tc.terracottaDark} />
+                  <Text style={[styles.actionText, { color: tc.terracottaDark }]}>
                     {l.turnOff}
                   </Text>
                 </Pressable>
@@ -199,7 +201,7 @@ export default function AppLock() {
                 onPress={startSetup}
                 style={({ pressed }) => [styles.cta, pressed && { opacity: 0.88 }]}
               >
-                <Ionicons name="lock-closed" size={18} color={colors.white} />
+                <Ionicons name="lock-closed" size={18} color={tc.white} />
                 <Text style={styles.ctaText}>{l.offerYes}</Text>
               </Pressable>
             )}
@@ -258,8 +260,8 @@ export default function AppLock() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -269,7 +271,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   back: { padding: 4 },
-  title: { fontSize: 21, fontWeight: "800", color: colors.ink },
+  title: { fontSize: 21, fontWeight: "800", color: c.ink },
   scroll: { padding: 16, paddingBottom: 40 },
   hero: { alignItems: "center", paddingVertical: 18 },
   heroIcon: {
@@ -280,12 +282,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.12)",
   },
-  heroTitle: { marginTop: 14, fontSize: 19, fontWeight: "800", color: colors.ink },
+  heroTitle: { marginTop: 14, fontSize: 19, fontWeight: "800", color: c.ink },
   heroSub: {
     marginTop: 7,
     fontSize: 13.5,
     lineHeight: 20,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     paddingHorizontal: 16,
   },
@@ -297,11 +299,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  rowLabel: { fontSize: 14.5, fontWeight: "700", color: colors.ink },
-  rowHint: { marginTop: 4, fontSize: 12.5, lineHeight: 18, color: colors.inkSoft },
+  rowLabel: { fontSize: 14.5, fontWeight: "700", color: c.ink },
+  rowHint: { marginTop: 4, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
   action: {
     flexDirection: "row",
     alignItems: "center",
@@ -311,10 +313,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  actionText: { flex: 1, fontSize: 14.5, fontWeight: "700", color: colors.ink },
+  actionText: { flex: 1, fontSize: 14.5, fontWeight: "700", color: c.ink },
   cta: {
     flexDirection: "row",
     alignItems: "center",
@@ -323,16 +325,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
     height: 52,
     borderRadius: 17,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 15, fontWeight: "800", color: colors.white },
+  ctaText: { fontSize: 15, fontWeight: "800", color: c.white },
   setup: { alignItems: "center", paddingTop: 30 },
-  setupTitle: { fontSize: 19, fontWeight: "800", color: colors.ink },
+  setupTitle: { fontSize: 19, fontWeight: "800", color: c.ink },
   setupSub: {
     marginTop: 8,
     fontSize: 13.5,
     lineHeight: 20,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     paddingHorizontal: 20,
   },
@@ -343,11 +345,11 @@ const styles = StyleSheet.create({
     width: 15,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  dotOn: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
-  err: { marginTop: 18, fontSize: 13.5, fontWeight: "700", color: colors.terracottaDark },
+  dotOn: { backgroundColor: c.terracotta, borderColor: c.terracotta },
+  err: { marginTop: 18, fontSize: 13.5, fontWeight: "700", color: c.terracottaDark },
   cancel: { marginTop: 26, padding: 8 },
-  cancelText: { fontSize: 14, fontWeight: "700", color: colors.inkSoft },
-});
+  cancelText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
+}));

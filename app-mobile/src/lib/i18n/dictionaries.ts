@@ -233,6 +233,26 @@ export type Dict = {
     share: string;
     viewAction: string;
     shareFailed: string;
+    /** Document ko phone ki Gallery me save karna. */
+    download: string;
+    savedToDevice: string;
+    saveNeedsPermission: string;
+    /**
+     * Save fail — aksar iska matlab purana build hai (media-library native
+     * module usme hai hi nahi). Isliye message Share ka raasta bhi batata hai,
+     * jo bina kisi native module ke chalta hai.
+     */
+    saveFailedUseShare: string;
+    /** "Renew kaise karein" — expiry ke baad ka asli sawaal. */
+    renewOpenSite: string;
+    renewShowSteps: string;
+    renewHideSteps: string;
+    /**
+     * Tab dikhta hai jab guide AI ka banaya ho (unreviewed) YA "har desh" wala
+     * aam jawab ho. Dono me jaankari kaam ki hai par aakhri sach nahi — aur
+     * sarkari process me galat salah mehngi padti hai.
+     */
+    renewVerifyNote: string;
     /** {n} */
     sharedN: string;
     selectAll: string;
@@ -415,8 +435,23 @@ export type Dict = {
     stubReply: string;
     inputPlaceholder: string;
     suggestions: string[];
-    /** Net fail hua — wahi message dobara bhejne ka button. */
+    /** Jawab nahi aaya — wahi message dobara bhejne ka button. */
     retrySend: string;
+    /** 6 second se soch raha hai. */
+    thinking: string;
+    /** 15 second se soch raha hai. */
+    thinkingLong: string;
+    /**
+     * Jawab kyun nahi aaya.
+     *
+     * ⚠️ Teenon me se KISI me bhi internet ka zikr nahi hai — aur ye jaan-boojh
+     * ke hai. Ye lines tabhi dikhti hain jab probe keh chuka ho ki net theek
+     * hai. Internet wali baat sirf full-screen popup me hai (`network.fail*`),
+     * jo ab sirf sach me offline hone par khulta hai.
+     */
+    failBusy: string;
+    failSlow: string;
+    failServer: string;
     /** AI tak baat nahi pahunchi, par local samajh se reminder ban gaya. */
     offlineReminderSet: string;
     reminderFailed: string;
@@ -623,6 +658,20 @@ export type Dict = {
     alertSilentSub: string;
     alertTest: string;
     language: string;
+    /** Offline documents kitni jagah le rahe hain + khaali karne ka raasta. */
+    /** Light / dark / phone ke hisaab se. */
+    theme: string;
+    themeSub: string;
+    themeLight: string;
+    themeLightSub: string;
+    themeDark: string;
+    themeDarkSub: string;
+    themeSystem: string;
+    themeSystemSub: string;
+    offlineDocs: string;
+    offlineDocsClearAsk: string;
+    offlineDocsClear: string;
+    offlineDocsCleared: string;
     privacy: string;
     exportData: string;
     deleteAll: string;
@@ -1013,6 +1062,15 @@ const hinglish: Dict = {
     share: "Share",
     viewAction: "Dekho",
     shareFailed: "Share nahi ho paaya",
+    download: "Download",
+    savedToDevice: "Gallery me save ho gaya",
+    saveNeedsPermission: "Save karne ke liye photos ki permission chahiye",
+    saveFailedUseShare: "Save nahi ho paaya — Share se try karo",
+    renewOpenSite: "Official site kholo",
+    renewShowSteps: "Renew kaise karein",
+    renewHideSteps: "Chhupa do",
+    renewVerifyNote:
+      "Ye aam tareeka hai. Apne desh ki official site par ek baar jaanch lena — process aur fees badalti rehti hain.",
     sharedN: "{n} document share hue",
     selectAll: "Sabhi chuno",
     selectCount: "{n} chune",
@@ -1174,6 +1232,11 @@ const hinglish: Dict = {
     inputPlaceholder: "Kuch likho…",
     suggestions: ["Kal 8 baje uthana", "Insurance kab expire hai?", "Aaj kya karna hai?"],
     retrySend: "Dobara bhejo",
+    thinking: "Saathi soch raha hai…",
+    thinkingLong: "Thoda waqt lag raha hai — jawab bana raha hoon",
+    failBusy: "Saathi abhi bahut busy hai. Thodi der me dobara bhejo.",
+    failSlow: "Saathi ne is baar der kar di. Dobara bhejo.",
+    failServer: "Saathi abhi jawab nahi de paaya. Dobara bhejo.",
     offlineReminderSet: "Net nahi tha, par maine reminder laga diya",
     reminderFailed: "Reminder ban nahi paaya",
     reminderNeedsTime: "Time thoda check kar lo — bas ek tap me set ho jayega",
@@ -1359,6 +1422,19 @@ const hinglish: Dict = {
     alertSilentSub: "Na awaaz, na vibrate — sirf screen par dikhega",
     alertTest: "Sun ke dekho",
     language: "Bhasha",
+    theme: "Theme",
+    themeSub: "App kaisi dikhe — ujli ya gehri.",
+    themeLight: "Light",
+    themeLightSub: "Din ki roshni me saaf padhne ke liye",
+    themeDark: "Dark",
+    themeDarkSub: "Raat me aankhon par naram",
+    themeSystem: "Phone ke hisaab se",
+    themeSystemSub: "Phone dark hote hi app bhi dark",
+    offlineDocs: "Offline documents",
+    offlineDocsClearAsk:
+      "Phone se hatt jayengi, par aapke documents surakshit rahenge — net aane par dobara utar jayengi.",
+    offlineDocsClear: "Khaali karo",
+    offlineDocsCleared: "Offline copy hata di",
     privacy: "Privacy & data",
     exportData: "Mera data export karo",
     deleteAll: "Sab data delete",
@@ -1685,6 +1761,15 @@ const hi: Dict = {
     share: "शेयर",
     viewAction: "देखें",
     shareFailed: "शेयर नहीं हो पाया",
+    download: "डाउनलोड",
+    savedToDevice: "गैलरी में सेव हो गया",
+    saveNeedsPermission: "सेव करने के लिए फ़ोटो की अनुमति चाहिए",
+    saveFailedUseShare: "सेव नहीं हो पाया — शेयर से कोशिश करें",
+    renewOpenSite: "आधिकारिक साइट खोलें",
+    renewShowSteps: "रिन्यू कैसे करें",
+    renewHideSteps: "छुपा दें",
+    renewVerifyNote:
+      "यह आम तरीक़ा है। अपने देश की आधिकारिक साइट पर एक बार जाँच लें — प्रक्रिया और फ़ीस बदलती रहती है।",
     sharedN: "{n} डॉक्युमेंट शेयर हुए",
     selectAll: "सभी चुनें",
     selectCount: "{n} चुने",
@@ -1846,6 +1931,11 @@ const hi: Dict = {
     inputPlaceholder: "कुछ लिखें…",
     suggestions: ["कल 8 बजे उठाना", "इंश्योरेंस कब एक्सपायर है?", "आज क्या करना है?"],
     retrySend: "दोबारा भेजें",
+    thinking: "साथी सोच रहा है…",
+    thinkingLong: "थोड़ा वक़्त लग रहा है — जवाब बना रहा हूँ",
+    failBusy: "साथी अभी बहुत व्यस्त है। थोड़ी देर में दोबारा भेजें।",
+    failSlow: "साथी ने इस बार देर कर दी। दोबारा भेजें।",
+    failServer: "साथी अभी जवाब नहीं दे पाया। दोबारा भेजें।",
     offlineReminderSet: "नेट नहीं था, फिर भी मैंने रिमाइंडर लगा दिया",
     reminderFailed: "रिमाइंडर बन नहीं पाया",
     reminderNeedsTime: "समय एक बार देख लीजिए — बस एक टैप में सेट हो जाएगा",
@@ -2031,6 +2121,19 @@ const hi: Dict = {
     alertSilentSub: "न आवाज़, न वाइब्रेट — सिर्फ़ स्क्रीन पर दिखेगा",
     alertTest: "सुनकर देखें",
     language: "भाषा",
+    theme: "थीम",
+    themeSub: "ऐप कैसी दिखे — उजली या गहरी।",
+    themeLight: "लाइट",
+    themeLightSub: "दिन की रोशनी में साफ़ पढ़ने के लिए",
+    themeDark: "डार्क",
+    themeDarkSub: "रात में आँखों पर नरम",
+    themeSystem: "फ़ोन के हिसाब से",
+    themeSystemSub: "फ़ोन डार्क होते ही ऐप भी डार्क",
+    offlineDocs: "ऑफ़लाइन डॉक्युमेंट",
+    offlineDocsClearAsk:
+      "फ़ोन से हट जाएँगी, पर आपके डॉक्युमेंट सुरक्षित रहेंगे — नेट आने पर दोबारा उतर जाएँगी।",
+    offlineDocsClear: "ख़ाली करें",
+    offlineDocsCleared: "ऑफ़लाइन कॉपी हटा दी",
     privacy: "प्राइवेसी & डेटा",
     exportData: "मेरा डेटा export करें",
     deleteAll: "सब डेटा डिलीट",
@@ -2356,6 +2459,15 @@ const en: Dict = {
     share: "Share",
     viewAction: "View",
     shareFailed: "Couldn't share",
+    download: "Download",
+    savedToDevice: "Saved to your gallery",
+    saveNeedsPermission: "Saving needs photo permission",
+    saveFailedUseShare: "Couldn't save — try Share instead",
+    renewOpenSite: "Open official site",
+    renewShowSteps: "How to renew",
+    renewHideSteps: "Hide",
+    renewVerifyNote:
+      "This is the general process. Check your country's official site once — steps and fees change over time.",
     sharedN: "{n} document(s) shared",
     selectAll: "Select all",
     selectCount: "{n} selected",
@@ -2517,6 +2629,11 @@ const en: Dict = {
     inputPlaceholder: "Type something…",
     suggestions: ["Wake me at 8am", "When does my insurance expire?", "What's on today?"],
     retrySend: "Send again",
+    thinking: "Saathi is thinking…",
+    thinkingLong: "This is taking a little longer — still working on it",
+    failBusy: "Saathi is very busy right now. Try again in a moment.",
+    failSlow: "Saathi took too long this time. Send it again.",
+    failServer: "Saathi couldn't answer just now. Send it again.",
     offlineReminderSet: "No internet, but I've set the reminder",
     reminderFailed: "Couldn't create the reminder",
     reminderNeedsTime: "Just check the time — one tap and it's set",
@@ -2702,6 +2819,19 @@ const en: Dict = {
     alertSilentSub: "No sound, no vibration — it only shows on screen",
     alertTest: "Hear it",
     language: "Language",
+    theme: "Theme",
+    themeSub: "How the app looks — light or dark.",
+    themeLight: "Light",
+    themeLightSub: "Easier to read in daylight",
+    themeDark: "Dark",
+    themeDarkSub: "Gentler on the eyes at night",
+    themeSystem: "Match my phone",
+    themeSystemSub: "Goes dark when your phone does",
+    offlineDocs: "Offline documents",
+    offlineDocsClearAsk:
+      "These copies leave your phone, but your documents stay safe — they'll download again when you're online.",
+    offlineDocsClear: "Clear",
+    offlineDocsCleared: "Offline copies removed",
     privacy: "Privacy & data",
     exportData: "Export my data",
     deleteAll: "Delete all data",

@@ -25,6 +25,8 @@ import {
   PenLine,
   Wallet,
   LifeBuoy,
+  RotateCw,
+  UserMinus,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
@@ -44,6 +46,8 @@ import AdminLogs from "@/components/AdminLogs";
 import AdminAnalytics from "@/components/AdminAnalytics";
 import AdminSeo from "@/components/AdminSeo";
 import AdminBlog from "@/components/AdminBlog";
+import AdminRenewals from "@/components/AdminRenewals";
+import AdminDeleteRequests from "@/components/AdminDeleteRequests";
 import AdminSupport from "@/components/AdminSupport";
 
 type ContactEntry = {
@@ -69,6 +73,8 @@ type Section =
   | "logs"
   | "contacts"
   | "support"
+  | "renewals"
+  | "deleteRequests"
   | "message";
 
 const NAV: { key: Section; icon: typeof Gift }[] = [
@@ -84,9 +90,15 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   // admin unhe ek saath dekhta hai.
   { key: "notes", icon: NotebookPen },
   { key: "documents", icon: FileText },
+  // Renew guides documents ke theek neeche — wo unhi documents ka agla sawaal
+  // hai ("expire ho raha hai, ab karun kya?").
+  { key: "renewals", icon: RotateCw },
   { key: "reviews", icon: Star },
   { key: "logs", icon: Bug },
   { key: "contacts", icon: MessageSquare },
+  // Delete requests contacts ke theek neeche — pehle ye contacts me hi ek
+  // prefix ke saath dabi hoti thi, isliye admin ki aankh yahin dhoondhti hai.
+  { key: "deleteRequests", icon: UserMinus },
   { key: "pricing", icon: Globe },
   { key: "rewards", icon: Gift },
 ];
@@ -458,6 +470,8 @@ function Dashboard({
               {section === "analytics" && <AdminAnalytics />}
               {section === "seo" && <AdminSeo />}
               {section === "blog" && <AdminBlog />}
+              {section === "renewals" && <AdminRenewals />}
+              {section === "deleteRequests" && <AdminDeleteRequests />}
               {section === "contacts" && <ContactsView rows={filteredContacts} />}
             </div>
           </div>

@@ -3,14 +3,13 @@ import {
   View,
   Text,
   Pressable,
-  StyleSheet,
   Modal,
   TextInput,
   Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
@@ -36,6 +35,8 @@ import { logEvent } from "@/lib/analytics";
  * Ek baar submit/dismiss ke baad dobara nahi. "Baad me" par 2 din ka aaram.
  */
 export function ReviewPrompt() {
+  const tc = useColors();
+  const styles = useStyles();
   const { review: r } = useT();
   const { session } = useAuth();
   const [visible, setVisible] = useState(false);
@@ -107,7 +108,7 @@ export function ReviewPrompt() {
               <Text style={styles.thanksTitle}>{r.thanksTitle}</Text>
               <Text style={styles.thanksSub}>{r.thanksSub}</Text>
               <Pressable onPress={onRate} style={styles.primary}>
-                <Ionicons name="star" size={18} color={colors.white} />
+                <Ionicons name="star" size={18} color={tc.white} />
                 <Text style={styles.primaryText}>{r.rateBtn}</Text>
               </Pressable>
               <Pressable onPress={() => setVisible(false)} style={styles.laterBtn}>
@@ -125,7 +126,7 @@ export function ReviewPrompt() {
                     <Ionicons
                       name={n <= rating ? "star" : "star-outline"}
                       size={38}
-                      color={n <= rating ? colors.amber : colors.inkSoft}
+                      color={n <= rating ? tc.amber : tc.inkSoft}
                     />
                   </Pressable>
                 ))}
@@ -135,14 +136,14 @@ export function ReviewPrompt() {
                 value={text}
                 onChangeText={setText}
                 placeholder={r.placeholder}
-                placeholderTextColor={colors.inkSoft}
+                placeholderTextColor={tc.inkSoft}
                 style={styles.input}
                 multiline
               />
 
               <Pressable style={styles.consentRow} onPress={() => setAllow((v) => !v)}>
                 <View style={[styles.box, allow && styles.boxOn]}>
-                  {allow && <Ionicons name="checkmark" size={14} color={colors.white} />}
+                  {allow && <Ionicons name="checkmark" size={14} color={tc.white} />}
                 </View>
                 <Text style={styles.consentText}>{r.consent}</Text>
               </Pressable>
@@ -170,7 +171,7 @@ export function ReviewPrompt() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -182,15 +183,15 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 380,
     borderRadius: 28,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     padding: 24,
     alignItems: "center",
   },
-  title: { fontSize: 21, fontWeight: "800", color: colors.ink, textAlign: "center" },
+  title: { fontSize: 21, fontWeight: "800", color: c.ink, textAlign: "center" },
   sub: {
     marginTop: 6,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     lineHeight: 20,
   },
@@ -201,10 +202,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     padding: 14,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
     textAlignVertical: "top",
   },
@@ -220,12 +221,12 @@ const styles = StyleSheet.create({
     width: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: colors.line,
+    borderColor: c.line,
     alignItems: "center",
     justifyContent: "center",
   },
-  boxOn: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
-  consentText: { flex: 1, fontSize: 12.5, color: colors.inkSoft, lineHeight: 17 },
+  boxOn: { backgroundColor: c.terracotta, borderColor: c.terracotta },
+  consentText: { flex: 1, fontSize: 12.5, color: c.inkSoft, lineHeight: 17 },
   primary: {
     flexDirection: "row",
     alignItems: "center",
@@ -234,25 +235,25 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     marginTop: 18,
   },
-  primaryText: { fontSize: 16, fontWeight: "800", color: colors.white },
+  primaryText: { fontSize: 16, fontWeight: "800", color: c.white },
   laterBtn: { marginTop: 12, paddingVertical: 6 },
-  laterText: { fontSize: 14, fontWeight: "600", color: colors.inkSoft },
+  laterText: { fontSize: 14, fontWeight: "600", color: c.inkSoft },
   heart: { fontSize: 46 },
   thanksTitle: {
     marginTop: 8,
     fontSize: 22,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   thanksSub: {
     marginTop: 8,
     fontSize: 14.5,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     lineHeight: 21,
   },
-});
+}));

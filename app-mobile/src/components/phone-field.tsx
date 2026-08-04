@@ -6,14 +6,13 @@ import {
   Pressable,
   Modal,
   FlatList,
-  StyleSheet,
 } from "react-native";
 import {
   getCountries,
   getCountryCallingCode,
   type CountryCode,
 } from "libphonenumber-js";
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 function flag(cc: string) {
@@ -50,6 +49,8 @@ export function PhoneField({
    */
   dialCode?: string;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const { phoneField: p } = useT();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -82,7 +83,7 @@ export function PhoneField({
         value={national}
         onChangeText={(v) => onNational(v.replace(/[^\d\s-]/g, ""))}
         placeholder={placeholder ?? p.placeholder}
-        placeholderTextColor={colors.inkSoft}
+        placeholderTextColor={tc.inkSoft}
         keyboardType="phone-pad"
         textContentType="telephoneNumber"
         autoComplete="tel-national"
@@ -99,7 +100,7 @@ export function PhoneField({
             value={q}
             onChangeText={setQ}
             placeholder={p.searchPlaceholder}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             autoFocus
           />
           <FlatList
@@ -130,52 +131,52 @@ export function PhoneField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   row: { flexDirection: "row", gap: 8 },
   codeBtn: {
     justifyContent: "center",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
   },
-  codeBtnLocked: { backgroundColor: colors.creamDeep },
-  codeText: { fontSize: 15, fontWeight: "600", color: colors.ink },
+  codeBtnLocked: { backgroundColor: c.creamDeep },
+  codeText: { fontSize: 15, fontWeight: "600", color: c.ink },
   input: {
     flex: 1,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
   modal: {
     flex: 1,
-    backgroundColor: colors.cream,
+    backgroundColor: c.cream,
     paddingTop: 60,
     paddingHorizontal: 16,
   },
   search: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
     marginBottom: 10,
   },
   item: {
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
+    borderBottomColor: c.line,
   },
-  itemText: { fontSize: 15, color: colors.ink },
+  itemText: { fontSize: 15, color: c.ink },
   close: { alignItems: "center", paddingVertical: 16 },
-  closeText: { fontSize: 15, fontWeight: "700", color: colors.terracotta },
-});
+  closeText: { fontSize: 15, fontWeight: "700", color: c.terracotta },
+}));

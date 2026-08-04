@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, Animated, Easing } from "react-native";
+import { View, Text, Pressable, Modal, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 
 /**
  * App ka apna confirm modal — OS ke bhadde native Alert ki jagah.
@@ -29,6 +29,8 @@ export function ConfirmModal({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const scale = useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export function ConfirmModal({
     }).start();
   }, [visible, scale]);
 
-  const accent = destructive ? "#B23B3B" : colors.terracotta;
+  const accent = destructive ? "#B23B3B" : tc.terracotta;
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
@@ -75,7 +77,7 @@ export function ConfirmModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -86,7 +88,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: "center",
     borderRadius: 26,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     paddingHorizontal: 24,
     paddingVertical: 28,
     shadowColor: "#000",
@@ -106,14 +108,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 19,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   message: {
     marginTop: 8,
     fontSize: 14.5,
     lineHeight: 21,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
   btnRow: { flexDirection: "row", gap: 10, alignSelf: "stretch", marginTop: 24 },
@@ -124,7 +126,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 15,
   },
-  btnText: { fontSize: 15.5, fontWeight: "800", color: colors.white },
+  btnText: { fontSize: 15.5, fontWeight: "800", color: c.white },
   btnAlt: {
     flex: 1,
     alignItems: "center",
@@ -132,10 +134,10 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  btnAltText: { fontSize: 15, fontWeight: "700", color: colors.inkSoft },
-});
+  btnAltText: { fontSize: 15, fontWeight: "700", color: c.inkSoft },
+}));
 
 export default ConfirmModal;

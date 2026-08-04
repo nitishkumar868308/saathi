@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import SaathiLogo from "@/components/saathi-logo";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 const pointIcons = ["documents-outline", "sunny-outline", "lock-closed-outline"];
 
 export default function Onboarding() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const { onboarding: o } = useT();
   const [name, setName] = useState("");
@@ -30,7 +32,7 @@ export default function Onboarding() {
           {points.map((p) => (
             <View key={p.text} style={styles.point}>
               <View style={styles.pIcon}>
-                <Ionicons name={p.icon as any} size={18} color={colors.terracotta} />
+                <Ionicons name={p.icon as any} size={18} color={tc.terracotta} />
               </View>
               <Text style={styles.pText}>{p.text}</Text>
             </View>
@@ -44,7 +46,7 @@ export default function Onboarding() {
           value={name}
           onChangeText={setName}
           placeholder={o.namePlaceholder}
-          placeholderTextColor={colors.inkSoft}
+          placeholderTextColor={tc.inkSoft}
           style={styles.input}
         />
 
@@ -53,15 +55,15 @@ export default function Onboarding() {
           style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
         >
           <Text style={styles.btnText}>{o.start}</Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.white} />
+          <Ionicons name="arrow-forward" size={18} color={tc.white} />
         </Pressable>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   content: { flex: 1, padding: 28, paddingTop: 40 },
   logo: {
     height: 76,
@@ -69,16 +71,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 26,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
   title: {
     marginTop: 24,
     fontSize: 38,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 44,
   },
-  sub: { marginTop: 12, fontSize: 16, lineHeight: 24, color: colors.inkSoft },
+  sub: { marginTop: 12, fontSize: 16, lineHeight: 24, color: c.inkSoft },
   points: { marginTop: 28, gap: 14 },
   point: { flexDirection: "row", alignItems: "center", gap: 12 },
   pIcon: {
@@ -89,16 +91,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  pText: { flex: 1, fontSize: 15, color: colors.ink },
-  label: { fontSize: 15, fontWeight: "700", color: colors.ink, marginBottom: 10 },
+  pText: { flex: 1, fontSize: 15, color: c.ink },
+  label: { fontSize: 15, fontWeight: "700", color: c.ink, marginBottom: 10 },
   input: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 18,
     paddingVertical: 15,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 16,
   },
   btn: {
@@ -108,8 +110,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     paddingVertical: 16,
   },
-  btnText: { color: colors.white, fontWeight: "700", fontSize: 16 },
-});
+  btnText: { color: c.white, fontWeight: "700", fontSize: 16 },
+}));

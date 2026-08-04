@@ -6,14 +6,13 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { TypingDots as Dots } from "@/components/typing-dots";
 import SaathiLogo from "@/components/saathi-logo";
 import { VoiceButton } from "@/components/voice-button";
@@ -22,7 +21,7 @@ import { useUserName, useAuth } from "@/components/auth-provider";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
-import { askSaathi, ChatTurn, ChatContext, type SaathiAction } from "@/lib/ai";
+import { askSaathi, ChatTurn, ChatContext, type AiFailure, type SaathiAction } from "@/lib/ai";
 import { ReminderLimitError } from "@/lib/reminders";
 import { listRemindersWithPending, saveReminder } from "@/lib/reminder-outbox";
 import { listDocuments, type Document } from "@/lib/documents";
@@ -36,7 +35,7 @@ import { useToast } from "@/components/toast";
 import { emitDataChanged } from "@/lib/data-events";
 
 /** Chat ki ek line — saathi ki line ke saath tappable document chips ho sakti hain. */
-type DocRef = { id: string; name: string; uri: string; path: string };
+type DocRef = { id: string; name: string; uri: string; path: string; mime: string; type: string };
 type Msg = {
   id: string;
   role: "user" | "saathi";
@@ -55,7 +54,46 @@ function matchDocs(text: string, docs: Document[]): DocRef[] {
       name: d.name,
       uri: d.file_uri ?? "",
       path: d.file_path ?? "",
+      mime: d.mime_type ?? "",
+      type: d.type,
     }));
+}
+
+type ThinkingLines = { thinking: string; thinkingLong: string };
+
+/**
+ * Saathi kitni der se soch raha hai — 6s baad, phir 15s baad.
+ *
+ * ⚠️ Ye seedha usi shikayat ka jawab hai jiske liye pehle "internet dheema"
+ * banner chal jaata tha. Gemini ko jawab banane me 5-20 second lagna bilkul
+ * normal hai; galti ye thi ki us khamoshi ko app "aapka net dheema hai" bol ke
+ * bharti thi — jo jhoot bhi tha, aur user ke haath me kuch chhodta bhi nahi tha.
+ * Ab wahi khamoshi sach se bhari jaati hai: "main soch raha hoon". Intezaar utna
+ * hi rehta hai, par samajh me aata hai.
+ *
+ * Ye alag component isliye hai (hook nahi): jawab aate hi TypingBubble ke saath
+ * ye bhi unmount ho jaata hai, aur agle sawaal par ginti apne aap zero se shuru
+ * hoti hai. Warna stage reset karna padta, aur wo effect ke andar setState hota.
+ */
+function ThinkingHint({ lines }: { lines: ThinkingLines }) {
+  const styles = useStyles();
+  const [stage, setStage] = useState(0);
+
+  useEffect(() => {
+    const soon = setTimeout(() => setStage(1), 6000);
+    const late = setTimeout(() => setStage(2), 15_000);
+    return () => {
+      clearTimeout(soon);
+      clearTimeout(late);
+    };
+  }, []);
+
+  if (stage === 0) return null;
+  return (
+    <Text style={styles.thinkingHint}>
+      {stage === 2 ? lines.thinkingLong : lines.thinking}
+    </Text>
+  );
 }
 
 /**
@@ -65,7 +103,8 @@ function matchDocs(text: string, docs: Document[]): DocRef[] {
  * deta hai — lagta hai app atak gaya. Dots batate hain ki saamne wala likh raha
  * hai, isliye intezaar swabhavik lagta hai.
  */
-function TypingBubble() {
+function TypingBubble({ lines }: { lines: ThinkingLines }) {
+  const styles = useStyles();
   return (
     <View style={styles.saathiRow}>
       <View style={styles.miniAvatar}>
@@ -73,6 +112,7 @@ function TypingBubble() {
       </View>
       <View style={styles.saathiBubble}>
         <Dots />
+        <ThinkingHint lines={lines} />
       </View>
     </View>
   );
@@ -118,6 +158,8 @@ function isSameDay(a: Date, b: Date) {
 }
 
 export default function Chat() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const name = useUserName();
   const { session } = useAuth();
@@ -128,8 +170,13 @@ export default function Chat() {
   const { locale } = useLocale();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  /** Aakhri turn jo net ki wajah se fail hua — "Dobara bhejo" isi ko chalata hai. */
+  /** Aakhri turn jo fail hua — "Dobara bhejo" isi ko chalata hai. */
   const [failedTurn, setFailedTurn] = useState<Pending | null>(null);
+  /**
+   * Fail kyun hua. `offline` yahan kabhi nahi aata — uske liye poori screen wala
+   * popup khulta hai. Baaki teenon me user ko chat me hi sach bata dete hain.
+   */
+  const [failReason, setFailReason] = useState<AiFailure | null>(null);
   /** Chat se pehla reminder banne par "reminder time pe aaye" wala setup. */
   const [permModal, setPermModal] = useState(false);
   const [messages, setMessages] = useState<Msg[]>(() => [
@@ -232,15 +279,16 @@ export default function Chat() {
    */
   async function ask(turn: Pending) {
     setSending(true);
+    setFailReason(null);
     try {
       const { context, docs } = ctxRef.current;
-      const { reply, action, failed } = await askSaathi(turn.text, turn.history, name, {
+      const { reply, action, failure } = await askSaathi(turn.text, turn.history, name, {
         locale,
         context,
         fallback: ch.stubReply,
       });
 
-      if (failed) {
+      if (failure) {
         // ⚠️ Yahi wo jagah thi jahan sabse zyada gadbad hoti thi: net fail hone
         // par bhi Saathi ka "main sirf reminders/documents me madad kar sakta
         // hoon" wala decline message chipak jaata tha. User ko lagta tha Saathi
@@ -254,8 +302,21 @@ export default function Chat() {
         // time nikaalta tha ("roz 6 baje 90 din tak" ko ek baar ka 6 baje samajh
         // ke) aur user ko lagta tha reminder theek lag gaya. Galat reminder
         // se behtar hai saaf keh dena ki net nahi tha — aur retry de dena.
+        //
+        // ⚠️ Yahan pehle HAR fail par `reportNetFailure("ai", …)` chalta tha —
+        // yaani poori screen ka "internet ne saath nahi diya" popup, awaaz ke
+        // saath. Char bilkul alag cheezein us ek popup me ghus jaati thi: sach
+        // me offline hona, Gemini ka 429, key ka na hona, aur AI ka der karna.
+        // Teen me se teen baar wo popup jhoot bolta tha, aur user ko lagta tha
+        // "AI use karte hi internet chala jaata hai".
+        //
+        // Ab popup sirf `offline` par — jahan wo sach hai.
         setFailedTurn(turn);
-        reportNetFailure("ai", () => ask(turn));
+        if (failure === "offline") {
+          reportNetFailure("ai", () => ask(turn));
+        } else {
+          setFailReason(failure);
+        }
         return;
       }
 
@@ -356,7 +417,26 @@ export default function Chat() {
       return;
     }
     if (action.type === "create_reminder") {
-      const when = new Date(action.remind_at);
+      /**
+       * ⚠️ Relative waqt ("30 second baad", "5 minute baad") ka hisaab YAHIN
+       * hota hai — server par nahi. Server jis lamhe time banata hai, wo lamha
+       * yahan pahunchte-pahunchte 5-20 second purana ho chuka hota hai.
+       *
+       * Absolute time par is der se kuch nahi bigadta, isliye ye kabhi pakda
+       * nahi gaya. Par "30 second baad" wala reminder is der me poora hi mar
+       * jaata tha: AI ka nikala hua time neeche wale `when <= Date.now()` guard
+       * se takra ke Add-reminder screen par chala jaata tha. User ke liye iska
+       * matlab tha "chat se reminder banta hi nahi".
+       *
+       * Ab `in_seconds` ki ginti jawab aane ke lamhe se shuru hoti hai — yaani
+       * theek wahi jo user ne maanga tha.
+       */
+      const when =
+        typeof action.in_seconds === "number" && action.in_seconds > 0
+          ? new Date(Date.now() + action.in_seconds * 1000)
+          : action.remind_at
+            ? new Date(action.remind_at)
+            : new Date(NaN);
       /**
        * ⚠️ Yahan pehle `return` tha — "reply already samhaal chuka hai" maan
        * ke. Wo maan lena galat nikla, aur yahi wo soorat hai jise user "chat se
@@ -433,12 +513,19 @@ export default function Chat() {
                           onPress={() =>
                             router.push({
                               pathname: "/document-view",
-                              params: { uri: doc.uri, path: doc.path, name: doc.name },
+                              params: {
+                                id: doc.id,
+                                uri: doc.uri,
+                                path: doc.path,
+                                mime: doc.mime,
+                                name: doc.name,
+                                type: doc.type,
+                              },
                             } as never)
                           }
                           style={styles.docChip}
                         >
-                          <Ionicons name="document-text-outline" size={14} color={colors.terracotta} />
+                          <Ionicons name="document-text-outline" size={14} color={tc.terracotta} />
                           <Text style={styles.docChipText} numberOfLines={1}>
                             {doc.name}
                           </Text>
@@ -454,23 +541,36 @@ export default function Chat() {
               </View>
             ),
           )}
-          {sending && <TypingBubble />}
+          {sending && <TypingBubble lines={ch} />}
 
-          {/* Net ki wajah se jawab nahi aaya — message chat me chipka rehta
-              hai, aur ek saaf "dobara bhejo". Pehle yahan Saathi ka jhoota
-              decline message aa jaata tha (item 7 & 15). */}
+          {/* Jawab nahi aaya — message chat me chipka rehta hai, uske saath
+              asli wajah aur ek saaf "dobara bhejo". Pehle yahan Saathi ka
+              jhoota decline message aa jaata tha (item 7 & 15), aur uske baad
+              har wajah ke liye ek hi "internet" wala popup. */}
           {!!failedTurn && !sending && (
-            <Pressable
-              onPress={() => {
-                const turn = failedTurn;
-                setFailedTurn(null);
-                void ask(turn);
-              }}
-              style={styles.retryRow}
-            >
-              <Ionicons name="refresh" size={15} color={colors.terracotta} />
-              <Text style={styles.retryText}>{ch.retrySend}</Text>
-            </Pressable>
+            <View style={styles.failWrap}>
+              {!!failReason && (
+                <Text style={styles.failLine}>
+                  {failReason === "busy"
+                    ? ch.failBusy
+                    : failReason === "slow"
+                      ? ch.failSlow
+                      : ch.failServer}
+                </Text>
+              )}
+              <Pressable
+                onPress={() => {
+                  const turn = failedTurn;
+                  setFailedTurn(null);
+                  setFailReason(null);
+                  void ask(turn);
+                }}
+                style={styles.retryRow}
+              >
+                <Ionicons name="refresh" size={15} color={tc.terracotta} />
+                <Text style={styles.retryText}>{ch.retrySend}</Text>
+              </Pressable>
+            </View>
           )}
         </ScrollView>
 
@@ -495,7 +595,7 @@ export default function Chat() {
             value={input}
             onChangeText={setInput}
             placeholder={ch.inputPlaceholder}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             style={styles.input}
             onSubmitEditing={() => sendText(input)}
             returnKeyType="send"
@@ -509,7 +609,7 @@ export default function Chat() {
               (pressed || sending) && { opacity: 0.85 },
             ]}
           >
-            <Ionicons name="arrow-up" size={20} color={colors.white} />
+            <Ionicons name="arrow-up" size={20} color={tc.white} />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -521,15 +621,15 @@ export default function Chat() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    backgroundColor: colors.surface,
+    borderBottomColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
@@ -539,12 +639,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: c.ink },
   onlineRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
-  dot: { height: 7, width: 7, borderRadius: 4, backgroundColor: colors.sage },
-  headerSub: { fontSize: 12.5, color: colors.sage, fontWeight: "500" },
+  dot: { height: 7, width: 7, borderRadius: 4, backgroundColor: c.sage },
+  headerSub: { fontSize: 12.5, color: c.sage, fontWeight: "500" },
   list: { padding: 16, gap: 14, paddingBottom: 8 },
   saathiRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, maxWidth: "88%" },
   miniAvatar: {
@@ -553,20 +653,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 10,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     marginBottom: 2,
   },
   saathiBubble: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     borderRadius: 20,
     borderBottomLeftRadius: 6,
     paddingHorizontal: 15,
     paddingVertical: 11,
   },
-  saathiText: { color: colors.ink, fontSize: 15, lineHeight: 22 },
+  saathiText: { color: c.ink, fontSize: 15, lineHeight: 22 },
   docChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
   docChip: {
     flexDirection: "row",
@@ -575,22 +675,31 @@ const styles = StyleSheet.create({
     maxWidth: 200,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  docChipText: { fontSize: 12.5, fontWeight: "600", color: colors.terracotta },
+  docChipText: { fontSize: 12.5, fontWeight: "600", color: c.terracotta },
   userBubble: {
     alignSelf: "flex-end",
     maxWidth: "82%",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     borderRadius: 20,
     borderBottomRightRadius: 6,
     paddingHorizontal: 15,
     paddingVertical: 11,
   },
-  userText: { color: colors.white, fontSize: 15, lineHeight: 22 },
+  userText: { color: c.white, fontSize: 15, lineHeight: 22 },
+  thinkingHint: { marginTop: 8, fontSize: 12.5, color: c.inkSoft, fontWeight: "600" },
+  failWrap: { alignSelf: "center", alignItems: "center", gap: 10, paddingHorizontal: 24 },
+  failLine: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: c.inkSoft,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   retryRow: {
     alignSelf: "center",
     flexDirection: "row",
@@ -603,26 +712,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  retryText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
+  retryText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
   chipsScroll: { flexGrow: 0, maxHeight: 56 },
   chips: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: "center" },
   chip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
     paddingVertical: 9,
     marginRight: 8,
   },
-  chipText: { fontSize: 13, color: colors.ink, fontWeight: "500" },
+  chipText: { fontSize: 13, color: c.ink, fontWeight: "500" },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.surface,
+    borderTopColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -632,11 +741,11 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
   sendBtn: {
@@ -645,6 +754,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-});
+}));

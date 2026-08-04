@@ -1,8 +1,8 @@
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { usePlan } from "@/lib/use-plan";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -18,6 +18,8 @@ export function UpgradeBanner({
   /** Container me pehle se horizontal padding ho to true — side margin hata deta hai. */
   flush?: boolean;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const { isPlus, loading } = usePlan();
   const { settings: s, common: c } = useT();
   if (loading || isPlus) return null;
@@ -33,7 +35,7 @@ export function UpgradeBanner({
       ]}
     >
       <View style={styles.iconWrap}>
-        <Ionicons name="star" size={16} color={colors.white} />
+        <Ionicons name="star" size={16} color={tc.white} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>{s.plusLo}</Text>
@@ -41,13 +43,13 @@ export function UpgradeBanner({
       </View>
       <View style={styles.cta}>
         <Text style={styles.ctaText}>{c.upgrade}</Text>
-        <Ionicons name="arrow-forward" size={13} color={colors.white} />
+        <Ionicons name="arrow-forward" size={13} color={tc.white} />
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -68,18 +70,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  title: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
-  sub: { marginTop: 1, fontSize: 12.5, color: colors.inkSoft },
+  title: { fontSize: 14.5, fontWeight: "800", color: c.ink },
+  sub: { marginTop: 1, fontSize: 12.5, color: c.inkSoft },
   cta: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  ctaText: { fontSize: 12.5, fontWeight: "800", color: colors.white },
-});
+  ctaText: { fontSize: 12.5, fontWeight: "800", color: c.white },
+}));

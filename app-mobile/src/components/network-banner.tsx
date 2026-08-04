@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Animated, Easing, StyleSheet } from "react-native";
+import { View, Text, Animated, Easing } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useNetworkStatus } from "@/lib/network";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -14,6 +14,8 @@ import { useT } from "@/lib/i18n/LanguageProvider";
  * app ki nahi.
  */
 export function NetworkBanner() {
+  const tc = useColors();
+  const styles = useStyles();
   const { offline, slow } = useNetworkStatus();
   const { network: n } = useT();
   const insets = useSafeAreaInsets();
@@ -49,7 +51,7 @@ export function NetworkBanner() {
       <Ionicons
         name={offline ? "cloud-offline-outline" : "time-outline"}
         size={15}
-        color={colors.white}
+        color={tc.white}
       />
       <Text style={styles.text} numberOfLines={1}>
         {offline ? n.offline : n.slow}
@@ -58,7 +60,7 @@ export function NetworkBanner() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   bar: {
     position: "absolute",
     top: 0,
@@ -72,7 +74,7 @@ const styles = StyleSheet.create({
     paddingBottom: 7,
     paddingHorizontal: 16,
   },
-  barOffline: { backgroundColor: colors.ink },
-  barSlow: { backgroundColor: colors.amber },
-  text: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
-});
+  barOffline: { backgroundColor: c.ink },
+  barSlow: { backgroundColor: c.amber },
+  text: { color: c.white, fontSize: 12.5, fontWeight: "700" },
+}));

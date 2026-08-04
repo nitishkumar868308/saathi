@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Keyboard,
   RefreshControl,
@@ -14,7 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { Loader } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
 import { useToast } from "@/components/toast";
@@ -63,6 +62,8 @@ function fmt(iso: string): string {
 }
 
 export default function Support() {
+  const tc = useColors();
+  const styles = useStyles();
   const t = useT();
   const s = t.support;
   const toast = useToast();
@@ -199,7 +200,7 @@ export default function Support() {
         hitSlop={10}
         style={styles.backBtn}
       >
-        <Ionicons name="chevron-back" size={22} color={colors.ink} />
+        <Ionicons name="chevron-back" size={22} color={tc.ink} />
       </Pressable>
       <View style={{ flex: 1 }}>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -211,7 +212,7 @@ export default function Support() {
       </View>
       {view === "list" && (
         <Pressable onPress={() => setView("new")} hitSlop={8} style={styles.newBtn}>
-          <Ionicons name="add" size={17} color={colors.white} />
+          <Ionicons name="add" size={17} color={tc.white} />
           <Text style={styles.newBtnText}>{s.newBtn}</Text>
         </Pressable>
       )}
@@ -235,7 +236,7 @@ export default function Support() {
                 await load();
                 setRefreshing(false);
               }}
-              tintColor={colors.terracotta}
+              tintColor={tc.terracotta}
             />
           }
         >
@@ -247,7 +248,7 @@ export default function Support() {
             </View>
           ) : tickets.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="help-buoy-outline" size={34} color={colors.terracotta} />
+              <Ionicons name="help-buoy-outline" size={34} color={tc.terracotta} />
               <Text style={styles.emptyTitle}>{s.empty}</Text>
               <Text style={styles.emptyHint}>{s.emptyHint}</Text>
               <Pressable onPress={() => setView("new")} style={styles.cta}>
@@ -287,7 +288,7 @@ export default function Support() {
               value={subject}
               onChangeText={setSubject}
               placeholder={s.subjectPh}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               style={styles.input}
             />
 
@@ -296,7 +297,7 @@ export default function Support() {
               value={body}
               onChangeText={setBody}
               placeholder={s.messagePh}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               multiline
               style={[styles.input, styles.textarea]}
             />
@@ -309,7 +310,7 @@ export default function Support() {
               {busy ? (
                 <Loader size={22} />
               ) : (
-                <Ionicons name="paper-plane" size={17} color={colors.white} />
+                <Ionicons name="paper-plane" size={17} color={tc.white} />
               )}
               <Text style={styles.ctaText}>{busy ? s.sending : s.send}</Text>
             </Pressable>
@@ -384,7 +385,7 @@ export default function Support() {
               value={reply}
               onChangeText={setReply}
               placeholder={s.replyPh}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               multiline
               style={styles.replyInput}
             />
@@ -396,7 +397,7 @@ export default function Support() {
                 (pressed || busy || !reply.trim()) && { opacity: 0.6 },
               ]}
             >
-              <Ionicons name="arrow-up" size={19} color={colors.white} />
+              <Ionicons name="arrow-up" size={19} color={tc.white} />
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -412,10 +413,12 @@ function StatusChip({
   status: string;
   s: ReturnType<typeof useT>["support"];
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const map: Record<string, { label: string; bg: string; fg: string }> = {
-    open: { label: s.stOpen, bg: "rgba(224,164,88,0.2)", fg: colors.terracottaDark },
-    answered: { label: s.stAnswered, bg: "rgba(124,138,107,0.16)", fg: colors.sage },
-    closed: { label: s.stClosed, bg: colors.creamDeep, fg: colors.inkSoft },
+    open: { label: s.stOpen, bg: "rgba(224,164,88,0.2)", fg: tc.terracottaDark },
+    answered: { label: s.stAnswered, bg: "rgba(124,138,107,0.16)", fg: tc.sage },
+    closed: { label: s.stClosed, bg: tc.creamDeep, fg: tc.inkSoft },
   };
   const v = map[status] ?? map.open;
   return (
@@ -425,40 +428,40 @@ function StatusChip({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-    backgroundColor: colors.surface,
+    borderBottomColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
+  headerTitle: { fontSize: 17, fontWeight: "800", color: c.ink },
   headerNo: {
     marginTop: 1,
     fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.4,
-    color: colors.terracotta,
+    color: c.terracotta,
   },
   newBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     borderRadius: 999,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  newBtnText: { fontSize: 12.5, fontWeight: "800", color: colors.white },
+  newBtnText: { fontSize: 12.5, fontWeight: "800", color: c.white },
 
   listContent: { padding: 16, gap: 12, paddingBottom: 40 },
-  sub: { fontSize: 14, lineHeight: 21, color: colors.inkSoft },
+  sub: { fontSize: 14, lineHeight: 21, color: c.inkSoft },
   center: { paddingVertical: 40, alignItems: "center" },
 
   emptyCard: {
@@ -466,24 +469,24 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 22,
     paddingVertical: 30,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
+  emptyTitle: { fontSize: 17, fontWeight: "800", color: c.ink },
   emptyHint: {
     fontSize: 13.5,
     lineHeight: 20,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
 
   row: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 14,
   },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -492,24 +495,24 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "800",
     letterSpacing: 0.4,
-    color: colors.terracotta,
+    color: c.terracotta,
   },
-  rowSubject: { marginTop: 6, fontSize: 15, fontWeight: "700", color: colors.ink },
-  rowTime: { marginTop: 4, fontSize: 11.5, color: colors.inkSoft },
+  rowSubject: { marginTop: 6, fontSize: 15, fontWeight: "700", color: c.ink },
+  rowTime: { marginTop: 4, fontSize: 11.5, color: c.inkSoft },
   chip: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
   chipText: { fontSize: 10.5, fontWeight: "800" },
 
-  formTitle: { fontSize: 19, fontWeight: "800", color: colors.ink },
-  label: { marginTop: 6, fontSize: 13, fontWeight: "700", color: colors.ink },
+  formTitle: { fontSize: 19, fontWeight: "800", color: c.ink },
+  label: { marginTop: 6, fontSize: 13, fontWeight: "700", color: c.ink },
   input: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
-    color: colors.ink,
+    color: c.ink,
   },
   textarea: { minHeight: 140, textAlignVertical: "top" },
   cta: {
@@ -520,10 +523,10 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 15.5, fontWeight: "800", color: colors.white },
-  hint: { fontSize: 12.5, lineHeight: 18.5, color: colors.inkSoft },
+  ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white },
+  hint: { fontSize: 12.5, lineHeight: 18.5, color: c.inkSoft },
 
   threadContent: { padding: 16, gap: 12, paddingBottom: 8 },
   themRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, maxWidth: "90%" },
@@ -533,7 +536,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 9,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     marginBottom: 2,
   },
   themBubble: {
@@ -541,23 +544,23 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderBottomLeftRadius: 6,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  themText: { fontSize: 14.5, lineHeight: 21, color: colors.ink },
-  themTime: { marginTop: 5, fontSize: 10.5, color: colors.inkSoft },
+  themText: { fontSize: 14.5, lineHeight: 21, color: c.ink },
+  themTime: { marginTop: 5, fontSize: 10.5, color: c.inkSoft },
   youBubble: {
     alignSelf: "flex-end",
     maxWidth: "86%",
     borderRadius: 18,
     borderBottomRightRadius: 6,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  youText: { fontSize: 14.5, lineHeight: 21, color: colors.white },
+  youText: { fontSize: 14.5, lineHeight: 21, color: c.white },
   youTime: { marginTop: 5, fontSize: 10.5, color: "rgba(255,255,255,0.75)" },
   waiting: {
     alignSelf: "center",
@@ -565,7 +568,7 @@ const styles = StyleSheet.create({
     maxWidth: "85%",
     fontSize: 12.5,
     lineHeight: 18,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
 
@@ -574,8 +577,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.surface,
+    borderTopColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -585,12 +588,12 @@ const styles = StyleSheet.create({
     minHeight: 46,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 15,
-    color: colors.ink,
+    color: c.ink,
   },
   sendBtn: {
     height: 46,
@@ -598,6 +601,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-});
+}));

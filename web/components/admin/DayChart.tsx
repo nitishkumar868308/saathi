@@ -39,8 +39,14 @@ export type DayRow = {
 const APP_COLOR = "#C25A37";
 /** Web ka hissa — colour-blind aankh ke liye bhi saaf alag. */
 const WEB_COLOR = "#2A6FC4";
-/** Bar ke peeche ki surface — 2px ka gap isi rang ka hota hai. */
-const SURFACE = "#FFFCF6";
+/**
+ * Bar ke peeche ki surface — 2px ka gap isi rang ka hota hai.
+ *
+ * ⚠️ Ye pehle hardcoded "#FFFCF6" tha. Dark theme me wo safed lakeer har bar ke
+ * beech chamakti thi, jabki baaki poora card gehra hota hai. CSS variable se ye
+ * apne aap dono theme me card ke rang jaisa rehta hai.
+ */
+const SURFACE = "rgb(var(--c-surface))";
 
 export type DayChartLabels = {
   app: string;

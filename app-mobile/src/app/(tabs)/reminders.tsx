@@ -1,10 +1,10 @@
 import { useState, useCallback } from "react";
-import { View, Text, Switch, ScrollView, Pressable, StyleSheet, Modal } from "react-native";
+import { View, Text, Switch, ScrollView, Pressable, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useRouter, useFocusEffect } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { SkeletonList } from "@/components/loader";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { reportError } from "@/lib/report-error";
@@ -45,6 +45,8 @@ function isToday(iso: string | null): boolean {
 }
 
 export default function Reminders() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { reminders: r0, common: c } = useT();
@@ -237,7 +239,7 @@ export default function Reminders() {
       ) : items.length === 0 ? (
         <View style={styles.center}>
           <View style={styles.emptyIcon}>
-            <Ionicons name="alarm-outline" size={28} color={colors.terracotta} />
+            <Ionicons name="alarm-outline" size={28} color={tc.terracotta} />
           </View>
           <Text style={styles.emptyTitle}>{r0.emptyTitle}</Text>
           <Text style={styles.emptyBody}>{r0.emptyBody}</Text>
@@ -255,7 +257,7 @@ export default function Reminders() {
         onPress={() => router.push("/add-reminder")}
         style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}
       >
-        <Ionicons name="add" size={20} color={colors.white} />
+        <Ionicons name="add" size={20} color={tc.white} />
         <Text style={styles.addText}>{r0.title}</Text>
       </Pressable>
 
@@ -315,6 +317,8 @@ function Section({
   repeatOf,
   labels,
 }: RowProps & { title: string; items: Reminder[] }) {
+  const tc = useColors();
+  const styles = useStyles();
   if (items.length === 0) return null;
   return (
     <View style={{ marginBottom: 20 }}>
@@ -334,7 +338,7 @@ function Section({
                   <Ionicons
                     name={r.is_paused ? "lock-closed" : "notifications"}
                     size={18}
-                    color={colors.terracotta}
+                    color={tc.terracotta}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -351,14 +355,14 @@ function Section({
                       hai. */}
                   {!r.is_paused && !!repeatOf(r) && (
                     <View style={styles.repeatTag}>
-                      <Ionicons name="repeat" size={12} color={colors.terracotta} />
+                      <Ionicons name="repeat" size={12} color={tc.terracotta} />
                       <Text style={styles.repeatTagText}>{repeatOf(r)}</Text>
                     </View>
                   )}
                 </View>
                 {r.is_paused && (
                   <View style={styles.pausedPill}>
-                    <Ionicons name="star" size={11} color={colors.white} />
+                    <Ionicons name="star" size={11} color={tc.white} />
                     <Text style={styles.pausedPillText}>Plus</Text>
                   </View>
                 )}
@@ -371,7 +375,7 @@ function Section({
                     style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
                     hitSlop={4}
                   >
-                    <Ionicons name="eye-outline" size={17} color={colors.inkSoft} />
+                    <Ionicons name="eye-outline" size={17} color={tc.inkSoft} />
                     <Text style={styles.actionText}>{labels.view}</Text>
                   </Pressable>
 
@@ -391,8 +395,8 @@ function Section({
                   <Switch
                     value={r.is_on}
                     onValueChange={() => onToggle(r)}
-                    trackColor={{ false: colors.line, true: colors.terracotta }}
-                    thumbColor={colors.white}
+                    trackColor={{ false: tc.line, true: tc.terracotta }}
+                    thumbColor={tc.white}
                   />
                 </View>
               )}
@@ -433,6 +437,8 @@ function DetailSheet({
     doneBtnRepeat: string;
   };
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   if (!reminder) return null;
   const r = reminder;
   return (
@@ -443,7 +449,7 @@ function DetailSheet({
 
           <View style={styles.sheetHead}>
             <View style={styles.rIcon}>
-              <Ionicons name="notifications" size={18} color={colors.terracotta} />
+              <Ionicons name="notifications" size={18} color={tc.terracotta} />
             </View>
             <Text style={styles.sheetLabel}>{copy.detailTitle}</Text>
           </View>
@@ -451,18 +457,18 @@ function DetailSheet({
           <Text style={styles.sheetTitle}>{r.title}</Text>
 
           <View style={styles.sheetRow}>
-            <Ionicons name="time-outline" size={17} color={colors.inkSoft} />
+            <Ionicons name="time-outline" size={17} color={tc.inkSoft} />
             <Text style={styles.sheetRowLabel}>{copy.detailWhen}</Text>
             <Text style={styles.sheetRowValue}>{timeOf(r) ?? "—"}</Text>
           </View>
 
           <View style={styles.sheetRow}>
-            <Ionicons name="pulse-outline" size={17} color={colors.inkSoft} />
+            <Ionicons name="pulse-outline" size={17} color={tc.inkSoft} />
             <Text style={styles.sheetRowLabel}>{copy.detailStatus}</Text>
             <Text
               style={[
                 styles.sheetRowValue,
-                { color: r.is_on ? colors.sage : colors.inkSoft },
+                { color: r.is_on ? tc.sage : tc.inkSoft },
               ]}
             >
               {r.is_on ? copy.activeLabel : copy.inactiveLabel}
@@ -471,7 +477,7 @@ function DetailSheet({
 
           {!!repeatOf(r) && (
             <View style={styles.sheetRow}>
-              <Ionicons name="repeat" size={17} color={colors.inkSoft} />
+              <Ionicons name="repeat" size={17} color={tc.inkSoft} />
               <Text style={styles.sheetRowLabel}>{copy.repeatLabel}</Text>
               <Text style={styles.sheetRowValue}>{repeatOf(r)}</Text>
             </View>
@@ -491,7 +497,7 @@ function DetailSheet({
             onPress={() => onDone(r)}
             style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.9 }]}
           >
-            <Ionicons name="checkmark-circle" size={19} color={colors.white} />
+            <Ionicons name="checkmark-circle" size={19} color={tc.white} />
             <Text style={styles.doneBtnText}>
               {isRepeating(r) ? copy.doneBtnRepeat : copy.doneBtn}
             </Text>
@@ -504,11 +510,11 @@ function DetailSheet({
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   headerWrap: { paddingHorizontal: 20, paddingTop: 16, ...CONTENT },
-  title: { fontSize: 26, fontWeight: "700", color: colors.ink },
-  sub: { marginTop: 4, fontSize: 14, color: colors.inkSoft },
+  title: { fontSize: 26, fontWeight: "700", color: c.ink },
+  sub: { marginTop: 4, fontSize: 14, color: c.inkSoft },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 32 },
   emptyIcon: {
     height: 64,
@@ -519,11 +525,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.10)",
     marginBottom: 4,
   },
-  emptyTitle: { fontSize: 18, fontWeight: "600", color: colors.ink },
+  emptyTitle: { fontSize: 18, fontWeight: "600", color: c.ink },
   emptyBody: {
     fontSize: 14,
     lineHeight: 21,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     maxWidth: 280,
   },
@@ -531,7 +537,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -539,8 +545,8 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     overflow: "hidden",
   },
   cardTop: {
@@ -559,9 +565,9 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  rTitle: { fontSize: 15.5, fontWeight: "700", color: colors.ink },
-  off: { textDecorationLine: "line-through", color: colors.inkSoft },
-  rTime: { marginTop: 3, fontSize: 13, color: colors.inkSoft },
+  rTitle: { fontSize: 15.5, fontWeight: "700", color: c.ink },
+  off: { textDecorationLine: "line-through", color: c.inkSoft },
+  rTime: { marginTop: 3, fontSize: 13, color: c.inkSoft },
   repeatTag: {
     flexDirection: "row",
     alignItems: "center",
@@ -573,7 +579,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  repeatTagText: { fontSize: 11.5, fontWeight: "700", color: colors.terracotta },
+  repeatTagText: { fontSize: 11.5, fontWeight: "700", color: c.terracotta },
   doneBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -582,10 +588,10 @@ const styles = StyleSheet.create({
     marginTop: 22,
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  doneBtnText: { fontSize: 16, fontWeight: "800", color: colors.white },
-  pausedTag: { marginTop: 2, fontSize: 12, fontWeight: "600", color: colors.terracotta },
+  doneBtnText: { fontSize: 16, fontWeight: "800", color: c.white },
+  pausedTag: { marginTop: 2, fontSize: 12, fontWeight: "600", color: c.terracotta },
   pausedPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -593,16 +599,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  pausedPillText: { fontSize: 11.5, fontWeight: "800", color: colors.white },
+  pausedPillText: { fontSize: 11.5, fontWeight: "800", color: c.white },
   actions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.cream,
+    borderTopColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
@@ -614,8 +620,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
-  actionPressed: { backgroundColor: colors.creamDeep },
-  actionText: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
+  actionPressed: { backgroundColor: c.creamDeep },
+  actionText: { fontSize: 13, fontWeight: "700", color: c.inkSoft },
   spacer: { flex: 1 },
   addBtn: {
     position: "absolute",
@@ -627,21 +633,21 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 20,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
-    shadowColor: colors.terracotta,
+    backgroundColor: c.terracotta,
+    shadowColor: c.terracotta,
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  addText: { color: colors.white, fontWeight: "700", fontSize: 15 },
+  addText: { color: c.white, fontWeight: "700", fontSize: 15 },
   sheetBackdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.5)",
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 22,
@@ -652,14 +658,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.line,
+    backgroundColor: c.line,
     marginBottom: 18,
   },
   sheetHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   sheetLabel: {
     fontSize: 12.5,
     fontWeight: "800",
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textTransform: "uppercase",
     letterSpacing: 0.6,
   },
@@ -667,7 +673,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 22,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 29,
   },
   sheetRow: {
@@ -676,31 +682,31 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 16,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
+    borderTopColor: c.line,
     paddingTop: 14,
   },
-  sheetRowLabel: { fontSize: 14, color: colors.inkSoft, fontWeight: "600" },
+  sheetRowLabel: { fontSize: 14, color: c.inkSoft, fontWeight: "600" },
   sheetRowValue: {
     flex: 1,
     textAlign: "right",
     fontSize: 15,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
   noteBox: {
     marginTop: 18,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     padding: 14,
   },
   noteLabel: {
     fontSize: 11.5,
     fontWeight: "800",
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  noteText: { marginTop: 6, fontSize: 15, lineHeight: 22, color: colors.ink },
-});
+  noteText: { marginTop: 6, fontSize: 15, lineHeight: 22, color: c.ink },
+}));

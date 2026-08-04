@@ -5,10 +5,10 @@ import { useRouter, useSegments, usePathname } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
-import { colors } from "@/theme/colors";
 import { ToastProvider } from "@/components/toast";
 import { AuthProvider, useAuth } from "@/components/auth-provider";
 import { LanguageProvider, useLocale } from "@/lib/i18n/LanguageProvider";
+import { ThemeProvider, useColors, useThemeMode } from "@/theme/theme";
 import { ReminderAlertHost } from "@/components/reminder-alert";
 import { ReviewPrompt } from "@/components/review-prompt";
 import { DeviceOwnerWarning } from "@/components/device-owner-warning";
@@ -16,6 +16,7 @@ import { MultiDeviceWarning } from "@/components/multi-device-warning";
 import { LockGate } from "@/components/lock-gate";
 import { LockOffer } from "@/components/lock-offer";
 import { NetworkBanner } from "@/components/network-banner";
+import { ThemeFab } from "@/components/theme-fab";
 import { NetAlertModal } from "@/components/net-alert-modal";
 import { ScreenLoader } from "@/components/loader";
 import { syncNotifications } from "@/lib/notifications";
@@ -31,10 +32,19 @@ installGlobalErrorHandler();
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <StatusBar style="dark" />
+      {/*
+        ⚠️ ThemeProvider sabse BAAHAR (Language/Auth se bhi upar).
+
+        Iske andar ki har cheez rang ke liye ispar tiki hai — Toast, lock
+        screen, network banner, saare overlay. Ise andar rakhne par wo cheezein
+        jo iske BAAHAR hoti, hamesha light theme me chipki rehti, aur dark mode
+        me screen ke kone safed chamakte.
+      */}
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <ThemedStatusBar />
             {/*
               App lock — Providers ke andar (lock screen ko bhasha aur session
               chahiye) par app ke poore content ke upar.
@@ -48,6 +58,9 @@ export default function RootLayout() {
             */}
             <LockGate>
               <RootNavigator />
+              {/* Har screen par theme switch — daayen kinare, beech ki oonchai
+                  par. Settings ka teen-wala chunav apni jagah rehta hai. */}
+              <ThemeFab />
               {/* Internet nahi/dheema — sabse upar patli patti. */}
               <NetworkBanner />
               {/* Net ki wajah se koi kaam ruka — beech screen me popup + retry. */}
@@ -62,15 +75,30 @@ export default function RootLayout() {
               <MultiDeviceWarning />
               {/* "Saathi ko lock kar lo?" — login ke baad ek hi baar. */}
               <LockOffer />
-            </LockGate>
-          </ToastProvider>
-        </AuthProvider>
-      </LanguageProvider>
+              </LockGate>
+            </ToastProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
+/**
+ * Upar ki ghadi/battery wali patti.
+ *
+ * ⚠️ Ye pehle `<StatusBar style="dark" />` tha — yaani hamesha gehre icons. Dark
+ * theme me gehre background par gehre icons bilkul gayab ho jaate hain: user ko
+ * apna time aur battery dikhna hi band ho jaata. Ab ye theme ke saath ulta hota
+ * hai.
+ */
+function ThemedStatusBar() {
+  const { scheme } = useThemeMode();
+  return <StatusBar style={scheme === "dark" ? "light" : "dark"} />;
+}
+
 function RootNavigator() {
+  const tc = useColors();
   const { session, loading } = useAuth();
   const { ready: langReady, chosen: langChosen } = useLocale();
   const segments = useSegments();
@@ -228,7 +256,7 @@ function RootNavigator() {
     <Stack
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: colors.cream },
+        cardStyle: { backgroundColor: tc.cream },
       }}
     >
       <Stack.Screen name="(tabs)" />

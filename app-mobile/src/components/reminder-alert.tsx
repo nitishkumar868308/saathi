@@ -3,7 +3,6 @@ import {
   View,
   Text,
   Pressable,
-  StyleSheet,
   Modal,
   Animated,
   Easing,
@@ -14,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import notifee, { EventType, type Notification } from "@notifee/react-native";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { alertUser, stopAlert } from "@/lib/alert-mode";
 import { completeReminder, listReminders } from "@/lib/reminders";
@@ -85,6 +84,8 @@ function reminderIdFrom(identifier: string): string {
  * Root me mount hai (_layout), isliye kisi bhi screen pe kaam karta hai.
  */
 export function ReminderAlertHost() {
+  const tc = useColors();
+  const styles = useStyles();
   const { notif: n } = useT();
   const { locale } = useLocale();
   const [alert, setAlert] = useState<Alert | null>(null);
@@ -313,7 +314,7 @@ export function ReminderAlertHost() {
             <Ionicons
               name={isExpiry ? "document-text" : "alarm"}
               size={34}
-              color={colors.white}
+              color={tc.white}
             />
           </View>
           <Text style={styles.kicker}>{isExpiry ? n.alertExpiry : n.alertReminder}</Text>
@@ -342,7 +343,7 @@ export function ReminderAlertHost() {
                       pressed && { opacity: 0.9 },
                     ]}
                   >
-                    <Ionicons name="checkmark" size={18} color={colors.white} />
+                    <Ionicons name="checkmark" size={18} color={tc.white} />
                     <Text style={styles.btnText}>{n.alertDone}</Text>
                   </Pressable>
                 </View>
@@ -359,7 +360,7 @@ export function ReminderAlertHost() {
                       onPress={onAddNew}
                       style={({ pressed }) => [styles.btn, pressed && { opacity: 0.9 }]}
                     >
-                      <Ionicons name="camera" size={18} color={colors.white} />
+                      <Ionicons name="camera" size={18} color={tc.white} />
                       <Text style={styles.btnText}>{n.docAddBtn}</Text>
                     </Pressable>
                   </>
@@ -390,7 +391,7 @@ export function ReminderAlertHost() {
                   onPress={onDone}
                   style={({ pressed }) => [styles.btn, { flex: 1, marginTop: 0 }, pressed && { opacity: 0.9 }]}
                 >
-                  <Ionicons name="checkmark" size={18} color={colors.white} />
+                  <Ionicons name="checkmark" size={18} color={tc.white} />
                   <Text style={styles.btnText}>{n.alertDone}</Text>
                 </Pressable>
               </View>
@@ -402,7 +403,7 @@ export function ReminderAlertHost() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -415,7 +416,7 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     alignItems: "center",
     borderRadius: 28,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     paddingHorizontal: 24,
     paddingVertical: 30,
     shadowColor: "#000",
@@ -430,30 +431,30 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  iconExpiry: { backgroundColor: colors.amber },
+  iconExpiry: { backgroundColor: c.amber },
   kicker: {
     marginTop: 16,
     fontSize: 12.5,
     fontWeight: "800",
     letterSpacing: 1,
     textTransform: "uppercase",
-    color: colors.inkSoft,
+    color: c.inkSoft,
   },
   body: {
     marginTop: 8,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   didText: {
     marginTop: 18,
     fontSize: 14,
     fontWeight: "600",
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
   btnRow: { flexDirection: "row", gap: 10, alignSelf: "stretch", marginTop: 12 },
@@ -466,26 +467,26 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  btnText: { fontSize: 16, fontWeight: "800", color: colors.white },
+  btnText: { fontSize: 16, fontWeight: "800", color: c.white },
   btnAlt: {
     alignItems: "center",
     justifyContent: "center",
     height: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 18,
   },
-  btnAltText: { fontSize: 15, fontWeight: "700", color: colors.inkSoft },
+  btnAltText: { fontSize: 15, fontWeight: "700", color: c.inkSoft },
   btnAltWide: { alignSelf: "stretch", marginTop: 10 },
   addNewText: {
     marginTop: 14,
     fontSize: 14,
     lineHeight: 20,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
-});
+}));

@@ -5,7 +5,6 @@ import {
   Pressable,
   Modal,
   ScrollView,
-  StyleSheet,
   Animated,
   Easing,
   useWindowDimensions,
@@ -14,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useAuth } from "@/components/auth-provider";
@@ -53,6 +52,8 @@ const QUIET_MS = 24 * 60 * 60 * 1000;
 type Ack = { count: number; at: number };
 
 export function MultiDeviceWarning() {
+  const tc = useColors();
+  const styles = useStyles();
   const { multiDevice: d } = useT();
   const { session } = useAuth();
   const toast = useToast();
@@ -181,7 +182,7 @@ export function MultiDeviceWarning() {
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
           <View style={[styles.card, { maxHeight: maxCardHeight }]}>
             <View style={styles.iconWrap}>
-              <Ionicons name="phone-portrait-outline" size={26} color={colors.terracotta} />
+              <Ionicons name="phone-portrait-outline" size={26} color={tc.terracotta} />
             </View>
 
             <Text style={styles.title}>{d.title}</Text>
@@ -198,7 +199,7 @@ export function MultiDeviceWarning() {
               <Point icon="lock-closed" title={d.privacyTitle} body={d.privacyBody} />
 
               <View style={styles.advice}>
-                <Ionicons name="bulb" size={16} color={colors.terracotta} />
+                <Ionicons name="bulb" size={16} color={tc.terracotta} />
                 <Text style={styles.adviceText}>{d.advice}</Text>
               </View>
             </ScrollView>
@@ -233,10 +234,12 @@ function Point({
   title: string;
   body: string;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.point}>
       <View style={styles.pointIcon}>
-        <Ionicons name={icon} size={16} color={colors.terracotta} />
+        <Ionicons name={icon} size={16} color={tc.terracotta} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.pointTitle}>{title}</Text>
@@ -246,7 +249,7 @@ function Point({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -256,11 +259,11 @@ const styles = StyleSheet.create({
   },
   cardWrap: { width: "100%", maxWidth: 440 },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: 28,
     padding: 22,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 30,
@@ -279,22 +282,22 @@ const styles = StyleSheet.create({
     marginTop: 15,
     fontSize: 21,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 28,
   },
   // flexShrink: chhoti screen par sirf beech ka hissa scroll karta hai —
   // heading upar aur dono button neeche hamesha dikhte rehte hain.
   scroll: { marginTop: 12, flexShrink: 1 },
   scrollContent: { paddingBottom: 4 },
-  body: { fontSize: 14.5, lineHeight: 22, color: colors.inkSoft },
+  body: { fontSize: 14.5, lineHeight: 22, color: c.inkSoft },
   point: {
     flexDirection: "row",
     gap: 11,
     marginTop: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     padding: 12,
   },
   pointIcon: {
@@ -305,8 +308,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.12)",
   },
-  pointTitle: { fontSize: 14, fontWeight: "700", color: colors.ink },
-  pointBody: { marginTop: 3, fontSize: 12.5, lineHeight: 18.5, color: colors.inkSoft },
+  pointTitle: { fontSize: 14, fontWeight: "700", color: c.ink },
+  pointBody: { marginTop: 3, fontSize: 12.5, lineHeight: 18.5, color: c.inkSoft },
   advice: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -324,7 +327,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     fontWeight: "600",
-    color: colors.ink,
+    color: c.ink,
   },
   cta: {
     marginTop: 14,
@@ -332,9 +335,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 15.5, fontWeight: "800", color: colors.white },
+  ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white },
   ghost: {
     marginTop: 9,
     height: 46,
@@ -342,8 +345,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  ghostText: { fontSize: 14, fontWeight: "700", color: colors.inkSoft },
-});
+  ghostText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
+}));

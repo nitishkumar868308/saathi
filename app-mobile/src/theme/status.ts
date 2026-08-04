@@ -1,20 +1,31 @@
 import type { ExpiryStatus } from "@/utils/expiry";
-import { colors } from "./colors";
+import type { Colors } from "./colors";
 
-export const statusStyle: Record<
-  ExpiryStatus,
-  { fg: string; bg: string; label: string }
-> = {
-  safe: { fg: colors.sage, bg: "rgba(124,138,107,0.15)", label: "Safe" },
-  soon: { fg: colors.terracotta, bg: "rgba(194,90,55,0.12)", label: "Soon" },
-  expired: { fg: "#B23B3B", bg: "rgba(178,59,59,0.12)", label: "Expired" },
-};
+/**
+ * Expiry ka rang — safe / soon / expired.
+ *
+ * ⚠️ Ye pehle ek plain `const` map tha jo module load par `colors` se bhar
+ * jaata tha. Us shakl me dark theme is map tak pahunchti hi nahi: har card ka
+ * status badge light theme ke rang leke baitha rehta.
+ *
+ * Ab ye ek function hai jo abhi ke rang leta hai. Screens ise `useColors()` ke
+ * saath bulati hain.
+ */
+export function statusStyleFor(
+  c: Colors,
+): Record<ExpiryStatus, { fg: string; bg: string; label: string }> {
+  return {
+    safe: { fg: c.sage, bg: "rgba(124,138,107,0.15)", label: "Safe" },
+    soon: { fg: c.terracotta, bg: "rgba(194,90,55,0.12)", label: "Soon" },
+    // Khatre ka laal dono theme me ek hi — halka karne par wo khatra jaisa
+    // lagna hi band ho jaata hai.
+    expired: { fg: "#B23B3B", bg: "rgba(178,59,59,0.12)", label: "Expired" },
+  };
+}
 
-export const neutralStyle = {
-  fg: colors.inkSoft,
-  bg: "rgba(107,95,84,0.10)",
-  label: "—",
-};
+export function neutralStyleFor(c: Colors) {
+  return { fg: c.inkSoft, bg: "rgba(107,95,84,0.10)", label: "—" };
+}
 
 const docIconMap: Record<string, string> = {
   car: "car-sport",

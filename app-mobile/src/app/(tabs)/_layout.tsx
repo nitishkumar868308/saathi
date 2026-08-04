@@ -1,21 +1,22 @@
 import { Tabs } from "expo-router/js-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 export default function TabsLayout() {
+  const tc = useColors();
   const { tabs } = useT();
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
-        tabBarActiveTintColor: colors.terracotta,
-        tabBarInactiveTintColor: colors.inkSoft,
+        tabBarActiveTintColor: tc.terracotta,
+        tabBarInactiveTintColor: tc.inkSoft,
         tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.line,
+          backgroundColor: tc.surface,
+          borderTopColor: tc.line,
         },
       }}
     >

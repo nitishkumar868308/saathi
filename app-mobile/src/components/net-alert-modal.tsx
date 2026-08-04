@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, Modal, StyleSheet, Animated, Easing } from "react-native";
+import { View, Text, Pressable, Modal, Animated, Easing } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { clearNetFailure, useNetFailure } from "@/lib/net-alert";
 import { alertUser, stopAlert } from "@/lib/alert-mode";
@@ -26,6 +26,8 @@ import { alertUser, stopAlert } from "@/lib/alert-mode";
  * (`lib/alert-mode.ts`).
  */
 export function NetAlertModal() {
+  const tc = useColors();
+  const styles = useStyles();
   const { network: n } = useT();
   const failure = useNetFailure();
   const [busy, setBusy] = useState(false);
@@ -98,7 +100,7 @@ export function NetAlertModal() {
         >
           <View style={styles.iconOuter}>
             <View style={styles.iconWrap}>
-              <Ionicons name="cloud-offline" size={44} color={colors.terracotta} />
+              <Ionicons name="cloud-offline" size={44} color={tc.terracotta} />
             </View>
           </View>
 
@@ -115,7 +117,7 @@ export function NetAlertModal() {
               disabled={busy}
               style={({ pressed }) => [styles.btn, (pressed || busy) && { opacity: 0.85 }]}
             >
-              <Ionicons name="refresh" size={19} color={colors.white} />
+              <Ionicons name="refresh" size={19} color={tc.white} />
               <Text style={styles.btnText}>{n.tryAgain}</Text>
             </Pressable>
           )}
@@ -131,10 +133,10 @@ export function NetAlertModal() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   screen: {
     flex: 1,
-    backgroundColor: colors.cream,
+    backgroundColor: c.cream,
     paddingHorizontal: 28,
   },
   glow: {
@@ -167,7 +169,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
     fontSize: 25,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   line: {
@@ -175,7 +177,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 25,
     fontWeight: "600",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
     maxWidth: 340,
   },
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14.5,
     lineHeight: 22,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     maxWidth: 320,
   },
@@ -195,19 +197,19 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 56,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  btnText: { fontSize: 16.5, fontWeight: "800", color: colors.white },
+  btnText: { fontSize: 16.5, fontWeight: "800", color: c.white },
   btnAlt: {
     alignItems: "center",
     justifyContent: "center",
     height: 54,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  btnAltText: { fontSize: 15.5, fontWeight: "700", color: colors.inkSoft },
-});
+  btnAltText: { fontSize: 15.5, fontWeight: "700", color: c.inkSoft },
+}));
 
 export default NetAlertModal;

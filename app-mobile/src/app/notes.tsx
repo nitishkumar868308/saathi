@@ -5,14 +5,13 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useToast } from "@/components/toast";
@@ -65,6 +64,8 @@ function tintFor(id: string) {
 }
 
 export default function Notes() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { notes: n, common: c } = useT();
@@ -182,7 +183,7 @@ export default function Notes() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Ionicons name="chevron-back" size={24} color={tc.ink} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{n.title}</Text>
@@ -198,17 +199,17 @@ export default function Notes() {
           khaali search box screen ko bhara-bhara aur uljha hua dikhata hai. */}
       {items.length > 4 && (
         <View style={styles.searchWrap}>
-          <Ionicons name="search" size={17} color={colors.inkSoft} />
+          <Ionicons name="search" size={17} color={tc.inkSoft} />
           <TextInput
             value={query}
             onChangeText={setQuery}
             placeholder={n.searchPh}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             style={styles.search}
           />
           {query.length > 0 && (
             <Pressable onPress={() => setQuery("")} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color={colors.inkSoft} />
+              <Ionicons name="close-circle" size={18} color={tc.inkSoft} />
             </Pressable>
           )}
         </View>
@@ -224,14 +225,14 @@ export default function Notes() {
               setRefreshing(true);
               void load(true);
             }}
-            tintColor={colors.terracotta}
+            tintColor={tc.terracotta}
           />
         }
       >
         {shown.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="create-outline" size={30} color={colors.terracotta} />
+              <Ionicons name="create-outline" size={30} color={tc.terracotta} />
             </View>
             <Text style={styles.emptyTitle}>{query ? n.searchEmpty : n.empty}</Text>
             {!query && <Text style={styles.emptyHint}>{n.emptyHint}</Text>}
@@ -263,7 +264,7 @@ export default function Notes() {
                         <Ionicons
                           name="bookmark"
                           size={13}
-                          color={colors.terracotta}
+                          color={tc.terracotta}
                           style={styles.pinMark}
                         />
                       )}
@@ -283,12 +284,12 @@ export default function Notes() {
                           <Ionicons
                             name={note.reminder.is_on ? "alarm" : "alarm-outline"}
                             size={12}
-                            color={note.reminder.is_on ? colors.sage : colors.inkSoft}
+                            color={note.reminder.is_on ? tc.sage : tc.inkSoft}
                           />
                           <Text
                             style={[
                               styles.remChipText,
-                              !note.reminder.is_on && { color: colors.inkSoft },
+                              !note.reminder.is_on && { color: tc.inkSoft },
                             ]}
                             numberOfLines={1}
                           >
@@ -311,7 +312,7 @@ export default function Notes() {
                           <Ionicons
                             name={note.is_pinned ? "bookmark" : "bookmark-outline"}
                             size={15}
-                            color={note.is_pinned ? colors.terracotta : colors.inkSoft}
+                            color={note.is_pinned ? tc.terracotta : tc.inkSoft}
                           />
                         </Pressable>
                       </View>
@@ -328,7 +329,7 @@ export default function Notes() {
         onPress={() => router.push("/note-edit" as never)}
         style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
       >
-        <Ionicons name="add" size={24} color={colors.white} />
+        <Ionicons name="add" size={24} color={tc.white} />
         <Text style={styles.fabText}>{n.add}</Text>
       </Pressable>
 
@@ -347,8 +348,8 @@ export default function Notes() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -358,8 +359,8 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   back: { padding: 4 },
-  title: { fontSize: 24, fontWeight: "800", color: colors.ink },
-  sub: { marginTop: 1, fontSize: 12.5, color: colors.inkSoft },
+  title: { fontSize: 24, fontWeight: "800", color: c.ink },
+  sub: { marginTop: 1, fontSize: 12.5, color: c.inkSoft },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -370,10 +371,10 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  search: { flex: 1, fontSize: 14.5, color: colors.ink, padding: 0 },
+  search: { flex: 1, fontSize: 14.5, color: c.ink, padding: 0 },
   // FAB list ke aakhri card ko dhak na le.
   scroll: { paddingHorizontal: 12, paddingBottom: 110 },
   grid: { flexDirection: "row", gap: 10 },
@@ -393,12 +394,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14.5,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 20,
     // Pin ke nishaan ke neeche title na chale jaye.
     paddingRight: 16,
   },
-  cardBody: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: colors.inkSoft },
+  cardBody: { marginTop: 5, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
   remChip: {
     marginTop: 9,
     flexDirection: "row",
@@ -411,14 +412,14 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: "rgba(124,138,107,0.16)",
   },
-  remChipText: { flexShrink: 1, fontSize: 11, fontWeight: "700", color: colors.sage },
+  remChipText: { flexShrink: 1, fontSize: 11, fontWeight: "700", color: c.sage },
   cardFoot: {
     marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  cardDate: { fontSize: 11, color: colors.inkSoft, opacity: 0.85 },
+  cardDate: { fontSize: 11, color: c.inkSoft, opacity: 0.85 },
   pinBtn: { padding: 2 },
   empty: { alignItems: "center", paddingTop: 70, paddingHorizontal: 30 },
   emptyIcon: {
@@ -433,14 +434,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 17,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   emptyHint: {
     marginTop: 8,
     fontSize: 13.5,
     lineHeight: 20,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
   fab: {
@@ -453,12 +454,12 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 20,
     borderRadius: 26,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     shadowColor: "#000",
     shadowOpacity: 0.22,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-  fabText: { fontSize: 14.5, fontWeight: "800", color: colors.white },
-});
+  fabText: { fontSize: 14.5, fontWeight: "800", color: c.white },
+}));

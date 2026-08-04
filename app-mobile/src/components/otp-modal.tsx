@@ -5,13 +5,12 @@ import {
   TextInput,
   Pressable,
   Modal,
-  StyleSheet,
   Animated,
   Easing,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import {
@@ -71,6 +70,8 @@ function OtpBody({
   onClose: () => void;
   onVerified: () => void;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const { profileDetails: t, common: c } = useT();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -170,11 +171,11 @@ function OtpBody({
               <Ionicons
                 name="chatbox-ellipses"
                 size={22}
-                color={colors.terracotta}
+                color={tc.terracotta}
               />
             </View>
             <Pressable onPress={onClose} hitSlop={10} style={styles.close}>
-              <Ionicons name="close" size={20} color={colors.inkSoft} />
+              <Ionicons name="close" size={20} color={tc.inkSoft} />
             </Pressable>
           </View>
 
@@ -190,7 +191,7 @@ function OtpBody({
               if (error) setError(null);
             }}
             placeholder={t.otpPh}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             keyboardType="number-pad"
             // Android/iOS dono SMS se code khud bhar dete hain — ek bhi tap
             // bachana yahan sach me kaam ka hai.
@@ -241,7 +242,7 @@ function OtpBody({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46,40,35,0.55)",
@@ -251,11 +252,11 @@ const styles = StyleSheet.create({
   },
   cardWrap: { width: "100%", maxWidth: 400 },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: 26,
     padding: 20,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 28,
@@ -280,40 +281,40 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 18,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     lineHeight: 25,
   },
-  sub: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: colors.inkSoft },
+  sub: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: c.inkSoft },
   input: {
     marginTop: 16,
     height: 56,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     // Code padhne me aasan ho — bada, beech me, aur ank alag-alag dikhein.
     fontSize: 22,
     fontWeight: "800",
     letterSpacing: 8,
     textAlign: "center",
-    color: colors.ink,
+    color: c.ink,
   },
   err: {
     marginTop: 9,
     fontSize: 13,
     fontWeight: "600",
-    color: colors.terracottaDark,
+    color: c.terracottaDark,
   },
-  note: { marginTop: 9, fontSize: 13, fontWeight: "600", color: colors.sage },
+  note: { marginTop: 9, fontSize: 13, fontWeight: "600", color: c.sage },
   cta: {
     marginTop: 16,
     height: 50,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 15, fontWeight: "800", color: colors.white },
+  ctaText: { fontSize: 15, fontWeight: "800", color: c.white },
   resend: { marginTop: 12, alignItems: "center", paddingVertical: 4 },
-  resendText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
-});
+  resendText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
+}));

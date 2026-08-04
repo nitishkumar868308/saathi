@@ -1,5 +1,6 @@
 "use client";
 
+import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
 import { Instagram, Twitter, Linkedin, Mail, Play } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -127,9 +128,17 @@ export default function Footer() {
           <p>
             © {year} Apka Saathi. {t.rights}
           </p>
-          <p className="flex items-center gap-1.5">
-            {t.madeIn}
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="flex items-center gap-1.5">{t.madeIn}</p>
+            {/*
+              Poora teen-wala chunav — light / dark / "phone ke hisaab se".
+              Bottom-right wala floating button sirf light↔dark palatta hai
+              (wahi kaam log baar-baar karte hain). "Phone ke hisaab se" ek baar
+              tay karne wali cheez hai, isliye wo yahan footer me hai — jahan
+              site ki baaki tay-karne wali settings rehti hain.
+            */}
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </footer>

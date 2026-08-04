@@ -6,7 +6,9 @@ import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { ToastProvider } from "@/components/Toast";
 import Analytics from "@/components/Analytics";
 import PageTracker from "@/components/PageTracker";
+import ThemeFab from "@/components/ThemeFab";
 import { pageMetadata, SITE_URL, SITE_NAME } from "@/lib/seo-server";
+import { THEME_SCRIPT } from "@/lib/theme";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -72,7 +74,12 @@ export function generateMetadata(): Promise<Metadata> {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#F7F2E9",
+  // Browser/phone ki apni patti ka rang. Ek hi rang dene par dark theme me
+  // upar ki patti safed reh jaati hai aur poore page se alag chipakti hai.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F7F2E9" },
+    { media: "(prefers-color-scheme: dark)", color: "#1A1714" },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -149,6 +156,14 @@ export default function RootLayout({
   return (
     <html lang="hi" className={`${fraunces.variable} ${mulish.variable}`}>
       <head>
+        {/*
+          ⚠️ Theme sabse pehle — React se bhi pehle.
+          React ke baad lagane par dark mode wale user ko pehli render par poori
+          safed screen dikhti hai aur phir wo kaali hoti hai. Wo jhatka dark mode
+          ki sabse aam shikayat hai, aur uska ek hi ilaaj hai: ek chhota blocking
+          inline script, <head> me.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -156,7 +171,12 @@ export default function RootLayout({
       </head>
       <body>
         <LanguageProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            {children}
+            {/* Har page par theme switch — bottom-right. LanguageProvider ke
+                ANDAR hona zaroori hai: iska label chuni hui bhasha se aata hai. */}
+            <ThemeFab />
+          </ToastProvider>
         </LanguageProvider>
         <Analytics />
         {/* Apna per-user journey tracking. useSearchParams ke kaaran Suspense me. */}

@@ -76,6 +76,14 @@
         }
       ],
       "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Saathi ko photos ki access chahiye taaki aapke documents gallery me save ho sakein.",
+          "savePhotosPermission": "Saathi aapke documents ko phone ki gallery me save karega.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "./plugins/with-fullscreen-notifications",
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 
 /**
  * Poore app ka ek hi page size.
@@ -46,6 +46,7 @@ export function Pagination({
   pageCount: number;
   onPage: (p: number) => void;
 }) {
+  const styles = useStyles();
   if (pageCount <= 1) return null;
   const pages = pageWindow(page, pageCount);
 
@@ -81,6 +82,8 @@ function Arrow({
   disabled: boolean;
   onPress: () => void;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -88,7 +91,7 @@ function Arrow({
       hitSlop={6}
       style={[styles.arrow, disabled && styles.arrowOff]}
     >
-      <Ionicons name={name} size={18} color={disabled ? colors.line : colors.ink} />
+      <Ionicons name={name} size={18} color={disabled ? tc.line : tc.ink} />
     </Pressable>
   );
 }
@@ -105,7 +108,7 @@ function pageWindow(page: number, pageCount: number): (number | "…")[] {
   return out;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -120,8 +123,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
   arrowOff: { opacity: 0.5 },
   page: {
@@ -132,11 +135,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  pageActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
-  pageText: { fontSize: 14, fontWeight: "700", color: colors.inkSoft },
-  pageTextActive: { color: colors.white },
-  gap: { paddingHorizontal: 2, color: colors.inkSoft, fontWeight: "700" },
-});
+  pageActive: { backgroundColor: c.terracotta, borderColor: c.terracotta },
+  pageText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
+  pageTextActive: { color: c.white },
+  gap: { paddingHorizontal: 2, color: c.inkSoft, fontWeight: "700" },
+}));

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -16,7 +15,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, TopProgress } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { ReminderLimitError } from "@/lib/reminders";
@@ -63,6 +62,8 @@ function midnight(offset = 0): Date {
 }
 
 export default function AddReminder() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { addReminder: a, common: c } = useT();
@@ -432,7 +433,7 @@ export default function AddReminder() {
       <View style={styles.header}>
         <Text style={styles.title}>{a.title}</Text>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close}>
-          <Ionicons name="close" size={22} color={colors.ink} />
+          <Ionicons name="close" size={22} color={tc.ink} />
         </Pressable>
       </View>
 
@@ -462,7 +463,7 @@ export default function AddReminder() {
                 if (t.length >= 3 && lastText.current !== t) void parseText(t);
               }}
               placeholder={a.whatPlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               style={styles.input}
               multiline
             />
@@ -475,7 +476,7 @@ export default function AddReminder() {
               {/* --- Kya (title) — hamesha editable --- */}
               <View style={styles.slot}>
                 <View style={styles.slotIcon}>
-                  <Ionicons name="create-outline" size={17} color={colors.terracotta} />
+                  <Ionicons name="create-outline" size={17} color={tc.terracotta} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.slotLabel}>
@@ -489,7 +490,7 @@ export default function AddReminder() {
                         setSubject(v);
                       }}
                       placeholder={a.askWhatPlaceholder}
-                      placeholderTextColor={colors.inkSoft}
+                      placeholderTextColor={tc.inkSoft}
                       style={styles.subInput}
                     />
                     <VoiceButton
@@ -505,7 +506,7 @@ export default function AddReminder() {
               {/* --- Kis din (date) --- */}
               <View style={styles.slot}>
                 <View style={styles.slotIcon}>
-                  <Ionicons name="calendar-outline" size={17} color={colors.terracotta} />
+                  <Ionicons name="calendar-outline" size={17} color={tc.terracotta} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={missingDate ? styles.slotAsk : styles.slotValue}>
@@ -531,7 +532,7 @@ export default function AddReminder() {
                       );
                     })}
                     <Pressable onPress={openDatePicker} style={styles.chip}>
-                      <Ionicons name="calendar" size={13} color={colors.inkSoft} />
+                      <Ionicons name="calendar" size={13} color={tc.inkSoft} />
                       <Text style={styles.chipText}>{a.pickDate}</Text>
                     </Pressable>
                   </View>
@@ -541,14 +542,14 @@ export default function AddReminder() {
               {/* --- Kis time --- */}
               <View style={styles.slot}>
                 <View style={styles.slotIcon}>
-                  <Ionicons name="alarm-outline" size={17} color={colors.terracotta} />
+                  <Ionicons name="alarm-outline" size={17} color={tc.terracotta} />
                 </View>
                 <View style={{ flex: 1 }}>
                   {!missingTime && (
                     <Text style={styles.slotValue}>{timeLabel(finalMinutes!)}</Text>
                   )}
                   <Pressable onPress={openTimePicker} style={styles.timeBtn}>
-                    <Ionicons name="time-outline" size={15} color={colors.terracotta} />
+                    <Ionicons name="time-outline" size={15} color={tc.terracotta} />
                     <Text style={styles.timeBtnText}>
                       {missingTime ? a.pickTime : a.change}
                     </Text>
@@ -563,7 +564,7 @@ export default function AddReminder() {
               {!!repeatText && (
                 <View style={styles.slot}>
                   <View style={styles.slotIcon}>
-                    <Ionicons name="repeat" size={17} color={colors.terracotta} />
+                    <Ionicons name="repeat" size={17} color={tc.terracotta} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.slotLabel}>{a.repeatLabel}</Text>
@@ -655,8 +656,8 @@ export default function AddReminder() {
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -666,16 +667,16 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     ...CONTENT,
   },
-  title: { fontSize: 22, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 22, fontWeight: "700", color: c.ink },
   close: {
     height: 38,
     width: 38,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
   content: { padding: 20, ...CONTENT },
   label: {
@@ -683,7 +684,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontSize: 15,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
   inputRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   input: {
@@ -691,20 +692,20 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
-  hint: { marginTop: 8, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
+  hint: { marginTop: 8, fontSize: 13, color: c.inkSoft, lineHeight: 18 },
   card: {
     marginTop: 18,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 6,
   },
   slot: {
@@ -723,20 +724,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.10)",
     marginTop: 1,
   },
-  slotValue: { flex: 1, fontSize: 15.5, fontWeight: "700", color: colors.ink, paddingTop: 6 },
-  slotAsk: { fontSize: 14, fontWeight: "600", color: colors.inkSoft, marginBottom: 8, paddingTop: 4 },
-  slotLabel: { fontSize: 13, fontWeight: "700", color: colors.ink, marginBottom: 6, paddingTop: 2 },
-  editHintText: { fontSize: 12, fontWeight: "500", color: colors.inkSoft },
+  slotValue: { flex: 1, fontSize: 15.5, fontWeight: "700", color: c.ink, paddingTop: 6 },
+  slotAsk: { fontSize: 14, fontWeight: "600", color: c.inkSoft, marginBottom: 8, paddingTop: 4 },
+  slotLabel: { fontSize: 13, fontWeight: "700", color: c.ink, marginBottom: 6, paddingTop: 2 },
+  editHintText: { fontSize: 12, fontWeight: "500", color: c.inkSoft },
   subInput: {
     flex: 1,
     minHeight: 46,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
@@ -746,14 +747,14 @@ const styles = StyleSheet.create({
     gap: 5,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     paddingHorizontal: 13,
     paddingVertical: 8,
   },
-  chipActive: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
-  chipText: { fontSize: 13, fontWeight: "600", color: colors.inkSoft },
-  chipTextActive: { color: colors.white },
+  chipActive: { backgroundColor: c.terracotta, borderColor: c.terracotta },
+  chipText: { fontSize: 13, fontWeight: "600", color: c.inkSoft },
+  chipTextActive: { color: c.white },
   timeBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -761,17 +762,17 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.terracotta,
+    borderColor: c.terracotta,
     paddingHorizontal: 14,
     paddingVertical: 8,
     marginTop: 4,
   },
-  timeBtnText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
+  timeBtnText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
   err: {
     marginHorizontal: 12,
     marginBottom: 8,
     fontSize: 13,
-    color: colors.terracotta,
+    color: c.terracotta,
     fontWeight: "600",
   },
   iosPicker: {
@@ -779,17 +780,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.cream,
+    borderColor: c.line,
+    backgroundColor: c.cream,
     padding: 8,
   },
   iosDone: {
     alignItems: "center",
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
+    borderTopColor: c.line,
   },
-  iosDoneText: { fontSize: 15, fontWeight: "700", color: colors.terracotta },
+  iosDoneText: { fontSize: 15, fontWeight: "700", color: c.terracotta },
   save: {
     margin: 20,
     marginTop: 8,
@@ -797,8 +798,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     ...CONTENT,
   },
-  saveText: { color: colors.white, fontWeight: "700", fontSize: 16 },
-});
+  saveText: { color: c.white, fontWeight: "700", fontSize: 16 },
+}));

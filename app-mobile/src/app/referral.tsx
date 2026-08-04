@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  StyleSheet,
   Share,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { router, useFocusEffect } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useToast } from "@/components/toast";
 import {
   getReferralInfo,
@@ -26,6 +25,8 @@ import { tpl } from "@/lib/i18n/dictionaries";
 import { ScreenLoader } from "@/components/loader";
 
 export default function Referral() {
+  const tc = useColors();
+  const styles = useStyles();
   const toast = useToast();
   const { referral: t } = useT();
   const [info, setInfo] = useState<ReferralInfo | null>(null);
@@ -86,7 +87,7 @@ export default function Referral() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <Ionicons name="chevron-back" size={22} color={tc.ink} />
         </Pressable>
         <Text style={styles.title}>{t.title}</Text>
         <View style={{ width: 22 }} />
@@ -99,7 +100,7 @@ export default function Referral() {
           {/* Hero */}
           <View style={styles.hero}>
             <View style={styles.giftIcon}>
-              <Ionicons name="gift" size={30} color={colors.white} />
+              <Ionicons name="gift" size={30} color={tc.white} />
             </View>
             <Text style={styles.heroTitle}>{tpl(t.heroTitle, { d: days })}</Text>
             <Text style={styles.heroSub}>{tpl(t.heroSub, { d: days })}</Text>
@@ -116,7 +117,7 @@ export default function Referral() {
               >
                 <Text style={styles.code}>{info?.code ?? "—"}</Text>
                 <View style={styles.copyChip}>
-                  <Ionicons name="copy-outline" size={15} color={colors.terracotta} />
+                  <Ionicons name="copy-outline" size={15} color={tc.terracotta} />
                   <Text style={styles.copyChipText}>{t.copyCode}</Text>
                 </View>
               </Pressable>
@@ -132,12 +133,12 @@ export default function Referral() {
                   {link}
                 </Text>
                 <View style={styles.linkCopyBtn}>
-                  <Ionicons name="copy-outline" size={17} color={colors.white} />
+                  <Ionicons name="copy-outline" size={17} color={tc.white} />
                 </View>
               </Pressable>
 
               <Pressable onPress={share} disabled={!info?.code} style={styles.shareBtn}>
-                <Ionicons name="share-social" size={18} color={colors.white} />
+                <Ionicons name="share-social" size={18} color={tc.white} />
                 <Text style={styles.shareText}>{t.shareBtn}</Text>
               </Pressable>
 
@@ -200,28 +201,30 @@ function Condition({
   cta: string;
   onPress: () => void;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.cond}>
       <View style={[styles.condTick, done ? styles.condTickDone : styles.condTickTodo]}>
         <Ionicons
           name={done ? "checkmark" : "ellipse-outline"}
           size={16}
-          color={done ? colors.white : colors.inkSoft}
+          color={done ? tc.white : tc.inkSoft}
         />
       </View>
       <Text style={[styles.condLabel, done && styles.condLabelDone]}>{label}</Text>
       {!done && (
         <Pressable onPress={onPress} style={styles.condCta}>
           <Text style={styles.condCtaText}>{cta}</Text>
-          <Ionicons name="arrow-forward" size={13} color={colors.terracotta} />
+          <Ionicons name="arrow-forward" size={13} color={tc.terracotta} />
         </Pressable>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -230,14 +233,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   back: { padding: 4 },
-  title: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 18, fontWeight: "700", color: c.ink },
   content: { padding: 20, paddingBottom: 40 },
   hero: { alignItems: "center", paddingVertical: 8 },
   giftIcon: {
     height: 64,
     width: 64,
     borderRadius: 22,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -245,14 +248,14 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 22,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   heroSub: {
     marginTop: 8,
     fontSize: 14.5,
     lineHeight: 21,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
   },
   /* Locked */
@@ -260,19 +263,19 @@ const styles = StyleSheet.create({
     marginTop: 26,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 20,
   },
-  lockTitle: { fontSize: 17, fontWeight: "800", color: colors.ink },
-  lockSub: { marginTop: 4, fontSize: 13.5, lineHeight: 20, color: colors.inkSoft, marginBottom: 8 },
+  lockTitle: { fontSize: 17, fontWeight: "800", color: c.ink },
+  lockSub: { marginTop: 4, fontSize: 13.5, lineHeight: 20, color: c.inkSoft, marginBottom: 8 },
   cond: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
+    borderTopColor: c.line,
   },
   condTick: {
     height: 28,
@@ -281,30 +284,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  condTickDone: { backgroundColor: colors.sage },
-  condTickTodo: { backgroundColor: colors.creamDeep },
-  condLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: colors.ink },
-  condLabelDone: { color: colors.inkSoft, textDecorationLine: "line-through" },
+  condTickDone: { backgroundColor: c.sage },
+  condTickTodo: { backgroundColor: c.creamDeep },
+  condLabel: { flex: 1, fontSize: 15, fontWeight: "600", color: c.ink },
+  condLabelDone: { color: c.inkSoft, textDecorationLine: "line-through" },
   condCta: { flexDirection: "row", alignItems: "center", gap: 3 },
-  condCtaText: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
+  condCtaText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
   /* Unlocked */
   label: {
     marginTop: 26,
     marginBottom: 10,
     fontSize: 15,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
   codeBox: {
     alignItems: "center",
     borderRadius: 18,
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: colors.terracotta,
+    borderColor: c.terracotta,
     backgroundColor: "rgba(194,90,55,0.08)",
     paddingVertical: 18,
   },
-  code: { fontSize: 28, fontWeight: "800", letterSpacing: 4, color: colors.terracotta },
+  code: { fontSize: 28, fontWeight: "800", letterSpacing: 4, color: c.terracotta },
   copyChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -313,31 +316,31 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(194,90,55,0.35)",
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  copyChipText: { fontSize: 12.5, fontWeight: "700", color: colors.terracotta },
+  copyChipText: { fontSize: 12.5, fontWeight: "700", color: c.terracotta },
   linkBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingLeft: 14,
     paddingRight: 6,
     paddingVertical: 6,
   },
-  linkText: { flex: 1, fontSize: 13.5, fontWeight: "600", color: colors.inkSoft },
+  linkText: { flex: 1, fontSize: 13.5, fontWeight: "600", color: c.inkSoft },
   linkCopyBtn: {
     height: 40,
     width: 40,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 13,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
   shareBtn: {
     marginTop: 16,
@@ -347,21 +350,21 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  shareText: { color: colors.white, fontWeight: "800", fontSize: 16 },
+  shareText: { color: c.white, fontWeight: "800", fontSize: 16 },
   statsRow: { flexDirection: "row", gap: 12, marginTop: 26 },
   stat: {
     flex: 1,
     alignItems: "center",
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingVertical: 18,
   },
-  statNum: { fontSize: 26, fontWeight: "800", color: colors.ink },
-  statLabel: { marginTop: 4, fontSize: 12.5, color: colors.inkSoft, textAlign: "center" },
-  capLabel: { marginTop: 22, fontSize: 13, fontWeight: "600", color: colors.inkSoft, lineHeight: 19 },
-  pending: { marginTop: 16, fontSize: 13.5, lineHeight: 20, color: colors.inkSoft },
-});
+  statNum: { fontSize: 26, fontWeight: "800", color: c.ink },
+  statLabel: { marginTop: 4, fontSize: 12.5, color: c.inkSoft, textAlign: "center" },
+  capLabel: { marginTop: 22, fontSize: 13, fontWeight: "600", color: c.inkSoft, lineHeight: 19 },
+  pending: { marginTop: 16, fontSize: 13.5, lineHeight: 20, color: c.inkSoft },
+}));

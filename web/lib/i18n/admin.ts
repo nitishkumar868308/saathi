@@ -55,6 +55,8 @@ export type AdminDict = {
     contacts: string;
     pricing: string;
     rewards: string;
+    renewals: string;
+    deleteRequests: string;
   };
   headings: Record<
     | "rewards"
@@ -71,7 +73,9 @@ export type AdminDict = {
     | "support"
     | "analytics"
     | "seo"
-    | "blog",
+    | "blog"
+    | "renewals"
+    | "deleteRequests",
     { title: string; sub: string }
   >;
   broadcast: {
@@ -458,6 +462,54 @@ export type AdminDict = {
       keywordsHint: string;
       noindex: string;
     };
+    /** "Ye document renew kaise karein" — har desh ke liye. */
+    renewals: {
+      title: string;
+      sub: string;
+      docType: string;
+      country: string;
+      /** country = '*' ka label — har desh wala fallback. */
+      allCountries: string;
+      add: string;
+      countryFormat: string;
+      alreadyExists: string;
+      /** {types} = jin doc types ka '*' fallback nahi bana. */
+      missingGlobal: string;
+      url: string;
+      urlPlaceholder: string;
+      urlHint: string;
+      authority: string;
+      guideTitle: string;
+      steps: string;
+      addStep: string;
+      note: string;
+      autoTranslate: string;
+      unreviewed: string;
+      deleteAsk: string;
+    };
+    /** Account delete requests — dekhna aur poora karna. */
+    deleteRequests: {
+      title: string;
+      sub: string;
+      empty: string;
+      status: { pending: string; hidden: string; deleted: string; rejected: string };
+      reason: string;
+      willDelete: string;
+      removedTitle: string;
+      files: string;
+      nothingLeft: string;
+      noAccount: string;
+      noAccountHelp: string;
+      hide: string;
+      unhide: string;
+      purge: string;
+      reject: string;
+      hideConfirm: string;
+      /** {email} = user ka email, jo admin ko likhna padta hai. */
+      purgeConfirm: string;
+      /** Dono raaston ka fark — sabse zaroori line. */
+      hideVsDelete: string;
+    };
     blog: {
       postsLabel: string;
       newPost: string;
@@ -561,11 +613,15 @@ const en: AdminDict = {
     contacts: "Contacts",
     pricing: "Pricing",
     rewards: "Rewards",
+    renewals: "Renew guides",
+    deleteRequests: "Delete requests",
   },
   headings: {
     support: { title: "Support", sub: "Questions raised from the app — read the whole thread and reply. Your reply reaches them in the app, by email and as a notification." },
     seo: { title: "SEO", sub: "Title, description and keywords for every page. Saving here updates the live site — no deploy needed." },
     blog: { title: "Blog", sub: "Write and edit posts. Published posts appear on the website and in the sitemap right away." },
+    renewals: { title: "How to renew", sub: "What people should actually do when a document expires. Every country gets an answer — the all-countries guide is the fallback." },
+    deleteRequests: { title: "Delete requests", sub: "People asking to have their account deleted. See everything of theirs, then hide it or remove it for good." },
     analytics: { title: "Analytics", sub: "Where people go on the website and in the app — and what one user actually did." },
     rewards: { title: "Rewards & Referrals", sub: "Change offer and referral numbers here — they go live instantly." },
     pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. Users see their country's price + currency by IP." },
@@ -837,6 +893,53 @@ const en: AdminDict = {
         "Comma separated. Use words people actually search for — a long list does not help.",
       noindex: "Hide from search",
     },
+    renewals: {
+      title: "How to renew",
+      sub: "What a user should do when a document is expiring. Shown inside the app, works offline.",
+      docType: "Document type",
+      country: "Country (ISO2)",
+      allCountries: "All countries",
+      add: "Add",
+      countryFormat: "Country must be a 2-letter code, like US or AE.",
+      alreadyExists: "This document type already has a guide for that country.",
+      missingGlobal:
+        "No all-countries fallback for: {types}. Users outside the countries listed below will see nothing for these document types.",
+      url: "Official link",
+      urlPlaceholder: "https://…",
+      urlHint:
+        "Leave empty when there is no single official portal — the steps are then the whole answer.",
+      authority: "Who handles it",
+      guideTitle: "Heading",
+      steps: "Steps",
+      addStep: "Add step",
+      note: "Note (the one thing people get wrong)",
+      autoTranslate: "Translate into the other languages on save",
+      unreviewed: "unchecked",
+      deleteAsk: "Remove this country's guide?",
+    },
+    deleteRequests: {
+      title: "Delete requests",
+      sub: "People who asked for their account to be deleted — and everything of theirs you would remove.",
+      empty: "No delete requests yet.",
+      status: { pending: "pending", hidden: "hidden", deleted: "deleted", rejected: "rejected" },
+      reason: "Reason they gave",
+      willDelete: "What would be deleted",
+      removedTitle: "What was deleted",
+      files: "Document files",
+      nothingLeft: "Nothing left to delete.",
+      noAccount: "no account",
+      noAccountHelp:
+        "No account matches this email, so there is nothing to delete. They may have used a different address — check with them before rejecting.",
+      hide: "Hide from user",
+      unhide: "Restore access",
+      purge: "Delete everything",
+      reject: "Reject",
+      hideConfirm: "Hide this account? Their data stays in the database and you can restore it.",
+      purgeConfirm:
+        "This cannot be undone. Type the email to confirm you want to permanently delete everything:\n\n{email}",
+      hideVsDelete:
+        "Hide first, delete later. Hiding shuts the account out of the app but keeps everything, so you can restore it if they come back or a payment question comes up. Deleting removes the files, every row and the login itself — there is no way back.",
+    },
     blog: {
       postsLabel: "posts",
       newPost: "New post",
@@ -929,11 +1032,15 @@ const hi: AdminDict = {
     contacts: "कॉन्टैक्ट",
     pricing: "प्राइसिंग",
     rewards: "रिवॉर्ड्स",
+    renewals: "रिन्यू गाइड",
+    deleteRequests: "डिलीट रिक्वेस्ट",
   },
   headings: {
     support: { title: "सपोर्ट", sub: "ऐप से आए सवाल — पूरी बातचीत पढ़िए और जवाब दीजिए। जवाब ऐप, ईमेल और नोटिफ़िकेशन तीनों जगह पहुँचता है।" },
     seo: { title: "SEO", sub: "हर पेज का टाइटल, डिस्क्रिप्शन और कीवर्ड। यहाँ सेव करते ही लाइव साइट पर लग जाता है — डिप्लॉय नहीं करना पड़ता।" },
     blog: { title: "ब्लॉग", sub: "पोस्ट लिखें और बदलें। पब्लिश्ड पोस्ट तुरंत वेबसाइट और sitemap दोनों में आ जाती है।" },
+    renewals: { title: "रिन्यू कैसे करें", sub: "डॉक्युमेंट एक्सपायर होने पर लोगों को असल में क्या करना चाहिए। हर देश को जवाब मिलता है — सभी-देश वाली गाइड फ़ॉलबैक है।" },
+    deleteRequests: { title: "डिलीट रिक्वेस्ट", sub: "जो लोग अकाउंट डिलीट करवाना चाहते हैं। उनका सब कुछ देखें, फिर छुपाएँ या हमेशा के लिए हटाएँ।" },
     analytics: { title: "एनालिटिक्स", sub: "लोग वेबसाइट और ऐप में कहाँ जाते हैं — और एक यूज़र ने क्या किया।" },
     rewards: { title: "रिवॉर्ड्स और रेफरल", sub: "ऑफर और रेफरल के नंबर यहीं से बदलें — तुरंत लाइव हो जाते हैं।" },
     pricing: { title: "देश अनुसार प्राइसिंग", sub: "Base × multiplier × conversion rate. IP से यूज़र को उसके देश का प्राइस + करेंसी दिखता है।" },
@@ -1206,6 +1313,54 @@ const hi: AdminDict = {
         "कॉमा से अलग करें। वही शब्द लिखें जो लोग सच में सर्च करते हैं — लंबी लिस्ट से फ़ायदा नहीं होता।",
       noindex: "सर्च से छुपाएँ",
     },
+    renewals: {
+      title: "रिन्यू कैसे करें",
+      sub: "डॉक्युमेंट एक्सपायर हो रहा हो तो यूज़र को क्या करना चाहिए। ऐप में दिखता है, ऑफ़लाइन भी चलता है।",
+      docType: "डॉक्युमेंट टाइप",
+      country: "देश (ISO2)",
+      allCountries: "सभी देश",
+      add: "जोड़ें",
+      countryFormat: "देश का कोड 2 अक्षर का होना चाहिए, जैसे US या AE।",
+      alreadyExists: "इस डॉक्युमेंट टाइप की गाइड उस देश के लिए पहले से है।",
+      missingGlobal:
+        "इनके लिए सभी-देश वाला फ़ॉलबैक नहीं है: {types}। नीचे दिए देशों के बाहर के यूज़र्स को इन टाइप पर कुछ नहीं दिखेगा।",
+      url: "आधिकारिक लिंक",
+      urlPlaceholder: "https://…",
+      urlHint:
+        "जहाँ कोई एक आधिकारिक पोर्टल नहीं है वहाँ ख़ाली छोड़ें — तब स्टेप्स ही पूरा जवाब हैं।",
+      authority: "कौन करता है",
+      guideTitle: "शीर्षक",
+      steps: "स्टेप्स",
+      addStep: "स्टेप जोड़ें",
+      note: "नोट (वह एक बात जिसमें लोग चूकते हैं)",
+      autoTranslate: "सेव करते ही बाक़ी भाषाओं में अनुवाद करें",
+      unreviewed: "अनजाँची",
+      deleteAsk: "इस देश की गाइड हटा दें?",
+    },
+    deleteRequests: {
+      title: "डिलीट रिक्वेस्ट",
+      sub: "जिन्होंने अकाउंट डिलीट करने को कहा — और उनका वह सब कुछ जो हटेगा।",
+      empty: "अभी कोई डिलीट रिक्वेस्ट नहीं है।",
+      status: { pending: "बाक़ी", hidden: "छुपाया", deleted: "डिलीट", rejected: "मना किया" },
+      reason: "उन्होंने जो वजह लिखी",
+      willDelete: "क्या-क्या डिलीट होगा",
+      removedTitle: "क्या-क्या डिलीट हुआ",
+      files: "डॉक्युमेंट फ़ाइलें",
+      nothingLeft: "डिलीट करने को कुछ नहीं बचा।",
+      noAccount: "अकाउंट नहीं",
+      noAccountHelp:
+        "इस ईमेल से कोई अकाउंट नहीं मिला, इसलिए डिलीट करने को कुछ नहीं है। हो सकता है उन्होंने कोई और ईमेल इस्तेमाल किया हो — मना करने से पहले उनसे पूछ लें।",
+      hide: "यूज़र से छुपाएँ",
+      unhide: "वापस चालू करें",
+      purge: "सब कुछ डिलीट करें",
+      reject: "मना करें",
+      hideConfirm:
+        "यह अकाउंट छुपा दें? इनका डेटा डेटाबेस में रहेगा और आप इसे वापस चालू कर सकते हैं।",
+      purgeConfirm:
+        "यह वापस नहीं होगा। हमेशा के लिए सब कुछ डिलीट करने की पुष्टि के लिए ईमेल लिखें:\n\n{email}",
+      hideVsDelete:
+        "पहले छुपाएँ, डिलीट बाद में। छुपाने से अकाउंट ऐप में बंद हो जाता है पर सब कुछ बचा रहता है — वे वापस आएँ या पेमेंट का सवाल उठे तो आप बहाल कर सकते हैं। डिलीट करने पर फ़ाइलें, हर रो और लॉगिन तक मिट जाता है — वापस लाने का कोई रास्ता नहीं।",
+    },
     blog: {
       postsLabel: "पोस्ट",
       newPost: "नई पोस्ट",
@@ -1299,11 +1454,15 @@ const hinglish: AdminDict = {
     contacts: "Contacts",
     pricing: "Pricing",
     rewards: "Rewards",
+    renewals: "Renew guides",
+    deleteRequests: "Delete requests",
   },
   headings: {
     support: { title: "Support", sub: "App se aaye sawaal — poori baatcheet padhiye aur jawab dijiye. Jawab app, email aur notification teeno jagah pahunchta hai." },
     seo: { title: "SEO", sub: "Har page ka title, description aur keywords. Yahan save karte hi live site par lag jaata hai — deploy nahi karna padta." },
     blog: { title: "Blog", sub: "Post likho aur badlo. Published post turant website aur sitemap dono me aa jaati hai." },
+    renewals: { title: "Renew kaise karein", sub: "Document expire hone par logon ko asal me kya karna chahiye. Har desh ko jawab milta hai — sab-desh wali guide fallback hai." },
+    deleteRequests: { title: "Delete requests", sub: "Jo log account delete karwana chahte hain. Unka sab kuch dekho, phir chhupao ya hamesha ke liye hatao." },
     analytics: { title: "Analytics", sub: "Log website aur app me kahan jaate hain — aur ek user ne asal me kya kiya." },
     rewards: { title: "Rewards & Referrals", sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain." },
     pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. IP se user ko uske desh ka price + currency dikhta hai." },
@@ -1574,6 +1733,54 @@ const hinglish: AdminDict = {
       keywordsHint:
         "Comma se alag karo. Wahi shabd likho jo log sach me search karte hain — lambi list se faayda nahi hota.",
       noindex: "Search se chhupao",
+    },
+    renewals: {
+      title: "Renew kaise karein",
+      sub: "Document expire ho raha ho to user ko kya karna chahiye. App me dikhta hai, offline bhi chalta hai.",
+      docType: "Document type",
+      country: "Desh (ISO2)",
+      allCountries: "Sab desh",
+      add: "Jodo",
+      countryFormat: "Desh ka code 2 akshar ka hona chahiye, jaise US ya AE.",
+      alreadyExists: "Is document type ki guide us desh ke liye pehle se hai.",
+      missingGlobal:
+        "Inke liye sab-desh wala fallback nahi hai: {types}. Neeche diye deshon ke bahar wale users ko in types par kuch nahi dikhega.",
+      url: "Official link",
+      urlPlaceholder: "https://…",
+      urlHint:
+        "Jahan koi ek official portal nahi hai wahan khaali chhodo — tab steps hi poora jawab hain.",
+      authority: "Kaun karta hai",
+      guideTitle: "Heading",
+      steps: "Steps",
+      addStep: "Step jodo",
+      note: "Note (wo ek baat jisme log chookte hain)",
+      autoTranslate: "Save karte hi baaki bhashaon me anuvaad karo",
+      unreviewed: "bin-jaanchi",
+      deleteAsk: "Is desh ki guide hata dein?",
+    },
+    deleteRequests: {
+      title: "Delete requests",
+      sub: "Jinhone account delete karne ko kaha — aur unka wo sab kuch jo hatega.",
+      empty: "Abhi koi delete request nahi hai.",
+      status: { pending: "baaki", hidden: "chhupaya", deleted: "delete", rejected: "mana kiya" },
+      reason: "Unhone jo wajah likhi",
+      willDelete: "Kya-kya delete hoga",
+      removedTitle: "Kya-kya delete hua",
+      files: "Document files",
+      nothingLeft: "Delete karne ko kuch nahi bacha.",
+      noAccount: "account nahi",
+      noAccountHelp:
+        "Is email se koi account nahi mila, isliye delete karne ko kuch nahi hai. Ho sakta hai unhone koi aur email use kiya ho — mana karne se pehle unse pooch lo.",
+      hide: "User se chhupao",
+      unhide: "Wapas chalu karo",
+      purge: "Sab kuch delete karo",
+      reject: "Mana karo",
+      hideConfirm:
+        "Ye account chhupa dein? Inka data database me rahega aur aap ise wapas chalu kar sakte ho.",
+      purgeConfirm:
+        "Ye wapas nahi hoga. Hamesha ke liye sab kuch delete karne ki pushti ke liye email likho:\n\n{email}",
+      hideVsDelete:
+        "Pehle chhupao, delete baad me. Chhupane se account app me band ho jaata hai par sab kuch bacha rehta hai — wo wapas aayein ya payment ka sawaal uthe to aap bahal kar sakte ho. Delete karne par files, har row aur login tak mit jaata hai — wapas laane ka koi raasta nahi.",
     },
     blog: {
       postsLabel: "posts",

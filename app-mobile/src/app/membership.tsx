@@ -4,14 +4,13 @@ import {
   Text,
   Pressable,
   ScrollView,
-  StyleSheet,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useAuth } from "@/components/auth-provider";
 import { getMyRewards, type MyRewards, type MyReferral } from "@/lib/plan";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -79,6 +78,8 @@ function stateOf(r: MyRewards): State {
 /* ------------------------------- screen ------------------------------- */
 
 export default function Membership() {
+  const tc = useColors();
+  const styles = useStyles();
   const { rewardsVersion, refreshRewards } = useAuth();
   const { membership: m } = useT();
   const [data, setData] = useState<MyRewards | null>(null);
@@ -107,7 +108,7 @@ export default function Membership() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <Ionicons name="chevron-back" size={22} color={tc.ink} />
         </Pressable>
         <Text style={styles.title}>{m.title}</Text>
         <View style={{ width: 22 }} />
@@ -127,7 +128,7 @@ export default function Membership() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.terracotta}
+              tintColor={tc.terracotta}
             />
           }
         >
@@ -154,7 +155,7 @@ export default function Membership() {
               />
               {data.referrals.length === 0 ? (
                 <View style={styles.empty}>
-                  <Ionicons name="people-outline" size={22} color={colors.inkSoft} />
+                  <Ionicons name="people-outline" size={22} color={tc.inkSoft} />
                   <Text style={styles.emptyText}>{m.noReferrals}</Text>
                 </View>
               ) : (
@@ -174,6 +175,8 @@ export default function Membership() {
 /* ------------------------------- pieces ------------------------------- */
 
 function PlanCard({ data, m }: { data: MyRewards; m: Dict["membership"] }) {
+  const tc = useColors();
+  const styles = useStyles();
   const st = stateOf(data);
   const srcLabel = data.plan_source ? sourceLabel(m, data.plan_source) : undefined;
   const srcIcon = data.plan_source ? SOURCE_ICON[data.plan_source] : undefined;
@@ -186,9 +189,9 @@ function PlanCard({ data, m }: { data: MyRewards; m: Dict["membership"] }) {
           <Ionicons
             name={plus ? "star" : "leaf-outline"}
             size={14}
-            color={plus ? colors.white : colors.inkSoft}
+            color={plus ? tc.white : tc.inkSoft}
           />
-          <Text style={[styles.planBadgeText, plus && { color: colors.white }]}>
+          <Text style={[styles.planBadgeText, plus && { color: tc.white }]}>
             {plus ? m.planPlus : m.planFree}
           </Text>
         </View>
@@ -197,7 +200,7 @@ function PlanCard({ data, m }: { data: MyRewards; m: Dict["membership"] }) {
         )}
       </View>
 
-      <Text style={[styles.planLine, plus && { color: colors.white }]}>
+      <Text style={[styles.planLine, plus && { color: tc.white }]}>
         {st.kind === "plus_forever" && m.lineForever}
         {st.kind === "plus_until" && tpl(m.lineUntil, { date: fmt(st.until) })}
         {st.kind === "expired" && tpl(m.lineExpired, { date: fmt(st.until) })}
@@ -214,7 +217,7 @@ function PlanCard({ data, m }: { data: MyRewards; m: Dict["membership"] }) {
       {!plus && (
         <Pressable onPress={() => router.push("/upgrade" as never)} style={styles.upgradeBtn}>
           <Text style={styles.upgradeText}>{m.plusLo}</Text>
-          <Ionicons name="arrow-forward" size={15} color={colors.white} />
+          <Ionicons name="arrow-forward" size={15} color={tc.white} />
         </Pressable>
       )}
     </View>
@@ -222,6 +225,8 @@ function PlanCard({ data, m }: { data: MyRewards; m: Dict["membership"] }) {
 }
 
 function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
+  const tc = useColors();
+  const styles = useStyles();
   const done = Boolean(r.rewarded_at);
   const who = r.name?.trim() || r.email || "—";
 
@@ -235,7 +240,7 @@ function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
         <Ionicons
           name={done ? "checkmark" : "time-outline"}
           size={16}
-          color={done ? colors.white : colors.inkSoft}
+          color={done ? tc.white : tc.inkSoft}
         />
       </View>
       <View style={{ flex: 1 }}>
@@ -250,6 +255,7 @@ function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
 }
 
 function Section({ title, right }: { title: string; right?: React.ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.sectionRow}>
       <Text style={styles.section}>{title}</Text>
@@ -267,10 +273,12 @@ function Row({
   label: string;
   value: string;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <View style={styles.rowIcon}>
-        <Ionicons name={icon} size={16} color={colors.terracotta} />
+        <Ionicons name={icon} size={16} color={tc.terracotta} />
       </View>
       <Text style={styles.rowLabel} numberOfLines={2}>
         {label}
@@ -282,8 +290,8 @@ function Row({
 
 /* ------------------------------- styles ------------------------------- */
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -292,14 +300,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   back: { padding: 4 },
-  title: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 18, fontWeight: "700", color: c.ink },
   content: { padding: 20, paddingBottom: 40 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30 },
-  muted: { fontSize: 14, color: colors.inkSoft, textAlign: "center" },
+  muted: { fontSize: 14, color: c.inkSoft, textAlign: "center" },
 
   planCard: { borderRadius: 22, padding: 20 },
-  planPlus: { backgroundColor: colors.terracotta },
-  planFree: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
+  planPlus: { backgroundColor: c.terracotta },
+  planFree: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.line },
   planTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   planBadge: {
     flexDirection: "row",
@@ -311,9 +319,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     backgroundColor: "rgba(255,255,255,0.18)",
   },
-  planBadgeText: { fontSize: 12.5, fontWeight: "800", color: colors.inkSoft },
+  planBadgeText: { fontSize: 12.5, fontWeight: "800", color: c.inkSoft },
   planLeft: { fontSize: 12.5, fontWeight: "700", color: "rgba(255,255,255,0.9)" },
-  planLine: { marginTop: 14, fontSize: 16, fontWeight: "700", color: colors.ink, lineHeight: 23 },
+  planLine: { marginTop: 14, fontSize: 16, fontWeight: "700", color: c.ink, lineHeight: 23 },
   planSrc: { marginTop: 8, flexDirection: "row", alignItems: "center", gap: 6 },
   planSrcText: { fontSize: 13, color: "rgba(255,255,255,0.85)", fontWeight: "600" },
   upgradeBtn: {
@@ -324,9 +332,9 @@ const styles = StyleSheet.create({
     gap: 7,
     height: 46,
     borderRadius: 14,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  upgradeText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  upgradeText: { color: c.white, fontWeight: "800", fontSize: 15 },
 
   sectionRow: {
     marginTop: 28,
@@ -335,8 +343,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  section: { fontSize: 15, fontWeight: "800", color: colors.ink },
-  link: { fontSize: 13.5, fontWeight: "700", color: colors.terracotta },
+  section: { fontSize: 15, fontWeight: "800", color: c.ink },
+  link: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
 
   row: {
     flexDirection: "row",
@@ -344,8 +352,8 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
     paddingVertical: 13,
     marginBottom: 8,
@@ -358,8 +366,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  rowLabel: { flex: 1, fontSize: 14, color: colors.inkSoft },
-  rowValue: { fontSize: 13.5, fontWeight: "700", color: colors.ink, textAlign: "right" },
+  rowLabel: { flex: 1, fontSize: 14, color: c.inkSoft },
+  rowValue: { fontSize: 13.5, fontWeight: "700", color: c.ink, textAlign: "right" },
 
   refRow: {
     flexDirection: "row",
@@ -367,28 +375,28 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 8,
   },
   refIcon: { height: 32, width: 32, borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  refIconDone: { backgroundColor: colors.sage },
-  refIconPending: { backgroundColor: colors.creamDeep },
-  refWho: { fontSize: 14.5, fontWeight: "700", color: colors.ink },
-  refDetail: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
-  refDays: { fontSize: 15, fontWeight: "800", color: colors.sage },
+  refIconDone: { backgroundColor: c.sage },
+  refIconPending: { backgroundColor: c.creamDeep },
+  refWho: { fontSize: 14.5, fontWeight: "700", color: c.ink },
+  refDetail: { marginTop: 2, fontSize: 12.5, color: c.inkSoft },
+  refDays: { fontSize: 15, fontWeight: "800", color: c.sage },
 
   empty: {
     alignItems: "center",
     gap: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingVertical: 26,
   },
-  emptyText: { fontSize: 13.5, color: colors.inkSoft },
-  note: { marginTop: 12, fontSize: 12.5, lineHeight: 19, color: colors.inkSoft },
-});
+  emptyText: { fontSize: 13.5, color: c.inkSoft },
+  note: { marginTop: 12, fontSize: 12.5, lineHeight: 19, color: c.inkSoft },
+}));

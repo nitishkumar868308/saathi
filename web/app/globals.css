@@ -3,6 +3,59 @@
 @tailwind utilities;
 
 @layer base {
+  /**
+   * Dono theme ke rang — ek hi jagah.
+   *
+   * ⚠️ Tailwind config inhi variables ko padhta hai, isliye `bg-cream`,
+   * `text-ink`, `border-line` jaisi har maujooda class apne aap dono theme me
+   * sahi rang le leti hai. Kisi component me `dark:` wala doosra class jodne
+   * ki zaroorat nahi padti — aur wahi is tareeke ki sabse badi baat hai: jo
+   * class aaj tak likhi ja chuki hain, wo sab bina chhue theme-aware ho gayi.
+   *
+   * Value me sirf "R G B" hai, `rgb()` nahi — kyunki Tailwind us par apna
+   * alpha chadhata hai (`bg-terracotta/12`).
+   */
+  :root {
+    --c-cream: 247 242 233;
+    --c-cream-deep: 239 231 214;
+    --c-surface: 255 252 246;
+    --c-ink: 46 40 35;
+    --c-ink-soft: 107 95 84;
+    --c-terracotta: 194 90 55;
+    --c-terracotta-dark: 168 73 43;
+    --c-amber-warm: 224 164 88;
+    --c-sage: 124 138 107;
+    --c-line: 229 219 201;
+    color-scheme: light;
+  }
+
+  /**
+   * Dark — kaala nahi, GARAM andhera.
+   *
+   * Sadhaaran #000/#111 is brand ke saath thanda aur sasta lagta hai. Yahan
+   * har dark rang me wahi bhoora-pan hai jo light theme me hai, bas ulta.
+   *
+   * ⚠️ Terracotta ka shade naap ke chuna gaya hai, aankh se nahi. Ise DO ulte
+   * kaam karne hain — gehre page par TEXT/link ban ke padha jaana (ujla
+   * chahiye), aur button ka BACKGROUND ban ke uspar safed text dikhana (gehra
+   * chahiye). Dono ko 4.5:1 par le jaana namumkin hai. #D2653C = 210 101 60 par
+   * text 4.82:1 (AA poora) aur safed button text 3.71:1 (AA "bada text"). Pehle
+   * yahan ujla 224 122 85 tha, jispar safed text 2.96:1 par gir jaata tha.
+   */
+  .dark {
+    --c-cream: 26 23 20;
+    --c-cream-deep: 36 31 26;
+    --c-surface: 34 29 25;
+    --c-ink: 242 234 224;
+    --c-ink-soft: 167 154 140;
+    --c-terracotta: 210 101 60;
+    --c-terracotta-dark: 194 90 55;
+    --c-amber-warm: 232 181 112;
+    --c-sage: 157 174 138;
+    --c-line: 58 50 43;
+    color-scheme: dark;
+  }
+
   html {
     scroll-behavior: smooth;
   }
@@ -38,9 +91,11 @@
   .blob {
     @apply pointer-events-none absolute rounded-full blur-3xl;
   }
+  /* Ink se banta hai, isliye dark me ye apne aap ulta ho jaata hai — warna
+     gehre background par ye gehre dots bilkul gayab ho jaate. */
   .grain {
     background-image: radial-gradient(
-      rgba(46, 40, 35, 0.04) 1px,
+      rgb(var(--c-ink) / 0.04) 1px,
       transparent 1px
     );
     background-size: 4px 4px;

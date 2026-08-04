@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, TextInput, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import SaathiLogo from "@/components/saathi-logo";
 import {
@@ -30,6 +30,8 @@ import {
  * jo asal me sirf lock hata deta ho — lock ko dikhawa bana deta.
  */
 export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
+  const tc = useColors();
+  const styles = useStyles();
   const { lock: l } = useT();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +120,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
             }
             style={({ pressed }) => [styles.bioBtn, pressed && { opacity: 0.85 }]}
           >
-            <Ionicons name="finger-print" size={19} color={colors.terracotta} />
+            <Ionicons name="finger-print" size={19} color={tc.terracotta} />
             <Text style={styles.bioText}>{l.useBiometric}</Text>
           </Pressable>
         )}
@@ -127,11 +129,11 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
-  title: { marginTop: 22, fontSize: 22, fontWeight: "800", color: colors.ink },
-  sub: { marginTop: 7, fontSize: 14, color: colors.inkSoft, textAlign: "center" },
+  title: { marginTop: 22, fontSize: 22, fontWeight: "800", color: c.ink },
+  sub: { marginTop: 7, fontSize: 14, color: c.inkSoft, textAlign: "center" },
   dots: { marginTop: 30, flexDirection: "row", gap: 16, alignItems: "center" },
   // Input dikhta nahi par tappable rehna chahiye — warna keyboard band hone ke
   // baad wapas laane ka koi raasta hi nahi bachta.
@@ -141,11 +143,11 @@ const styles = StyleSheet.create({
     width: 15,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  dotOn: { backgroundColor: colors.terracotta, borderColor: colors.terracotta },
-  err: { marginTop: 18, fontSize: 13.5, fontWeight: "700", color: colors.terracottaDark },
+  dotOn: { backgroundColor: c.terracotta, borderColor: c.terracotta },
+  err: { marginTop: 18, fontSize: 13.5, fontWeight: "700", color: c.terracottaDark },
   bioBtn: {
     marginTop: 30,
     flexDirection: "row",
@@ -158,5 +160,5 @@ const styles = StyleSheet.create({
     borderColor: "rgba(194,90,55,0.32)",
     backgroundColor: "rgba(194,90,55,0.07)",
   },
-  bioText: { fontSize: 14, fontWeight: "700", color: colors.terracotta },
-});
+  bioText: { fontSize: 14, fontWeight: "700", color: c.terracotta },
+}));

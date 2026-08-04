@@ -1,56 +1,28 @@
 import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system/legacy";
 
-import { signedUrl } from "./storage";
-
-/** Share ke liye document ka minimum shape. */
-export type Shareable = {
-  name: string;
-  file_uri: string | null;
-  file_path: string | null;
-};
-
-async function fileExists(uri: string): Promise<boolean> {
-  try {
-    const info = await FileSystem.getInfoAsync(uri);
-    return info.exists;
-  } catch {
-    return false;
-  }
-}
-
-function safeName(name: string): string {
-  const base = name.replace(/[^\w.\- ]+/g, "").trim() || "document";
-  return base.toLowerCase().endsWith(".jpg") || base.toLowerCase().endsWith(".png")
-    ? base
-    : `${base}.jpg`;
-}
+import { resolveDocUri, type DocFile } from "./doc-cache";
 
 /**
- * Ek document ka shareable local uri nikaalo — pehle local file, na ho to
- * private storage se signed URL download karke cache me. Na mile to null.
+ * Document share karna.
+ *
+ * ⚠️ Yahan pehle apna alag resolve-logic tha: local `file_uri` dekho, na mile to
+ * signed URL se cache directory me download karo. Wo do wajah se galat tha —
+ * (1) `cacheDirectory` OS kabhi bhi khaali kar deta hai, isliye wahi file baar
+ * baar download hoti thi, aur (2) offline me signed URL milta hi nahi, to naye
+ * phone par share bilkul kaam nahi karta tha.
+ *
+ * Ab file dhoondhne ka poore app me ek hi raasta hai — `resolveDocUri` — jo
+ * pehle offline cache dekhta hai. Isliye share ab bina internet ke bhi chalta
+ * hai.
  */
-async function resolveShareUri(doc: Shareable): Promise<string | null> {
-  if (doc.file_uri && (await fileExists(doc.file_uri))) return doc.file_uri;
-  if (doc.file_path) {
-    const url = await signedUrl("documents", doc.file_path);
-    if (url) {
-      try {
-        const dest = (FileSystem.cacheDirectory ?? "") + safeName(doc.name);
-        const res = await FileSystem.downloadAsync(url, dest);
-        return res.uri;
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
-}
+
+/** Share ke liye document ka minimum shape — file dhoondhne bhar ka, aur naam. */
+export type Shareable = DocFile & { name: string };
 
 /** Ek document share karo (system share sheet). true = share sheet khul gaya. */
 export async function shareDocument(doc: Shareable): Promise<boolean> {
   if (!(await Sharing.isAvailableAsync())) return false;
-  const uri = await resolveShareUri(doc);
+  const uri = await resolveDocUri(doc);
   if (!uri) return false;
   await Sharing.shareAsync(uri, { dialogTitle: doc.name });
   return true;
@@ -64,7 +36,7 @@ export async function shareDocuments(docs: Shareable[]): Promise<number> {
   if (!(await Sharing.isAvailableAsync())) return 0;
   let shared = 0;
   for (const doc of docs) {
-    const uri = await resolveShareUri(doc);
+    const uri = await resolveDocUri(doc);
     if (!uri) continue;
     await Sharing.shareAsync(uri, { dialogTitle: doc.name });
     shared++;

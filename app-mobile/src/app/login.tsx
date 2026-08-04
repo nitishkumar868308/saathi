@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
 import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
@@ -39,6 +38,8 @@ function referralFromUrl(url: string | null): string | null {
 }
 
 export default function Login() {
+  const tc = useColors();
+  const styles = useStyles();
   const toast = useToast();
   const offers = useOffers();
   const { login: l, deviceOwner: d } = useT();
@@ -159,7 +160,7 @@ export default function Login() {
               banda galat phone par apni ID daalne se pehle ruk ke soch le. */}
           {!!owner && (
             <View style={styles.ownerNote}>
-              <Ionicons name="phone-portrait-outline" size={16} color={colors.terracotta} />
+              <Ionicons name="phone-portrait-outline" size={16} color={tc.terracotta} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.ownerTitle}>{d.bannerTitle}</Text>
                 <Text style={styles.ownerBody}>
@@ -177,7 +178,7 @@ export default function Login() {
                 value={name}
                 onChangeText={setName}
                 placeholder={l.namePlaceholder}
-                placeholderTextColor={colors.inkSoft}
+                placeholderTextColor={tc.inkSoft}
                 autoCapitalize="words"
                 style={styles.input}
               />
@@ -190,7 +191,7 @@ export default function Login() {
             value={email}
             onChangeText={setEmail}
             placeholder={l.emailPlaceholder}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
@@ -204,7 +205,7 @@ export default function Login() {
               value={password}
               onChangeText={setPassword}
               placeholder={l.passwordPlaceholder}
-              placeholderTextColor={colors.inkSoft}
+              placeholderTextColor={tc.inkSoft}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -220,7 +221,7 @@ export default function Login() {
               <Ionicons
                 name={showPassword ? "eye-off-outline" : "eye-outline"}
                 size={20}
-                color={colors.inkSoft}
+                color={tc.inkSoft}
               />
             </Pressable>
           </View>
@@ -235,7 +236,7 @@ export default function Login() {
                 value={refCode}
                 onChangeText={(txt) => setRefCode(txt.toUpperCase())}
                 placeholder={tpl(l.referralPlaceholderTpl, { d: offers.referralDays })}
-                placeholderTextColor={colors.inkSoft}
+                placeholderTextColor={tc.inkSoft}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 maxLength={10}
@@ -297,8 +298,8 @@ export default function Login() {
 
 const CONTENT = { width: "100%", maxWidth: 440, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   content: { padding: 28, paddingTop: 48, flexGrow: 1, justifyContent: "center", ...CONTENT },
   logo: {
     height: 72,
@@ -306,11 +307,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 24,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     marginBottom: 20,
   },
-  title: { fontSize: 30, fontWeight: "800", color: colors.ink },
-  sub: { marginTop: 8, fontSize: 15, color: colors.inkSoft, lineHeight: 22 },
+  title: { fontSize: 30, fontWeight: "800", color: c.ink },
+  sub: { marginTop: 8, fontSize: 15, color: c.inkSoft, lineHeight: 22 },
   ownerNote: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -323,25 +324,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 11,
   },
-  ownerTitle: { fontSize: 13.5, fontWeight: "800", color: colors.ink },
-  ownerBody: { marginTop: 2, fontSize: 12.5, lineHeight: 18, color: colors.inkSoft },
+  ownerTitle: { fontSize: 13.5, fontWeight: "800", color: c.ink },
+  ownerBody: { marginTop: 2, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
   label: {
     marginTop: 20,
     marginBottom: 8,
     fontSize: 14,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
-  optional: { fontWeight: "500", color: colors.inkSoft },
-  refHint: { marginTop: 8, fontSize: 12.5, lineHeight: 18, color: colors.inkSoft },
+  optional: { fontWeight: "500", color: c.inkSoft },
+  refHint: { marginTop: 8, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
   input: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 15,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
   passWrap: { position: "relative", justifyContent: "center" },
@@ -362,12 +363,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  btnText: { color: colors.white, fontWeight: "700", fontSize: 16 },
+  btnText: { color: c.white, fontWeight: "700", fontSize: 16 },
   divider: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 22 },
-  line: { flex: 1, height: 1, backgroundColor: colors.line },
-  or: { fontSize: 13, color: colors.inkSoft, fontWeight: "600" },
+  line: { flex: 1, height: 1, backgroundColor: c.line },
+  or: { fontSize: 13, color: c.inkSoft, fontWeight: "600" },
   googleBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -376,11 +377,11 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  googleText: { fontSize: 15, fontWeight: "700", color: colors.ink },
+  googleText: { fontSize: 15, fontWeight: "700", color: c.ink },
   toggle: { marginTop: 24, alignItems: "center" },
-  toggleText: { fontSize: 14.5, color: colors.inkSoft },
-  toggleLink: { color: colors.terracotta, fontWeight: "700" },
-});
+  toggleText: { fontSize: 14.5, color: c.inkSoft },
+  toggleLink: { color: c.terracotta, fontWeight: "700" },
+}));

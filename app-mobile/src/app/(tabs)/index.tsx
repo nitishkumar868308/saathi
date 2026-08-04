@@ -5,14 +5,13 @@ import {
   Text,
   Pressable,
   ScrollView,
-  StyleSheet,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { SkeletonList } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
@@ -48,6 +47,8 @@ function isToday(iso: string | null): boolean {
 }
 
 export default function Home() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const firstName = useUserName();
@@ -234,8 +235,8 @@ export default function Home() {
               setRefreshing(true);
               load(true);
             }}
-            tintColor={colors.terracotta}
-            colors={[colors.terracotta]}
+            tintColor={tc.terracotta}
+            colors={[tc.terracotta]}
           />
         }
       >
@@ -269,7 +270,7 @@ export default function Home() {
         {/* Daily brief card */}
         <View style={styles.briefCard}>
           <View style={styles.briefTag}>
-            <Ionicons name="sunny" size={13} color={colors.amber} />
+            <Ionicons name="sunny" size={13} color={tc.amber} />
             <Text style={styles.briefTagText}>{h.briefLabel}</Text>
           </View>
           {/* Plus me Saathi ka apna brief; na aaya ho (ya free plan ho) to
@@ -296,11 +297,11 @@ export default function Home() {
               onPress={() => router.push("/upgrade" as never)}
               style={({ pressed }) => [styles.briefUpsell, pressed && { opacity: 0.85 }]}
             >
-              <Ionicons name="sparkles" size={14} color={colors.amber} />
+              <Ionicons name="sparkles" size={14} color={tc.amber} />
               <Text style={styles.briefUpsellText}>{h.briefPlusHook}</Text>
               <View style={styles.briefUpsellCta}>
                 <Text style={styles.briefUpsellCtaText}>{h.briefPlusCta}</Text>
-                <Ionicons name="arrow-forward" size={12} color={colors.ink} />
+                <Ionicons name="arrow-forward" size={12} color={tc.ink} />
               </View>
             </Pressable>
           )}
@@ -310,7 +311,7 @@ export default function Home() {
         {!loading && today.length > 0 && (
           <View style={styles.todayCard}>
             <View style={styles.todayHead}>
-              <Ionicons name="alarm" size={16} color={colors.terracotta} />
+              <Ionicons name="alarm" size={16} color={tc.terracotta} />
               <Text style={styles.todayTitle}>{h.todayTitle}</Text>
             </View>
             {today.map((r) => (
@@ -325,7 +326,7 @@ export default function Home() {
                   onPress={() => markDone(r)}
                   style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.85 }]}
                 >
-                  <Ionicons name="checkmark" size={15} color={colors.white} />
+                  <Ionicons name="checkmark" size={15} color={tc.white} />
                   <Text style={styles.doneText}>{h.markDone}</Text>
                 </Pressable>
               </View>
@@ -340,7 +341,7 @@ export default function Home() {
             style={({ pressed }) => [styles.action, pressed && styles.pressed]}
           >
             <View style={[styles.actionIcon, { backgroundColor: "rgba(194,90,55,0.12)" }]}>
-              <Ionicons name="add-circle" size={22} color={colors.terracotta} />
+              <Ionicons name="add-circle" size={22} color={tc.terracotta} />
             </View>
             <Text style={styles.actionText}>{h.quickDoc}</Text>
           </Pressable>
@@ -350,7 +351,7 @@ export default function Home() {
             style={({ pressed }) => [styles.action, pressed && styles.pressed]}
           >
             <View style={[styles.actionIcon, { backgroundColor: "rgba(124,138,107,0.15)" }]}>
-              <Ionicons name="chatbubble-ellipses" size={20} color={colors.sage} />
+              <Ionicons name="chatbubble-ellipses" size={20} color={tc.sage} />
             </View>
             <Text style={styles.actionText}>{h.quickChat}</Text>
           </Pressable>
@@ -366,7 +367,7 @@ export default function Home() {
             style={({ pressed }) => [styles.action, pressed && styles.pressed]}
           >
             <View style={[styles.actionIcon, { backgroundColor: "rgba(224,164,88,0.18)" }]}>
-              <Ionicons name="create" size={20} color={colors.amber} />
+              <Ionicons name="create" size={20} color={tc.amber} />
             </View>
             <Text style={styles.actionText}>{nt.title}</Text>
           </Pressable>
@@ -384,7 +385,7 @@ export default function Home() {
           <SkeletonList count={2} />
         ) : attention.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Ionicons name="checkmark-circle" size={22} color={colors.sage} />
+            <Ionicons name="checkmark-circle" size={22} color={tc.sage} />
             <Text style={styles.emptyText}>{h.nothingUrgent} 🌿</Text>
           </View>
         ) : (
@@ -415,7 +416,7 @@ export default function Home() {
             style={({ pressed }) => [styles.referCard, pressed && { opacity: 0.92 }]}
           >
             <View style={styles.referIcon}>
-              <Ionicons name="gift" size={20} color={colors.white} />
+              <Ionicons name="gift" size={20} color={tc.white} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.referTitle}>
@@ -423,7 +424,7 @@ export default function Home() {
               </Text>
               <Text style={styles.referSub}>{h.referCardSub}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.terracotta} />
+            <Ionicons name="chevron-forward" size={20} color={tc.terracotta} />
           </Pressable>
         )}
       </ScrollView>
@@ -435,8 +436,8 @@ export default function Home() {
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   content: { padding: 20, paddingBottom: 32, ...CONTENT },
   referCard: {
     flexDirection: "row",
@@ -453,40 +454,40 @@ const styles = StyleSheet.create({
     height: 42,
     width: 42,
     borderRadius: 14,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
-  referTitle: { fontSize: 14.5, fontWeight: "800", color: colors.ink },
-  referSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
+  referTitle: { fontSize: 14.5, fontWeight: "800", color: c.ink },
+  referSub: { marginTop: 2, fontSize: 12.5, color: c.inkSoft },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  greeting: { fontSize: 28, fontWeight: "700", color: colors.ink },
-  sub: { marginTop: 3, fontSize: 15, color: colors.inkSoft },
+  greeting: { fontSize: 28, fontWeight: "700", color: c.ink },
+  sub: { marginTop: 3, fontSize: 15, color: c.inkSoft },
   avatarRing: {
     height: 62,
     width: 62,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
   briefCard: {
     marginTop: 20,
     borderRadius: 24,
-    backgroundColor: colors.ink,
+    backgroundColor: c.ink,
     padding: 20,
   },
   briefTag: { flexDirection: "row", alignItems: "center", gap: 6 },
   briefTagText: {
     fontSize: 12,
     fontWeight: "700",
-    color: colors.amber,
+    color: c.amber,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -516,41 +517,41 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     borderRadius: 999,
-    backgroundColor: colors.amber,
+    backgroundColor: c.amber,
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
-  briefUpsellCtaText: { fontSize: 12, fontWeight: "800", color: colors.ink },
+  briefUpsellCtaText: { fontSize: 12, fontWeight: "800", color: c.ink },
   todayCard: {
     marginTop: 16,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 16,
   },
   todayHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
-  todayTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
+  todayTitle: { fontSize: 15, fontWeight: "800", color: c.ink },
   todayRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     paddingVertical: 9,
     borderTopWidth: 1,
-    borderTopColor: colors.line,
+    borderTopColor: c.line,
   },
-  todayTask: { fontSize: 15, fontWeight: "600", color: colors.ink },
-  todayTime: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
+  todayTask: { fontSize: 15, fontWeight: "600", color: c.ink },
+  todayTime: { marginTop: 2, fontSize: 12.5, color: c.inkSoft },
   doneBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     borderRadius: 999,
-    backgroundColor: colors.sage,
+    backgroundColor: c.sage,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  doneText: { fontSize: 12.5, fontWeight: "700", color: colors.white },
+  doneText: { fontSize: 12.5, fontWeight: "700", color: c.white },
   actions: { flexDirection: "row", gap: 12, marginTop: 16 },
   action: {
     flex: 1,
@@ -558,8 +559,8 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingVertical: 18,
   },
   pressed: { opacity: 0.8 },
@@ -570,7 +571,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 14,
   },
-  actionText: { fontSize: 14, fontWeight: "600", color: colors.ink },
+  actionText: { fontSize: 14, fontWeight: "600", color: c.ink },
   sectionHead: {
     flexDirection: "row",
     alignItems: "center",
@@ -578,8 +579,8 @@ const styles = StyleSheet.create({
     marginTop: 26,
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 19, fontWeight: "700", color: colors.ink },
-  link: { fontSize: 14, fontWeight: "600", color: colors.terracotta },
+  sectionTitle: { fontSize: 19, fontWeight: "700", color: c.ink },
+  link: { fontSize: 14, fontWeight: "600", color: c.terracotta },
   loadingBox: { paddingVertical: 30, alignItems: "center" },
   emptyBox: {
     flexDirection: "row",
@@ -587,9 +588,9 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 16,
   },
-  emptyText: { fontSize: 14.5, color: colors.inkSoft, fontWeight: "500" },
-});
+  emptyText: { fontSize: 14.5, color: c.inkSoft, fontWeight: "500" },
+}));

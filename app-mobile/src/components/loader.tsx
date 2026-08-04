@@ -5,12 +5,11 @@ import {
   Modal,
   Animated,
   Easing,
-  StyleSheet,
   type ViewStyle,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import SaathiLogo from "@/components/saathi-logo";
 
 /**
@@ -38,6 +37,7 @@ const TEAL = "#125156";
  * (item 6). Ab koi card nahi — sirf logo, uske neeche brand ka naam.
  */
 function BrandName({ size, onDark }: { size: number; onDark: boolean }) {
+  const styles = useStyles();
   return (
     <Text
       style={[
@@ -66,6 +66,8 @@ function BrandLoader({
   brand?: boolean;
   onDark?: boolean;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const beat = useRef(new Animated.Value(0)).current;
   const ring1 = useRef(new Animated.Value(0)).current;
   const ring2 = useRef(new Animated.Value(0)).current;
@@ -142,7 +144,7 @@ function BrandLoader({
           <Animated.View
             style={{ position: "absolute", opacity: heartOpacity, transform: [{ translateY: heartY }, { scale: heartScale }] }}
           >
-            <Ionicons name="heart" size={Math.round(size * 0.26)} color={colors.terracotta} />
+            <Ionicons name="heart" size={Math.round(size * 0.26)} color={tc.terracotta} />
           </Animated.View>
         )}
       </View>
@@ -169,6 +171,7 @@ export function HandsLoader({ size = 60, label }: { size?: number; label?: strin
 
 /** Poori screen ka loader — naram cream bg ke saath (safed/neela kabhi nahi). */
 export function ScreenLoader({ label }: { label?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.screen}>
       <View style={styles.screenGlow} />
@@ -193,6 +196,7 @@ export function ScreenLoader({ label }: { label?: string }) {
  * aur peeche naram dark overlay. Har jagah bilkul ek jaisa.
  */
 export function LoaderOverlay({ visible }: { visible: boolean }) {
+  const styles = useStyles();
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
       <View style={styles.overlay}>
@@ -215,6 +219,7 @@ export function Skeleton({
   radius?: number;
   style?: ViewStyle;
 }) {
+  const tc = useColors();
   const v = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -235,7 +240,7 @@ export function Skeleton({
           width,
           height,
           borderRadius: radius,
-          backgroundColor: colors.line,
+          backgroundColor: tc.line,
           opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
         },
         style,
@@ -245,6 +250,7 @@ export function Skeleton({
 }
 
 export function SkeletonCard() {
+  const styles = useStyles();
   return (
     <View style={styles.card}>
       <Skeleton width={44} height={44} radius={14} />
@@ -270,6 +276,7 @@ export function SkeletonList({ count = 3 }: { count?: number }) {
 /* ---------------------------- top progress ---------------------------- */
 
 export function TopProgress({ visible }: { visible: boolean }) {
+  const styles = useStyles();
   const v = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -296,22 +303,22 @@ export function TopProgress({ visible }: { visible: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   wrap: { alignItems: "center", justifyContent: "center", gap: 12 },
-  label: { fontSize: 14, color: colors.inkSoft, fontWeight: "600" },
+  label: { fontSize: 14, color: c.inkSoft, fontWeight: "600" },
   brand: { fontWeight: "800", letterSpacing: 0.3 },
   brandOnDark: {
-    color: colors.cream,
+    color: c.cream,
     textShadowColor: "rgba(0,0,0,0.35)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  brandOnLight: { color: colors.ink, opacity: 0.85 },
+  brandOnLight: { color: c.ink, opacity: 0.85 },
   screen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.cream,
+    backgroundColor: c.cream,
   },
   screenGlow: {
     position: "absolute",
@@ -332,8 +339,8 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 14,
   },
   progressTrack: {
@@ -346,6 +353,6 @@ const styles = StyleSheet.create({
     height: 2.5,
     width: 120,
     borderRadius: 2,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-});
+}));

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   Image,
   KeyboardAvoidingView,
 } from "react-native";
@@ -15,7 +14,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
@@ -44,6 +43,8 @@ async function persistImage(cacheUri: string): Promise<string> {
 }
 
 export default function AddDocument() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { addDocument: d } = useT();
@@ -189,7 +190,7 @@ export default function AddDocument() {
       <View style={styles.header}>
         <Text style={styles.title}>{d.title}</Text>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.close}>
-          <Ionicons name="close" size={22} color={colors.ink} />
+          <Ionicons name="close" size={22} color={tc.ink} />
         </Pressable>
       </View>
 
@@ -201,7 +202,7 @@ export default function AddDocument() {
               <Image source={{ uri: imageUri }} style={styles.preview} resizeMode="cover" />
             ) : (
               <View style={styles.scanIcon}>
-                <Ionicons name="scan" size={30} color={colors.terracotta} />
+                <Ionicons name="scan" size={30} color={tc.terracotta} />
               </View>
             )}
 
@@ -218,7 +219,7 @@ export default function AddDocument() {
                 disabled={scanning}
                 style={({ pressed }) => [styles.sBtn, pressed && styles.pressed]}
               >
-                <Ionicons name="camera" size={18} color={colors.white} />
+                <Ionicons name="camera" size={18} color={tc.white} />
                 <Text style={styles.sBtnText}>{d.camera}</Text>
               </Pressable>
               <Pressable
@@ -226,7 +227,7 @@ export default function AddDocument() {
                 disabled={scanning}
                 style={({ pressed }) => [styles.sBtnAlt, pressed && styles.pressed]}
               >
-                <Ionicons name="images" size={18} color={colors.terracotta} />
+                <Ionicons name="images" size={18} color={tc.terracotta} />
                 <Text style={styles.sBtnAltText}>{d.gallery}</Text>
               </Pressable>
             </View>
@@ -236,13 +237,13 @@ export default function AddDocument() {
           {scanned && (
             <View style={styles.detected}>
               <View style={styles.detIcon}>
-                <Ionicons name={iconForType(type) as any} size={20} color={colors.terracotta} />
+                <Ionicons name={iconForType(type) as any} size={20} color={tc.terracotta} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.detLabel}>{d.detectedLabel}</Text>
                 <Text style={styles.detType}>{labelForType(type)}</Text>
               </View>
-              <Ionicons name="checkmark-circle" size={22} color={colors.sage} />
+              <Ionicons name="checkmark-circle" size={22} color={tc.sage} />
             </View>
           )}
 
@@ -250,7 +251,7 @@ export default function AddDocument() {
           {scanned && !!summary.trim() && (
             <View style={styles.summaryCard}>
               <View style={styles.summaryHead}>
-                <Ionicons name="sparkles" size={14} color={colors.terracotta} />
+                <Ionicons name="sparkles" size={14} color={tc.terracotta} />
                 <Text style={styles.summaryHeadText}>{d.summaryLabel}</Text>
               </View>
               <Text style={styles.summaryText}>{summary.trim()}</Text>
@@ -265,7 +266,7 @@ export default function AddDocument() {
             value={name}
             onChangeText={setName}
             placeholder={d.namePlaceholder}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             style={[styles.input, scanned && name ? styles.inputFilled : null]}
           />
 
@@ -275,7 +276,7 @@ export default function AddDocument() {
             value={expiry}
             onChangeText={setExpiry}
             placeholder={d.expiryPlaceholder}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             style={[styles.input, scanned && expiry ? styles.inputFilled : null]}
             keyboardType="numbers-and-punctuation"
           />
@@ -298,8 +299,8 @@ export default function AddDocument() {
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -309,16 +310,16 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     ...CONTENT,
   },
-  title: { fontSize: 22, fontWeight: "700", color: colors.ink },
+  title: { fontSize: 22, fontWeight: "700", color: c.ink },
   close: {
     height: 38,
     width: 38,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
   content: { padding: 20, paddingBottom: 20, ...CONTENT },
   scanBox: {
@@ -326,8 +327,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingVertical: 24,
     paddingHorizontal: 20,
   },
@@ -344,15 +345,15 @@ const styles = StyleSheet.create({
     width: 120,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
   scanningRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
-  scanningText: { fontSize: 14, fontWeight: "600", color: colors.terracotta },
-  scanTitle: { marginTop: 12, fontSize: 17, fontWeight: "700", color: colors.ink },
+  scanningText: { fontSize: 14, fontWeight: "600", color: c.terracotta },
+  scanTitle: { marginTop: 12, fontSize: 17, fontWeight: "700", color: c.ink },
   scanSub: {
     marginTop: 3,
     fontSize: 13,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     maxWidth: 280,
     lineHeight: 18,
@@ -363,22 +364,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 7,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     paddingHorizontal: 18,
     paddingVertical: 11,
   },
-  sBtnText: { color: colors.white, fontWeight: "700", fontSize: 14 },
+  sBtnText: { color: c.white, fontWeight: "700", fontSize: 14 },
   sBtnAlt: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.terracotta,
+    borderColor: c.terracotta,
     paddingHorizontal: 18,
     paddingVertical: 11,
   },
-  sBtnAltText: { color: colors.terracotta, fontWeight: "700", fontSize: 14 },
+  sBtnAltText: { color: c.terracotta, fontWeight: "700", fontSize: 14 },
   pressed: { opacity: 0.8 },
   detected: {
     flexDirection: "row",
@@ -387,7 +388,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.sage,
+    borderColor: c.sage,
     backgroundColor: "rgba(124,138,107,0.08)",
     padding: 14,
   },
@@ -399,44 +400,44 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  detLabel: { fontSize: 12, color: colors.inkSoft, fontWeight: "600" },
-  detType: { fontSize: 16, fontWeight: "700", color: colors.ink, marginTop: 1 },
+  detLabel: { fontSize: 12, color: c.inkSoft, fontWeight: "600" },
+  detType: { fontSize: 16, fontWeight: "700", color: c.ink, marginTop: 1 },
   summaryCard: {
     marginTop: 12,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 16,
   },
   summaryHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
   summaryHeadText: {
     fontSize: 12.5,
     fontWeight: "700",
-    color: colors.terracotta,
+    color: c.terracotta,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
-  summaryText: { fontSize: 14.5, lineHeight: 21, color: colors.ink },
+  summaryText: { fontSize: 14.5, lineHeight: 21, color: c.ink },
   label: {
     marginTop: 22,
     marginBottom: 10,
     fontSize: 15,
     fontWeight: "700",
-    color: colors.ink,
+    color: c.ink,
   },
-  editHint: { fontSize: 12, fontWeight: "500", color: colors.inkSoft },
+  editHint: { fontSize: 12, fontWeight: "500", color: c.inkSoft },
   input: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: colors.ink,
+    color: c.ink,
     fontSize: 15,
   },
-  inputFilled: { borderColor: colors.sage, backgroundColor: "rgba(124,138,107,0.08)" },
+  inputFilled: { borderColor: c.sage, backgroundColor: "rgba(124,138,107,0.08)" },
   save: {
     margin: 20,
     marginTop: 8,
@@ -444,8 +445,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     ...CONTENT,
   },
-  saveText: { color: colors.white, fontWeight: "700", fontSize: 16 },
-});
+  saveText: { color: c.white, fontWeight: "700", fontSize: 16 },
+}));

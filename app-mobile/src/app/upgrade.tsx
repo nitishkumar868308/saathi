@@ -4,13 +4,12 @@ import {
   Text,
   ScrollView,
   Pressable,
-  StyleSheet,
   Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
@@ -38,6 +37,8 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
 export default function Upgrade() {
+  const tc = useColors();
+  const styles = useStyles();
   const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
@@ -240,7 +241,7 @@ export default function Upgrade() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.back} hitSlop={10}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <Ionicons name="chevron-back" size={22} color={tc.ink} />
         </Pressable>
         <Text style={styles.headerTitle}>{u.title}</Text>
         <View style={{ width: 22 }} />
@@ -255,7 +256,7 @@ export default function Upgrade() {
         ) : isPlus ? (
           <View style={styles.plusActive}>
             <View style={styles.plusBadge}>
-              <Ionicons name="checkmark-circle" size={30} color={colors.white} />
+              <Ionicons name="checkmark-circle" size={30} color={tc.white} />
             </View>
             <Text style={styles.plusActiveTitle}>{u.activeTitle} 🎉</Text>
             <Text style={styles.plusActiveSub}>{u.activeSub}</Text>
@@ -295,7 +296,7 @@ export default function Upgrade() {
                 {PLUS_FEATURES.map((f) => (
                   <View key={f} style={styles.featRow}>
                     <View style={styles.tickPlus}>
-                      <Ionicons name="checkmark" size={13} color={colors.white} />
+                      <Ionicons name="checkmark" size={13} color={tc.white} />
                     </View>
                     <Text style={styles.featTextPlus}>{f}</Text>
                   </View>
@@ -313,7 +314,7 @@ export default function Upgrade() {
               >
                 {(
                   <>
-                    <Ionicons name="lock-closed" size={16} color={colors.white} />
+                    <Ionicons name="lock-closed" size={16} color={tc.white} />
                     <Text style={styles.payText}>{tpl(u.payBtn, { price: priceLabel })}</Text>
                   </>
                 )}
@@ -328,7 +329,7 @@ export default function Upgrade() {
                 style={({ pressed }) => [styles.referCard, pressed && { opacity: 0.9 }]}
               >
                 <View style={styles.referIcon}>
-                  <Ionicons name="gift" size={20} color={colors.white} />
+                  <Ionicons name="gift" size={20} color={tc.white} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.referTitle}>
@@ -338,7 +339,7 @@ export default function Upgrade() {
                     {tpl(u.referSub, { d: offers.referralDays })}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.terracotta} />
+                <Ionicons name="chevron-forward" size={20} color={tc.terracotta} />
               </Pressable>
             )}
 
@@ -352,7 +353,7 @@ export default function Upgrade() {
                     <Ionicons
                       name="checkmark-circle-outline"
                       size={16}
-                      color={colors.sage}
+                      color={tc.sage}
                     />
                     <Text style={styles.featText}>{f}</Text>
                   </View>
@@ -368,7 +369,7 @@ export default function Upgrade() {
         <View style={styles.mmBackdrop}>
           <View style={styles.mmCard}>
             <View style={styles.mmIcon}>
-              <Ionicons name="globe-outline" size={26} color={colors.white} />
+              <Ionicons name="globe-outline" size={26} color={tc.white} />
             </View>
             <Text style={styles.mmTitle}>{u.mismatchTitle}</Text>
             <Text style={styles.mmBody}>
@@ -398,8 +399,8 @@ export default function Upgrade() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -408,7 +409,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   back: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.ink },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: c.ink },
   content: { padding: 20, paddingBottom: 40 },
   reward: {
     flexDirection: "row",
@@ -420,15 +421,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.1)",
     padding: 14,
   },
-  rewardText: { flex: 1, fontSize: 13.5, fontWeight: "700", color: colors.ink },
+  rewardText: { flex: 1, fontSize: 13.5, fontWeight: "700", color: c.ink },
   toggle: {
     flexDirection: "row",
     marginTop: 18,
     padding: 4,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
   toggleBtn: {
     flex: 1,
@@ -436,27 +437,27 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
   },
-  toggleActive: { backgroundColor: colors.terracotta },
-  toggleText: { fontSize: 13, fontWeight: "700", color: colors.inkSoft },
-  toggleTextActive: { color: colors.white },
+  toggleActive: { backgroundColor: c.terracotta },
+  toggleText: { fontSize: 13, fontWeight: "700", color: c.inkSoft },
+  toggleTextActive: { color: c.white },
   plusCard: {
     marginTop: 18,
     borderRadius: 26,
     borderWidth: 2,
-    borderColor: colors.terracotta,
-    backgroundColor: colors.ink,
+    borderColor: c.terracotta,
+    backgroundColor: c.ink,
     padding: 22,
   },
-  plusName: { fontSize: 18, fontWeight: "700", color: colors.white },
+  plusName: { fontSize: 18, fontWeight: "700", color: c.white },
   priceRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 8, gap: 4 },
-  price: { fontSize: 38, fontWeight: "800", color: colors.white },
+  price: { fontSize: 38, fontWeight: "800", color: c.white },
   period: { fontSize: 15, color: "rgba(247,242,233,0.6)", paddingBottom: 6 },
   gst: { marginTop: 2, fontSize: 12.5, color: "rgba(247,242,233,0.6)", fontWeight: "600" },
   tickPlus: {
     height: 20,
     width: 20,
     borderRadius: 10,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -470,9 +471,9 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 54,
     borderRadius: 18,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  payText: { color: colors.white, fontWeight: "800", fontSize: 16 },
+  payText: { color: c.white, fontWeight: "800", fontSize: 16 },
   payNote: {
     marginTop: 10,
     textAlign: "center",
@@ -494,29 +495,29 @@ const styles = StyleSheet.create({
     height: 42,
     width: 42,
     borderRadius: 14,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
-  referTitle: { fontSize: 15, fontWeight: "800", color: colors.ink },
-  referSub: { marginTop: 2, fontSize: 12.5, color: colors.inkSoft },
+  referTitle: { fontSize: 15, fontWeight: "800", color: c.ink },
+  referSub: { marginTop: 2, fontSize: 12.5, color: c.inkSoft },
   freeCard: {
     marginTop: 16,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 20,
   },
-  freeName: { fontSize: 17, fontWeight: "700", color: colors.ink },
-  freePrice: { marginTop: 4, fontSize: 15, color: colors.inkSoft, fontWeight: "600" },
-  featText: { fontSize: 14.5, color: colors.ink, flex: 1 },
+  freeName: { fontSize: 17, fontWeight: "700", color: c.ink },
+  freePrice: { marginTop: 4, fontSize: 15, color: c.inkSoft, fontWeight: "600" },
+  featText: { fontSize: 14.5, color: c.ink, flex: 1 },
   plusActive: { alignItems: "center", paddingTop: 40 },
   plusBadge: {
     height: 68,
     width: 68,
     borderRadius: 24,
-    backgroundColor: colors.sage,
+    backgroundColor: c.sage,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -524,12 +525,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 22,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
   },
   plusActiveSub: {
     marginTop: 8,
     fontSize: 15,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     paddingHorizontal: 20,
     lineHeight: 22,
@@ -545,7 +546,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 360,
     borderRadius: 26,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     padding: 24,
     alignItems: "center",
   },
@@ -553,7 +554,7 @@ const styles = StyleSheet.create({
     height: 58,
     width: 58,
     borderRadius: 20,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -561,13 +562,13 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 19,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     textAlign: "center",
   },
   mmBody: {
     marginTop: 8,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     lineHeight: 20,
   },
@@ -578,9 +579,9 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: "center",
     borderRadius: 15,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  mmBtnText: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  mmBtnText: { color: c.white, fontWeight: "800", fontSize: 15 },
   mmBtnAlt: {
     marginTop: 10,
     alignSelf: "stretch",
@@ -589,7 +590,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
-  mmBtnAltText: { color: colors.ink, fontWeight: "700", fontSize: 15 },
-});
+  mmBtnAltText: { color: c.ink, fontWeight: "700", fontSize: 15 },
+}));

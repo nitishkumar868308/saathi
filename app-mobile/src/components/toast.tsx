@@ -6,11 +6,12 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { Text, StyleSheet, Animated, Platform } from "react-native";
+import { Text, Animated, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
+import type { Colors } from "@/theme/colors";
 
 type ToastType = "success" | "error" | "info";
 type ToastState = { msg: string; type: ToastType } | null;
@@ -21,13 +22,25 @@ const ToastContext = createContext<{
 
 export const useToast = () => useContext(ToastContext);
 
-const meta: Record<ToastType, { bg: string; icon: string }> = {
-  success: { bg: colors.sage, icon: "checkmark-circle" },
+/**
+ * Toast ka rang aur icon.
+ *
+ * Function isliye (const map nahi): rang theme se aate hain, aur module level
+ * par theme abhi pata hi nahi hoti. Yahi wo chhoti si jagah thi jo dark mode me
+ * hamesha light ka rang leke baithi rehti.
+ *
+ * Error ka laal dono theme me ek hi hai — jaan-boojh ke. Khatre ka rang halka
+ * karne se wo khatra jaisa lagna band ho jaata hai.
+ */
+const metaFor = (tc: Colors): Record<ToastType, { bg: string; icon: string }> => ({
+  success: { bg: tc.sage, icon: "checkmark-circle" },
   error: { bg: "#B23B3B", icon: "alert-circle" },
-  info: { bg: colors.ink, icon: "information-circle" },
-};
+  info: { bg: tc.ink, icon: "information-circle" },
+});
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const styles = useStyles();
+  const meta = metaFor(useColors());
   const [toast, setToast] = useState<ToastState>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-12)).current;
@@ -74,7 +87,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   wrap: {
     position: "absolute",
     top: 0,
@@ -100,4 +113,4 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   text: { flex: 1, color: "#fff", fontSize: 14.5, fontWeight: "600" },
-});
+}));

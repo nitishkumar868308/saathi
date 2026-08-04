@@ -1,9 +1,9 @@
-import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from "react-native";
+import { View, Text, ScrollView, Pressable, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 
 export type LegalSection = { h: string; p: string; icon?: keyof typeof Ionicons.glyphMap };
 
@@ -24,12 +24,14 @@ export default function LegalScreen({
   contactEmail?: string;
   contactLabel?: string;
 }) {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <Ionicons name="chevron-back" size={22} color={tc.ink} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {title}
@@ -41,7 +43,7 @@ export default function LegalScreen({
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Ionicons name={heroIcon} size={28} color={colors.terracotta} />
+            <Ionicons name={heroIcon} size={28} color={tc.terracotta} />
           </View>
           <Text style={styles.heroTitle}>{title}</Text>
           {intro ? <Text style={styles.intro}>{intro}</Text> : null}
@@ -52,7 +54,7 @@ export default function LegalScreen({
           <View key={i} style={styles.card}>
             <View style={styles.cardHead}>
               <View style={styles.cardIcon}>
-                <Ionicons name={s.icon ?? "ellipse-outline"} size={18} color={colors.terracotta} />
+                <Ionicons name={s.icon ?? "ellipse-outline"} size={18} color={tc.terracotta} />
               </View>
               <Text style={styles.h}>{s.h}</Text>
             </View>
@@ -66,7 +68,7 @@ export default function LegalScreen({
             onPress={() => Linking.openURL(`mailto:${contactEmail}`).catch(() => {})}
             style={({ pressed }) => [styles.contact, pressed && { opacity: 0.9 }]}
           >
-            <Ionicons name="mail-outline" size={20} color={colors.white} />
+            <Ionicons name="mail-outline" size={20} color={tc.white} />
             <Text style={styles.contactText}>{contactLabel ?? contactEmail}</Text>
           </Pressable>
         ) : null}
@@ -77,8 +79,8 @@ export default function LegalScreen({
 
 const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.cream },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.cream },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -94,11 +96,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: c.line,
   },
-  headerTitle: { flex: 1, textAlign: "center", fontSize: 16, fontWeight: "700", color: colors.ink },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 16, fontWeight: "700", color: c.ink },
   content: { padding: 20, paddingBottom: 44, ...CONTENT },
   hero: { alignItems: "center", paddingVertical: 12, marginBottom: 8 },
   heroIcon: {
@@ -110,12 +112,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(194,90,55,0.12)",
     marginBottom: 14,
   },
-  heroTitle: { fontSize: 24, fontWeight: "800", color: colors.ink, textAlign: "center" },
+  heroTitle: { fontSize: 24, fontWeight: "800", color: c.ink, textAlign: "center" },
   intro: {
     marginTop: 10,
     fontSize: 15,
     lineHeight: 23,
-    color: colors.inkSoft,
+    color: c.inkSoft,
     textAlign: "center",
     maxWidth: 340,
   },
@@ -123,8 +125,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.surface,
+    borderColor: c.line,
+    backgroundColor: c.surface,
     padding: 16,
   },
   cardHead: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
@@ -136,8 +138,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(194,90,55,0.10)",
   },
-  h: { flex: 1, fontSize: 15.5, fontWeight: "700", color: colors.ink },
-  p: { fontSize: 14.5, lineHeight: 22, color: colors.inkSoft },
+  h: { flex: 1, fontSize: 15.5, fontWeight: "700", color: c.ink },
+  p: { fontSize: 14.5, lineHeight: 22, color: c.inkSoft },
   contact: {
     marginTop: 22,
     flexDirection: "row",
@@ -146,7 +148,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  contactText: { color: colors.white, fontWeight: "700", fontSize: 15 },
-});
+  contactText: { color: c.white, fontWeight: "700", fontSize: 15 },
+}));

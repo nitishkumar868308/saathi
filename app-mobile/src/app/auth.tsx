@@ -1,13 +1,14 @@
 import { useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles } from "@/theme/theme";
 import { ScreenLoader } from "@/components/loader";
 import { supabase } from "@/lib/supabase";
 
 // Google login ke baad yahan aata hai — token le ke session set karta hai.
 export default function AuthCallback() {
+  const styles = useStyles();
   const params = useLocalSearchParams<{
     code?: string;
     access_token?: string;
@@ -41,11 +42,11 @@ export default function AuthCallback() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((c) => ({
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.cream,
+    backgroundColor: c.cream,
   },
-});
+}));

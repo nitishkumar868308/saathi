@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -13,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
-import { colors } from "@/theme/colors";
+import { makeStyles, useColors } from "@/theme/theme";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { useToast } from "@/components/toast";
 import { ConfirmModal } from "@/components/confirm-modal";
@@ -46,6 +45,8 @@ import { emitDataChanged } from "@/lib/data-events";
  * rehta hai.
  */
 export default function NoteEdit() {
+  const tc = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
   const { notes: n, common: c } = useT();
@@ -241,7 +242,7 @@ export default function NoteEdit() {
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <Pressable onPress={() => void onBack()} hitSlop={10} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Ionicons name="chevron-back" size={24} color={tc.ink} />
         </Pressable>
 
         <View style={styles.headerRight}>
@@ -253,12 +254,12 @@ export default function NoteEdit() {
             <Ionicons
               name={pinned ? "bookmark" : "bookmark-outline"}
               size={21}
-              color={pinned ? colors.terracotta : colors.inkSoft}
+              color={pinned ? tc.terracotta : tc.inkSoft}
             />
           </Pressable>
           {!!noteId && (
             <Pressable onPress={() => setAskDelete(true)} hitSlop={10} style={styles.iconBtn}>
-              <Ionicons name="trash-outline" size={20} color={colors.inkSoft} />
+              <Ionicons name="trash-outline" size={20} color={tc.inkSoft} />
             </Pressable>
           )}
           <Pressable
@@ -288,14 +289,14 @@ export default function NoteEdit() {
             value={title}
             onChangeText={setTitle}
             placeholder={n.titlePh}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             style={styles.titleInput}
           />
           <TextInput
             value={body}
             onChangeText={setBody}
             placeholder={n.bodyPh}
-            placeholderTextColor={colors.inkSoft}
+            placeholderTextColor={tc.inkSoft}
             multiline
             // Naya note khulte hi keyboard aa jaye — ek tap bacha, aur screen ka
             // maqsad turant saaf ho jaata hai.
@@ -312,10 +313,10 @@ export default function NoteEdit() {
             <Ionicons
               name={reminder.is_on ? "alarm" : "alarm-outline"}
               size={18}
-              color={reminder.is_on ? colors.sage : colors.inkSoft}
+              color={reminder.is_on ? tc.sage : tc.inkSoft}
             />
             <Text
-              style={[styles.remindDoneText, !reminder.is_on && { color: colors.inkSoft }]}
+              style={[styles.remindDoneText, !reminder.is_on && { color: tc.inkSoft }]}
             >
               {reminder.is_on
                 ? reminder.remind_at
@@ -329,9 +330,9 @@ export default function NoteEdit() {
             onPress={toReminder}
             style={({ pressed }) => [styles.remindBtn, pressed && { opacity: 0.85 }]}
           >
-            <Ionicons name="alarm-outline" size={18} color={colors.terracotta} />
+            <Ionicons name="alarm-outline" size={18} color={tc.terracotta} />
             <Text style={styles.remindText}>{n.toReminder}</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.terracotta} />
+            <Ionicons name="chevron-forward" size={16} color={tc.terracotta} />
           </Pressable>
         )}
       </KeyboardAvoidingView>
@@ -353,8 +354,8 @@ export default function NoteEdit() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.surface },
+const useStyles = makeStyles((c) => ({
+  safe: { flex: 1, backgroundColor: c.surface },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -372,21 +373,21 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.terracotta,
+    backgroundColor: c.terracotta,
   },
-  saveText: { fontSize: 14, fontWeight: "800", color: colors.white },
+  saveText: { fontSize: 14, fontWeight: "800", color: c.white },
   scroll: { paddingHorizontal: 20, paddingBottom: 24 },
   titleInput: {
     fontSize: 22,
     fontWeight: "800",
-    color: colors.ink,
+    color: c.ink,
     paddingVertical: 8,
   },
   bodyInput: {
     marginTop: 4,
     fontSize: 16,
     lineHeight: 25,
-    color: colors.ink,
+    color: c.ink,
     // Kaagaz jaisa lage — poori screen likhne ke liye khuli rahe.
     minHeight: 320,
     padding: 0,
@@ -404,7 +405,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(194,90,55,0.32)",
     backgroundColor: "rgba(194,90,55,0.07)",
   },
-  remindText: { flex: 1, fontSize: 14.5, fontWeight: "700", color: colors.terracotta },
+  remindText: { flex: 1, fontSize: 14.5, fontWeight: "700", color: c.terracotta },
   remindDone: {
     flexDirection: "row",
     alignItems: "center",
@@ -418,5 +419,5 @@ const styles = StyleSheet.create({
     borderColor: "rgba(124,138,107,0.35)",
     backgroundColor: "rgba(124,138,107,0.10)",
   },
-  remindDoneText: { flex: 1, fontSize: 13.5, fontWeight: "700", color: colors.sage },
-});
+  remindDoneText: { flex: 1, fontSize: 13.5, fontWeight: "700", color: c.sage },
+}));
