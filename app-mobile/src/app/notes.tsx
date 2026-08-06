@@ -11,10 +11,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
-import { makeStyles, useColors } from "@/theme/theme";
+import { makeStyles, useColors, useThemeMode } from "@/theme/theme";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useToast } from "@/components/toast";
+import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/loader";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { reportError } from "@/lib/report-error";
@@ -41,12 +42,31 @@ import { useDataChanged } from "@/lib/data-events";
  * kaam ka rakhti hai.
  */
 
-/** Har note ko uska apna halka rang — ek jaisi cardon ki deewar padhne me thakati hai. */
-const TINTS = [
+/**
+ * Har note ko uska apna halka rang — ek jaisi cardon ki deewar padhne me
+ * thakati hai.
+ *
+ * ⚠️ DO set, aur ye zaroori hai. Pehle sirf ek (light wala) tha aur wo
+ * hardcoded chipka rehta tha. Dark theme me card halka-pastel hi rehta tha
+ * jabki uske andar ka text `c.ink` se aata hai — jo dark me UJLA ho jaata hai.
+ * Natija: cream card par cream text, yaani poora note gayab. List me sirf
+ * rangeen khaali cards dikhte the.
+ *
+ * Dark wale rang jaan-boojh ke gehre-rangeen hain (halke nahi): card page se
+ * alag to dikhna chahiye, par uspar ujla text 10:1 se upar padhna chahiye.
+ */
+const TINTS_LIGHT = [
   { bg: "#FFF6E8", edge: "#F0DFC0" },
   { bg: "#F1F5EC", edge: "#D9E3CE" },
   { bg: "#FDF0EA", edge: "#F2D9CC" },
   { bg: "#F4F1FA", edge: "#DFD8EE" },
+] as const;
+
+const TINTS_DARK = [
+  { bg: "#332B1E", edge: "#4A3F2C" },
+  { bg: "#242C22", edge: "#374030" },
+  { bg: "#332420", edge: "#4A342E" },
+  { bg: "#2A2634", edge: "#3C3748" },
 ] as const;
 
 /**
@@ -57,14 +77,16 @@ const TINTS = [
  * hain — lagta hai kuch toot gaya. ID kabhi badalti nahi, isliye note ka rang
  * uska apna rehta hai.
  */
-function tintFor(id: string) {
+function tintFor(id: string, dark: boolean) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return TINTS[h % TINTS.length];
+  const set = dark ? TINTS_DARK : TINTS_LIGHT;
+  return set[h % set.length];
 }
 
 export default function Notes() {
   const tc = useColors();
+  const { scheme } = useThemeMode();
   const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
@@ -230,19 +252,17 @@ export default function Notes() {
         }
       >
         {shown.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="create-outline" size={30} color={tc.terracotta} />
-            </View>
-            <Text style={styles.emptyTitle}>{query ? n.searchEmpty : n.empty}</Text>
-            {!query && <Text style={styles.emptyHint}>{n.emptyHint}</Text>}
-          </View>
+          <EmptyState
+            icon="create-outline"
+            title={query ? n.searchEmpty : n.empty}
+            body={query ? undefined : n.emptyHint}
+          />
         ) : (
           <View style={styles.grid}>
             {columns.map((col, ci) => (
               <View key={ci} style={styles.col}>
                 {col.map((note) => {
-                  const tint = tintFor(note.id);
+                  const tint = tintFor(note.id, scheme === "dark");
                   const preview = notePreview(note);
                   return (
                     <Pressable
@@ -421,29 +441,6 @@ const useStyles = makeStyles((c) => ({
   },
   cardDate: { fontSize: 11, color: c.inkSoft, opacity: 0.85 },
   pinBtn: { padding: 2 },
-  empty: { alignItems: "center", paddingTop: 70, paddingHorizontal: 30 },
-  emptyIcon: {
-    height: 66,
-    width: 66,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(194,90,55,0.10)",
-  },
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 17,
-    fontWeight: "700",
-    color: c.ink,
-    textAlign: "center",
-  },
-  emptyHint: {
-    marginTop: 8,
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: c.inkSoft,
-    textAlign: "center",
-  },
   fab: {
     position: "absolute",
     right: 18,

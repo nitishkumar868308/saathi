@@ -57,6 +57,109 @@ type ListResponse = {
 
 type Filter = "all" | "open" | "answered" | "closed";
 
+/** Us user ki SMS-OTP ginti — `/api/admin/users/:id/otp-reset` se. */
+type OtpStatus = {
+  blocked: boolean;
+  sent_hour: number;
+  sent_day: number;
+  per_hour: number;
+  per_day: number;
+};
+
+/**
+ * Ticket ke saath us user ki OTP limit — dekhne aur reset karne ke liye.
+ *
+ * ⚠️ Ye yahan (ticket ke andar) isliye hai, Users screen me nahi. "Mera number
+ * verify nahi ho raha" support ki sabse aam ticket hai, aur uska jawab aksar ek
+ * hi hota hai: limit poori ho gayi. Pehle admin ko wo ginti dekhne ke liye
+ * Supabase kholna padta tha aur reset ke liye SQL likhni padti thi — yaani
+ * aadhi ticketein bina jawab ke padi rehti thi. Ab jawab dene wali jagah par hi
+ * pura sandarbh aur ek button hai.
+ *
+ * Ginti pehle dikhti hai, reset baad me — jaan-boojh ke. Jo user aaj 3 SMS
+ * mangwa chuka hai aur jo 15, dono ki ticket bilkul ek jaisi padhti hai; bina
+ * ginti dekhe reset dena aksar galti hoti hai.
+ */
+function OtpLimitPanel({
+  userId,
+  s,
+}: {
+  userId: string;
+  s: ReturnType<typeof useAdminT>["support"];
+}) {
+  const [status, setStatus] = useState<OtpStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/otp-reset`, { cache: "no-store" });
+      const out = (await res.json()) as { status?: OtpStatus };
+      setStatus(out.status ?? null);
+    } catch {
+      setStatus(null);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    setNote(null);
+    void load();
+  }, [load]);
+
+  async function reset() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/otp-reset`, { method: "POST" });
+      const out = (await res.json()) as { ok?: boolean; cleared?: number; status?: OtpStatus };
+      if (!res.ok || !out.ok) throw new Error("failed");
+      setStatus(out.status ?? null);
+      setNote(atpl(s.otpResetDone, { n: out.cleared ?? 0 }));
+    } catch {
+      setNote(s.otpResetFailed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) return null;
+
+  return (
+    <div
+      className={`mt-3 rounded-2xl border p-3 ${
+        status.blocked ? "border-terracotta/50 bg-terracotta/10" : "border-line bg-cream/40"
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-xs font-bold text-ink">{s.otpTitle}</span>
+        <span className="text-xs text-ink-soft">
+          {atpl(s.otpCount, {
+            hour: status.sent_hour,
+            perHour: status.per_hour,
+            day: status.sent_day,
+            perDay: status.per_day,
+          })}
+        </span>
+        <span
+          className={`text-xs font-bold ${status.blocked ? "text-terracotta" : "text-sage"}`}
+        >
+          {status.blocked ? s.otpBlocked : s.otpFine}
+        </span>
+        <button
+          type="button"
+          onClick={() => void reset()}
+          disabled={busy}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-terracotta px-3 py-1.5 text-xs font-bold text-terracotta transition hover:bg-terracotta hover:text-white disabled:opacity-50"
+        >
+          <RefreshCw size={13} className={busy ? "animate-spin" : undefined} />
+          {busy ? s.otpResetting : s.otpReset}
+        </button>
+      </div>
+      {!!note && <p className="mt-2 text-xs text-ink-soft">{note}</p>}
+    </div>
+  );
+}
+
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString("en-IN", {
     day: "numeric",
@@ -338,6 +441,12 @@ export default function AdminSupport() {
                 </span>
               </div>
               <p className="mt-3 text-base font-bold text-ink">{thread.ticket?.subject}</p>
+
+              {/* Is user ki OTP limit — "number verify nahi ho raha" wali
+                  ticket ka jawab aksar yahi ek button hai. */}
+              {!!thread.ticket?.user_id && (
+                <OtpLimitPanel userId={thread.ticket.user_id} s={s} />
+              )}
 
               <ul className="mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
                 {thread.messages.map((m) => {

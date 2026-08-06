@@ -23,6 +23,7 @@ import { ConfirmModal } from "@/components/confirm-modal";
 import { Pagination, usePaged, PAGE_SIZE } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { useToast } from "@/components/toast";
+import { EmptyState } from "@/components/empty-state";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
@@ -181,16 +182,11 @@ export default function Documents() {
           }
         >
           {list.length === 0 ? (
-            <View style={styles.empty}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="document-text-outline" size={28} color={tc.terracotta} />
-              </View>
-              <Text style={styles.emptyTitle}>
-                {docs.length === 0 ? d.emptyTitle : d.emptyInCategory}
-              </Text>
-              <Text style={styles.emptyBody}>
-                {docs.length === 0 ? d.emptyBodyFirst : d.emptyBodyFilter}
-              </Text>
+            <EmptyState
+              icon="document-text-outline"
+              title={docs.length === 0 ? d.emptyTitle : d.emptyInCategory}
+              body={docs.length === 0 ? d.emptyBodyFirst : d.emptyBodyFilter}
+            >
               {docs.length === 0 && (
                 <Pressable
                   onPress={() => router.push("/add-document")}
@@ -200,7 +196,7 @@ export default function Documents() {
                   <Text style={styles.emptyBtnText}>{d.addBtn}</Text>
                 </Pressable>
               )}
-            </View>
+            </EmptyState>
           ) : (
             <>
               {pageItems.map((doc) => (
@@ -316,24 +312,6 @@ const useStyles = makeStyles((c) => ({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   centerText: { color: c.inkSoft, fontSize: 14 },
   list: { padding: 20, gap: 10, paddingBottom: 100, ...CONTENT },
-  empty: { alignItems: "center", paddingVertical: 48, gap: 10 },
-  emptyIcon: {
-    height: 64,
-    width: 64,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 24,
-    backgroundColor: "rgba(194,90,55,0.10)",
-    marginBottom: 4,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: "600", color: c.ink },
-  emptyBody: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: c.inkSoft,
-    textAlign: "center",
-    maxWidth: 280,
-  },
   emptyBtn: {
     marginTop: 18,
     flexDirection: "row",

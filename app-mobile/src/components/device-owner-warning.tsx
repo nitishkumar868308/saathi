@@ -135,7 +135,7 @@ export function DeviceOwnerWarning() {
     : tpl(d.introNoName, { email: who });
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onOk}>
+    <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={onOk}>
       <View
         style={[
           styles.backdrop,
@@ -218,7 +218,7 @@ function Point({
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,

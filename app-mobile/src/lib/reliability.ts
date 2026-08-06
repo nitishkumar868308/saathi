@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import * as IntentLauncher from "expo-intent-launcher";
+import { withoutLock } from "./app-lock";
 import notifee, {
   AndroidNotificationSetting,
   AuthorizationStatus,
@@ -177,9 +178,23 @@ async function requestBatteryExemption(): Promise<void> {
   await notifee.openBatteryOptimizationSettings();
 }
 
-/** Ek step ke liye OS ka sahi dialog/screen kholo. */
+/**
+ * Ek step ke liye OS ka sahi dialog/screen kholo.
+ *
+ * ⚠️ Poora function `withoutLock` me lipta hai. Har step user ko Android ki
+ * Settings me bhejta hai — battery optimisation, alarms & reminders,
+ * full-screen intent, OEM ka power manager. Wahan wo aksar 1-2 minute lagata
+ * hai (list me app dhoondhna, toggle dabana, wapas aana), aur bina is guard ke
+ * lautte hi app PIN maang leti thi. Yaani "reminders reliable banao" wala poora
+ * setup beech me lock se toot jaata tha — theek wo cheez jo user ko sabse zyada
+ * chahiye thi.
+ */
 export async function requestStep(key: StepKey): Promise<void> {
   if (Platform.OS === "web") return;
+  return withoutLock(() => requestStepInner(key));
+}
+
+async function requestStepInner(key: StepKey): Promise<void> {
   // Baaki teen steps sirf Android ki dikkatein hain — iOS par un rows ko
   // `checkReadiness()` bhejta hi nahi, par yahan bhi guard rakhna zaroori hai
   // taaki koi galti se Android-only intent iOS par na chala de.

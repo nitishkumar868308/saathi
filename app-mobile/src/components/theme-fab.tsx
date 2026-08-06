@@ -43,7 +43,7 @@ export function ThemeFab() {
         accessibilityLabel={goingDark ? t.settings.themeDark : t.settings.themeLight}
         style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
       >
-        <Ionicons name={goingDark ? "moon" : "sunny"} size={17} color={tc.terracotta} />
+        <Ionicons name={goingDark ? "moon" : "sunny"} size={15} color={tc.terracotta} />
       </Pressable>
     </View>
   );
@@ -54,26 +54,36 @@ const useStyles = makeStyles((c) => ({
    * `pointerEvents="box-none"` zaroori hai — warna ye poori-oonchai wala
    * container beech ki screen ke saare tap kha jaata (scroll bhi ruk jaata).
    */
+  /**
+   * ⚠️ `top: "42%"` tha — aur wo theek screen ke beech me aata tha, yaani
+   * hamesha kisi na kisi card ke upar. Home par ye "Aaj ka brief" wale card ka
+   * text dhak leta tha (screenshot me saaf dikhta hai).
+   *
+   * 66% par ye content ke us hisse me aata hai jo aksar khaali ya list ka
+   * kinara hota hai, aur tab bar (neeche ~84px) se bhi upar rehta hai.
+   */
   wrap: {
     position: "absolute",
     right: 0,
-    top: "42%",
+    top: "66%",
     zIndex: 40,
   },
   btn: {
-    height: 42,
-    // Aadha kinare ke bahar — isliye sirf 30 chaudai dikhti hai.
-    width: 34,
+    height: 38,
+    // Aadha kinare ke bahar — isliye sirf ~26 chaudai dikhti hai. Pehle 34 tha
+    // aur wo list ke daayin kinare ka text chhoo leta tha.
+    width: 30,
     alignItems: "center",
     justifyContent: "center",
     // Sirf baayin taraf gol — daayan hissa screen ke kinare se chipka rehta hai.
-    borderTopLeftRadius: 21,
-    borderBottomLeftRadius: 21,
+    borderTopLeftRadius: 19,
+    borderBottomLeftRadius: 19,
     borderWidth: 1,
     borderRightWidth: 0,
     borderColor: c.line,
     backgroundColor: c.surface,
-    opacity: 0.94,
+    // Peeche ka content padha ja sake — dabane par poora saaf ho jaata hai.
+    opacity: 0.82,
     // Halki chhaya — warna light theme me ye cream background me ghul jaata hai.
     shadowColor: "#000",
     shadowOpacity: 0.12,

@@ -36,8 +36,21 @@ type Guide = {
 type Loc = "hinglish" | "hi" | "en";
 const LOCALES: Loc[] = ["hinglish", "hi", "en"];
 
-/** documents.type — app me yahi saat hote hain. */
-const DOC_TYPES = ["car", "license", "passport", "fastag", "warranty", "health", "other"];
+/**
+ * Wo doc types jo app ke andar pehle se maujood hain (`documents.type`).
+ *
+ * ⚠️ Ye ab sirf ek SHURUAATI list hai, poori list nahi. Asli list neeche
+ * `docTypes` me banti hai — ye saat PLUS jo bhi type DB me pehle se pada hai.
+ *
+ * Pehle sirf yahi hardcoded array tha, aur uske do nateeje the: naya document
+ * type (jaise "visa", "gst", "pan") ke liye guide banane ka koi rasta hi nahi
+ * tha bina app release kiye; aur agar kisi ne SQL se aisi row daal di, to wo
+ * dropdown me dikhti hi nahi thi — admin ko lagta wo guide hai hi nahi.
+ *
+ * Ab dropdown DB se bhi bharta hai, aur uske neeche ek khaali khaana hai jisme
+ * bilkul naya type likha ja sakta hai.
+ */
+const BUILT_IN_TYPES = ["car", "license", "passport", "fastag", "warranty", "health", "other"];
 
 const inputCls =
   "mt-1.5 w-full rounded-xl border border-line bg-cream-deep/20 px-3 py-2 text-sm outline-none focus:border-terracotta";
@@ -65,10 +78,25 @@ export default function AdminRenewals() {
   const [draft, setDraft] = useState<Guide | null>(null);
   const [doTranslate, setDoTranslate] = useState(true);
 
-  const [newType, setNewType] = useState(DOC_TYPES[0]);
+  const [newType, setNewType] = useState(BUILT_IN_TYPES[0]);
   const [newCountry, setNewCountry] = useState("");
+  /** Dropdown me na ho aisa bilkul naya type — admin khud likh sakta hai. */
+  const [customType, setCustomType] = useState("");
 
   const keyOf = (g: Pick<Guide, "doc_type" | "country">) => `${g.doc_type}:${g.country}`;
+
+  /**
+   * Dropdown ki asli list — built-in + jo bhi DB me pehle se hai.
+   *
+   * DB wale isliye ki admin ke banaye naye type (ya kisi ne SQL se daale hue)
+   * agli baar dropdown me apne aap aa jayein. Warna wo ek baar bante the aur
+   * phir kabhi chune nahi ja sakte the.
+   */
+  const docTypes = useMemo(() => {
+    const all = new Set(BUILT_IN_TYPES);
+    for (const g of guides ?? []) if (g.doc_type) all.add(g.doc_type);
+    return Array.from(all).sort();
+  }, [guides]);
 
   const load = useCallback(async () => {
     setError("");
@@ -104,7 +132,7 @@ export default function AdminRenewals() {
   /** Kitne doc_type ke paas '*' wala fallback hai — ek bhi missing ho to warning. */
   const missingGlobal = useMemo(() => {
     const have = new Set((guides ?? []).filter((g) => g.country === "*").map((g) => g.doc_type));
-    return DOC_TYPES.filter((d) => !have.has(d));
+    return BUILT_IN_TYPES.filter((d) => !have.has(d));
   }, [guides]);
 
   function openEditor(g: Guide) {
@@ -188,16 +216,31 @@ export default function AdminRenewals() {
 
   function addNew() {
     const c = newCountry.trim().toUpperCase();
-    if (!/^[A-Z]{2}$/.test(c)) {
+    // "*" = har desh wala safety-net guide. Naya doc_type banate waqt SABSE
+    // pehle yahi banna chahiye — uske bina us type ke un users ko kuch bhi
+    // nahi dikhta jinke desh ka apna content nahi hai.
+    if (c !== "*" && !/^[A-Z]{2}$/.test(c)) {
       setError(s.countryFormat);
       return;
     }
-    if ((guides ?? []).some((g) => g.doc_type === newType && g.country === c)) {
+    /**
+     * Dropdown me na ho aisa bilkul naya type — admin khud likh sakta hai.
+     *
+     * ⚠️ Pehle type sirf ek hardcoded list se aata tha, yaani naye document
+     * type (visa, gst, pan…) ka guide banane ke liye app release chahiye tha.
+     */
+    const custom = customType.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    const type = custom || newType;
+    if (!type) {
+      setError(s.docTypeNeeded);
+      return;
+    }
+    if ((guides ?? []).some((g) => g.doc_type === type && g.country === c)) {
       setError(s.alreadyExists);
       return;
     }
     const fresh: Guide = {
-      doc_type: newType,
+      doc_type: type,
       country: c,
       url: null,
       authority: null,
@@ -206,6 +249,7 @@ export default function AdminRenewals() {
     };
     setGuides((list) => [...(list ?? []), fresh]);
     setNewCountry("");
+    setCustomType("");
     setError("");
     openEditor(fresh);
   }
@@ -245,7 +289,7 @@ export default function AdminRenewals() {
             onChange={(e) => setNewType(e.target.value)}
             className={inputCls}
           >
-            {DOC_TYPES.map((d) => (
+            {docTypes.map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>
@@ -253,10 +297,25 @@ export default function AdminRenewals() {
           </select>
         </div>
         <div>
+          {/* Bilkul naya type — dropdown me na ho to yahan likho. Ye bharte hi
+              upar wala dropdown anadekha ho jaata hai. */}
+          <label className={labelCls}>{s.newType}</label>
+          <input
+            value={customType}
+            onChange={(e) => setCustomType(e.target.value)}
+            placeholder={s.newTypePh}
+            className={`${inputCls} w-36 lowercase`}
+          />
+        </div>
+        <div>
           <label className={labelCls}>{s.country}</label>
           <input
             value={newCountry}
-            onChange={(e) => setNewCountry(e.target.value.toUpperCase().slice(0, 2))}
+            onChange={(e) =>
+              setNewCountry(
+                e.target.value === "*" ? "*" : e.target.value.toUpperCase().slice(0, 2),
+              )
+            }
             placeholder="US"
             className={`${inputCls} w-24 uppercase`}
           />

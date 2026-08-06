@@ -121,7 +121,7 @@ export function ReferralCodeModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal statusBarTranslucent visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.iconWrap}>
@@ -161,7 +161,7 @@ export function ReferralCodeModal({
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.45)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,

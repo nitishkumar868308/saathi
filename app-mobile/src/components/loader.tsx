@@ -1,13 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
   Modal,
   Animated,
   Easing,
+  useWindowDimensions,
+  type LayoutChangeEvent,
   type ViewStyle,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import SaathiLogo from "@/components/saathi-logo";
@@ -15,167 +16,229 @@ import SaathiLogo from "@/components/saathi-logo";
 /**
  * Loader system — poore app me EK HI loader (BrandLoader).
  *
- * Saathi ka apna logo halke se saans leta hai, peeche se naram teal ripple-ring
- * phailti hai, aur beech-beech me ek dil upar tairta hai. Warm, zinda, "yaad
- * rakhne wala saathi" feel. Web + admin me bilkul yahi loader hai
- * (web/components/Loader.tsx).
+ * Logo screen ke theek beech me, halke se saans leta hua. Uske PEECHE se
+ * "Apka Saathi" sarak ke bahar aata hai, thoda ruk ke wapas logo ke peeche
+ * chhup jaata hai — aur ye chalta rehta hai. Web + admin me bilkul yahi loader
+ * hai (web/components/Loader.tsx).
  *
  * `Loader`, `LogoLoader`, `ScreenLoader`, `HandsLoader` sab isi BrandLoader ko
  * dikhate hain — purane naam sirf compatibility ke liye.
  *
- * Chhote size (button) par sirf saans-leta logo; bade par ring + dil bhi (halo).
  * Content aa raha ho -> Skeleton. Background kaam -> TopProgress.
- */
-
-const TEAL = "#125156";
-
-/**
- * Loader ke peeche hamesha "Apka Saathi" — brand ka naam, halka sa.
  *
- * Pehle blocking loader ek safed/neela sa chauda card tha jiske andar logo
- * ghoomta tha. Wo card har jagah alag rang ka dikhta tha aur bhadda lagta tha
- * (item 6). Ab koi card nahi — sirf logo, uske neeche brand ka naam.
+ * ⚠️ Peeche wali teal ripple-ring (circle) jaan-boojh ke hata di gayi hai,
+ * wapas mat laana. Pehle logo ke peeche se do circle phail ke gayab hote the —
+ * wo dhyaan logo se hata leti thi aur har bg par apna alag rang dikhati thi.
+ * Ab peeche se sirf naam nikalta hai.
+ *
+ * ── Naam "peeche se" kaise nikalta hai ──────────────────────────────────
+ *
+ * Trick do cheezon ki hai:
+ *
+ *   1. Logo ki image OPAQUE hai (teal bg wala square). To jo text logo ke
+ *      x-range me hai, wo apne aap dhak jaata hai — logo upar (zIndex) hai.
+ *   2. Logo ke BAAYE jo hissa bachta hai use ek `overflow: "hidden"` wali
+ *      khidki kaat deti hai, jiska baayan kinara theek logo ke baaye kinare
+ *      par hai.
+ *
+ * Dono milke: text jab `translateX = -textW` par hota hai to uska daayan
+ * kinara logo ke daaye kinare par hota hai — poora text ya to logo ke neeche
+ * hai ya khidki ke bahar. Yaani bilkul gayab. Wahan se wo daaye sarakta hai
+ * aur logo ke peeche se nikalta hua dikhta hai.
+ *
+ * Khidki `position: "absolute"` hai, isliye layout me jagah nahi leti — LOGO
+ * HAMESHA CENTER ME RAHTA HAI, naam bahar aane par bhi wo khiskta nahi.
+ *
+ * Sab kuch `translateX`/`opacity` par hai (width par nahi), isliye poori
+ * animation native driver par chalti hai — JS thread busy ho tab bhi (jaise AI
+ * ka jawab aate waqt) makkhan chalti hai.
  */
-function BrandName({ size, onDark }: { size: number; onDark: boolean }) {
-  const styles = useStyles();
-  return (
-    <Text
-      style={[
-        styles.brand,
-        onDark ? styles.brandOnDark : styles.brandOnLight,
-        { fontSize: Math.max(12, Math.round(size * 0.19)) },
-      ]}
-    >
-      Apka Saathi
-    </Text>
-  );
-}
+
+/** Ek poori saans — andar 900ms, bahar 900ms. */
+const BREATH_MS = 900;
+
+/** Naam ke nikalne-rukne-chhupne ka ek poora chakkar. */
+const REVEAL_MS = 2800;
+
+/** Logo aur naam ke beech ka faasla, logo ke size ke hisaab se. */
+const GAP_RATIO = 0.16;
 
 function BrandLoader({
   size = 72,
   label,
-  halo = false,
-  /** Logo ke neeche brand ka naam bhi dikhao. */
+  /** Logo ke peeche se brand ka naam bhi nikale. */
   brand = false,
-  /** Naam dark overlay par hai (cream text) ya cream bg par (ink text)? */
+  /** Naam dark overlay par hai (cream text) ya normal bg par (ink text)? */
   onDark = false,
 }: {
   size?: number;
   label?: string;
-  halo?: boolean;
   brand?: boolean;
   onDark?: boolean;
 }) {
-  const tc = useColors();
   const styles = useStyles();
   const beat = useRef(new Animated.Value(0)).current;
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
-  const heart = useRef(new Animated.Value(0)).current;
+  const reveal = useRef(new Animated.Value(0)).current;
+  /**
+   * Naam ki asli chaudai. Jab tak naapi nahi jaati, animation ki manzil pata
+   * nahi — isliye tab tak naam chhupa rehta hai (`opacity: 0`), warna wo pehle
+   * frame me logo ke bagal me chipka hua dikh jaata.
+   */
+  const [textW, setTextW] = useState(0);
 
   useEffect(() => {
+    beat.setValue(0);
     const b = Animated.loop(
       Animated.sequence([
-        Animated.timing(beat, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(beat, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(beat, {
+          toValue: 1,
+          duration: BREATH_MS,
+          // sin easing = dono siron par sabse naram mod; loop ke jodh par
+          // koi jhatka mehsoos nahi hota.
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(beat, {
+          toValue: 0,
+          duration: BREATH_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
       ]),
     );
     b.start();
+    return () => b.stop();
+  }, [beat]);
 
-    let r1: Animated.CompositeAnimation | undefined;
-    let r2: Animated.CompositeAnimation | undefined;
-    let h: Animated.CompositeAnimation | undefined;
-    if (halo) {
-      const mkRing = (v: Animated.Value, delay: number) =>
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(delay),
-            Animated.timing(v, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-            Animated.timing(v, { toValue: 0, duration: 0, useNativeDriver: true }),
-          ]),
-        );
-      r1 = mkRing(ring1, 0);
-      r2 = mkRing(ring2, 900);
-      h = Animated.loop(
-        Animated.sequence([
-          Animated.timing(heart, { toValue: 1, duration: 1500, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-          Animated.delay(500),
-          Animated.timing(heart, { toValue: 0, duration: 0, useNativeDriver: true }),
-        ]),
-      );
-      r1.start();
-      r2.start();
-      h.start();
-    }
-    return () => {
-      b.stop();
-      r1?.stop();
-      r2?.stop();
-      h?.stop();
-    };
-  }, [beat, ring1, ring2, heart, halo]);
+  useEffect(() => {
+    if (!brand || textW === 0) return;
+    reveal.setValue(0);
+    // Linear clock 0 -> 1; nikalna/rukna/chhupna sab neeche interpolate ke
+    // keyframes me hai. Clock linear isliye ki loop ka jodh (1 -> 0) exactly
+    // wahin pade jahan naam poora chhupa hua hai — koi jhatka nahi.
+    const r = Animated.loop(
+      Animated.timing(reveal, {
+        toValue: 1,
+        duration: REVEAL_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+    r.start();
+    return () => r.stop();
+  }, [reveal, brand, textW]);
 
   const radius = Math.round(size * 0.3);
-  const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+  const gap = Math.round(size * GAP_RATIO);
+  const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
 
-  const ringStyle = (v: Animated.Value): Animated.WithAnimatedObject<ViewStyle> => ({
-    position: "absolute",
-    width: size,
-    height: size,
-    borderRadius: radius,
-    backgroundColor: TEAL,
-    opacity: v.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 0.22, 0] }),
-    transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.85] }) }],
+  // Chhupa hua = text ka daayan kinara logo ke daaye kinare par. Bahar = logo
+  // ke daaye kinare se `gap` aage.
+  const hidden = -textW;
+  const shown = gap;
+  const nameX = reveal.interpolate({
+    //      nikalna      ruko            chhupna       ruko (poora chhupa)
+    inputRange: [0, 0.06, 0.3, 0.68, 0.9, 1],
+    outputRange: [hidden, hidden, shown, shown, hidden, hidden],
+    extrapolate: "clamp",
+  });
+  // Nikalte waqt halka sa fade-in; wapas jaate waqt aakhir tak dikhta rahe
+  // (kyunki wo logo ke peeche chhup raha hai, gayab nahi ho raha).
+  const nameOpacity = reveal.interpolate({
+    inputRange: [0, 0.1, 0.3, 1],
+    outputRange: [0, 0.35, 1, 1],
+    extrapolate: "clamp",
   });
 
-  const heartOpacity = heart.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [0, 1, 1, 0] });
-  const heartY = heart.interpolate({ inputRange: [0, 1], outputRange: [size * 0.1, -size * 0.55] });
-  const heartScale = heart.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1, 0.7] });
+  const onNameLayout = (e: LayoutChangeEvent) => {
+    const w = Math.ceil(e.nativeEvent.layout.width);
+    if (w > 0 && w !== textW) setTextW(w);
+  };
 
   return (
     <View style={styles.wrap}>
-      <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-        {halo && <Animated.View style={ringStyle(ring1)} />}
-        {halo && <Animated.View style={ringStyle(ring2)} />}
-        <Animated.View style={{ transform: [{ scale }] }}>
+      {/* Fixed box = logo saans lete waqt bhi apni jagah se nahi hilta, aur
+          neeche ka label upar-neeche nahi kaudta. */}
+      <View style={[styles.logoBox, { width: size, height: size }]}>
+        {brand && (
+          /* Khidki: baayan kinara = logo ka baayan kinara. Isse baayi taraf
+             nikla text kat jaata hai. Daayi taraf khuli hai (isliye chaudai
+             udaar rakhi hai) taaki naam poora bahar aa sake. `absolute` hone
+             se layout par koi asar nahi — logo center me hi rahta hai. */
+          <View
+            pointerEvents="none"
+            style={[styles.nameWindow, { width: size + gap + textW + 8, height: size }]}
+          >
+            <Animated.View
+              onLayout={onNameLayout}
+              style={[
+                styles.nameSlider,
+                {
+                  left: size,
+                  // Naapne se pehle chhupa hi rehne do — warna pehla frame
+                  // logo ke bagal me chipka hua naam dikha deta hai.
+                  opacity: textW === 0 ? 0 : nameOpacity,
+                  transform: [{ translateX: textW === 0 ? -9999 : nameX }],
+                },
+              ]}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.name,
+                  onDark ? styles.nameOnDark : styles.nameOnLight,
+                  { fontSize: Math.max(13, Math.round(size * 0.24)) },
+                ]}
+              >
+                Apka Saathi
+              </Text>
+            </Animated.View>
+          </View>
+        )}
+        <Animated.View style={[styles.logoTop, { transform: [{ scale }] }]}>
           <SaathiLogo size={size} radius={radius} />
         </Animated.View>
-        {halo && (
-          <Animated.View
-            style={{ position: "absolute", opacity: heartOpacity, transform: [{ translateY: heartY }, { scale: heartScale }] }}
-          >
-            <Ionicons name="heart" size={Math.round(size * 0.26)} color={tc.terracotta} />
-          </Animated.View>
-        )}
       </View>
-      {brand ? <BrandName size={size} onDark={onDark} /> : null}
       {label ? <Text style={styles.label}>{label}</Text> : null}
     </View>
   );
 }
 
-/** Inline/button loader. Chhota — sirf saans-leta logo. */
-export function Loader({ size = 40, label }: { size?: number; label?: string; color?: string }) {
-  return <BrandLoader size={size} label={label} halo={size >= 44} />;
+/**
+ * Screen ke hisaab se loader ka size — chhote 4" phone se le kar tablet tak
+ * loader na to kho jaaye na screen kha jaaye. 390pt (aam phone) par `base`
+ * milta hai, usse chhoti/badi screen par proportionally, phir min/max clamp.
+ */
+function useLoaderSize(base: number, min: number, max: number) {
+  const { width, height } = useWindowDimensions();
+  return useMemo(() => {
+    const short = Math.min(width, height);
+    return Math.round(Math.max(min, Math.min(max, (short / 390) * base)));
+  }, [width, height, base, min, max]);
 }
 
-/** Bada logo loader (halo ke saath). */
+/** Inline/button loader. Chhota — sirf saans-leta logo. */
+export function Loader({ size = 40, label }: { size?: number; label?: string; color?: string }) {
+  return <BrandLoader size={size} label={label} />;
+}
+
+/** Bada logo loader. */
 export function LogoLoader({ size = 76, label }: { size?: number; label?: string }) {
-  return <BrandLoader size={size} label={label} halo />;
+  return <BrandLoader size={size} label={label} />;
 }
 
 /** AI padh raha / kuch post ho raha — wahi ek loader. */
 export function HandsLoader({ size = 60, label }: { size?: number; label?: string }) {
-  return <BrandLoader size={size} label={label} halo />;
+  return <BrandLoader size={size} label={label} />;
 }
 
-/** Poori screen ka loader — naram cream bg ke saath (safed/neela kabhi nahi). */
+/** Poori screen ka loader — naram cream bg, logo theek beech me. */
 export function ScreenLoader({ label }: { label?: string }) {
   const styles = useStyles();
+  const size = useLoaderSize(84, 64, 120);
   return (
     <View style={styles.screen}>
-      <View style={styles.screenGlow} />
-      <BrandLoader size={84} label={label} halo brand />
+      <BrandLoader size={size} label={label} brand />
     </View>
   );
 }
@@ -187,20 +250,22 @@ export function ScreenLoader({ label }: { label?: string }) {
  * kaam chal raha hai user peeche ka form chhu na sake (pehle loader inline aata
  * tha, form clickable rehta tha aur do baar submit ho jaata tha).
  *
- * Jaan-boojh ke koi text nahi — "Samajh raha hoon…" jaisi lines hata di gayi
- * hain. Loader ko sirf ye batana hai ki kaam chal raha hai, kahani nahi sunani.
+ * Jaan-boojh ke koi status text nahi — "Samajh raha hoon…" jaisi line nahi.
+ * Loader ko sirf ye batana hai ki kaam chal raha hai, kahani nahi sunani.
+ * Brand ka naam sirf animation ka hissa hai (logo ke peeche se nikalta hua).
  *
- * ⚠️ Pehle loader ke peeche ek safed (kahin neela sa) card box hota tha. Wo har
- * screen ke bg par alag rang ka dikhta tha aur poora bhadda lagta tha (item 6).
- * Ab card hata diya gaya hai — sirf brand ka logo, uske neeche "Apka Saathi",
- * aur peeche naram dark overlay. Har jagah bilkul ek jaisa.
+ * ⚠️ Pehle loader ke peeche ek safed (kahin neela sa) card box hota tha, aur
+ * logo ke peeche se teal circle phailte the. Dono hata diye gaye hain — ab
+ * sirf brand ka logo, screen ke theek beech me, aur peeche naram dark overlay.
+ * Har jagah bilkul ek jaisa.
  */
 export function LoaderOverlay({ visible }: { visible: boolean }) {
   const styles = useStyles();
+  const size = useLoaderSize(78, 60, 110);
   return (
     <Modal transparent visible={visible} animationType="fade" statusBarTranslucent>
       <View style={styles.overlay}>
-        <BrandLoader size={78} halo brand onDark />
+        <BrandLoader size={size} brand onDark />
       </View>
     </Modal>
   );
@@ -305,33 +370,39 @@ export function TopProgress({ visible }: { visible: boolean }) {
 
 const useStyles = makeStyles((c) => ({
   wrap: { alignItems: "center", justifyContent: "center", gap: 12 },
-  label: { fontSize: 14, color: c.inkSoft, fontWeight: "600" },
-  brand: { fontWeight: "800", letterSpacing: 0.3 },
-  brandOnDark: {
+  logoBox: { alignItems: "center", justifyContent: "center" },
+  /** Logo hamesha naam ke UPAR — naam iske "peeche" se nikalta hai. */
+  logoTop: { zIndex: 2 },
+  /**
+   * Naam ki khidki. Baayan kinara theek logo ke baaye kinare par (left: 0),
+   * isliye us se baaya nikla text kat jaata hai. `absolute` — layout me jagah
+   * nahi leti, to logo center se nahi hilta.
+   */
+  nameWindow: { position: "absolute", left: 0, top: 0, overflow: "hidden", zIndex: 1 },
+  nameSlider: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
+  name: { fontWeight: "800", letterSpacing: 0.3 },
+  nameOnDark: {
     color: c.cream,
     textShadowColor: "rgba(0,0,0,0.35)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  brandOnLight: { color: c.ink, opacity: 0.85 },
+  nameOnLight: { color: c.ink, opacity: 0.9 },
+  label: { fontSize: 14, color: c.inkSoft, fontWeight: "600", textAlign: "center" },
   screen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: c.cream,
   },
-  screenGlow: {
-    position: "absolute",
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: "rgba(18,81,86,0.07)",
-  },
   overlay: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(46,40,35,0.45)",
+    // Theme ke hisaab se — light par 45% garam-kaala, dark par 72%. Pehle
+    // yahan ek hi hardcoded rgba tha, jo dark mode me gehre page par bilkul
+    // dikhta hi nahi tha.
+    backgroundColor: c.scrim,
   },
   card: {
     flexDirection: "row",

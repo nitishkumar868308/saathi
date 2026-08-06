@@ -16,7 +16,7 @@ import { makeStyles, useColors } from "@/theme/theme";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { useToast } from "@/components/toast";
 import { ConfirmModal } from "@/components/confirm-modal";
-import { LoaderOverlay } from "@/components/loader";
+import { Loader, LoaderOverlay } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { reportIfNetwork } from "@/lib/net-alert";
 import {
@@ -262,16 +262,40 @@ export default function NoteEdit() {
               <Ionicons name="trash-outline" size={20} color={tc.inkSoft} />
             </Pressable>
           )}
+          {/**
+           * Save — loader BUTTON ke andar, poori screen par nahi.
+           *
+           * ⚠️ Pehle yahan sirf text tha aur save par ek full-screen
+           * `LoaderOverlay` khul jaata tha. Do dikkatein thi:
+           *
+           *  • Note save hone me aksar aadha second lagta hai. Us aadhe second
+           *    ke liye poori screen par ek gehra parda aur beech me bada logo
+           *    aana ek chhote se kaam ke liye bahut bada jhatka hai — screen
+           *    "blink" karti hui lagti thi.
+           *  • Aur wo parda note ko dhak leta tha, to user ko ye dikhta hi nahi
+           *    tha ki uska likha hua bach gaya ya nahi. Uske baad screen band ho
+           *    jaati aur toast peeche kahin dikhta.
+           *
+           * Ab kaam wahin dikhta hai jahan user ne tap kiya (button ke andar
+           * chhota loader), note saamne rehta hai, aur uske baad toast aata hai.
+           *
+           * `minWidth` isliye ki text aur loader ki chaudai alag hai — bina
+           * iske button save karte hi sikud jaata aur header hil jaata.
+           */}
           <Pressable
             onPress={() => void onSave()}
             disabled={empty || saving}
             style={({ pressed }) => [
               styles.saveBtn,
-              (empty || saving) && { opacity: 0.45 },
-              pressed && { opacity: 0.85 },
+              empty && { opacity: 0.45 },
+              pressed && !saving && { opacity: 0.85 },
             ]}
           >
-            <Text style={styles.saveText}>{c.save}</Text>
+            {saving ? (
+              <Loader size={18} />
+            ) : (
+              <Text style={styles.saveText}>{c.save}</Text>
+            )}
           </Pressable>
         </View>
       </View>
@@ -349,7 +373,10 @@ export default function NoteEdit() {
         onCancel={() => setAskDelete(false)}
       />
 
-      <LoaderOverlay visible={loading || saving} />
+      {/* Overlay SIRF pehli load par (note server se aa raha hai) — tab screen
+          par dikhane ko kuch hai hi nahi. Save par nahi: uska loader button ke
+          andar hai, taaki note saamne rahe aur screen blink na kare. */}
+      <LoaderOverlay visible={loading} />
     </SafeAreaView>
   );
 }
@@ -369,6 +396,9 @@ const useStyles = makeStyles((c) => ({
   saveBtn: {
     marginLeft: 4,
     height: 38,
+    // Text aur loader ki chaudai alag hai — `minWidth` ke bina button save
+    // karte hi sikud jaata aur poora header hil jaata.
+    minWidth: 84,
     paddingHorizontal: 18,
     borderRadius: 19,
     alignItems: "center",

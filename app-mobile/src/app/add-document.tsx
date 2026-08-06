@@ -21,6 +21,7 @@ import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
 import { scanDocumentAI } from "@/lib/ai";
+import { withoutLock } from "@/lib/app-lock";
 import { logEvent } from "@/lib/analytics";
 import { markFirstDocument } from "@/lib/reviews";
 import { isValidDate } from "@/utils/expiry";
@@ -67,13 +68,23 @@ export default function AddDocument() {
         quality: 0.4,
         allowsEditing: true,
       };
+      /**
+       * ⚠️ Camera/gallery ke poore waqt lock band rehta hai.
+       *
+       * Yahi wo jagah hai jahan shikayat sabse zyada thi: document ki photo
+       * lene camera kholo, wapas aao — aur app PIN maang rahi hai. Camera app
+       * ke bahar khulta hai, yaani Saathi background me chali jaati hai; par
+       * user ne app CHHODI nahi hai, app hi use bahar bhej rahi hai. Scan me
+       * aksar 30-60 second lagte hain (photo lena, crop karna), to purani 60
+       * second wali khidki har baar hi kat jaati thi.
+       */
       let result: ImagePicker.ImagePickerResult;
       if (source === "camera") {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) return toast.show(d.cameraPermission, "info");
-        result = await ImagePicker.launchCameraAsync(opts);
+        result = await withoutLock(() => ImagePicker.launchCameraAsync(opts));
       } else {
-        result = await ImagePicker.launchImageLibraryAsync(opts);
+        result = await withoutLock(() => ImagePicker.launchImageLibraryAsync(opts));
       }
       if (result.canceled) return;
       const asset = result.assets[0];

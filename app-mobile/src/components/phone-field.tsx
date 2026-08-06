@@ -12,6 +12,7 @@ import {
   getCountryCallingCode,
   type CountryCode,
 } from "libphonenumber-js";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -51,6 +52,7 @@ export function PhoneField({
 }) {
   const tc = useColors();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
   const { phoneField: p } = useT();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -93,8 +95,25 @@ export function PhoneField({
         visible={open && !locked}
         animationType="slide"
         onRequestClose={() => setOpen(false)}
+        statusBarTranslucent
+        navigationBarTranslucent
       >
-        <View style={styles.modal}>
+        {/**
+         * ⚠️ Padding insets se aati hai, tay number se nahi.
+         *
+         * Pehle `paddingTop: 60` hardcoded tha aur neeche kuch bhi nahi. Do
+         * jagah tootta tha: notch/punch-hole wale lambe phone par 60 kam pad
+         * jaata (search box status bar ke neeche ghus jaata), aur 3-button
+         * navigation bar wale phone par "Band karo" button us bar ke neeche
+         * chala jaata — yaani country list se nikalne ka ekmatra button hi
+         * daba nahi paata tha. `insets` har phone par apna sach batate hain.
+         */}
+        <View
+          style={[
+            styles.modal,
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom },
+          ]}
+        >
           <TextInput
             style={styles.search}
             value={q}
@@ -157,7 +176,6 @@ const useStyles = makeStyles((c) => ({
   modal: {
     flex: 1,
     backgroundColor: c.cream,
-    paddingTop: 60,
     paddingHorizontal: 16,
   },
   search: {

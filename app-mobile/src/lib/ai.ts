@@ -358,35 +358,58 @@ export type ReminderAI = {
 };
 
 /**
+ * Reminder parse ka nateeja — samajh, ya na samajh paane ki WAJAH.
+ *
+ * ⚠️ Pehle `parseReminderAI` sirf `ReminderAI | null` lautata tha, aur `null`
+ * ka koi matlab nahi tha. Add-reminder screen us `null` par bilkul chup reh
+ * jaati thi: user text likhta, patli patti chalti, ruk jaati, aur screen par
+ * kuch nahi hota. Chaar bilkul alag halaat ek jaisi dikhti thi — net band,
+ * Gemini bhara hua, key set nahi, aur AI ka sach me na samajh paana. User ke
+ * liye chaaron ka ek hi matlab tha: "AI kuch karta hi nahi". Ab wajah bahar
+ * aati hai aur screen usi hisaab se saaf baat kehti hai.
+ */
+export type ReminderParse =
+  | { ok: true; data: ReminderAI }
+  | { ok: false; failure: AiFailure };
+
+/**
  * Ek reminder = ek AI call. Text bhejo, structured samajh wapas lo.
- * Key/network fail ho to null — caller local UI (pickers) se aage badha sakta hai.
+ * Fail ho to wajah ke saath — caller local UI (pickers) se aage badha sakta hai.
  */
 export async function parseReminderAI(
   text: string,
   locale?: string,
-): Promise<ReminderAI | null> {
-  if (!supabase || !text.trim()) return null;
+): Promise<ReminderParse> {
+  if (!supabase) return { ok: false, failure: "server" };
+  if (!text.trim()) return { ok: false, failure: "server" };
   try {
     const data = await callAi<(Partial<ReminderAI> & { error?: string }) | null>(
       { task: "reminder", text, locale, now: new Date().toISOString() },
       TASK_TIMEOUT_MS,
     );
-    if (!data) return null;
+    // Server ne jawab to diya, par usme samajh nahi thi — ye AI ki apni baat
+    // hai, net ki nahi.
+    const title = data?.title;
+    if (!data || data.error || typeof title !== "string") {
+      return { ok: false, failure: "server" };
+    }
     const r = data;
-    if (r.error || typeof r.title !== "string") return null;
     return {
-      title: r.title,
-      remind_at: r.remind_at ?? null,
-      label: r.label ?? null,
-      needsDate: r.needsDate ?? !r.remind_at,
-      needsTime: r.needsTime ?? !r.remind_at,
-      repeat_every_days: r.repeat_every_days ?? null,
-      repeat_until: r.repeat_until ?? null,
+      ok: true,
+      data: {
+        title,
+        remind_at: r.remind_at ?? null,
+        label: r.label ?? null,
+        needsDate: r.needsDate ?? !r.remind_at,
+        needsTime: r.needsTime ?? !r.remind_at,
+        repeat_every_days: r.repeat_every_days ?? null,
+        repeat_until: r.repeat_until ?? null,
+      },
     };
-  } catch {
-    // Net/timeout — caller local parser par chalta rehta hai, isliye `null` hi
-    // theek hai. Screen kabhi khaali nahi rehti.
-    return null;
+  } catch (e) {
+    // Net/timeout — caller local pickers par chalta rehta hai, screen kabhi
+    // khaali nahi rehti. Par ab use wajah bhi pata hai.
+    return { ok: false, failure: failureOf(e) };
   }
 }
 

@@ -90,11 +90,27 @@ export default function DocumentView() {
    * wo kabhi update hi na hon.
    */
   const [guide, setGuide] = useState<RenewalGuide | null>(null);
+  /**
+   * Guide dhoondhna khatam ho gaya (mila ho ya na mila ho).
+   *
+   * ⚠️ Iske bina "abhi dhoondh rahe hain" aur "hai hi nahi" ek jaise dikhte
+   * the — dono me `guide === null` hota hai. Isliye pehle jab kisi doc_type ka
+   * guide nahi hota tha, us document par renewal ka poora hissa CHUP-CHAAP
+   * gayab ho jaata tha. User ko expiry ka alert milta tha, wo document kholta
+   * tha, aur "ab karun kya?" ka koi jawab hi nahi milta — na guide, na ye baat
+   * ki jawab abhi banaya ja raha hai. Ab wo saaf likha jaata hai.
+   */
+  const [guideLoaded, setGuideLoaded] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    void renewalFor(type || "other", locale).then((g) => alive && setGuide(g));
+    setGuideLoaded(false);
+    void renewalFor(type || "other", locale).then((g) => {
+      if (!alive) return;
+      setGuide(g);
+      setGuideLoaded(true);
+    });
     return () => {
       alive = false;
     };
@@ -144,6 +160,32 @@ export default function DocumentView() {
           <View style={styles.empty}>
             <Ionicons name="document-outline" size={40} color={tc.inkSoft} />
             <Text style={styles.emptyText}>{d.noFileSaved}</Text>
+          </View>
+        )}
+
+        {/**
+         * Is document type ka guide abhi bana hi nahi — "jald aa raha hai".
+         *
+         * ⚠️ Pehle yahan kuch bhi nahi tha: guide na hone par renewal ka poora
+         * hissa chup-chaap gayab ho jaata tha. User ko expiry ka alert milta,
+         * wo document kholta, aur "ab karun kya?" ka jawab kahin nahi hota —
+         * na guide, na ye baat ki jawab banaya ja raha hai. Use lagta tha app
+         * adhoori hai. Saaf keh dena hamesha behtar hai.
+         *
+         * `guideLoaded` ki shart zaroori hai, warna load hone tak har document
+         * par ek pal ke liye "coming soon" chamak jaata.
+         */}
+        {guideLoaded && !guide && (
+          <View style={styles.renewCard}>
+            <View style={styles.renewHead}>
+              <View style={styles.renewIcon}>
+                <Ionicons name="time-outline" size={17} color={tc.terracotta} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.renewTitle}>{d.renewSoonTitle}</Text>
+              </View>
+            </View>
+            <Text style={styles.renewSoonBody}>{d.renewSoonBody}</Text>
           </View>
         )}
 
@@ -291,6 +333,7 @@ const useStyles = makeStyles((c) => ({
   },
   renewTitle: { fontSize: 15.5, fontWeight: "700", color: c.ink },
   renewAuthority: { marginTop: 2, fontSize: 12.5, color: c.inkSoft },
+  renewSoonBody: { marginTop: 12, fontSize: 13.5, lineHeight: 20, color: c.inkSoft },
   renewLink: {
     flexDirection: "row",
     alignItems: "center",

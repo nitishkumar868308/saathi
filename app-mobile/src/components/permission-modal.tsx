@@ -142,7 +142,7 @@ export function PermissionModal({
   };
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+    <Modal statusBarTranslucent transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={[styles.backdrop, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
           <View style={[styles.card, { maxHeight: maxCardHeight }]}>
@@ -231,7 +231,7 @@ export function PermissionModal({
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
@@ -326,7 +326,9 @@ const useStyles = makeStyles((c) => ({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: c.ink,
+    // ⚠️ `c.ink` NAHI — dark theme me button cream ka ho jaata tha aur uspar
+    // ka SAFED text (`ctaText`) bilkul gayab.
+    backgroundColor: c.inkCard,
   },
   ctaDone: { backgroundColor: c.sage },
   ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white },

@@ -14,6 +14,24 @@ export const CONFIG_KEYS = [
   "free_documents",
   "plus_price_monthly",
   "plus_price_yearly",
+  /**
+   * SMS OTP ki haddein — `supabase/phone-otp.sql` inhe `cfg_int` se padhta hai.
+   *
+   * ⚠️ Ye pehle SQL me hardcoded the. Do dikkatein thi: badalne ke liye har
+   * baar migration chalani padti thi, aur (asli baat) ek user ki soorat me
+   * hadd thodi dheeli karne ka koi tareeka hi nahi tha. Ab teenon cheezein
+   * yahan se live badalti hain, aur ek user ki ginti alag se reset ho sakti
+   * hai (`/api/admin/users/[id]/otp-reset`).
+   *
+   * Har SMS ka paisa lagta hai, isliye inhe badhane se pehle Admin > Spend
+   * dekh lena.
+   */
+  "otp_cooldown_seconds",
+  "otp_ttl_seconds",
+  "otp_per_hour",
+  "otp_per_day",
+  "otp_ip_per_day",
+  "otp_max_attempts",
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];

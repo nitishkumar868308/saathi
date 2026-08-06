@@ -68,8 +68,17 @@ export default function Support() {
   const s = t.support;
   const toast = useToast();
 
-  /** Notification se aaye to seedha usi ticket me khol do. */
-  const params = useLocalSearchParams<{ ticketId?: string }>();
+  /**
+   * `ticketId` — notification se aaye to seedha usi ticket me khol do.
+   * `subject`  — kisi screen ne pehle se bhara hua subject bheja hai.
+   *
+   * Abhi `subject` ek hi jagah se aata hai: profile ka "OTP limit poori ho
+   * gayi" wala note. Wahan user ko apni dikkat likhni hi nahi padti (aur wo
+   * aksar "verify nahi ho raha" jaisa kuch likhta hai, jisse admin ko kuch
+   * pata nahi chalta). Ek jaisa subject aane se admin ko har aisi ticket ek hi
+   * shakal me milti hai — dhoondhne aur nipatane me kahin aasan.
+   */
+  const params = useLocalSearchParams<{ ticketId?: string; subject?: string }>();
 
   const [view, setView] = useState<Screen>("list");
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
@@ -132,6 +141,21 @@ export default function Support() {
       void openThread(found);
     }
   }, [params.ticketId, tickets, openThread]);
+
+  /**
+   * Pehle se bhara hua subject leke aaye — seedha "nayi ticket" wala form kholo.
+   *
+   * `prefilled` ref ke bina ye har render par chalta aur user ka apna likha hua
+   * subject wapas mita deta.
+   */
+  const prefilled = useRef(false);
+  useEffect(() => {
+    const sub = typeof params.subject === "string" ? params.subject.trim() : "";
+    if (!sub || prefilled.current) return;
+    prefilled.current = true;
+    setSubject(sub);
+    setView("new");
+  }, [params.subject]);
 
   /* ------------------------------- actions ------------------------------- */
 

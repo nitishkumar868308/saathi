@@ -365,7 +365,7 @@ export default function Upgrade() {
       </ScrollView>
 
       {/* IP-country vs profile-country mismatch — kaunse desh ka price? */}
-      <Modal transparent visible={showMismatch} animationType="fade" onRequestClose={() => setShowMismatch(false)}>
+      <Modal statusBarTranslucent transparent visible={showMismatch} animationType="fade" onRequestClose={() => setShowMismatch(false)}>
         <View style={styles.mmBackdrop}>
           <View style={styles.mmCard}>
             <View style={styles.mmIcon}>
@@ -445,14 +445,16 @@ const useStyles = makeStyles((c) => ({
     borderRadius: 26,
     borderWidth: 2,
     borderColor: c.terracotta,
-    backgroundColor: c.ink,
+    // ⚠️ `c.ink` NAHI — dark theme me card cream ban jaata tha aur uspar ka
+    // safed price/feature text gayab ho jaata tha.
+    backgroundColor: c.inkCard,
     padding: 22,
   },
   plusName: { fontSize: 18, fontWeight: "700", color: c.white },
   priceRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 8, gap: 4 },
   price: { fontSize: 38, fontWeight: "800", color: c.white },
-  period: { fontSize: 15, color: "rgba(247,242,233,0.6)", paddingBottom: 6 },
-  gst: { marginTop: 2, fontSize: 12.5, color: "rgba(247,242,233,0.6)", fontWeight: "600" },
+  period: { fontSize: 15, color: c.onInkSoft, paddingBottom: 6 },
+  gst: { marginTop: 2, fontSize: 12.5, color: c.onInkSoft, fontWeight: "600" },
   tickPlus: {
     height: 20,
     width: 20,
@@ -462,7 +464,7 @@ const useStyles = makeStyles((c) => ({
     justifyContent: "center",
   },
   featRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  featTextPlus: { fontSize: 14.5, color: "rgba(247,242,233,0.92)", flex: 1 },
+  featTextPlus: { fontSize: 14.5, color: c.onInk, flex: 1 },
   payBtn: {
     marginTop: 20,
     flexDirection: "row",
@@ -478,7 +480,7 @@ const useStyles = makeStyles((c) => ({
     marginTop: 10,
     textAlign: "center",
     fontSize: 12,
-    color: "rgba(247,242,233,0.55)",
+    color: c.onInkSoft,
   },
   referCard: {
     marginTop: 16,
@@ -537,7 +539,7 @@ const useStyles = makeStyles((c) => ({
   },
   mmBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: 26,

@@ -1,6 +1,14 @@
 import { useState, useCallback } from "react";
-import { View, Text, Switch, ScrollView, Pressable, Modal } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  View,
+  Text,
+  Switch,
+  ScrollView,
+  Pressable,
+  Modal,
+  useWindowDimensions,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useRouter, useFocusEffect } from "expo-router";
 
@@ -384,8 +392,8 @@ function Section({
                     style={({ pressed }) => [styles.actionBtn, pressed && styles.actionPressed]}
                     hitSlop={4}
                   >
-                    <Ionicons name="trash-outline" size={17} color="#B23B3B" />
-                    <Text style={[styles.actionText, { color: "#B23B3B" }]}>
+                    <Ionicons name="trash-outline" size={17} color={tc.danger} />
+                    <Text style={[styles.actionText, { color: tc.danger }]}>
                       {labels.remove}
                     </Text>
                   </Pressable>
@@ -439,12 +447,29 @@ function DetailSheet({
 }) {
   const tc = useColors();
   const styles = useStyles();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   if (!reminder) return null;
   const r = reminder;
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+    <Modal statusBarTranslucent navigationBarTranslucent transparent animationType="fade" visible onRequestClose={onClose}>
       <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        {/**
+         * ⚠️ Bottom padding insets se, aur oonchai par hadd.
+         *
+         * Pehle `paddingBottom: 34` tay tha: 3-button navigation bar wale phone
+         * par (Samsung ka ||| ○ <) neeche wala "Ho gaya" button us bar ke
+         * neeche chala jaata tha aur daba hi nahi paata tha. Aur lambe note
+         * wale reminder par sheet upar se bahar nikal jaata tha — title tak
+         * dikhta hi nahi tha.
+         */}
+        <Pressable
+          style={[
+            styles.sheet,
+            { paddingBottom: 16 + insets.bottom, maxHeight: height * 0.85 },
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.sheetHandle} />
 
           <View style={styles.sheetHead}>
@@ -643,15 +668,16 @@ const useStyles = makeStyles((c) => ({
   addText: { color: c.white, fontWeight: "700", fontSize: 15 },
   sheetBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.5)",
+    backgroundColor: c.scrim,
     justifyContent: "flex-end",
   },
   sheet: {
     backgroundColor: c.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    padding: 22,
-    paddingBottom: 34,
+    paddingHorizontal: 22,
+    paddingTop: 22,
+    // paddingBottom / maxHeight component me insets se lagte hain.
   },
   sheetHandle: {
     alignSelf: "center",

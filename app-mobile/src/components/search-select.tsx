@@ -75,6 +75,7 @@ export function SearchSelect({
         visible={open}
         animationType="slide"
         transparent
+        statusBarTranslucent
         onRequestClose={() => setOpen(false)}
       >
         {/*
@@ -160,7 +161,7 @@ const useStyles = makeStyles((c) => ({
   rowText: { flex: 1, fontSize: 15, color: c.ink, marginRight: 8 },
   rowPlaceholder: { color: c.inkSoft },
 
-  backdrop: { flex: 1, backgroundColor: "rgba(46,40,35,0.5)" },
+  backdrop: { flex: 1, backgroundColor: c.scrim },
   sheet: {
     backgroundColor: c.surface,
     borderTopLeftRadius: 26,

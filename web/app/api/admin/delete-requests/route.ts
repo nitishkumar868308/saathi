@@ -51,6 +51,9 @@ const USER_TABLES: { table: string; col: string; label: string }[] = [
   { table: "service_usage", col: "user_id", label: "AI / WhatsApp usage" },
   { table: "message_sends", col: "user_id", label: "Broadcast messages" },
   { table: "app_errors", col: "user_id", label: "Error logs" },
+  // Phone verification ke bheje hue OTP ka hisaab (`supabase/phone-otp.sql`).
+  // Isme user ka phone number hai, isliye purge me shaamil hona zaroori hai.
+  { table: "phone_otp", col: "user_id", label: "SMS OTP history" },
   { table: "referrals", col: "referrer_id", label: "Referrals made" },
   { table: "referrals", col: "referee_id", label: "Referred by" },
   // Profile sabse aakhir me — baaki sab uske hisaab se dikhta hai.

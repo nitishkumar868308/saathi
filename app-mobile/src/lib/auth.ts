@@ -25,6 +25,46 @@ export async function signInEmail(email: string, password: string) {
   if (error) throw error;
 }
 
+/* ------------------------ password bhool gaye ------------------------ */
+
+/**
+ * "Password bhool gaya" — reset ka link email par bhejo.
+ *
+ * ⚠️ Ye poora raasta pehle THA HI NAHI. Email+password se bana account, aur
+ * password bhool gaye — to app me kahin koi rasta nahi tha. Google wale to
+ * phir bhi andar aa jaate the; email wale hamesha ke liye apne hi documents
+ * aur reminders se bahar khade reh jaate the. Support bhi kuch nahi kar sakta
+ * tha (password Supabase ke paas hashed hai, hum use dekh hi nahi sakte).
+ *
+ * ⚠️ Jawab hamesha KAAMYAAB dikhta hai, chahe wo email hamare paas ho ya na
+ * ho. Wajah surakhsha hai: "ye email register nahi hai" bata dena kisi ko bhi
+ * ye jaanne ka tareeka de deta hai ki kaun-kaun is app par hai (account
+ * enumeration). Supabase khud bhi isi wajah se is call par error nahi deta.
+ */
+export async function sendPasswordReset(email: string): Promise<void> {
+  const sb = client();
+  // Wahi deep link jo Google login use karta hai — `app/auth.tsx` dono
+  // sambhalta hai. Supabase link par `type=recovery` bhejta hai, jisse wo
+  // screen pehchaan leti hai ki ab naya password poochna hai.
+  const redirectTo = Linking.createURL("auth");
+  const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+  // Sirf network/config wali galti upar bhejte hain. "Email nahi mila" wali
+  // baat jaan-boojh ke nigal jaate hain (upar dekho).
+  if (error && !/not\s*found|invalid/i.test(error.message)) throw error;
+}
+
+/**
+ * Naya password set karo — recovery link se aane ke BAAD.
+ *
+ * Ye tabhi chalta hai jab Supabase ne recovery session bana diya ho (link par
+ * tap karne se). Bina us session ke `updateUser` khud hi mana kar deta hai —
+ * yaani koi bhi bina link ke kisi ka password nahi badal sakta.
+ */
+export async function setNewPassword(password: string): Promise<void> {
+  const { error } = await client().auth.updateUser({ password });
+  if (error) throw error;
+}
+
 export async function signOut() {
   await client().auth.signOut();
 }

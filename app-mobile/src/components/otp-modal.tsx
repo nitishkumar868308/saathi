@@ -40,6 +40,16 @@ export function OtpModal(props: {
   phone: string;
   onClose: () => void;
   onVerified: () => void;
+  /**
+   * OTP ki hadd poori ho gayi — is user ko ab support se reset karwana padega.
+   *
+   * ⚠️ Ye modal se BAHAR bhi dikhna chahiye, aur yahi is callback ki poori
+   * wajah hai. Modal band hote hi uske andar ka error gayab ho jaata hai, aur
+   * user ko sirf ek "Verify karo" button dikhta rehta hai jo dabane par har
+   * baar fail hota hai — bina ye bataye ki karna kya hai. Ab profile screen
+   * phone field ke neeche wo note tikaye rakhti hai, support ke button ke saath.
+   */
+  onBlocked?: () => void;
 }) {
   /**
    * Andar wala hissa band hote hi UNMOUNT ho jaata hai.
@@ -52,11 +62,19 @@ export function OtpModal(props: {
   return (
     <Modal
       transparent
+      statusBarTranslucent
       animationType="fade"
       visible={props.visible}
       onRequestClose={props.onClose}
     >
-      {props.visible && <OtpBody {...props} />}
+      {props.visible && (
+        <OtpBody
+          phone={props.phone}
+          onClose={props.onClose}
+          onVerified={props.onVerified}
+          onBlocked={props.onBlocked}
+        />
+      )}
     </Modal>
   );
 }
@@ -65,10 +83,12 @@ function OtpBody({
   phone,
   onClose,
   onVerified,
+  onBlocked,
 }: {
   phone: string;
   onClose: () => void;
   onVerified: () => void;
+  onBlocked?: () => void;
 }) {
   const tc = useColors();
   const styles = useStyles();
@@ -93,6 +113,9 @@ function OtpBody({
       expired: t.errExpired,
       failed: t.errFailed,
       network: t.errNetwork,
+      cooldown: t.errCooldown,
+      too_many: t.errTooMany,
+      blocked: t.errBlockedCountry,
     })[e];
 
   // Mount hote hi: animation + pehla SMS.
@@ -108,8 +131,10 @@ function OtpBody({
     void sendPhoneOtp(phone)
       .then((err) => {
         if (!alive) return;
-        if (err) setError(message(err));
-        else setNote(t.otpSent);
+        if (err) {
+          setError(message(err));
+          if (err === "too_many") onBlocked?.();
+        } else setNote(t.otpSent);
       })
       .finally(() => {
         if (alive) setSending(false);
@@ -155,11 +180,16 @@ function OtpBody({
     setCode("");
     const err = await sendPhoneOtp(phone);
     setSending(false);
-    if (err) setError(message(err));
-    else {
-      setNote(t.otpSent);
-      setLeft(RESEND_AFTER);
+    if (err) {
+      setError(message(err));
+      if (err === "too_many") onBlocked?.();
+      // Server ne "abhi-abhi bheja hai" kaha — button ko dobara zinda mat
+      // dikhao, warna user usi diwaar se baar-baar takrata rahega.
+      if (err === "cooldown") setLeft(RESEND_AFTER);
+      return;
     }
+    setNote(t.otpSent);
+    setLeft(RESEND_AFTER);
   }
 
   return (
@@ -245,7 +275,9 @@ function OtpBody({
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    // Theme-aware parda. Pehle yahan ek hardcoded rgba tha jo dark mode me
+    // gehre page par bilkul dikhta hi nahi tha.
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: 18,

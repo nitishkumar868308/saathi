@@ -59,3 +59,77 @@ export function phoneTakenByOther(userId: string, phone: string): Promise<boolea
 export function markPhoneVerified(userId: string, phone: string): Promise<string> {
   return rpc<string>("mark_phone_verified", { p_user: userId, p_phone: phone });
 }
+
+/* ───────────────────────── apna khud ka OTP ───────────────────────── */
+
+/**
+ * Neeche wale dono bhi `security definer` RPC hain aur sirf service_role ko
+ * mile hain (`supabase/phone-otp.sql`). App ko `phone_otp` table ka raasta
+ * bilkul nahi milna chahiye — warna wo apna hi hash padh ke aage badh sakti
+ * hai, aur poora OTP bekaar ho jaata hai.
+ */
+
+export type OtpIssue =
+  | { status: "ok"; ttl: number }
+  | { status: "cooldown" | "too_many"; retry_after: number }
+  | { status: "invalid" };
+
+/**
+ * Naya OTP jaari karo — hadd jaanchte hue.
+ *
+ * Rate-limit / cooldown / fraud, teenon ka faisla DB me hota hai (code me
+ * nahi), kyunki Vercel par har serverless instance ki apni memory hoti hai aur
+ * in-memory counter alag-alag instance par ja ke patla ho jaata hai. OTP par ye
+ * do tarah se mehnga hai: har SMS ka daam, aur 6 ank ki brute-force.
+ */
+export function otpIssue(
+  userId: string,
+  phone: string,
+  codeHash: string,
+  ip: string | null,
+  country: string | null,
+): Promise<OtpIssue> {
+  return rpc<OtpIssue>("otp_issue", {
+    p_user: userId,
+    p_phone: phone,
+    p_hash: codeHash,
+    p_ip: ip,
+    p_country: country,
+  });
+}
+
+/** 'ok' | 'wrong' | 'expired' | 'locked' | 'none' */
+export function otpCheck(
+  userId: string,
+  phone: string,
+  codeHash: string,
+): Promise<string> {
+  return rpc<string>("otp_check", {
+    p_user: userId,
+    p_phone: phone,
+    p_hash: codeHash,
+  });
+}
+
+export type OtpStatus = {
+  blocked: boolean;
+  sent_hour: number;
+  sent_day: number;
+  per_hour: number;
+  per_day: number;
+};
+
+/** Is user ne kitne SMS mangwaye aur hadd kya hai — admin ke faisle ke liye. */
+export function otpStatus(userId: string): Promise<OtpStatus> {
+  return rpc<OtpStatus>("otp_status", { p_user: userId });
+}
+
+/**
+ * Admin: is user ki OTP ginti saaf karo.
+ *
+ * Lautata hai kitni rows ginti se hataayi gayi. Rows delete nahi hoti — sirf
+ * `ignored` lagta hai, taaki fraud dekhne ke liye itihaas bacha rahe.
+ */
+export function otpResetUser(userId: string): Promise<number> {
+  return rpc<number>("otp_reset_user", { p_user: userId });
+}

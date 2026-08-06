@@ -96,7 +96,7 @@ export function DocCard({
               hitSlop={8}
               style={({ pressed }) => [styles.iconBtn, styles.iconDanger, pressed && styles.iconPressed]}
             >
-              <Ionicons name="trash-outline" size={17} color="#B23B3B" />
+              <Ionicons name="trash-outline" size={17} color={tc.danger} />
             </Pressable>
           </View>
         </View>

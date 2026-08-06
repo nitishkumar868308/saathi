@@ -32,6 +32,7 @@ import { markFirstReminder } from "@/lib/reviews";
 import { reliabilityPromptShown } from "@/lib/reliability";
 import { PermissionModal } from "@/components/permission-modal";
 import { VoiceButton } from "@/components/voice-button";
+import { ReminderAskModal, type AskSlot } from "@/components/reminder-ask-modal";
 import { useToast } from "@/components/toast";
 import { emitDataChanged } from "@/lib/data-events";
 
@@ -44,6 +45,19 @@ type AiParse = {
   everyDays: number | null;
   until: string | null;
 };
+
+/** Parse ke baad kya-kya baaki reh gaya — isi tarteeb me poochha jaata hai. */
+function missingSlots(
+  title: string,
+  date: Date | null,
+  minutes: number | null,
+): AskSlot[] {
+  const out: AskSlot[] = [];
+  if (!title.trim()) out.push("what");
+  if (!date) out.push("day");
+  if (minutes == null) out.push("time");
+  return out;
+}
 
 function isSameDay(a: Date, b: Date) {
   return (
@@ -86,6 +100,14 @@ export default function AddReminder() {
   }>();
 
   const [title, setTitle] = useState(typeof prefill === "string" ? prefill : "");
+  /**
+   * `title` ki taaza copy, render ke bahar padhne ke liye.
+   *
+   * Voice ke do transcript pass-pass aa sakte hain; tab tak `title` state
+   * purani hoti hai aur pehla tukda merge me kho jaata hai. Ref usi tick me
+   * taaza rehta hai.
+   */
+  const titleRef = useRef(typeof prefill === "string" ? prefill : "");
   // Saaf title (AI se bharta hai, user badal sakta hai).
   const [subject, setSubject] = useState("");
   // User ne title khud chhua? Tab AI usse overwrite na kare.
@@ -133,13 +155,49 @@ export default function AddReminder() {
   /** Abhi jo sawaal hawa me hai — Save use dobara nahi bhejta, usi ka intezaar karta hai. */
   const inflight = useRef<{ text: string; p: Promise<AiParse | null> } | null>(null);
 
+  /**
+   * Saathi khud poochhe — jo baat text me nahi mili.
+   *
+   * ⚠️ Pehle aisa kuch tha hi nahi. AI jo samajh paata wo bhar deta tha, aur jo
+   * nahi samajh paata wo bas khaali khaana ban ke pada reh jaata tha. User ke
+   * liye iska matlab seedha "AI kuch karta hi nahi" tha — kyunki uske hisse ka
+   * kaam kabhi ghata hi nahi. Ab Saathi baaki baat ek popup me ek-ek karke
+   * poochta hai.
+   */
+  const [askSlots, setAskSlots] = useState<AskSlot[]>([]);
+  /**
+   * Popup khud se ek hi baar khulta hai.
+   *
+   * Bina iske wo har parse ke baad dobara khul jaata — user "Rehne do" dabata
+   * aur wo turant wapas aa jaata. Save dabane par ye phir se khul sakta hai
+   * (wahan user ne khud maanga hai), isliye Save use reset kar deta hai.
+   */
+  const askedOnce = useRef(false);
+
   // Text khaali ho to samajh bhi khaali.
   useEffect(() => {
     if (!title.trim()) {
       setAi(null);
       lastText.current = "";
+      // Naya text = naya mauka. Warna ek baar "Rehne do" dabane ke baad Saathi
+      // us screen par dobara kabhi nahi poochta.
+      askedOnce.current = false;
     }
   }, [title]);
+
+  /**
+   * AI text samajh hi nahi paaya — wajah ke hisaab se saaf baat kaho.
+   *
+   * ⚠️ Pehle yahan bilkul sannata tha: `parseReminderAI` null lautata tha aur
+   * screen kuch nahi kehti thi. Patli patti chalti, ruk jaati, aur bas. Net
+   * band hona, Gemini ka bhara hona aur AI ka na samajh paana — teenon bilkul
+   * ek jaise dikhte the.
+   */
+  function tellWhyAiFailed(kind: "offline" | "busy" | "server" | "slow") {
+    if (kind === "offline") toast.show(a.aiOffline, "info");
+    else if (kind === "busy" || kind === "slow") toast.show(a.aiBusy, "info");
+    else toast.show(a.aiFailed, "info");
+  }
 
   /** Ek text ko AI se samjho, aur agar ye aakhri sawaal hai to screen par laga do. */
   function parseText(text: string): Promise<AiParse | null> {
@@ -150,8 +208,14 @@ export default function AddReminder() {
     setParsing(true);
     const p = (async (): Promise<AiParse | null> => {
       try {
-        const r = await parseReminderAI(text, locale);
-        if (!r) return null; // net/AI fail — pickers se user khud bhar sakta hai
+        const res = await parseReminderAI(text, locale);
+        if (!res.ok) {
+          // Net/AI fail — pickers se user khud bhar sakta hai, par ab use
+          // pata rahega ki hua kya.
+          if (mine === seq.current) tellWhyAiFailed(res.failure);
+          return null;
+        }
+        const r = res.data;
         let date: Date | null = null;
         let minutes: number | null = null;
         if (r.remind_at) {
@@ -186,6 +250,30 @@ export default function AddReminder() {
     })();
     inflight.current = { text, p };
     return p;
+  }
+
+  /**
+   * Samjho, aur jo na samjha wo turant poochho.
+   *
+   * Ye sirf un jagahon se chalta hai jahan user ki baat POORI ho chuki hai —
+   * awaaz ka transcript aane par, ya keyboard band hone par. Har keystroke ke
+   * debounce par nahi: wahan popup keyboard se ladta hai aur likhna namumkin
+   * ho jaata hai.
+   */
+  async function parseThenAsk(text: string) {
+    const parsed = await parseText(text);
+    if (askedOnce.current) return;
+    // AI samajh hi nahi paaya — wajah pehle hi toast me ja chuki hai. Uske
+    // upar popup daalna sirf gussa dilata hai.
+    if (!parsed) return;
+    const gaps = missingSlots(
+      titleTouched.current ? subject : parsed.title,
+      pickedDate ?? parsed.date,
+      pickedMinutes ?? parsed.minutes,
+    );
+    if (gaps.length === 0) return;
+    askedOnce.current = true;
+    setAskSlots(gaps);
   }
 
   // AI — typing rukne ke baad ek baar. Yahi ek jagah hai jahan se samajh aati hai.
@@ -287,10 +375,22 @@ export default function AddReminder() {
     }
   }
 
-  async function save() {
+  /**
+   * Save — dono raaston ka ek hi darwaza.
+   *
+   * `over` sirf tab aata hai jab Saathi ke popup ne abhi-abhi jawab liye hain.
+   * Wo jawab `setPickedDate`/`setSubject` me bhi jaate hain, par React state us
+   * tick me purani hoti hai — isliye save ko wo seedhe bhi mil jaate hain,
+   * warna popup bharne ke turant baad Save phir wahi "kis din?" poochta.
+   */
+  async function saveWith(over?: {
+    title?: string;
+    date?: Date;
+    minutes?: number;
+  }) {
     if (saving) return;
     const raw = title.trim();
-    if (!raw && !subject.trim()) return toast.show(a.whatLabel, "info");
+    if (!raw && !subject.trim() && !over?.title) return toast.show(a.whatLabel, "info");
 
     /**
      * Save dabane se PEHLE Saathi ko wo text zaroor dekh lena chahiye.
@@ -306,38 +406,65 @@ export default function AddReminder() {
      * jaise hain — pehle samjho, phir save karo.
      */
     let parsed = ai;
-    if (raw.length >= 3 && lastText.current !== raw) {
-      parsed = (await parseText(raw)) ?? ai;
-    } else if (inflight.current) {
-      // Jawab pehle se raaste me hai — nayi call mat karo, usi ka intezaar karo.
-      parsed = (await inflight.current.p) ?? ai;
+    // Popup se aaya hua save: text to Saathi pehle hi dekh chuka hai (popup
+    // usi ke baad khula tha), isliye dobara AI call karna sirf der karega.
+    if (!over) {
+      if (raw.length >= 3 && lastText.current !== raw) {
+        setSaving(true);
+        try {
+          parsed = (await parseText(raw)) ?? ai;
+        } finally {
+          setSaving(false);
+        }
+      } else if (inflight.current) {
+        // Jawab pehle se raaste me hai — nayi call mat karo, usi ka intezaar karo.
+        setSaving(true);
+        try {
+          parsed = (await inflight.current.p) ?? ai;
+        } finally {
+          setSaving(false);
+        }
+      }
     }
 
     // Await ke baad render wale `final*` purane pad chuke hain — yahan hamesha
     // abhi-abhi mili samajh se hi hisaab lagao.
-    // User ne title khud likha ho to wahi sabse upar. Warna abhi-abhi mila AI
-    // ka saaf title — `subject` me abhi purani (adhoore text wali) samajh pada
-    // ho sakta hai, kyunki `setSubject` is await ke baad hi asar dikhata hai.
+    // Tarteeb: popup ka abhi-abhi liya jawab sabse upar, phir user ka apna
+    // likha title, phir AI ka saaf title.
     const useTitle =
+      over?.title?.trim() ||
       (titleTouched.current ? subject.trim() : "") ||
       parsed?.title?.trim() ||
       subject.trim() ||
       raw;
-    const useDate = pickedDate ?? parsed?.date ?? null;
-    const useMinutes = pickedMinutes ?? parsed?.minutes ?? null;
+    const useDate = over?.date ?? pickedDate ?? parsed?.date ?? null;
+    const useMinutes = over?.minutes ?? pickedMinutes ?? parsed?.minutes ?? null;
     const useEvery = parsed?.everyDays ?? null;
     const useUntil = parsed?.until ?? null;
     const useWhen = useDate && useMinutes != null ? combine(useDate, useMinutes) : null;
 
-    if (!useTitle) return toast.show(a.askWhat, "info");
-    if (!useDate) return toast.show(a.askDay, "info");
-    if (useMinutes == null) {
-      toast.show(a.pickTime, "info");
-      openTimePicker();
+    /**
+     * Kuch baaki hai — Saathi khud poochh lega.
+     *
+     * ⚠️ Pehle yahan teen alag toast the ("Ye reminder kis cheez ke liye
+     * hai?", "Kis din yaad dilau?", "Time chuno") aur time wale par native
+     * picker khul jaata tha. Wo teeno halaat me bura tha: toast do second me
+     * gayab ho jaata hai, usme jawab dene ki koi jagah nahi hoti, aur agar do
+     * cheezein missing hon to user ko do baar Save dabana padta tha — har baar
+     * ek nayi shikayat sunne ke liye. Ab ek hi popup saari baaki baatein
+     * ek-ek karke poochta hai, aur `onDone` seedha save chala deta hai.
+     */
+    const gaps = missingSlots(useTitle, useDate, useMinutes);
+    if (gaps.length > 0) {
+      askedOnce.current = true;
+      setAskSlots(gaps);
       return;
     }
+
     if (!useWhen || useWhen.getTime() <= Date.now()) {
       toast.show(a.pastError, "error");
+      // Beeta hua time ek hi aisi soorat hai jahan sirf time badalna hai —
+      // poora popup kholna yahan zyada hai.
       openTimePicker();
       return;
     }
@@ -415,10 +542,11 @@ export default function AddReminder() {
       if (e instanceof ReminderLimitError) {
         toast.show(a.limitReached, "info");
         router.replace("/upgrade" as never);
-      } else if (reportIfNetwork(e, "save", save)) {
+      } else if (reportIfNetwork(e, "save", () => void saveWith(over))) {
         // Net ki dikkat — popup khud "dobara koshish karo" de raha hai. Toast
         // dikhana bekaar hai; user ko lagta tha reminder ban gaya aur ban hi
-        // nahi paaya (item 12).
+        // nahi paaya (item 12). Retry me `over` saath jaata hai, warna popup me
+        // bhare hue jawab dobari koshish par gayab ho jaate.
       } else {
         reportError(e, { screen: "add-reminder", action: "save" });
         toast.show(a.title + " ✕", "error");
@@ -426,6 +554,11 @@ export default function AddReminder() {
     } finally {
       setSaving(false);
     }
+  }
+
+  /** Save button ka seedha raasta — bina kisi popup-jawab ke. */
+  function save() {
+    void saveWith();
   }
 
   return (
@@ -455,19 +588,38 @@ export default function AddReminder() {
           <View style={styles.inputRow}>
             <TextInput
               value={title}
-              onChangeText={setTitle}
+              onChangeText={(v) => {
+                titleRef.current = v;
+                setTitle(v);
+              }}
               // Keyboard band karte hi samajh shuru — 600ms ka intezaar tab
-              // bekaar hai jab user likhna khatam kar hi chuka hai.
+              // bekaar hai jab user likhna khatam kar hi chuka hai. Aur yahi
+              // wo lamha hai jab user ki baat POORI ho chuki hai, isliye jo
+              // baaki reh gaya wo Saathi yahin poochh leta hai.
               onBlur={() => {
                 const t = title.trim();
-                if (t.length >= 3 && lastText.current !== t) void parseText(t);
+                if (t.length >= 3) void parseThenAsk(t);
               }}
               placeholder={a.whatPlaceholder}
               placeholderTextColor={tc.inkSoft}
               style={styles.input}
               multiline
             />
-            <VoiceButton onText={(txt) => setTitle((p) => (p ? p + " " + txt : txt))} />
+            <VoiceButton
+              onText={(txt) => {
+                // Transcript aa gaya = poori baat aa gayi. Yahan 600ms ka
+                // intezaar karne ka koi matlab nahi — turant samjho aur jo
+                // baaki reh gaya wo poochho.
+                //
+                // Merge `titleRef` se hota hai, `title` state se nahi: do
+                // transcript pass-pass aa jaayein to state abhi purani hoti
+                // hai aur pehla tukda kho jaata hai.
+                const merged = titleRef.current ? titleRef.current + " " + txt : txt;
+                titleRef.current = merged;
+                setTitle(merged);
+                if (merged.trim().length >= 3) void parseThenAsk(merged.trim());
+              }}
+            />
           </View>
           <Text style={styles.hint}>🎤 {a.micHint}</Text>
 
@@ -642,6 +794,35 @@ export default function AddReminder() {
           aate hi wo khaane apne aap bhar jaate hain. Uska ishaara upar ki patli
           patti deti hai. */}
       <LoaderOverlay visible={saving} />
+
+      {/* Jo Saathi na samajh paaya, wo yahin poochh leta hai — ek-ek karke. */}
+      <ReminderAskModal
+        visible={askSlots.length > 0}
+        slots={askSlots}
+        knownTitle={titleTouched.current ? subject : (ai?.title ?? subject)}
+        knownDate={finalDate}
+        knownMinutes={finalMinutes}
+        onCancel={() => setAskSlots([])}
+        onDone={(ans) => {
+          setAskSlots([]);
+          // Jawab screen par bhi chipak jaate hain — popup band hone ke baad
+          // user ko wo dikhna chahiye, aur badalna bhi aasaan rahe.
+          if (ans.title != null) {
+            titleTouched.current = true;
+            setSubject(ans.title);
+          }
+          if (ans.date) setPickedDate(ans.date);
+          if (ans.minutes != null) setPickedMinutes(ans.minutes);
+          // Saara khaana bhar chuka hai — ab user ko dobara Save dabane ke
+          // liye majboor karna bekaar hai. `saveWith` seedha inhi taaza
+          // value par chalta hai (state abhi purani hai).
+          void saveWith({
+            title: ans.title,
+            date: ans.date,
+            minutes: ans.minutes,
+          });
+        }}
+      />
 
       <PermissionModal
         visible={permModal}

@@ -82,6 +82,14 @@ export default function ProfileDetails() {
    */
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
   const [otpOpen, setOtpOpen] = useState(false);
+  /**
+   * OTP ki hadd poori ho chuki hai — naya code ab nahi ja sakta.
+   *
+   * Modal ke bahar rakha hai jaan-boojh ke: modal band hote hi uska error
+   * gayab ho jaata tha aur user ko phir wahi "Verify karo" button dikhta tha
+   * jo har baar fail hota. Ab note screen par tika rehta hai.
+   */
+  const [otpBlocked, setOtpBlocked] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -371,6 +379,41 @@ export default function ProfileDetails() {
                   <Ionicons name="checkmark-circle" size={17} color={tc.sage} />
                   <Text style={styles.verifiedText}>{t.verified}</Text>
                 </View>
+              ) : otpBlocked ? (
+                /**
+                 * OTP ki hadd poori — is user ko ab support se reset karwana
+                 * hoga.
+                 *
+                 * ⚠️ Ye note yahan (modal ke BAHAR) hai, aur yahi iska poora
+                 * matlab hai. Pehle ye baat sirf modal ke andar ek error line
+                 * thi: modal band karte hi wo gayab, aur user ko phir wahi
+                 * "Verify karo" button dikhta jo har baar fail hota tha — bina
+                 * ye bataye ki ab karna kya hai. Wo baar-baar dabata rehta tha
+                 * (aur har dabaav ek aur fail). Ab agla kadam saaf likha hai
+                 * aur ek tap door hai.
+                 */
+                <View style={styles.blockedBox}>
+                  <View style={styles.blockedHead}>
+                    <Ionicons name="alert-circle" size={17} color={tc.terracotta} />
+                    <Text style={styles.blockedTitle}>{t.errTooMany}</Text>
+                  </View>
+                  <Text style={styles.blockedNote}>{t.otpBlockedNote}</Text>
+                  <Pressable
+                    onPress={() =>
+                      router.push({
+                        pathname: "/support",
+                        // Subject pehle se bhara hua jaata hai — user ko apni
+                        // dikkat likhni hi nahi padti, aur admin ko har aisi
+                        // ticket ek hi shakal me milti hai (dhoondhne me aasan).
+                        params: { subject: t.otpBlockedSubject },
+                      } as never)
+                    }
+                    style={({ pressed }) => [styles.verifyBtn, pressed && { opacity: 0.85 }]}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={15} color={tc.white} />
+                    <Text style={styles.verifyBtnText}>{t.otpBlockedCta}</Text>
+                  </Pressable>
+                </View>
               ) : (
                 <View style={styles.verifyBox}>
                   <Text style={styles.verifyWhy}>{t.verifyWhy}</Text>
@@ -438,8 +481,10 @@ export default function ProfileDetails() {
         visible={otpOpen}
         phone={normalized}
         onClose={() => setOtpOpen(false)}
+        onBlocked={() => setOtpBlocked(true)}
         onVerified={() => {
           setOtpOpen(false);
+          setOtpBlocked(false);
           // Server ne is number ko is user ke naam par likh diya hai — screen
           // ka status usi wakt sudhar jaana chahiye, save dabane ka intezaar
           // kiye bina.
@@ -543,6 +588,21 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.terracotta,
   },
   verifyBtnText: { fontSize: 13.5, fontWeight: "800", color: c.white },
+  /**
+   * "Hadd poori ho gayi" wala note — verifyBox se thoda gehra, taaki ye ek
+   * roka hua raasta lage, ek aur suggestion nahi.
+   */
+  blockedBox: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.45)",
+    backgroundColor: "rgba(194,90,55,0.12)",
+    padding: 13,
+  },
+  blockedHead: { flexDirection: "row", alignItems: "center", gap: 7 },
+  blockedTitle: { flex: 1, fontSize: 13.5, fontWeight: "800", color: c.ink },
+  blockedNote: { marginTop: 7, fontSize: 12.5, lineHeight: 19, color: c.inkSoft },
   err: { marginTop: 6, fontSize: 13, color: c.terracotta, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

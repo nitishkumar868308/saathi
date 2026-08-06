@@ -99,7 +99,7 @@ export function ReviewPrompt() {
   if (!visible) return null;
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onLater}>
+    <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={onLater}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           {thanks ? (
@@ -174,7 +174,7 @@ export function ReviewPrompt() {
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: 26,

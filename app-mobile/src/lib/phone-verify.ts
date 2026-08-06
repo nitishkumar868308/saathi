@@ -6,9 +6,19 @@ import { WEB_URL } from "./plan";
  *
  * ⚠️ Poora kaam server par hota hai, app me nahi — aur ye jaan-boojh ke hai.
  * OTP app me banaya ja sakta tha (aur bahut jagah banaya jaata hai), par tab wo
- * app ke andar hi kahin hota, yaani use padha ja sakta hai. Yahan app ko OTP
- * kabhi dikhta hi nahi: wo Twilio Verify ke paas rehta hai, aur app sirf ye
- * poochti hai ki "user ne jo daala wo sahi tha kya".
+ * app ke andar hi kahin hota, yaani use padha ja sakta hai: rooted phone, adb
+ * backup, ya ek patched APK me app ka storage saaf dikh jaata hai. Aur jo check
+ * app ke andar hota hai use app ke andar hi bypass kiya ja sakta hai — hamlavar
+ * ko SMS ka intezaar tak nahi karna padta. Poora sawaal hi ye hai ki "kya ye
+ * number sach me is user ka hai", aur uska jawab sirf wahi jagah de sakti hai
+ * jahan user ka haath na pahunche.
+ *
+ * Isliye app ko OTP kabhi dikhta hi nahi: uska hash server ke DB me rehta hai
+ * (`supabase/phone-otp.sql`), aur app sirf ye poochti hai ki "user ne jo daala
+ * wo sahi tha kya".
+ *
+ * ⚠️ Ab OTP apna khud ka hai, Twilio Verify ka nahi (wo har verification par
+ * alag fees leta tha). App ke liye kuch nahi badla — wahi do call, wahi jawab.
  *
  * Isi wajah se `phone_verified_at` bhi app se kabhi nahi likha ja sakta (uski
  * RPC sirf service_role ko mili hai). Warna koi bhi apna number "verified" likh
@@ -25,7 +35,17 @@ export type PhoneError =
   | "wrong_code"
   | "expired"
   | "failed"
-  | "network";
+  | "network"
+  /** 30 second ka thehraav — button khud khul jayega. */
+  | "cooldown"
+  /**
+   * Ghante/din ki hadd poori. `rate_limited` (Twilio ka apna limit) se alag
+   * hai: wahan intezaar kaam aata hai, yahan user ko support se reset
+   * karwana padta hai.
+   */
+  | "too_many"
+  /** Us desh me SMS bhejna abhi chalu nahi hai. */
+  | "blocked";
 
 async function post(path: string, body: unknown): Promise<PhoneError | null> {
   if (!supabase) return "failed";

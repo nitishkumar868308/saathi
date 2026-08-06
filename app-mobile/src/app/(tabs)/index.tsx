@@ -480,7 +480,10 @@ const useStyles = makeStyles((c) => ({
   briefCard: {
     marginTop: 20,
     borderRadius: 24,
-    backgroundColor: c.ink,
+    // ⚠️ `c.ink` NAHI. Wo text ka rang hai aur dark theme me ULTA (lagbhag
+    // safed) ho jaata hai — card cream ka ban jaata tha aur uspar cream text
+    // bilkul gayab. `inkCard` dono theme me gehra rehta hai.
+    backgroundColor: c.inkCard,
     padding: 20,
   },
   briefTag: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -495,7 +498,7 @@ const useStyles = makeStyles((c) => ({
     marginTop: 10,
     fontSize: 15.5,
     lineHeight: 23,
-    color: "rgba(247,242,233,0.9)",
+    color: c.onInk,
   },
   briefUpsell: {
     flexDirection: "row",
@@ -504,13 +507,13 @@ const useStyles = makeStyles((c) => ({
     marginTop: 14,
     paddingTop: 13,
     borderTopWidth: 1,
-    borderTopColor: "rgba(247,242,233,0.16)",
+    borderTopColor: c.onInkLine,
   },
   briefUpsellText: {
     flex: 1,
     fontSize: 12.5,
     lineHeight: 17,
-    color: "rgba(247,242,233,0.72)",
+    color: c.onInkSoft,
   },
   briefUpsellCta: {
     flexDirection: "row",

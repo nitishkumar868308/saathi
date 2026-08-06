@@ -1,76 +1,131 @@
 /**
  * Loader system (web) — app wale jaisa hi feel.
  *
- * Soch: ghoomta spinner "dheema" lagta hai. Isliye teen dots ki tez lehar,
- * aur content ke liye Skeleton (page ka shape turant dikh jaata hai).
+ * Ek hi loader har jagah: app, web aur admin. App wala
+ * `app-mobile/src/components/loader.tsx` me hai — dono ko saath me badalna.
  */
 
 /**
- * BrandLoader — Saathi ka apna logo saans leta hai, peeche naram teal ripple
- * ring phailti hai, aur beech-beech ek dil upar tairta hai. App wale loader
- * jaisa bilkul same (ek hi loader har jagah — app, web, admin).
- * Chhota (button) size par sirf saans-leta logo; bade par ring + dil bhi.
+ * BrandLoader — logo apni jagah par (center me) halke se saans leta hai, aur
+ * uske PEECHE se "Apka Saathi" sarak ke bahar aata hai, thoda ruk ke wapas
+ * logo ke peeche chhup jaata hai.
+ *
+ * ⚠️ Logo ke liye `/icon-256.png` — `/logo-128.png` NAHI. logo-128 ke andar
+ * "Apka Saathi" pehle se baked hai, to us par ye animation do baar naam dikha
+ * deti (ek chipka hua, ek sarakta hua). icon-256 saaf mark hai.
+ *
+ * ⚠️ Logo ke peeche wali teal ripple-ring (circle) jaan-boojh ke hata di gayi
+ * hai, wapas mat laana — wo dhyaan logo se hata leti thi aur har page ke bg
+ * par apna alag rang dikhati thi.
+ *
+ * ── Naam "peeche se" kaise nikalta hai ──────────────────────────────────
+ *
+ * Do cheezein milke:
+ *
+ *   1. Logo ki image OPAQUE hai (teal square) aur `z-index` me upar hai — jo
+ *      text uske x-range me hai wo apne aap dhak jaata hai.
+ *   2. Logo ke baaye wala hissa `.sa-window` kaat deti hai (`overflow: hidden`,
+ *      jiska baayan kinara theek logo ke baaye kinare par hai).
+ *
+ * `translateX(-100%)` element ki APNI chaudai jitna khiskata hai — yaani us
+ * haalat me naam ka daayan kinara theek logo ke daaye kinare par baithta hai,
+ * to naam poora ya logo ke neeche hai ya khidki ke bahar. Bilkul gayab. Wahan
+ * se wo daaye sarakta hai — "logo ke peeche se nikalta hua".
+ *
+ * `.sa-window` absolute hai, isliye layout me jagah nahi leti: LOGO HAMESHA
+ * CENTER ME RAHTA HAI, naam bahar aane par bhi khiskta nahi.
+ *
+ * Responsive: `size` sirf upper bound hai. Asli size `clamp()` se aata hai —
+ * chhoti screen par loader apne aap chhota ho jaata hai, kabhi viewport se
+ * bahar nahi nikalta. Naam/gap sab `em` me hain, to size ke saath khud scale
+ * karte hain — koi alag breakpoint nahi chahiye.
+ *
+ * Rang: naam `text-ink` par hai, jo dono theme me apne aap ulta ho jaata hai
+ * (globals.css ke CSS variables) — light page par gehra, dark par ujla.
  */
 export default function Loader({
   size = 48,
   label,
+  brand,
 }: {
   size?: number;
   label?: string;
+  /** Logo ke peeche se brand ka naam bhi nikale. Bade (full-screen) loader par. */
+  brand?: boolean;
   /** compatibility — ab use nahi hota (logo apne rang laata hai). */
   color?: string;
 }) {
-  const halo = size >= 40;
-  const radius = Math.round(size * 0.3);
-  const heart = Math.round(size * 0.28);
-  const up = Math.round(size * 0.55);
+  // Chhoti screens par size ko viewport ke hisaab se sikodo. Floor = 60% of
+  // requested (ya 24px, jo bada ho) taaki button loader gayab na ho jaye.
+  const min = Math.max(24, Math.round(size * 0.6));
+  const box = `clamp(${min}px, ${(size / 3.9).toFixed(2)}vmin, ${size}px)`;
+  const showName = brand ?? size >= 56;
 
   return (
     <div className="flex flex-col items-center justify-center gap-3">
       <span
         role="status"
         aria-label={label || "Loading"}
-        style={{ position: "relative", width: size, height: size, display: "inline-block" }}
+        className="sa-box"
+        style={{ ["--sa-box" as string]: box }}
       >
-        {halo && (
-          <>
-            <span className="sa-ring" style={{ width: size, height: size, borderRadius: radius }} />
-            <span className="sa-ring sa-ring2" style={{ width: size, height: size, borderRadius: radius }} />
-          </>
-        )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="sa-logo"
-          src="/logo-128.png"
-          alt={label || "Loading"}
-          width={size}
-          height={size}
-          style={{ width: size, height: size, borderRadius: radius, position: "relative", display: "block" }}
-        />
-        {halo && (
-          <span className="sa-heart" style={{ width: heart, height: heart, marginLeft: -heart / 2, color: "#C25A37" }}>
-            <svg viewBox="0 0 24 24" width={heart} height={heart} fill="currentColor" aria-hidden>
-              <path d="M12 21s-7.5-4.9-10-9.4C.4 8.2 2 5 5.2 5c2 0 3.3 1.2 3.8 2.2C9.5 6.2 10.8 5 12.8 5 16 5 17.6 8.2 16 11.6 13.5 16.1 12 21 12 21z" />
-            </svg>
+        {showName && (
+          <span className="sa-window" aria-hidden>
+            <span className="sa-name text-ink">Apka Saathi</span>
           </span>
         )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="sa-logo" src="/icon-256.png" alt={label || "Loading"} width={256} height={256} />
       </span>
-      {label ? <span className="text-sm font-semibold text-ink-soft">{label}</span> : null}
+      {label ? <span className="text-center text-sm font-semibold text-ink-soft">{label}</span> : null}
       <style>{`
-        @keyframes sa-breathe { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.06); } }
-        @keyframes sa-ripple  { 0%{ transform: scale(.95); opacity:.22; } 100%{ transform: scale(1.85); opacity:0; } }
-        @keyframes sa-float {
-          0%,32%  { opacity:0; transform: translateX(-50%) translateY(0) scale(.4); }
-          46%,60% { opacity:1; transform: translateX(-50%) translateY(-${up}px) scale(1); }
-          82%,100%{ opacity:0; transform: translateX(-50%) translateY(-${up + 8}px) scale(.6); }
+        @keyframes sa-breathe { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.05); } }
+        @keyframes sa-reveal {
+          /* chhupa (logo ke peeche) -> bahar -> ruko -> wapas peeche */
+          /* .67em yahan naam ke apne font-size (.24 box) par hai = ~.16 box —
+             app wale GAP_RATIO ke barabar. */
+          0%, 6%    { transform: translateX(-100%); }
+          30%, 68%  { transform: translateX(.67em); }
+          90%, 100% { transform: translateX(-100%); }
         }
-        .sa-logo  { animation: sa-breathe 1.8s ease-in-out infinite; }
-        .sa-ring  { position:absolute; inset:0; background:#125156; z-index:0; animation: sa-ripple 1.8s ease-out infinite; }
-        .sa-ring2 { animation-delay: .9s; }
-        .sa-heart { position:absolute; left:50%; top:50%; z-index:2; animation: sa-float 2.4s ease-in-out infinite; }
+        .sa-box {
+          position: relative;
+          display: inline-block;
+          width: var(--sa-box);
+          height: var(--sa-box);
+          font-size: var(--sa-box);   /* har child em me — size ke saath scale */
+          line-height: 0;
+        }
+        .sa-logo {
+          position: relative; z-index: 2;   /* naam iske PEECHE se nikalta hai */
+          width: 100%; height: 100%;
+          border-radius: .3em;
+          display: block;
+          animation: sa-breathe 1.8s ease-in-out infinite;
+          will-change: transform;
+        }
+        /* Khidki ka baayan kinara = logo ka baayan kinara. Daayi taraf udaar
+           chaudai, taaki naam poora bahar aa sake. */
+        .sa-window {
+          position: absolute; left: 0; top: 0; z-index: 1;
+          height: 100%; width: 400%;
+          overflow: hidden;
+          display: flex; align-items: center;
+          pointer-events: none;
+        }
+        .sa-name {
+          position: absolute; left: 25%;   /* = 100% of .sa-box (window 4x hai) */
+          white-space: nowrap;
+          font-size: .24em; font-weight: 800; letter-spacing: .012em;
+          line-height: 1.1;
+          animation: sa-reveal 2.8s cubic-bezier(.4,0,.2,1) infinite;
+          will-change: transform;
+        }
         @media (prefers-reduced-motion: reduce) {
-          .sa-logo, .sa-ring, .sa-heart { animation: none; }
-          .sa-ring { opacity: 0; }
+          .sa-logo { animation: none; }
+          /* Naam chhupa hi rehne do — warna wo logo ke bagal me chipka hua
+             dikhta hai, jo animation ke bina bekaar lagta hai. */
+          .sa-name { animation: none; transform: translateX(-100%); }
         }
       `}</style>
     </div>

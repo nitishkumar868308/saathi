@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { appUserId } from "@/lib/app-auth";
-import { checkOtp, verifyConfigured } from "@/lib/verify";
 import { logServerError } from "@/lib/errors-server";
-import { isE164, markPhoneVerified } from "@/lib/phone";
+import { isE164, markPhoneVerified, otpCheck } from "@/lib/phone";
+import { hashCode, otpConfigured } from "@/lib/otp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,12 +15,18 @@ export const dynamic = "force-dynamic";
  * check karti aur phir alag se "mera number verified likh do" bhejti, to wo
  * doosri call akeli bhi bheji ja sakti thi — bina kisi OTP ke. Poora
  * verification usi ek chhed se bekaar ho jaata.
+ *
+ * ⚠️ Milaan DB me hota hai (`otp_check`), yahan nahi — aur app me to bilkul
+ * nahi. Ek hi statement me `attempts` badhta hai aur hash milta hai, isliye
+ * ek saath aayi 50 requests bhi ginti se bach nahi sakti. Code kabhi is
+ * process me plain shakal me nahi aata: user ka bheja hua code seedha hash
+ * banta hai aur hash hi DB jaata hai.
  */
 export async function POST(request: Request) {
   const userId = await appUserId(request);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (!verifyConfigured()) {
+  if (!otpConfigured()) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -29,8 +35,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     phone = String(body?.phone ?? "").trim();
-    // Log space/dash daal dete hain ("123 456") — wo Twilio ke liye galat code
-    // ban jaata hai. Sirf ank rakhna user ki ek bekaar "galat code" bacha deta.
+    // Log space/dash daal dete hain ("123 456") — wo hash ko poori tarah badal
+    // deta hai. Sirf ank rakhna user ki ek bekaar "galat code" bacha deta hai.
     code = String(body?.code ?? "").replace(/\D/g, "");
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
@@ -39,17 +45,33 @@ export async function POST(request: Request) {
   if (!isE164(phone)) return NextResponse.json({ error: "bad_number" }, { status: 400 });
   if (code.length < 4) return NextResponse.json({ error: "wrong_code" }, { status: 400 });
 
-  const res = await checkOtp(phone, code, userId).catch((e) => {
-    void logServerError(e, { where: "phone/verify-otp", step: "twilio" });
-    return { ok: false, reason: "failed" } as const;
-  });
+  let verdict: string;
+  try {
+    verdict = await otpCheck(userId, phone, hashCode(phone, code));
+  } catch (e) {
+    void logServerError(e, { where: "phone/verify-otp", step: "check", userId });
+    return NextResponse.json({ error: "failed" }, { status: 502 });
+  }
 
-  if (!res.ok) {
-    // `expired` ko alag rakhna zaroori hai — user ka code sahi ho sakta hai, bas
-    // 10 minute nikal gaye. App uspar "dobara bhejo" dikhati hai, "galat code"
-    // nahi (jise padh ke user wahi sahi code teen baar daalta rehta tha).
-    const status = res.reason === "failed" ? 502 : 400;
-    return NextResponse.json({ error: res.reason }, { status });
+  if (verdict !== "ok") {
+    /**
+     * Char alag jawab, char alag agla kadam — aur user ko ye farak dikhna
+     * chahiye:
+     *
+     *   wrong   — code galat hai. Dobara daalo.
+     *   expired — code sahi ho sakta hai, bas 10 minute nikal gaye. "Dobara
+     *             bhejo" dabao. (Ise `wrong` bata dene par user apna BILKUL
+     *             SAHI code teen baar daal ke "galat code" padhta rehta tha.)
+     *   locked  — 5 galat koshish ho gayi, ye code ab marr chuka. Naya mangao.
+     *   none    — is number ka koi zinda code hai hi nahi. Bhi naya mangao.
+     */
+    const error =
+      verdict === "wrong"
+        ? "wrong_code"
+        : verdict === "locked"
+          ? "too_many"
+          : "expired";
+    return NextResponse.json({ error }, { status: 400 });
   }
 
   /**

@@ -5,12 +5,17 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { tpl } from "@/lib/i18n/dictionaries";
 import SaathiLogo from "@/components/saathi-logo";
+import { ConfirmModal } from "@/components/confirm-modal";
+import { signOut } from "@/lib/auth";
 import {
   PIN_LENGTH,
   checkPin,
   getLockState,
   markUnlocked,
+  pinAttemptsLeft,
+  resetGrace,
   unlockWithBiometric,
 } from "@/lib/app-lock";
 
@@ -22,21 +27,40 @@ import {
  * peeche PIN hamesha khada rehta hai — ungli na padhe, dhoop me face na chale,
  * ya phone khud PIN maang le, teeno soorat me raasta band nahi hota.
  *
- * ⚠️ Yahan "bhool gaye?" wala koi raasta nahi hai, aur ye jaan-boojh ke hai.
- * PIN sirf is phone par hai — server par uska koi nishaan hi nahi, isliye use
- * "reset" karna bhi kahin se nahi ho sakta. Bhool jaane par asli raasta yahi hai
- * ki app hata ke dobara login karo (Supabase ka account waise ka waisa rehta
- * hai, saara data wapas aa jaata hai). Jhootha "Forgot PIN" button laga dena —
- * jo asal me sirf lock hata deta ho — lock ko dikhawa bana deta.
+ * ⚠️ Yahan koi "Forgot PIN → reset" wala button nahi hai, aur ye jaan-boojh ke
+ * hai. PIN sirf is phone par hai — server par uska koi nishaan hi nahi, isliye
+ * use "reset" karne ka koi tareeka ho hi nahi sakta. Aur ek aisa button jo asal
+ * me sirf lock hata deta ho, lock ko poora dikhawa bana deta: jiske haath phone
+ * lagta wo bas wahi button dabata.
+ *
+ * Iski jagah ek IMAANDAAR raasta hai — Logout. Wo lock hatata nahi, wo session
+ * hi khatam kar deta hai: uske baad login screen aati hai, aur bina email/Google
+ * ke andar kuch nahi dikhta. Asli user apne hi account se dobara login karke
+ * saara data wapas paa leta hai; kisi aur ke liye wo button bekaar hai. Pehle
+ * yahan kuch bhi nahi tha aur PIN bhoolne wale ko app UNINSTALL karni padti thi.
  */
 export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   const tc = useColors();
   const styles = useStyles();
-  const { lock: l } = useT();
+  const { lock: l, common: c } = useT();
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [bioOn, setBioOn] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [askSignOut, setAskSignOut] = useState(false);
+  /** Brute-force rok ka baaki intezaar (second). 0 = koi rok nahi. */
+  const [wait, setWait] = useState(0);
+
+  // Intezaar ki ulti ginti — user ko dikhna chahiye ki kab tak rukna hai,
+  // warna wo baar-baar wahi PIN daalta rehta hai aur kuch hota nahi dikhta.
+  useEffect(() => {
+    if (wait <= 0) return;
+    const id = setTimeout(() => {
+      const next = pinAttemptsLeft();
+      setWait(next.blocked ? next.waitSeconds : 0);
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
 
   function done() {
     markUnlocked();
@@ -66,20 +90,50 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     setChecking(true);
     const ok = await checkPin(value);
     setChecking(false);
+    setPin("");
     if (ok) {
       done();
       return;
     }
+    // Ye koshish hadd paar kar gayi? Tab rok ka message dikhao, "PIN galat"
+    // nahi — user ko pata hona chahiye ki ab wo daal hi nahi sakta.
+    const st = pinAttemptsLeft();
+    if (st.blocked) {
+      setWait(st.waitSeconds);
+      setError(null);
+      return;
+    }
     setError(l.wrongPin);
-    setPin("");
   }
 
   function onChange(v: string) {
+    // Rok chal rahi hai — kuch type hi mat hone do.
+    if (wait > 0) return;
     const digits = v.replace(/\D/g, "").slice(0, PIN_LENGTH);
     setPin(digits);
     if (error) setError(null);
     // Poore ank aate hi khud check — 4 ank ke baad "OK" dabwana ek bekaar tap hai.
     if (digits.length === PIN_LENGTH) void submit(digits);
+  }
+
+  /**
+   * Logout — PIN bhool jaane ka imaandaar raasta.
+   *
+   * `resetGrace()` zaroori hai: uske bina purani "abhi-abhi khola tha" wali
+   * haalat memory me padi reh jaati aur agla user bina lock ke andar aa jaata.
+   */
+  async function doSignOut() {
+    setAskSignOut(false);
+    setChecking(true);
+    try {
+      resetGrace();
+      await signOut();
+    } catch {
+      // Net na ho to bhi local session chala jaata hai — AuthProvider ise
+      // pakad ke login screen par bhej dega.
+    } finally {
+      setChecking(false);
+    }
   }
 
   return (
@@ -109,9 +163,13 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
           ))}
         </Pressable>
 
-        {!!error && <Text style={styles.err}>{error}</Text>}
+        {wait > 0 ? (
+          <Text style={styles.err}>{tpl(l.tooManyPin, { s: wait })}</Text>
+        ) : (
+          !!error && <Text style={styles.err}>{error}</Text>
+        )}
 
-        {bioOn && (
+        {bioOn && wait === 0 && (
           <Pressable
             onPress={() =>
               void unlockWithBiometric(l.biometricPrompt, l.enterPin).then(
@@ -124,7 +182,30 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
             <Text style={styles.bioText}>{l.useBiometric}</Text>
           </Pressable>
         )}
+
+        {/* PIN bhool gaye ka ek hi imaandaar raasta — logout. Ye lock hatata
+            nahi, session khatam karta hai: uske baad login screen aati hai
+            aur bina account ke andar kuch nahi dikhta. */}
+        <Pressable
+          onPress={() => setAskSignOut(true)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.forgot, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.forgotText}>{l.signOutInstead}</Text>
+        </Pressable>
       </View>
+
+      <ConfirmModal
+        visible={askSignOut}
+        title={l.signOutAsk}
+        message={l.signOutBody}
+        confirmLabel={l.signOutAsk}
+        cancelLabel={c.cancel}
+        icon="log-out-outline"
+        destructive
+        onConfirm={() => void doSignOut()}
+        onCancel={() => setAskSignOut(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -161,4 +242,12 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: "rgba(194,90,55,0.07)",
   },
   bioText: { fontSize: 14, fontWeight: "700", color: c.terracotta },
+  forgot: { marginTop: 26, paddingVertical: 6, paddingHorizontal: 10 },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: c.inkSoft,
+    textAlign: "center",
+    textDecorationLine: "underline",
+  },
 }));

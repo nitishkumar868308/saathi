@@ -1,16 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Gift, Save, UserPlus, SlidersHorizontal } from "lucide-react";
+import { Gift, Save, UserPlus, SlidersHorizontal, MessageSquare } from "lucide-react";
 import Loader from "@/components/Loader";
 import { useAdminT, atpl } from "@/lib/i18n/admin";
 
-// Plus ka daam ab Pricing section me (country-wise). Yahan sirf referral + free limits.
+// Plus ka daam ab Pricing section me (country-wise). Yahan referral + free
+// limits + SMS OTP ki haddein.
 type Config = {
   referrals_enabled: boolean;
   referral_days: number;
   free_reminders: number;
   free_documents: number;
+
+  /**
+   * SMS OTP ki haddein — `supabase/phone-otp.sql` inhe `app_config` se padhta
+   * hai, isliye yahan badalte hi live lag jaati hain.
+   *
+   * ⚠️ Ye number seedha paise se jude hain: har OTP ek SMS hai. Badhane se
+   * pehle Admin > Spend dekh lena. Aur inhe bahut chhota rakhne par asli users
+   * phans jaate hain (naya phone, purana number, do-teen galat try) — us soorat
+   * ke liye har user ka apna reset Support ticket ke saath maujood hai.
+   */
+  otp_cooldown_seconds: number;
+  otp_ttl_seconds: number;
+  otp_per_hour: number;
+  otp_per_day: number;
+  otp_ip_per_day: number;
+  otp_max_attempts: number;
 };
 
 type Stats = {
@@ -24,6 +41,13 @@ const DEFAULTS: Config = {
   referral_days: 15,
   free_reminders: 5,
   free_documents: 3,
+  // Yahi default SQL me bhi hain (`otp_limits()`) — dono jagah ek jaise rakhna.
+  otp_cooldown_seconds: 30,
+  otp_ttl_seconds: 600,
+  otp_per_hour: 5,
+  otp_per_day: 15,
+  otp_ip_per_day: 40,
+  otp_max_attempts: 5,
 };
 
 const label = "block text-xs font-semibold uppercase tracking-wide text-ink-soft";
@@ -162,6 +186,54 @@ export default function AdminRewards() {
               onChange={(e) => setCfg({ ...cfg, free_documents: Number(e.target.value) })}
             />
           </div>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-terracotta px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-terracotta-dark disabled:opacity-60"
+          >
+            {saving ? <Loader size={18} /> : <Save size={15} />}
+            {saving ? t.common.saving : t.common.save}
+          </button>
+          {msg && <span className="text-sm text-ink-soft">{msg}</span>}
+        </div>
+      </div>
+
+      {/* SMS OTP ki haddein.
+          Har OTP ek SMS hai, yaani seedha paisa — isliye ye admin ke haath me
+          hain, code me nahi. Pehle ye SQL me hardcoded the aur badalne ke liye
+          har baar migration chalani padti thi. */}
+      <div className="rounded-2xl border border-line bg-surface p-5">
+        <div className="flex items-center gap-2">
+          <MessageSquare size={17} className="text-terracotta" />
+          <h3 className="font-display text-lg font-semibold">{d.otpTitle}</h3>
+        </div>
+        <p className="mt-1.5 text-sm text-ink-soft">{d.otpSub}</p>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {(
+            [
+              ["otp_cooldown_seconds", d.otpCooldown],
+              ["otp_ttl_seconds", d.otpTtl],
+              ["otp_per_hour", d.otpPerHour],
+              ["otp_per_day", d.otpPerDay],
+              ["otp_ip_per_day", d.otpIpPerDay],
+              ["otp_max_attempts", d.otpMaxAttempts],
+            ] as const
+          ).map(([key, text]) => (
+            <div key={key}>
+              <label className={label}>{text}</label>
+              <input
+                type="number"
+                min={1}
+                className={input}
+                value={cfg[key]}
+                onChange={(e) => setCfg({ ...cfg, [key]: Number(e.target.value) })}
+              />
+            </div>
+          ))}
         </div>
 
         <div className="mt-5 flex items-center gap-3">

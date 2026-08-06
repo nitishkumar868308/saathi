@@ -11,6 +11,56 @@ export const lightColors = {
   sage: "#7C8A6B",
   line: "#E5DBC9",
   white: "#FFFFFF",
+  /**
+   * Modal/loader ke peeche ka parda.
+   *
+   * ⚠️ Ye dono theme me GEHRA hi rehta hai, ulta nahi hota — parde ka kaam
+   * peeche wali screen ko dabana hai, uska rang copy karna nahi. Light theme
+   * par cream page ke upar 45% garam-kaala kaafi hai.
+   *
+   * Dark theme me iski value ALAG hai (colors.ts me neeche dekho): wahan page
+   * khud gehra hai, to 45% ka parda dikhta hi nahi tha — user ko lagta tha app
+   * ne uska tap suna hi nahi, aur wo dobara dabata tha.
+   */
+  scrim: "rgba(46,40,35,0.45)",
+
+  /* ── "Ulta" highlight card ──────────────────────────────────────────
+   *
+   * Wo gehra card jisme ujla text hota hai — home ka "Aaj ka brief", profile ka
+   * "Saathi Plus", upgrade ka price card, permission modal ka header.
+   *
+   * ⚠️ Ye teen token isliye bane kyunki bina inke ek saaf bug tha, aur wo
+   * SIRF dark mode me dikhta tha. Card ka background `c.ink` se aata tha aur
+   * uska text hardcoded `rgba(247,242,233,0.9)` (cream) tha. Light theme me ye
+   * theek chalta hai — `ink` gehra bhoora hai, uspar cream text saaf padhta
+   * hai. Par dark theme me `ink` ULTA ho jaata hai (#F2EAE0, yaani lagbhag
+   * safed) — aur text ab bhi cream hi rehta tha. Natija: cream par cream.
+   * Card poora khaali dikhta tha, jaise text load hi na hua ho. (Screenshot me
+   * "Aaj ka brief" aur profile ka "Saathi Plus" dono aise hi gayab the.)
+   *
+   * Ab card ka apna rang hai jo dono theme me GEHRA rehta hai, aur uska text
+   * dono theme me UJLA. `ink` ka is card se koi lena-dena nahi.
+   */
+  /** Highlight card ka background — dono theme me gehra. */
+  inkCard: "#2E2823",
+  /** Us card par ka mukhya text. */
+  onInk: "#F7F2E9",
+  /** Us card par ka halka/doosre darje ka text. */
+  onInkSoft: "rgba(247,242,233,0.72)",
+  /** Us card ke andar ki lakeer. */
+  onInkLine: "rgba(247,242,233,0.16)",
+
+  /**
+   * Khatre ka rang — delete, logout, "ye wapas nahi aayega".
+   *
+   * ⚠️ Ye poore app me `#B23B3B` hardcoded pada tha (settings, reminders,
+   * doc-card, toast, confirm-modal, status). Light theme par wo theek hai —
+   * cream #F7F2E9 par 5.1:1. Par dark page #1A1714 par wahi rang sirf 3.4:1
+   * par gir jaata hai, jo aam text ke liye AA se neeche hai: "Delete" jaisa
+   * sabse zaroori shabd hi sabse kam padha jaata tha. Dark me isliye halka
+   * ujla shade (#E06B6B, 5.9:1).
+   */
+  danger: "#B23B3B",
 } as const;
 
 export type Colors = { -readonly [K in keyof typeof lightColors]: string };
@@ -50,6 +100,25 @@ export const darkColors: Colors = {
   sage: "#9DAE8A",
   line: "#3A322B",
   white: "#FFFFFF",
+  // Light theme se kaafi gehra. Page khud #1A1714 hai; 45% wala parda uspar
+  // bilkul nahi dikhta tha, yaani "app abhi busy hai" ka koi ishaara hi nahi
+  // jaata tha. 72% par peeche ka content dab jaata hai aur parda saaf padhta hai.
+  scrim: "rgba(8,6,5,0.72)",
+
+  /**
+   * Dark theme me card page se THODA UJLA hai, gehra nahi.
+   *
+   * Page khud #1A1714 hai. Usse aur gehra card banane par wo dikhta hi nahi —
+   * highlight card ka poora matlab hi yahi hai ki wo baaki page se alag dikhe.
+   * #332C26 page se saaf upar uthta hai aur uspar cream text ab bhi 11:1 se
+   * upar padhta hai.
+   */
+  inkCard: "#332C26",
+  onInk: "#F2EAE0",
+  onInkSoft: "rgba(242,234,224,0.72)",
+  onInkLine: "rgba(242,234,224,0.16)",
+  // Light wala #B23B3B gehre page par 3.4:1 par gir jaata hai (AA se neeche).
+  danger: "#E06B6B",
 };
 
 export type ColorKey = keyof Colors;

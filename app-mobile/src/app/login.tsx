@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
+import { useRouter } from "expo-router";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
@@ -40,6 +41,7 @@ function referralFromUrl(url: string | null): string | null {
 export default function Login() {
   const tc = useColors();
   const styles = useStyles();
+  const router = useRouter();
   const toast = useToast();
   const offers = useOffers();
   const { login: l, deviceOwner: d } = useT();
@@ -226,6 +228,28 @@ export default function Login() {
             </Pressable>
           </View>
 
+          {/**
+           * "Password bhool gaye?" — sirf login par.
+           *
+           * ⚠️ Ye link pehle tha hi nahi, aur uska matlab ye tha ki email se
+           * bana account password bhoolte hi HAMESHA ke liye band ho jaata
+           * tha. Google wale phir bhi andar aa jaate the; email wale apne hi
+           * documents aur reminders se bahar khade reh jaate the, aur support
+           * bhi kuch nahi kar sakta tha (password Supabase ke paas hashed hai,
+           * hum use dekh hi nahi sakte).
+           *
+           * Signup par nahi dikhata — wahan abhi koi password hai hi nahi.
+           */}
+          {mode === "login" && (
+            <Pressable
+              onPress={() => router.push("/forgot-password" as never)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.forgot, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.forgotText}>{l.forgot}</Text>
+            </Pressable>
+          )}
+
           {/* referral code (signup only, optional; referrals band ho to nahi) */}
           {mode === "signup" && offers.referralsEnabled && (
             <>
@@ -335,6 +359,8 @@ const useStyles = makeStyles((c) => ({
   },
   optional: { fontWeight: "500", color: c.inkSoft },
   refHint: { marginTop: 8, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
+  forgot: { alignSelf: "flex-end", marginTop: 10, paddingVertical: 4 },
+  forgotText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
   input: {
     borderRadius: 16,
     borderWidth: 1,

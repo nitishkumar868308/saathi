@@ -136,7 +136,7 @@ export async function setPin(pin: string): Promise<void> {
 /** Lock poori tarah band — PIN, salt aur biometric ki setting, teeno. */
 export async function disableLock(): Promise<void> {
   await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY)]);
-  unlockedAt = 0;
+  resetGrace();
 }
 
 export async function setBiometricOn(on: boolean): Promise<void> {
@@ -145,10 +145,72 @@ export async function setBiometricOn(on: boolean): Promise<void> {
 
 /* ------------------------------ unlock ------------------------------- */
 
+/**
+ * Galat PIN ki ginti — brute-force ki rok.
+ *
+ * ⚠️ Iske bina lock lagbhag dikhawa tha. PIN 4 ank ka hai, yaani sirf 10,000
+ * sambhavnaayein, aur check poori tarah local aur turant hai — koi network nahi,
+ * koi der nahi. Jis kisi ke haath phone lag jaye wo aaram se baith ke saare
+ * combination try kar sakta tha; 10,000 tap bahut lagte hain par ye ek insaan
+ * ke liye bhi ek shaam ka kaam hai, aur wo bhi bina kisi rok-tok ke.
+ *
+ * Ab har 5 galat koshish ke baad intezaar badhta jaata hai. Ye asli user ko
+ * mushkil se chhoota hai (wo aksar pehli ya doosri baar me sahi daalta hai) par
+ * brute-force ko poori tarah bekaar kar deta hai: 10,000 koshishon me ghanton
+ * nahi, dinon lag jaate hain.
+ *
+ * Memory me hai, storage me nahi — soch samajh ke. Storage me rakhne par ek
+ * hamlavar app ka data clear karke ginti reset kar sakta tha (aur app data
+ * clear karne se PIN bhi chala jaata, yaani wo raasta waise bhi lock hata deta
+ * hai). Memory me hone ka matlab hai ki app poori tarah band karke ginti reset
+ * ho sakti hai — par uske liye har 5 koshish par app restart karni padegi, jo
+ * apne aap me ek badi rok hai.
+ */
+const MAX_TRIES = 5;
+/** Har 5 galat koshish ke baad: 30s, 60s, 2m, 4m… (aakhir me 15 min par ruk). */
+const LOCKOUT_STEPS_MS = [30_000, 60_000, 120_000, 240_000, 480_000, 900_000];
+
+let wrongTries = 0;
+let lockoutRound = 0;
+let lockedUntil = 0;
+
+/** Abhi PIN daala ja sakta hai? Nahi to kitne second baad. */
+export function pinAttemptsLeft(): { blocked: boolean; waitSeconds: number; left: number } {
+  const now = Date.now();
+  if (lockedUntil > now) {
+    return {
+      blocked: true,
+      waitSeconds: Math.ceil((lockedUntil - now) / 1000),
+      left: 0,
+    };
+  }
+  return { blocked: false, waitSeconds: 0, left: MAX_TRIES - wrongTries };
+}
+
 export async function checkPin(pin: string): Promise<boolean> {
+  // Intezaar chal raha hai — koshish ginte bhi nahi, warna hamlavar lagatar
+  // bhej ke ginti aage badhata rehta aur asli user aur lamba phansta.
+  if (pinAttemptsLeft().blocked) return false;
+
   const [saved, salt] = await Promise.all([get(PIN_KEY), get(SALT_KEY)]);
   if (!saved || !salt) return false;
-  return (await hashPin(pin, salt)) === saved;
+  const ok = (await hashPin(pin, salt)) === saved;
+
+  if (ok) {
+    wrongTries = 0;
+    lockoutRound = 0;
+    lockedUntil = 0;
+    return true;
+  }
+
+  wrongTries += 1;
+  if (wrongTries >= MAX_TRIES) {
+    const step = LOCKOUT_STEPS_MS[Math.min(lockoutRound, LOCKOUT_STEPS_MS.length - 1)];
+    lockedUntil = Date.now() + step;
+    lockoutRound += 1;
+    wrongTries = 0;
+  }
+  return false;
 }
 
 /**
@@ -176,24 +238,110 @@ export async function unlockWithBiometric(prompt: string, fallbackLabel: string)
 
 /* ------------------------------- grace ------------------------------- */
 //
-// Ye jaan-boojh ke sirf memory me hai, storage me nahi. App poori tarah band
-// hoke dobara khule to `unlockedAt` 0 hi hota hai — yaani lock lagta hai. Isse
-// storage me rakhne par phone band karke kholne par bhi khidki chalti rehti,
+// Ye sab jaan-boojh ke sirf memory me hai, storage me nahi. App poori tarah
+// band hoke dobara khule to sab 0 se shuru hota hai — yaani lock lagta hai.
+// Storage me rakhne par phone band karke kholne par bhi khidki chalti rehti,
 // jo lock ka matlab hi kam kar deta.
 
-let unlockedAt = 0;
+/** Ek baar bhi khula tha is session me? */
+let unlocked = false;
+/** App background me kab gaya (0 = abhi saamne hai). */
+let leftAt = 0;
+/**
+ * Kitne "jaan-boojh ke bahar jaane wale" kaam abhi chal rahe hain.
+ *
+ * Ginti hai, boolean nahi: camera khulte waqt hi share sheet bhi khul sakti
+ * hai, aur pehle wale ka `end` doosre ki chhoot chheen leta.
+ */
+let interludes = 0;
 
 /** Abhi-abhi khola tha — dobara mat poocho. */
 export function markUnlocked(): void {
-  unlockedAt = Date.now();
+  unlocked = true;
+  leftAt = 0;
+}
+
+/**
+ * App background me chala gaya — ghadi ab se chalegi.
+ *
+ * ⚠️ **Yahi wo cheez thi jiske bina lock "apne aap" lag jaata tha.** Pehle
+ * khidki `unlockedAt` (yaani KHOLNE ke waqt) se naapi jaati thi. Iska matlab
+ * ye tha ki khidki tab bhi kat rahi hoti thi jab user app ke andar hi kaam kar
+ * raha ho. Nateeja bilkul wahi tha jo shikayat me hai:
+ *
+ *   User ne subah lock khola, 5 minute documents dekhe, phir document ki photo
+ *   lene camera kholi (10 second) — aur wapas aate hi lock. Kyunki 5 minute 10
+ *   second > 60 second. Usne app chhodi hi nahi thi.
+ *
+ * AI ka kaam aur bhi bura tha: scan ke liye gallery/camera kholna, phir jawab
+ * ka intezaar — beech me app kai baar background me jaati hai, aur har baar
+ * lock.
+ *
+ * Ab ghadi tabhi chalti hai jab app SACH ME bahar ho. Andar bitaya gaya waqt
+ * kabhi ginti me nahi aata.
+ */
+export function markBackgrounded(): void {
+  // Jaan-boojh ke bahar gaye hain (camera / share / browser) — ye "chhodna"
+  // nahi hai. Ghadi shuru hi mat karo.
+  if (interludes > 0) return;
+  if (leftAt === 0) leftAt = Date.now();
 }
 
 /** Background se wapas aane par: lock dikhana hai ya nahi. */
 export function needsUnlock(): boolean {
-  return Date.now() - unlockedAt > GRACE_MS;
+  // Is session me kabhi khola hi nahi (app abhi-abhi chali hai) — lock lagega.
+  if (!unlocked) return true;
+  // Koi jaan-boojh ke bahar jaane wala kaam abhi chal raha hai — kabhi nahi.
+  if (interludes > 0) {
+    leftAt = 0;
+    return false;
+  }
+  if (leftAt === 0) return false;
+  const away = Date.now() - leftAt;
+  leftAt = 0;
+  return away > GRACE_MS;
+}
+
+/**
+ * "Main jaan-boojh ke app se bahar bhej raha hoon — is par lock mat lagana."
+ *
+ * Camera, gallery, share sheet, PDF viewer, browser (payment) — in sab me app
+ * background me jaati hai, par user ne app CHHODI nahi hai; app hi use bahar
+ * bhej rahi hai. In par lock lagana user ko apne hi kaam ke beech me rok dena
+ * hai, aur wahi sabse zyada chidhata hai.
+ *
+ * ⚠️ Hamesha `finally` me `endTrustedInterlude()` bulana — warna ginti kabhi
+ * 0 par nahi aayegi aur lock us session me poori tarah band ho jayega.
+ */
+export function beginTrustedInterlude(): void {
+  interludes += 1;
+  leftAt = 0;
+}
+
+export function endTrustedInterlude(): void {
+  interludes = Math.max(0, interludes - 1);
+  // Bahar jaane wala kaam khatam. Ghadi ab se — na ki tab se jab camera khuli
+  // thi. Warna lamba scan khatam hote hi lock lag jaata.
+  leftAt = 0;
+}
+
+/**
+ * Camera/share/browser jaisa koi kaam — uske dauraan lock nahi lagta.
+ *
+ * Isse lapetna sabse surakshit tareeka hai: `finally` bhoolna namumkin hai.
+ */
+export async function withoutLock<T>(work: () => Promise<T>): Promise<T> {
+  beginTrustedInterlude();
+  try {
+    return await work();
+  } finally {
+    endTrustedInterlude();
+  }
 }
 
 /** Logout par sab bhool jao — agla user purani khidki me na ghus jaye. */
 export function resetGrace(): void {
-  unlockedAt = 0;
+  unlocked = false;
+  leftAt = 0;
+  interludes = 0;
 }

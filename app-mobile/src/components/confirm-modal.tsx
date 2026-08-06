@@ -44,10 +44,10 @@ export function ConfirmModal({
     }).start();
   }, [visible, scale]);
 
-  const accent = destructive ? "#B23B3B" : tc.terracotta;
+  const accent = destructive ? tc.danger : tc.terracotta;
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+    <Modal statusBarTranslucent transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
       <Pressable style={styles.backdrop} onPress={onCancel}>
         <Animated.View style={{ transform: [{ scale }], width: "100%", maxWidth: 360 }}>
           <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
@@ -80,7 +80,7 @@ export function ConfirmModal({
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: 28,

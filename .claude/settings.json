@@ -377,7 +377,12 @@
       "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const c=JSON.parse\\(s\\);const r=c.rules||{};for\\(const k of Object.keys\\(r\\)\\) if\\(k.includes\\('rules-of-hooks'\\)||k.includes\\('exhaustive-deps'\\)\\) console.log\\(k,'=',JSON.stringify\\(r[k]\\)\\);}\\)\")",
       "Bash(perl -0pi -e 's|\\(        <Analytics />\\)|        <ThemeFab />\\\\n$1|; s|\\(import PageTracker from \"\\\\@/components/PageTracker\";\\)|$1\\\\nimport ThemeFab from \"\\\\@/components/ThemeFab\";|' app/layout.tsx)",
       "Bash(perl -0pi -e 's|          <ThemeToggle />\\\\n          <LanguageSwitcher />|          <LanguageSwitcher />|g; s|import ThemeToggle from \"\\\\@/components/ThemeToggle\";\\\\n||' components/SubHeader.tsx)",
-      "Bash(perl -0pi -e 's|          <ThemeToggle />\\\\n          <LanguageSwitcher />|          <LanguageSwitcher />|; s|                <ThemeToggle />\\\\n                <LanguageSwitcher />|                <LanguageSwitcher />|; s|import ThemeToggle from \"\\\\@/components/ThemeToggle\";\\\\n||' components/AdminDashboard.tsx)"
+      "Bash(perl -0pi -e 's|          <ThemeToggle />\\\\n          <LanguageSwitcher />|          <LanguageSwitcher />|; s|                <ThemeToggle />\\\\n                <LanguageSwitcher />|                <LanguageSwitcher />|; s|import ThemeToggle from \"\\\\@/components/ThemeToggle\";\\\\n||' components/AdminDashboard.tsx)",
+      "Bash(python \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/0ace4f5c-ba2d-4dca-bdc9-2489af854e40/scratchpad/comment_verify.py\")",
+      "Bash(sed -i 's/^  modal: {\\\\n    flex: 1,//' src/components/phone-field.tsx)",
+      "Bash(grep -E \"^D:\\\\\\\\\\\\\\\\my-app|voice-button|loader|bottom-sheet|reminder-ask|phone-field|add-reminder|otp-modal|profile-details|theme-fab\")",
+      "Bash(grep -A 8 \"reminder-ask-modal.tsx$\")",
+      "Bash(timeout 560 npx next build)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { appUserId } from "@/lib/app-auth";
-import { sendOtp, verifyConfigured } from "@/lib/verify";
 import { logServerError } from "@/lib/errors-server";
-import { isE164, phoneTakenByOther } from "@/lib/phone";
+import { isE164, otpIssue, phoneTakenByOther } from "@/lib/phone";
+import { countryOf, generateCode, hashCode, otpConfigured, sendOtpSms } from "@/lib/otp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,14 +13,23 @@ export const dynamic = "force-dynamic";
  * Number BODY se aata hai (user abhi type kar raha hai, wo abhi DB me hai bhi
  * nahi), par user ki pehchaan hamesha TOKEN se — kabhi body se nahi.
  *
- * Jawab me kabhi OTP nahi jaata (na ja sakta hai — Twilio Verify use hume bhi
- * nahi batata). App sirf itna jaanti hai ki SMS chala gaya.
+ * Jawab me kabhi OTP nahi jaata. Ye ab bhi utna hi sach hai jitna Twilio Verify
+ * ke zamane me tha: code sirf SMS me aur uska hash DB me jaata hai; na response
+ * me, na kisi header me, na log me.
+ *
+ * ⚠️ Tarteeb jaan-boojh ke aisi hai — pehle DB, phir SMS:
+ *
+ *   1. hadd jaancho + code likho  (`otp_issue`)
+ *   2. SMS bhejo                   (`sendOtpSms`)
+ *
+ * Ulta karne par ek fail hue insert ke baad SMS ja chuka hota, aur user ke paas
+ * ek aisa code hota jo verify hi nahi ho sakta — sabse uljhan wali soorat.
  */
 export async function POST(request: Request) {
   const userId = await appUserId(request);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (!verifyConfigured()) {
+  if (!otpConfigured()) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -56,7 +65,49 @@ export async function POST(request: Request) {
     void logServerError(e, { where: "phone/send-otp", step: "taken check" });
   }
 
-  const res = await sendOtp(phone, userId).catch((e) => {
+  const country = countryOf(phone);
+  const code = generateCode();
+
+  /**
+   * Hadd + code, dono ek hi DB call me.
+   *
+   * Rate-limit DB me hai, memory me nahi — Vercel par har serverless instance
+   * ki apni memory hoti hai, aur tez-tez requests alag-alag instance par ja ke
+   * in-memory counter ko patla kar deti hain. OTP par ye do tarah se mehnga
+   * hai: har SMS ka daam, aur 6 ank ki brute-force.
+   */
+  let issued;
+  try {
+    issued = await otpIssue(userId, phone, hashCode(phone, code), clientIp(request), country);
+  } catch (e) {
+    void logServerError(e, { where: "phone/send-otp", step: "issue", userId });
+    return NextResponse.json({ error: "failed" }, { status: 500 });
+  }
+
+  if (issued.status === "cooldown") {
+    return NextResponse.json(
+      { error: "cooldown", retryAfter: issued.retry_after },
+      { status: 429, headers: { "Retry-After": String(issued.retry_after) } },
+    );
+  }
+  if (issued.status === "too_many") {
+    /**
+     * Aaj/is ghante ki hadd poori. Ye `cooldown` se ALAG jawab hai, aur ye
+     * farak zaroori hai: cooldown 30 second ka intezaar hai, par yahan
+     * intezaar karne ko kehna jhooth hoga — user ko sach me madad chahiye.
+     * App is par profile me "support me ticket raise karo" wali line dikhati
+     * hai, aur admin ek button se uski ginti reset kar deta hai.
+     */
+    return NextResponse.json(
+      { error: "too_many", retryAfter: issued.retry_after },
+      { status: 429, headers: { "Retry-After": String(issued.retry_after) } },
+    );
+  }
+  if (issued.status !== "ok") {
+    return NextResponse.json({ error: "failed" }, { status: 500 });
+  }
+
+  const res = await sendOtpSms(phone, code, issued.ttl, userId).catch((e) => {
     void logServerError(e, { where: "phone/send-otp", step: "twilio" });
     return { ok: false, reason: "failed" } as const;
   });
@@ -64,9 +115,41 @@ export async function POST(request: Request) {
   if (!res.ok) {
     // 429 sirf rate-limit par — app usi par "thodi der baad" wali baat dikhati
     // hai. Baaki sab 502: dikkat hamari taraf hai, user ke number me nahi.
-    const status = res.reason === "bad_number" ? 400 : res.reason === "rate_limited" ? 429 : 502;
+    const status =
+      res.reason === "bad_number" || res.reason === "blocked"
+        ? 400
+        : res.reason === "rate_limited"
+          ? 429
+          : 502;
     return NextResponse.json({ error: res.reason }, { status });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, retryAfter: cooldownHint(issued.ttl) });
+}
+
+/**
+ * App ke countdown ke liye.
+ *
+ * Ye asli hadd nahi hai (wo DB me hai) — sirf ek ishara hai taaki button turant
+ * dobara zinda na dikhe. Asli faisla hamesha server ka hai; app ka countdown
+ * khatam hone par bhi server `cooldown` de sakta hai aur app usse maan leti hai.
+ */
+function cooldownHint(ttlSeconds: number): number {
+  // TTL 600s hai aur cooldown 30s — ttl se seedha nikalna galat hoga. 30 hi
+  // bhejte hain; server ka jawab hamesha upar rehta hai.
+  void ttlSeconds;
+  return 30;
+}
+
+/**
+ * Request kis "jagah" se aayi — fraud ginti ke liye.
+ *
+ * Vercel `x-forwarded-for` bharta hai; sabse pehla hissa asli client hota hai.
+ * Kuch na mile to null — tab IP wali ginti lagti hi nahi (usse behtar hai ki
+ * sab ek hi bucket me daal ke asli users ko block kar diya jaye).
+ */
+function clientIp(request: Request): string | null {
+  const fwd = request.headers.get("x-forwarded-for") ?? "";
+  const first = fwd.split(",")[0]?.trim();
+  return first || request.headers.get("x-real-ip") || null;
 }

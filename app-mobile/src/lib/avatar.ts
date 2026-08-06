@@ -1,5 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 
+import { withoutLock } from "./app-lock";
 import { supabase } from "./supabase";
 import { uploadFile, fileSizeBytes } from "./storage";
 
@@ -20,12 +21,16 @@ export async function pickAndUploadAvatar(): Promise<string | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) throw new Error("Gallery permission chahiye");
 
-  const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: "images",
-    allowsEditing: true,
-    aspect: [1, 1],
-    quality: 0.85,
-  });
+  // Gallery app ke bahar khulti hai — us dauraan app lock nahi lagna chahiye.
+  // (Photo chun ke crop karne me aaram se ek minute lag jaata hai.)
+  const res = await withoutLock(() =>
+    ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    }),
+  );
   if (res.canceled || !res.assets?.[0]) return null;
   const asset = res.assets[0];
 

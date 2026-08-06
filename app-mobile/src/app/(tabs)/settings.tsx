@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable, Modal } from "react-native";
+import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -8,6 +8,7 @@ import * as Application from "expo-application";
 import { makeStyles, useColors } from "@/theme/theme";
 import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmModal } from "@/components/confirm-modal";
+import { BottomSheet } from "@/components/bottom-sheet";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
@@ -36,9 +37,6 @@ import { reportError } from "@/lib/report-error";
  * har hissa apne heading ke neeche EK card me. Aankh ko teen cheezein dikhti
  * hain, dus nahi.
  */
-
-/** Logout aur delete — dono jagah wahi laal. */
-const DANGER = "#B23B3B";
 
 type RowId =
   | "profile"
@@ -395,7 +393,7 @@ export default function Settings() {
             <Text style={styles.planTitle}>{isPlus ? s.plusActive : s.plusLo}</Text>
             <Text style={styles.planSub}>{isPlus ? s.plusActiveSub : s.plusSub}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="rgba(247,242,233,0.7)" />
+          <Ionicons name="chevron-forward" size={20} color={tc.onInkSoft} />
         </Pressable>
 
         {groups.map((g) => (
@@ -416,11 +414,11 @@ export default function Settings() {
                     <Ionicons
                       name={r.icon}
                       size={18}
-                      color={r.danger ? DANGER : tc.terracotta}
+                      color={r.danger ? tc.danger : tc.terracotta}
                     />
                   </View>
                   <Text
-                    style={[styles.rowLabel, r.danger && { color: DANGER }]}
+                    style={[styles.rowLabel, r.danger && { color: tc.danger }]}
                     numberOfLines={1}
                   >
                     {r.label}
@@ -437,7 +435,7 @@ export default function Settings() {
           onPress={() => setLogoutAsk(true)}
           style={({ pressed }) => [styles.logout, pressed && { opacity: 0.85 }]}
         >
-          <Ionicons name="log-out-outline" size={20} color="#B23B3B" />
+          <Ionicons name="log-out-outline" size={20} color={tc.danger} />
           <Text style={styles.logoutText}>{s.logout}</Text>
         </Pressable>
 
@@ -494,19 +492,14 @@ export default function Settings() {
       {/* Alert kaise sunayi de — ring / vibrate / silent (item 6).
           "Sun ke dekho" jaan-boojh ke hai: awaaz ek aisi cheez hai jise padh ke
           nahi, sun ke hi chuna ja sakta hai. */}
-      <Modal
+      <BottomSheet
         visible={alertOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAlertOpen(false)}
+        title={s.alertMode}
+        subtitle={s.alertModeSub}
+        onClose={() => setAlertOpen(false)}
       >
-        <Pressable style={styles.sheetBackdrop} onPress={() => setAlertOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{s.alertMode}</Text>
-            <Text style={styles.sheetSub}>{s.alertModeSub}</Text>
-
-            {ALERT_MODES.map((m) => {
+        <>
+          {ALERT_MODES.map((m) => {
               const active = alertMode === m;
               const copy = ALERT_COPY[m];
               return (
@@ -539,31 +532,25 @@ export default function Settings() {
               );
             })}
 
-            <Pressable
-              onPress={() => void alertUser()}
-              style={({ pressed }) => [styles.alertTest, pressed && { opacity: 0.85 }]}
-            >
-              <Ionicons name="play" size={16} color={tc.terracotta} />
-              <Text style={styles.alertTestText}>{s.alertTest}</Text>
-            </Pressable>
+          <Pressable
+            onPress={() => void alertUser()}
+            style={({ pressed }) => [styles.alertTest, pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons name="play" size={16} color={tc.terracotta} />
+            <Text style={styles.alertTestText}>{s.alertTest}</Text>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </>
+      </BottomSheet>
 
       {/* Theme picker — light / dark / phone ke hisaab se */}
-      <Modal
+      <BottomSheet
         visible={themeOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setThemeOpen(false)}
+        title={s.theme}
+        subtitle={s.themeSub}
+        onClose={() => setThemeOpen(false)}
       >
-        <Pressable style={styles.sheetBackdrop} onPress={() => setThemeOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{s.theme}</Text>
-            <Text style={styles.sheetSub}>{s.themeSub}</Text>
-
-            {THEME_MODES.map((m) => {
+        <>
+          {THEME_MODES.map((m) => {
               const active = themeMode === m;
               const copy = THEME_COPY[m];
               return (
@@ -585,57 +572,51 @@ export default function Settings() {
                     </Text>
                     <Text style={styles.alertSub}>{copy.sub}</Text>
                   </View>
-                  {active && (
-                    <Ionicons name="checkmark-circle" size={22} color={tc.terracotta} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+                {active && (
+                  <Ionicons name="checkmark-circle" size={22} color={tc.terracotta} />
+                )}
+              </Pressable>
+            );
+          })}
+        </>
+      </BottomSheet>
 
       {/* Bhasha picker */}
-      <Modal
+      <BottomSheet
         visible={langOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLangOpen(false)}
+        title={s.language}
+        subtitle={s.langAlertBody}
+        onClose={() => setLangOpen(false)}
       >
-        <Pressable style={styles.sheetBackdrop} onPress={() => setLangOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>{s.language}</Text>
-            <Text style={styles.sheetSub}>{s.langAlertBody}</Text>
-            {LOCALES.map((l) => {
-              const active = locale === l;
-              return (
-                <Pressable
-                  key={l}
-                  onPress={() => {
-                    setLocale(l);
-                    setLangOpen(false);
-                  }}
-                  style={[styles.langOpt, active && styles.langOptActive]}
-                >
-                  <Text style={[styles.langNative, active && { color: tc.terracotta }]}>
-                    {LOCALE_META[l].native}
-                  </Text>
-                  <Text style={styles.langSub}>{LOCALE_META[l].sub}</Text>
-                  {active && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={22}
-                      color={tc.terracotta}
-                      style={{ marginLeft: "auto" }}
-                    />
-                  )}
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+        <>
+          {LOCALES.map((l) => {
+            const active = locale === l;
+            return (
+              <Pressable
+                key={l}
+                onPress={() => {
+                  setLocale(l);
+                  setLangOpen(false);
+                }}
+                style={[styles.langOpt, active && styles.langOptActive]}
+              >
+                <Text style={[styles.langNative, active && { color: tc.terracotta }]}>
+                  {LOCALE_META[l].native}
+                </Text>
+                <Text style={styles.langSub}>{LOCALE_META[l].sub}</Text>
+                {active && (
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={22}
+                    color={tc.terracotta}
+                    style={{ marginLeft: "auto" }}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -708,7 +689,9 @@ const useStyles = makeStyles((c) => ({
     marginTop: 20,
     borderRadius: 22,
     padding: 16,
-    backgroundColor: c.ink,
+    // ⚠️ `c.ink` NAHI — dark theme me wo ulta ho ke card ko cream bana deta tha
+    // aur uspar ka safed/cream text bilkul gayab ho jaata tha.
+    backgroundColor: c.inkCard,
   },
   planIcon: {
     height: 46,
@@ -719,7 +702,7 @@ const useStyles = makeStyles((c) => ({
     justifyContent: "center",
   },
   planTitle: { fontSize: 15.5, fontWeight: "800", color: c.white },
-  planSub: { marginTop: 2, fontSize: 12.5, color: "rgba(247,242,233,0.65)" },
+  planSub: { marginTop: 2, fontSize: 12.5, color: c.onInkSoft },
 
   group: { marginTop: 26 },
   groupTitle: {
@@ -770,7 +753,7 @@ const useStyles = makeStyles((c) => ({
     borderColor: "rgba(178,59,59,0.3)",
     backgroundColor: "rgba(178,59,59,0.06)",
   },
-  logoutText: { color: "#B23B3B", fontWeight: "700", fontSize: 15 },
+  logoutText: { color: c.danger, fontWeight: "700", fontSize: 15 },
   version: {
     marginTop: 18,
     textAlign: "center",
@@ -778,28 +761,9 @@ const useStyles = makeStyles((c) => ({
     color: c.inkSoft,
   },
 
-  sheetBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(46,40,35,0.5)",
-    justifyContent: "flex-end",
-  },
-  sheet: {
-    backgroundColor: c.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 22,
-    paddingBottom: 34,
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: c.line,
-    marginBottom: 16,
-  },
-  sheetTitle: { fontSize: 20, fontWeight: "800", color: c.ink },
-  sheetSub: { marginTop: 4, fontSize: 13.5, color: c.inkSoft, marginBottom: 14 },
+  // Sheet ka apna chrome (backdrop/handle/title) ab `components/bottom-sheet`
+  // me hai — teenon sheet wahi use karte hain, isliye safe-area, maxHeight aur
+  // theme-aware parda ek hi jagah theek hote hain.
   langOpt: {
     flexDirection: "row",
     alignItems: "center",

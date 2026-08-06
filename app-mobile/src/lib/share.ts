@@ -1,5 +1,6 @@
 import * as Sharing from "expo-sharing";
 
+import { withoutLock } from "./app-lock";
 import { resolveDocUri, type DocFile } from "./doc-cache";
 
 /**
@@ -19,12 +20,19 @@ import { resolveDocUri, type DocFile } from "./doc-cache";
 /** Share ke liye document ka minimum shape — file dhoondhne bhar ka, aur naam. */
 export type Shareable = DocFile & { name: string };
 
-/** Ek document share karo (system share sheet). true = share sheet khul gaya. */
+/**
+ * Ek document share karo (system share sheet). true = share sheet khul gaya.
+ *
+ * ⚠️ `withoutLock` zaroori hai. Share sheet khulte hi app background me chali
+ * jaati hai, aur WhatsApp/Gmail chun ke wapas aane me aaram se ek minute lag
+ * jaata hai. Uske bina user apna document share karke lautta tha aur app lock
+ * maang leti thi — usne app chhodi hi nahi thi, app hi use bahar bhej rahi thi.
+ */
 export async function shareDocument(doc: Shareable): Promise<boolean> {
   if (!(await Sharing.isAvailableAsync())) return false;
   const uri = await resolveDocUri(doc);
   if (!uri) return false;
-  await Sharing.shareAsync(uri, { dialogTitle: doc.name });
+  await withoutLock(() => Sharing.shareAsync(uri, { dialogTitle: doc.name }));
   return true;
 }
 
@@ -34,12 +42,16 @@ export async function shareDocument(doc: Shareable): Promise<boolean> {
  */
 export async function shareDocuments(docs: Shareable[]): Promise<number> {
   if (!(await Sharing.isAvailableAsync())) return 0;
-  let shared = 0;
-  for (const doc of docs) {
-    const uri = await resolveDocUri(doc);
-    if (!uri) continue;
-    await Sharing.shareAsync(uri, { dialogTitle: doc.name });
-    shared++;
-  }
-  return shared;
+  // Poore loop ko ek hi interlude me lapeta hai — beech me app baar-baar bahar
+  // jaayegi, aur har share ke beech lock lagana yahan sabse bura hoga.
+  return withoutLock(async () => {
+    let shared = 0;
+    for (const doc of docs) {
+      const uri = await resolveDocUri(doc);
+      if (!uri) continue;
+      await Sharing.shareAsync(uri, { dialogTitle: doc.name });
+      shared++;
+    }
+    return shared;
+  });
 }

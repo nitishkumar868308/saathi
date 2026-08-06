@@ -89,6 +89,21 @@ export type Dict = {
     /** Awaaz pahunchi hi nahi — bahut door se bola. */
     tooQuiet: string;
     /**
+     * Phone me voice service hai hi nahi (ya band hai).
+     *
+     * `unavailable` se alag: wo "abhi chal nahi paaya" hai, ye "is phone par
+     * setup hi nahi hai" hai. Dono ka ilaaj alag hai, isliye line bhi alag —
+     * warna user baar-baar wahi button dabata rehta hai jo kabhi chalega hi
+     * nahi.
+     */
+    noService: string;
+    /** Recognizer ko internet chahiye tha aur wo nahi mila. */
+    needsNet: string;
+    /** Doosri app (ya Assistant) mic pakde baithi hai. */
+    micBusy: string;
+    /** Ye bhasha is phone ke recognizer me nahi hai. */
+    langMissing: string;
+    /**
      * Button kaise chalta hai — dono tareeke ek line me.
      *
      * Ye likhna zaroori hai: hold-to-talk dikhta nahi hai, aur jo user use
@@ -174,6 +189,30 @@ export type Dict = {
     welcomeBackToast: string;
     somethingWrong: string;
     googleFailed: string;
+
+    /* ── Password bhool gaye ─────────────────────────────────────────
+     *
+     * ⚠️ Ye poora raasta pehle tha hi nahi. Email+password wala user apna
+     * password bhool jaye to app me kahin koi rasta nahi tha — wo hamesha ke
+     * liye apne hi documents se bahar. Support bhi kuch nahi kar sakta tha
+     * (password Supabase ke paas hashed hai).
+     */
+    forgot: string;
+    forgotTitle: string;
+    forgotSub: string;
+    forgotSend: string;
+    /** Jawab hamesha ek jaisa — chahe email register ho ya na ho. */
+    forgotSent: string;
+    forgotBack: string;
+    /** Recovery link se aane ke baad ka screen. */
+    newPassTitle: string;
+    newPassSub: string;
+    newPassLabel: string;
+    newPassPlaceholder: string;
+    newPassConfirm: string;
+    newPassMismatch: string;
+    newPassSave: string;
+    newPassOk: string;
   };
   home: {
     /** {name} */
@@ -245,6 +284,16 @@ export type Dict = {
     saveFailedUseShare: string;
     /** "Renew kaise karein" — expiry ke baad ka asli sawaal. */
     renewOpenSite: string;
+    /**
+     * Is document type ka renewal guide abhi bana hi nahi.
+     *
+     * ⚠️ Pehle aisi soorat me renewal ka poora hissa CHUP-CHAAP gayab ho jaata
+     * tha. User ko expiry ka alert milta, wo document kholta, aur "ab karun
+     * kya?" ka koi jawab hi nahi milta — na guide, na ye baat ki jawab banaya
+     * ja raha hai. Chup rehne se saaf keh dena hamesha behtar hai.
+     */
+    renewSoonTitle: string;
+    renewSoonBody: string;
     renewShowSteps: string;
     renewHideSteps: string;
     /**
@@ -385,6 +434,34 @@ export type Dict = {
     repeatUntil: string;
     repeatForever: string;
     repeatOff: string;
+
+    /* ── Saathi khud poochhe (ask-modal) ───────────────────────────────
+     *
+     * Jo baat text/awaaz me nahi mili, use Saathi popup me ek-ek karke
+     * poochta hai. Pehle wo baatein sirf khaali khaano ki tarah padi rehti
+     * thi aur user ko khud dhoondhni padti thi.
+     */
+    /** Popup ka sirnaam — "{n}" me kitni baatein baaki hain. */
+    askTitleOne: string;
+    askTitleMany: string;
+    /** Har sawaal ke upar: "Saathi ne itna samajha" */
+    askGotIt: string;
+    askNext: string;
+    askFinish: string;
+    /** "Rehne do, main khud bhar lunga" */
+    askManual: string;
+    /** Time ke jhat-pat wale chips. */
+    timeMorning: string;
+    timeNoon: string;
+    timeEvening: string;
+    timeNight: string;
+    /**
+     * AI text samajh hi nahi paaya (net/server) — user ko wajah pata chale.
+     * Pehle ye chup-chaap fail hota tha aur lagta tha AI kuch karta hi nahi.
+     */
+    aiOffline: string;
+    aiBusy: string;
+    aiFailed: string;
   };
   review: {
     title: string;
@@ -409,6 +486,27 @@ export type Dict = {
     failHint: string;
     tryAgain: string;
     later: string;
+
+    /* ── Poori app band, sirf documents (offline screen) ──────────────
+     *
+     * Net na hone par app ka baaki kuch bhi kaam nahi karta — reminder save
+     * nahi hota, AI jawab nahi deta, list refresh nahi hoti. Aadhi-adhoori
+     * chalti hui app dikhane se behtar hai ek saaf screen jo wahi ek cheez
+     * deti hai jo sach me offline chalti hai: save kiye hue documents.
+     */
+    offTitle: string;
+    offBody: string;
+    offDocsTitle: string;
+    offEmpty: string;
+    offEmptyBody: string;
+    offRetry: string;
+    offChecking: string;
+    /** Ek document par ke teen kaam. */
+    offView: string;
+    offDownload: string;
+    offShare: string;
+    /** File is phone par cache hi nahi hui — offline nahi khul sakti. */
+    offNoFile: string;
   };
   /** App ke andar se "hume likho" form. */
   contact: {
@@ -596,6 +694,22 @@ export type Dict = {
     errNotConfigured: string;
     errFailed: string;
     errNetwork: string;
+    /** 30 second ka thehraav — button khud khul jayega. */
+    errCooldown: string;
+    /**
+     * Aaj/is ghante ki hadd poori. `errRateLimited` se ALAG hai jaan-boojh ke:
+     * wahan intezaar kaam aata hai, yahan nahi — user ko sach me madad chahiye,
+     * aur ye line use bataati hai ki maangni kahan hai.
+     */
+    errTooMany: string;
+    /** Us soorat me phone field ke neeche dikhne wala note. */
+    otpBlockedNote: string;
+    /** Us note ka button — support ticket screen kholta hai. */
+    otpBlockedCta: string;
+    /** Support form me pehle se bhara hua subject. */
+    otpBlockedSubject: string;
+    /** Us number par bheja hua desh — SMS kis desh me nahi ja sakta. */
+    errBlockedCountry: string;
     address: string;
     addressPlaceholder: string;
     gender: string;
@@ -855,6 +969,18 @@ export type Dict = {
     unlockSub: string;
     enterPin: string;
     wrongPin: string;
+    /**
+     * Bahut galat koshish — thodi der ke liye rok. {s} = kitne second.
+     *
+     * ⚠️ Ye rok pehle thi hi nahi: 4-ank ka PIN, local check, aur unlimited
+     * koshish — yaani jiske haath phone lag jaye wo baith ke saare 10,000
+     * combination try kar sakta tha.
+     */
+    tooManyPin: string;
+    /** Lock screen se nikalne ka imaandaar raasta. */
+    signOutInstead: string;
+    signOutAsk: string;
+    signOutBody: string;
     useBiometric: string;
     biometricPrompt: string;
     /** Set/change karte waqt. */
@@ -946,6 +1072,10 @@ const hinglish: Dict = {
     unavailable: "Voice available nahi hai is device pe",
     tooNoisy: "Aas-paas shor bahut hai — phone muh ke paas laakar dobara boliye",
     tooQuiet: "Awaaz nahi pahunchi — thoda paas se aur zor se boliye",
+    noService: "Is phone me voice typing band hai — Google app update/enable karke dobara try karo",
+    needsNet: "Voice ke liye internet chahiye — net on karke dobara boliye",
+    micBusy: "Mic abhi kisi aur app ke paas hai — use band karke dobara boliye",
+    langMissing: "Ye bhasha is phone ke voice me nahi hai — Settings me language pack install karo",
     micHint: "Mic dabaye rakho aur bolo — ya ek tap karo, phir tap se band",
   },
   phoneField: {
@@ -1014,6 +1144,20 @@ const hinglish: Dict = {
     welcomeBackToast: "Wapas aa gaye! 🙂",
     somethingWrong: "Kuch gadbad ho gayi",
     googleFailed: "Google login nahi hua",
+    forgot: "Password bhool gaye?",
+    forgotTitle: "Password reset karo",
+    forgotSub: "Apna email daalo — reset ka link bhej denge. Link par tap karke naya password bana lena.",
+    forgotSend: "Reset link bhejo",
+    forgotSent: "Agar ye email register hai to link bhej diya hai. Inbox (aur spam) dekh lo.",
+    forgotBack: "Login par wapas",
+    newPassTitle: "Naya password banao",
+    newPassSub: "Kam se kam 6 akshar. Yaad rakhne laayak rakhna.",
+    newPassLabel: "Naya password",
+    newPassPlaceholder: "Naya password",
+    newPassConfirm: "Dobara likho",
+    newPassMismatch: "Dono password ek jaise nahi hain",
+    newPassSave: "Password save karo",
+    newPassOk: "Password badal gaya ✓",
   },
   home: {
     greeting: "Namaste{name}",
@@ -1067,6 +1211,9 @@ const hinglish: Dict = {
     saveNeedsPermission: "Save karne ke liye photos ki permission chahiye",
     saveFailedUseShare: "Save nahi ho paaya — Share se try karo",
     renewOpenSite: "Official site kholo",
+    renewSoonTitle: "Renew ka tareeka — jald aa raha hai",
+    renewSoonBody:
+      "Is document ke liye step-by-step guide abhi taiyar ho rahi hai. Tab tak document par likhi sanstha ki official site dekh lo.",
     renewShowSteps: "Renew kaise karein",
     renewHideSteps: "Chhupa do",
     renewVerifyNote:
@@ -1180,6 +1327,19 @@ const hinglish: Dict = {
     repeatUntil: "{date} tak",
     repeatForever: "Jab tak band na karo",
     repeatOff: "Sirf ek baar",
+    askTitleOne: "Bas ek baat aur",
+    askTitleMany: "Bas {n} baatein aur",
+    askGotIt: "Saathi ne samjha",
+    askNext: "Aage",
+    askFinish: "Ho gaya",
+    askManual: "Rehne do, khud bhar lunga",
+    timeMorning: "Subah 8",
+    timeNoon: "Dopahar 1",
+    timeEvening: "Shaam 6",
+    timeNight: "Raat 9",
+    aiOffline: "Net nahi hai — Saathi samajh nahi paaya. Neeche khud chun lo.",
+    aiBusy: "Saathi abhi bahut busy hai — thodi der me dobara, ya neeche khud chun lo.",
+    aiFailed: "Saathi is baar samajh nahi paaya — neeche khud chun lo.",
   },
   review: {
     title: "Saathi ko kitne star doge?",
@@ -1203,6 +1363,19 @@ const hinglish: Dict = {
     failAi: "Saathi aapki baat padh nahi paaya.",
     failHint: "Ye app ki galti nahi hai — net wapas aate hi ye chal jayega.",
     tryAgain: "Dobara koshish karo",
+    offTitle: "Internet nahi hai",
+    offBody:
+      "Net aate hi Saathi poora chalu ho jayega. Tab tak aapke save kiye hue documents yahan hain — dekh sakte ho, download aur share bhi kar sakte ho.",
+    offDocsTitle: "Aapke documents",
+    offEmpty: "Yahan abhi koi document nahi",
+    offEmptyBody:
+      "Jo documents aapne pehle khole the wo apne aap yahan save ho jaate hain. Net aane par ek baar Documents tab khol lo.",
+    offRetry: "Dobara jaancho",
+    offChecking: "Jaanch rahe hain…",
+    offView: "Dekho",
+    offDownload: "Download",
+    offShare: "Share",
+    offNoFile: "Ye file is phone par save nahi hai — net aane par khol lo",
     later: "Theek hai",
   },
   contact: {
@@ -1363,6 +1536,13 @@ const hinglish: Dict = {
     errNotConfigured: "SMS abhi chalu nahi hua hai. Thodi der baad koshish karo.",
     errFailed: "Nahi ho paya. Thodi der baad dobara koshish karo.",
     errNetwork: "Net nahi mila. Connection check karke dobara koshish karo.",
+    errCooldown: "Abhi-abhi code bheja hai. Thoda ruk ke dobara bhejo.",
+    errTooMany: "Aaj ki SMS limit poori ho gayi. Support se limit reset karwa lo.",
+    otpBlockedNote:
+      "Aapki OTP limit poori ho chuki hai, isliye abhi naya code nahi ja sakta. Support me ticket raise karo — hum limit reset kar denge aur aap turant verify kar paoge.",
+    otpBlockedCta: "Support me ticket raise karo",
+    otpBlockedSubject: "OTP limit reset karo",
+    errBlockedCountry: "Is desh me abhi SMS nahi ja sakta.",
     address: "Address",
     addressPlaceholder: "Ghar / office ka pata",
     gender: "Gender",
@@ -1557,6 +1737,10 @@ const hinglish: Dict = {
     unlockSub: "Kholne ke liye apna PIN daalo",
     enterPin: "PIN daalo",
     wrongPin: "PIN galat hai",
+    tooManyPin: "Bahut baar galat PIN. {s} second baad dobara koshish karo.",
+    signOutInstead: "PIN bhool gaye? Logout karke dobara login karo",
+    signOutAsk: "Logout kar dein?",
+    signOutBody: "App lock hat jayega. Aapka saara data safe hai — usi email/Google se dobara login karte hi sab wapas aa jayega.",
     useBiometric: "Fingerprint/face se kholo",
     biometricPrompt: "Saathi kholne ke liye",
     setTitle: "Naya PIN banao",
@@ -1646,6 +1830,10 @@ const hi: Dict = {
     unavailable: "इस डिवाइस पर voice available नहीं है",
     tooNoisy: "आस-पास बहुत शोर है — फ़ोन मुँह के पास लाकर दोबारा बोलिए",
     tooQuiet: "आवाज़ नहीं पहुँची — थोड़ा पास से और ज़ोर से बोलिए",
+    noService: "इस फ़ोन में voice typing बंद है — Google app update/enable करके दोबारा कोशिश करें",
+    needsNet: "Voice के लिए इंटरनेट चाहिए — नेट चालू करके दोबारा बोलिए",
+    micBusy: "माइक अभी किसी और app के पास है — उसे बंद करके दोबारा बोलिए",
+    langMissing: "यह भाषा इस फ़ोन की voice में नहीं है — Settings में language pack इंस्टॉल करें",
     micHint: "माइक दबाए रखें और बोलें — या एक टैप करें, फिर टैप से बंद",
   },
   phoneField: {
@@ -1714,6 +1902,20 @@ const hi: Dict = {
     welcomeBackToast: "वापस आ गए! 🙂",
     somethingWrong: "कुछ गड़बड़ हो गई",
     googleFailed: "Google लॉगिन नहीं हुआ",
+    forgot: "पासवर्ड भूल गए?",
+    forgotTitle: "पासवर्ड रीसेट करें",
+    forgotSub: "अपना ईमेल डालिए — रीसेट का लिंक भेज देंगे। लिंक पर टैप करके नया पासवर्ड बना लीजिए।",
+    forgotSend: "रीसेट लिंक भेजें",
+    forgotSent: "अगर यह ईमेल रजिस्टर है तो लिंक भेज दिया है। इनबॉक्स (और स्पैम) देख लीजिए।",
+    forgotBack: "लॉगिन पर वापस",
+    newPassTitle: "नया पासवर्ड बनाएँ",
+    newPassSub: "कम से कम 6 अक्षर। याद रखने लायक रखिए।",
+    newPassLabel: "नया पासवर्ड",
+    newPassPlaceholder: "नया पासवर्ड",
+    newPassConfirm: "दोबारा लिखिए",
+    newPassMismatch: "दोनों पासवर्ड एक जैसे नहीं हैं",
+    newPassSave: "पासवर्ड सेव करें",
+    newPassOk: "पासवर्ड बदल गया ✓",
   },
   home: {
     greeting: "नमस्ते{name}",
@@ -1766,6 +1968,9 @@ const hi: Dict = {
     saveNeedsPermission: "सेव करने के लिए फ़ोटो की अनुमति चाहिए",
     saveFailedUseShare: "सेव नहीं हो पाया — शेयर से कोशिश करें",
     renewOpenSite: "आधिकारिक साइट खोलें",
+    renewSoonTitle: "रिन्यू का तरीका — जल्द आ रहा है",
+    renewSoonBody:
+      "इस डॉक्युमेंट के लिए स्टेप-बाय-स्टेप गाइड अभी तैयार हो रही है। तब तक डॉक्युमेंट पर लिखी संस्था की आधिकारिक साइट देख लीजिए।",
     renewShowSteps: "रिन्यू कैसे करें",
     renewHideSteps: "छुपा दें",
     renewVerifyNote:
@@ -1879,6 +2084,19 @@ const hi: Dict = {
     repeatUntil: "{date} तक",
     repeatForever: "जब तक बंद न करें",
     repeatOff: "सिर्फ़ एक बार",
+    askTitleOne: "बस एक बात और",
+    askTitleMany: "बस {n} बातें और",
+    askGotIt: "साथी ने समझा",
+    askNext: "आगे",
+    askFinish: "हो गया",
+    askManual: "रहने दें, मैं खुद भर लूँगा",
+    timeMorning: "सुबह 8",
+    timeNoon: "दोपहर 1",
+    timeEvening: "शाम 6",
+    timeNight: "रात 9",
+    aiOffline: "नेट नहीं है — साथी समझ नहीं पाया। नीचे खुद चुन लें।",
+    aiBusy: "साथी अभी बहुत व्यस्त है — थोड़ी देर में दोबारा, या नीचे खुद चुन लें।",
+    aiFailed: "साथी इस बार समझ नहीं पाया — नीचे खुद चुन लें।",
   },
   review: {
     title: "साथी को कितने स्टार दोगे?",
@@ -1902,6 +2120,19 @@ const hi: Dict = {
     failAi: "साथी आपकी बात पढ़ नहीं पाया।",
     failHint: "यह ऐप की ग़लती नहीं है — नेट वापस आते ही यह चल जाएगा।",
     tryAgain: "दोबारा कोशिश करें",
+    offTitle: "इंटरनेट नहीं है",
+    offBody:
+      "नेट आते ही साथी पूरा चालू हो जाएगा। तब तक आपके सेव किए हुए डॉक्युमेंट यहाँ हैं — देख सकते हैं, डाउनलोड और शेयर भी कर सकते हैं।",
+    offDocsTitle: "आपके डॉक्युमेंट",
+    offEmpty: "यहाँ अभी कोई डॉक्युमेंट नहीं",
+    offEmptyBody:
+      "जो डॉक्युमेंट आपने पहले खोले थे वे अपने आप यहाँ सेव हो जाते हैं। नेट आने पर एक बार Documents टैब खोल लीजिए।",
+    offRetry: "दोबारा जाँचें",
+    offChecking: "जाँच रहे हैं…",
+    offView: "देखें",
+    offDownload: "डाउनलोड",
+    offShare: "शेयर",
+    offNoFile: "यह फ़ाइल इस फ़ोन पर सेव नहीं है — नेट आने पर खोल लीजिए",
     later: "ठीक है",
   },
   contact: {
@@ -2062,6 +2293,13 @@ const hi: Dict = {
     errNotConfigured: "SMS अभी चालू नहीं हुआ है। थोड़ी देर बाद कोशिश कीजिए।",
     errFailed: "नहीं हो पाया। थोड़ी देर बाद दोबारा कोशिश कीजिए।",
     errNetwork: "नेट नहीं मिला। कनेक्शन देखकर दोबारा कोशिश कीजिए।",
+    errCooldown: "अभी-अभी कोड भेजा है। थोड़ा रुककर दोबारा भेजिए।",
+    errTooMany: "आज की SMS लिमिट पूरी हो गई। सपोर्ट से लिमिट रीसेट करवा लीजिए।",
+    otpBlockedNote:
+      "आपकी OTP लिमिट पूरी हो चुकी है, इसलिए अभी नया कोड नहीं जा सकता। सपोर्ट में टिकट राइज़ कीजिए — हम लिमिट रीसेट कर देंगे और आप तुरंत वेरिफ़ाई कर पाएँगे।",
+    otpBlockedCta: "सपोर्ट में टिकट राइज़ करें",
+    otpBlockedSubject: "OTP लिमिट रीसेट करें",
+    errBlockedCountry: "इस देश में अभी SMS नहीं जा सकता।",
     address: "पता",
     addressPlaceholder: "घर / ऑफ़िस का पता",
     gender: "लिंग",
@@ -2256,6 +2494,10 @@ const hi: Dict = {
     unlockSub: "खोलने के लिए अपना PIN डालिए",
     enterPin: "PIN डालिए",
     wrongPin: "PIN ग़लत है",
+    tooManyPin: "बहुत बार ग़लत PIN। {s} सेकंड बाद दोबारा कोशिश कीजिए।",
+    signOutInstead: "PIN भूल गए? लॉगआउट करके दोबारा लॉगिन कीजिए",
+    signOutAsk: "लॉगआउट कर दें?",
+    signOutBody: "ऐप लॉक हट जाएगा। आपका सारा डेटा सुरक्षित है — उसी ईमेल/Google से दोबारा लॉगिन करते ही सब वापस आ जाएगा।",
     useBiometric: "फ़िंगरप्रिंट/फ़ेस से खोलें",
     biometricPrompt: "साथी खोलने के लिए",
     setTitle: "नया PIN बनाइए",
@@ -2345,6 +2587,10 @@ const en: Dict = {
     unavailable: "Voice isn't available on this device",
     tooNoisy: "It's noisy around you — hold the phone closer and try again",
     tooQuiet: "We couldn't hear you — speak a bit closer and louder",
+    noService: "Voice typing is off on this phone — update or enable the Google app and try again",
+    needsNet: "Voice needs the internet — turn it on and speak again",
+    micBusy: "Another app is using the mic — close it and speak again",
+    langMissing: "This language isn't in your phone's voice — install the language pack in Settings",
     micHint: "Hold the mic and speak — or tap once, then tap to stop",
   },
   phoneField: {
@@ -2413,6 +2659,20 @@ const en: Dict = {
     welcomeBackToast: "Welcome back! 🙂",
     somethingWrong: "Something went wrong",
     googleFailed: "Google sign-in failed",
+    forgot: "Forgot your password?",
+    forgotTitle: "Reset your password",
+    forgotSub: "Enter your email and we'll send a reset link. Tap it to set a new password.",
+    forgotSend: "Send reset link",
+    forgotSent: "If that email is registered, the link is on its way. Check your inbox (and spam).",
+    forgotBack: "Back to login",
+    newPassTitle: "Set a new password",
+    newPassSub: "At least 6 characters. Pick something you'll remember.",
+    newPassLabel: "New password",
+    newPassPlaceholder: "New password",
+    newPassConfirm: "Type it again",
+    newPassMismatch: "The two passwords don't match",
+    newPassSave: "Save password",
+    newPassOk: "Password changed ✓",
   },
   home: {
     greeting: "Hello{name}",
@@ -2464,6 +2724,9 @@ const en: Dict = {
     saveNeedsPermission: "Saving needs photo permission",
     saveFailedUseShare: "Couldn't save — try Share instead",
     renewOpenSite: "Open official site",
+    renewSoonTitle: "How to renew — coming soon",
+    renewSoonBody:
+      "A step-by-step guide for this document is being prepared. Until then, check the official site of the authority named on your document.",
     renewShowSteps: "How to renew",
     renewHideSteps: "Hide",
     renewVerifyNote:
@@ -2577,6 +2840,19 @@ const en: Dict = {
     repeatUntil: "until {date}",
     repeatForever: "until you turn it off",
     repeatOff: "Just once",
+    askTitleOne: "Just one more thing",
+    askTitleMany: "Just {n} more things",
+    askGotIt: "Saathi understood",
+    askNext: "Next",
+    askFinish: "Done",
+    askManual: "Skip, I'll fill it in",
+    timeMorning: "8 AM",
+    timeNoon: "1 PM",
+    timeEvening: "6 PM",
+    timeNight: "9 PM",
+    aiOffline: "No internet — Saathi couldn't read that. Pick it below yourself.",
+    aiBusy: "Saathi is very busy right now — try again shortly, or pick it below.",
+    aiFailed: "Saathi couldn't read that this time — pick it below yourself.",
   },
   review: {
     title: "How many stars for Saathi?",
@@ -2600,6 +2876,19 @@ const en: Dict = {
     failAi: "Saathi couldn't read what you said.",
     failHint: "This isn't the app's fault — it'll work as soon as the network is back.",
     tryAgain: "Try again",
+    offTitle: "No internet",
+    offBody:
+      "Saathi comes back fully as soon as you're online. Until then, your saved documents are right here — view, download and share them.",
+    offDocsTitle: "Your documents",
+    offEmpty: "No documents here yet",
+    offEmptyBody:
+      "Documents you've opened before are saved here automatically. Open the Documents tab once when you're back online.",
+    offRetry: "Check again",
+    offChecking: "Checking…",
+    offView: "View",
+    offDownload: "Download",
+    offShare: "Share",
+    offNoFile: "This file isn't saved on this phone — open it when you're online",
     later: "OK",
   },
   contact: {
@@ -2760,6 +3049,13 @@ const en: Dict = {
     errNotConfigured: "SMS isn't switched on yet. Please try again later.",
     errFailed: "Couldn't do it. Please try again in a moment.",
     errNetwork: "No connection. Check your network and try again.",
+    errCooldown: "A code just went out. Wait a moment and send again.",
+    errTooMany: "You've hit today's SMS limit. Ask support to reset it.",
+    otpBlockedNote:
+      "You've hit your OTP limit, so a new code can't go out right now. Raise a support ticket — we'll reset the limit and you can verify straight away.",
+    otpBlockedCta: "Raise a support ticket",
+    otpBlockedSubject: "Reset my OTP limit",
+    errBlockedCountry: "We can't send SMS to this country yet.",
     address: "Address",
     addressPlaceholder: "Home / office address",
     gender: "Gender",
@@ -2954,6 +3250,10 @@ const en: Dict = {
     unlockSub: "Enter your PIN to open it",
     enterPin: "Enter PIN",
     wrongPin: "That PIN isn't right",
+    tooManyPin: "Too many wrong tries. Try again in {s} seconds.",
+    signOutInstead: "Forgot your PIN? Sign out and log in again",
+    signOutAsk: "Sign out?",
+    signOutBody: "The app lock will be removed. All your data is safe — log in again with the same email/Google and everything comes back.",
     useBiometric: "Use fingerprint / face",
     biometricPrompt: "Unlock Saathi",
     setTitle: "Create a PIN",

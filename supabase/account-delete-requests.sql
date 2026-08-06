@@ -154,6 +154,34 @@ create policy "own tickets" on public.support_tickets for all
   with check (user_id = auth.uid() and public.account_active(auth.uid()));
 
 /*
+ * ⚠️ Ye do table pehle chhoot gayi thi, aur "hide" adhoora reh jaata tha.
+ *
+ * `reviews` — user apna diya hua review app me dekh sakta hai.
+ * `referrals` — Refer & Earn screen apne referrals ki poori list dikhati hai,
+ *   jisme referee ka rishta bhi hota hai.
+ *
+ * Yaani band kiye gaye account me bhi ye dono hisse khulte rehte the. Account
+ * "band" tabhi hai jab uska KUCH bhi na dikhe.
+ *
+ * (`payments` yahan nahi hai kyunki uspar koi public policy hai hi nahi —
+ *  wo poori tarah service_role-only hai, to app usse padh hi nahi sakti.)
+ */
+drop policy if exists "own review read" on public.reviews;
+create policy "own review read" on public.reviews for select
+  using (auth.uid() = user_id and public.account_active(auth.uid()));
+
+drop policy if exists "own review insert" on public.reviews;
+create policy "own review insert" on public.reviews for insert
+  with check (auth.uid() = user_id and public.account_active(auth.uid()));
+
+drop policy if exists "own referrals" on public.referrals;
+create policy "own referrals" on public.referrals for select
+  using (
+    (auth.uid() = referrer_id or auth.uid() = referee_id)
+    and public.account_active(auth.uid())
+  );
+
+/*
  * Profile khud padhne se nahi rokte — app ko `deleted_at` DIKHNA chahiye,
  * tabhi wo user ko saaf keh sakti hai "ye account band kar diya gaya hai".
  * Rokna sirf badalne par hai, warna band user apna profile edit karta rahega.

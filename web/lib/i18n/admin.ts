@@ -238,6 +238,24 @@ export type AdminDict = {
     sendFailed: string;
     yes: string;
     no: string;
+
+    /* ── SMS OTP ki hadd (is ticket wale user ki) ────────────────────
+     *
+     * "Mera number verify nahi ho raha" support ki sabse aam ticket hai, aur
+     * uska jawab aksar ek hi hai: user ki OTP limit poori ho gayi. Pehle uske
+     * liye Supabase kholna padta tha. Ab wahi ginti aur reset ticket ke saath
+     * hi dikhte hain.
+     */
+    otpTitle: string;
+    /** {hour} {perHour} {day} {perDay} */
+    otpCount: string;
+    otpBlocked: string;
+    otpFine: string;
+    otpReset: string;
+    otpResetting: string;
+    /** {n} */
+    otpResetDone: string;
+    otpResetFailed: string;
   };
   contacts: {
     countMsg: string; // {n}
@@ -295,6 +313,18 @@ export type AdminDict = {
       referralsTitle: string;
       referralDays: string;
       referralsOn: string;
+      /* ── SMS OTP ki haddein ─────────────────────────────────────────
+       * Har OTP ek SMS hai, yaani seedha paisa. Isliye ye admin ke haath me
+       * hain — pehle SQL me hardcoded the aur badalne ke liye migration
+       * chalani padti thi. */
+      otpTitle: string;
+      otpSub: string;
+      otpCooldown: string;
+      otpTtl: string;
+      otpPerHour: string;
+      otpPerDay: string;
+      otpIpPerDay: string;
+      otpMaxAttempts: string;
       grantTitle: string;
       grantSub: string;
       grantDaysPh: string;
@@ -467,6 +497,10 @@ export type AdminDict = {
       title: string;
       sub: string;
       docType: string;
+      /** Bilkul naya doc_type — dropdown me na ho to admin khud likhta hai. */
+      newType: string;
+      newTypePh: string;
+      docTypeNeeded: string;
       country: string;
       /** country = '*' ka label — har desh wala fallback. */
       allCountries: string;
@@ -771,6 +805,14 @@ const en: AdminDict = {
     sendFailed: "Could not send the reply.",
     yes: "yes",
     no: "no",
+    otpTitle: "SMS OTP limit",
+    otpCount: "{hour}/{perHour} this hour · {day}/{perDay} today",
+    otpBlocked: "Blocked — can't request a new code",
+    otpFine: "Within limit",
+    otpReset: "Reset limit",
+    otpResetting: "Resetting…",
+    otpResetDone: "Limit reset ({n} sends cleared). They can try again now.",
+    otpResetFailed: "Could not reset the limit.",
   },
   contacts: {
     countMsg: "{n} messages",
@@ -798,6 +840,14 @@ const en: AdminDict = {
       freeReminders: "Free reminders", freeDocuments: "Free documents",
       referralsTitle: "Referrals", referralDays: "Referral days (for both)",
       referralsOn: "Referrals on",
+      otpTitle: "SMS OTP limits",
+      otpSub: "Every OTP is a paid SMS. Raising these costs money — check Spend first. If a genuine user gets stuck, reset just their limit from their support ticket.",
+      otpCooldown: "Gap between SMS (seconds)",
+      otpTtl: "Code valid for (seconds)",
+      otpPerHour: "Max SMS per hour (per user)",
+      otpPerDay: "Max SMS per day (per user)",
+      otpIpPerDay: "Max different numbers per IP per day",
+      otpMaxAttempts: "Wrong tries before a code dies",
       grantTitle: "Grant Plus days manually",
       grantSub: "Days are added to the user's current plan (a paid plan gets extended too).",
       grantDaysPh: "Days", grantBtn: "Grant",
@@ -897,6 +947,9 @@ const en: AdminDict = {
       title: "How to renew",
       sub: "What a user should do when a document is expiring. Shown inside the app, works offline.",
       docType: "Document type",
+      newType: "…or a new type",
+      newTypePh: "e.g. visa",
+      docTypeNeeded: "Pick a document type or type a new one.",
       country: "Country (ISO2)",
       allCountries: "All countries",
       add: "Add",
@@ -1191,6 +1244,14 @@ const hi: AdminDict = {
     sendFailed: "जवाब नहीं भेजा जा सका।",
     yes: "हाँ",
     no: "नहीं",
+    otpTitle: "SMS OTP लिमिट",
+    otpCount: "इस घंटे {hour}/{perHour} · आज {day}/{perDay}",
+    otpBlocked: "ब्लॉक — नया कोड नहीं माँग सकते",
+    otpFine: "लिमिट के अंदर",
+    otpReset: "लिमिट रीसेट करें",
+    otpResetting: "रीसेट हो रहा है…",
+    otpResetDone: "लिमिट रीसेट हो गई ({n} भेजे हुए हटाए)। अब दोबारा कोशिश कर सकते हैं।",
+    otpResetFailed: "लिमिट रीसेट नहीं हो पाई।",
   },
   contacts: {
     countMsg: "{n} मैसेज",
@@ -1218,6 +1279,14 @@ const hi: AdminDict = {
       freeReminders: "फ्री रिमाइंडर", freeDocuments: "फ्री डॉक्युमेंट",
       referralsTitle: "रेफरल", referralDays: "रेफरल दिन (दोनों को)",
       referralsOn: "रेफरल चालू",
+      otpTitle: "SMS OTP लिमिट",
+      otpSub: "हर OTP एक पेड SMS है। इन्हें बढ़ाने में पैसा लगता है — पहले Spend देख लें। कोई सही यूज़र फँस जाए तो उसकी लिमिट उसके सपोर्ट टिकट से अलग से रीसेट करें।",
+      otpCooldown: "दो SMS के बीच अंतर (सेकंड)",
+      otpTtl: "कोड कितनी देर चले (सेकंड)",
+      otpPerHour: "एक घंटे में ज़्यादा से ज़्यादा SMS (प्रति यूज़र)",
+      otpPerDay: "एक दिन में ज़्यादा से ज़्यादा SMS (प्रति यूज़र)",
+      otpIpPerDay: "एक IP से एक दिन में कितने अलग नंबर",
+      otpMaxAttempts: "कितनी ग़लत कोशिश के बाद कोड मर जाए",
       grantTitle: "मैन्युअली प्लस दिन दें",
       grantSub: "दिन यूज़र के मौजूदा प्लान में जुड़ेंगे (पेड प्लान भी बढ़ेगा)।",
       grantDaysPh: "दिन", grantBtn: "दें",
@@ -1317,6 +1386,9 @@ const hi: AdminDict = {
       title: "रिन्यू कैसे करें",
       sub: "डॉक्युमेंट एक्सपायर हो रहा हो तो यूज़र को क्या करना चाहिए। ऐप में दिखता है, ऑफ़लाइन भी चलता है।",
       docType: "डॉक्युमेंट टाइप",
+      newType: "…या नया टाइप",
+      newTypePh: "जैसे visa",
+      docTypeNeeded: "डॉक्युमेंट टाइप चुनिए या नया लिखिए।",
       country: "देश (ISO2)",
       allCountries: "सभी देश",
       add: "जोड़ें",
@@ -1612,6 +1684,14 @@ const hinglish: AdminDict = {
     sendFailed: "Jawab nahi bheja ja saka.",
     yes: "haan",
     no: "nahi",
+    otpTitle: "SMS OTP limit",
+    otpCount: "Is ghante {hour}/{perHour} · aaj {day}/{perDay}",
+    otpBlocked: "Block — naya code nahi maang sakte",
+    otpFine: "Limit ke andar",
+    otpReset: "Limit reset karo",
+    otpResetting: "Reset ho raha hai…",
+    otpResetDone: "Limit reset ho gayi ({n} bheje hue hataye). Ab dobara koshish kar sakte hain.",
+    otpResetFailed: "Limit reset nahi ho payi.",
   },
   contacts: {
     countMsg: "{n} message",
@@ -1639,6 +1719,14 @@ const hinglish: AdminDict = {
       freeReminders: "Free reminders", freeDocuments: "Free documents",
       referralsTitle: "Referrals", referralDays: "Referral din (dono ko)",
       referralsOn: "Referrals chalu",
+      otpTitle: "SMS OTP ki haddein",
+      otpSub: "Har OTP ek paid SMS hai. Inhe badhane me paisa lagta hai — pehle Spend dekh lo. Koi sahi user phans jaye to uski limit uske support ticket se alag se reset kar do.",
+      otpCooldown: "Do SMS ke beech ka gap (second)",
+      otpTtl: "Code kitni der chale (second)",
+      otpPerHour: "Ek ghante me max SMS (per user)",
+      otpPerDay: "Ek din me max SMS (per user)",
+      otpIpPerDay: "Ek IP se ek din me kitne alag number",
+      otpMaxAttempts: "Kitni galat koshish ke baad code marr jaye",
       grantTitle: "Manually Plus din do",
       grantSub: "Din user ke maujooda plan me add honge (paid plan bhi extend hoga).",
       grantDaysPh: "Din", grantBtn: "Do",
@@ -1738,6 +1826,9 @@ const hinglish: AdminDict = {
       title: "Renew kaise karein",
       sub: "Document expire ho raha ho to user ko kya karna chahiye. App me dikhta hai, offline bhi chalta hai.",
       docType: "Document type",
+      newType: "…ya naya type",
+      newTypePh: "jaise visa",
+      docTypeNeeded: "Document type chuno ya naya likho.",
       country: "Desh (ISO2)",
       allCountries: "Sab desh",
       add: "Jodo",

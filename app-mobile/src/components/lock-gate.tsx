@@ -3,7 +3,13 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import { useAuth } from "@/components/auth-provider";
 import { LockScreen } from "@/components/lock-screen";
-import { getLockState, needsUnlock, markUnlocked, resetGrace } from "@/lib/app-lock";
+import {
+  getLockState,
+  needsUnlock,
+  markUnlocked,
+  markBackgrounded,
+  resetGrace,
+} from "@/lib/app-lock";
 
 /**
  * App ke saamne khada pehredaar.
@@ -53,13 +59,22 @@ export function LockGate({ children }: { children: ReactNode }) {
     if (!uid) resetGrace();
   }, [uid]);
 
-  // Background se wapas — khidki nikal gayi ho to phir se poocho.
+  /**
+   * Background se wapas — khidki nikal gayi ho to phir se poocho.
+   *
+   * ⚠️ Ab background me JAATE waqt bhi ek kaam hota hai: `markBackgrounded()`.
+   * Pehle wo nahi tha aur khidki KHOLNE ke waqt se naapi jaati thi — yaani
+   * ghadi tab bhi chal rahi hoti thi jab user app ke andar hi kaam kar raha ho.
+   * Isliye 5 minute app chalane ke baad camera 10 second ke liye kholne par bhi
+   * lock lag jaata tha. Ab ghadi sirf tab chalti hai jab app sach me bahar ho.
+   *
+   * `setLocked(true)` yahan phir bhi nahi karte — wo app switcher me lock
+   * screen ki jhalak dikha deta, jo bhadda lagta hai.
+   */
   useEffect(() => {
     const sub = AppState.addEventListener("change", (s: AppStateStatus) => {
       if (s === "active") void evaluate();
-      // Background me jaate waqt kuch nahi karte: `needsUnlock()` khud waqt se
-      // hisaab lagata hai. Yahan `setLocked(true)` karna app switcher me lock
-      // screen ki jhalak dikha deta, jo bhadda lagta hai.
+      else markBackgrounded();
     });
     return () => sub.remove();
   }, [evaluate]);

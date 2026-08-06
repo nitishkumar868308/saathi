@@ -14,6 +14,7 @@ import { ReviewPrompt } from "@/components/review-prompt";
 import { DeviceOwnerWarning } from "@/components/device-owner-warning";
 import { MultiDeviceWarning } from "@/components/multi-device-warning";
 import { LockGate } from "@/components/lock-gate";
+import { OfflineGate } from "@/components/offline-gate";
 import { LockOffer } from "@/components/lock-offer";
 import { NetworkBanner } from "@/components/network-banner";
 import { ThemeFab } from "@/components/theme-fab";
@@ -57,7 +58,23 @@ export default function RootLayout() {
               laga hai, app ka kuch bhi na dikhe aur kuch bhi na badla ja sake.
             */}
             <LockGate>
-              <RootNavigator />
+              {/*
+                Net na ho to poori app ki jagah sirf offline screen (save kiye
+                hue documents — dekho / download / share).
+
+                ⚠️ Ye LockGate ke ANDAR hai, bahar nahi. Tarteeb maayne rakhti
+                hai: agar ye lock se BAHAR hota, to koi bhi phone uthata, flight
+                mode on karta, aur offline screen se saare documents dekh leta —
+                lock poori tarah bypass ho jaata.
+
+                ⚠️ Aur ye overlays se UPAR hai: `NetAlertModal` jaise popup
+                offline screen ke upar khulne ka koi matlab nahi (wo baat wo
+                screen khud keh rahi hai), par `ReminderAlertHost` ko chalte
+                rehna chahiye — reminder ka alarm local hai aur bina net ke bhi
+                bajta hai.
+              */}
+              <OfflineGate>
+                <RootNavigator />
               {/* Har screen par theme switch — daayen kinare, beech ki oonchai
                   par. Settings ka teen-wala chunav apni jagah rehta hai. */}
               <ThemeFab />
@@ -65,7 +82,10 @@ export default function RootLayout() {
               <NetworkBanner />
               {/* Net ki wajah se koi kaam ruka — beech screen me popup + retry. */}
               <NetAlertModal />
-              {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar. */}
+              </OfflineGate>
+              {/* Reminder/expiry ka full-screen alert — kisi bhi screen ke upar.
+                  OfflineGate ke BAHAR: alarm local hai, bina net ke bhi bajta
+                  hai, aur offline screen par bhi dikhna chahiye. */}
               <ReminderAlertHost />
               {/* 1 hafte baad rating/review popup. */}
               <ReviewPrompt />
@@ -113,6 +133,24 @@ function RootNavigator() {
   const decided = !loading && langReady;
 
   /**
+   * Wo screens jahan bina login ke pahunchna zaroori hai.
+   *
+   * ⚠️ `forgot-password` yahan hona ZAROORI hai. Wo screen use hi tab hoti hai
+   * jab user andar nahi aa paa raha — agar ise "login zaroori hai" wale niyam
+   * me rakh dein to tap karte hi wo wapas login par phenk diya jaata hai, aur
+   * password reset ka koi rasta hi nahi bachta.
+   *
+   * `new-password` bhi: recovery link se aane par session to ban jaata hai, par
+   * user ko wahin rukna hai — "/" par bhej dene se wo naya password kabhi set
+   * hi nahi karega aur agli baar phir wahi bhoola hua password maanga jayega.
+   */
+  const isAuthRoute =
+    first === "login" ||
+    first === "auth" ||
+    first === "forgot-password" ||
+    first === "new-password";
+
+  /**
    * Abhi jis screen par hain, kya wo GALAT screen hai?
    *
    * ⚠️ Ye render ke waqt pata hona zaroori hai. Pehle sirf neeche wala effect
@@ -130,11 +168,7 @@ function RootNavigator() {
   const needsRedirect =
     decided &&
     ((!langChosen && first !== "language") ||
-      (langChosen &&
-        !hasSession &&
-        first !== "login" &&
-        first !== "auth" &&
-        first !== "language") ||
+      (langChosen && !hasSession && !isAuthRoute && first !== "language") ||
       (langChosen && hasSession && (first === "login" || first === "language")));
 
   useEffect(() => {
@@ -147,8 +181,7 @@ function RootNavigator() {
       return;
     }
 
-    const inAuthFlow = first === "login" || first === "auth";
-    if (!hasSession && !inAuthFlow && first !== "language") {
+    if (!hasSession && !isAuthRoute && first !== "language") {
       // Abhi-abhi logout hua (pehle session tha) -> language select.
       // App pehle se hai par logged out (fresh launch) -> login.
       router.replace(prevSession.current ? ("/language" as never) : "/login");
@@ -156,7 +189,7 @@ function RootNavigator() {
       router.replace("/");
     }
     prevSession.current = hasSession;
-  }, [hasSession, loading, langReady, langChosen, first, router]);
+  }, [hasSession, loading, langReady, langChosen, first, isAuthRoute, router]);
 
   // Reminders + document expiries OS me dobara schedule karo. Zaroori hai kyunki
   // scheduled notifications reinstall ke baad nahi bachti, aur doosre device pe
@@ -263,6 +296,10 @@ function RootNavigator() {
       <Stack.Screen name="language" />
       <Stack.Screen name="login" />
       <Stack.Screen name="auth" />
+      {/* Password bhool gaye — dono screens bina login ke bhi khulti hain
+          (`isAuthRoute` upar dekho). */}
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="new-password" />
       <Stack.Screen name="add-document" options={{ presentation: "modal" }} />
       <Stack.Screen name="add-reminder" options={{ presentation: "modal" }} />
       <Stack.Screen name="notes" />

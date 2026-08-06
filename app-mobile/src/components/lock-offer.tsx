@@ -84,7 +84,7 @@ export function LockOffer() {
   if (!show) return null;
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={() => void no()}>
+    <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={() => void no()}>
       <View style={styles.backdrop}>
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
           <View style={styles.card}>
@@ -116,7 +116,7 @@ export function LockOffer() {
 const useStyles = makeStyles((c) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(46,40,35,0.55)",
+    backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
     padding: 18,

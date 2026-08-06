@@ -19,6 +19,7 @@ import { takePendingReferral } from "@/lib/referral-pending";
 import { clearPlanCache, getPlanSnapshot, refreshPlan } from "@/lib/plan-store";
 import { useDataChanged } from "@/lib/data-events";
 import { clearUserDetailsCache } from "@/lib/user-details";
+import { clearRenewalMemo } from "@/lib/renewal";
 import { loadAlertMode, setAlertUserName } from "@/lib/alert-mode";
 import { sendWelcomeEmail } from "@/lib/welcome";
 import { useLocale } from "@/lib/i18n/LanguageProvider";
@@ -205,6 +206,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Aur plan bhi. Iske bina agla user ek pal ke liye pichhle wale ka plan
         // dekh leta: free ko Plus wali screen, ya Plus wale ko upgrade banner.
         clearPlanCache();
+        /**
+         * Renewal guides ka memo bhi.
+         *
+         * ⚠️ `clearRenewalMemo` `renewal.ts` me bana pada tha par use kabhi
+         * kahin se BULAYA hi nahi jaata tha — yaani wo module-level memo poore
+         * app-session tak zinda rehta tha.
+         *
+         * Ye koi bada bug nahi tha (memo me teeno bhashaon ka content ek saath
+         * hota hai, aur locale/country har call par chunte hain — to bhasha
+         * badalne se kuch galat nahi dikhta tha). Par uska matlab ye tha ki
+         * admin ke update kiye hue guide app band karne tak nahi aate the.
+         * Logout ek saaf mauka hai use taaza karne ka.
+         */
+        clearRenewalMemo();
       }
     });
     return () => sub.subscription.unsubscribe();

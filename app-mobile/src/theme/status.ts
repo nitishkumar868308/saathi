@@ -17,9 +17,20 @@ export function statusStyleFor(
   return {
     safe: { fg: c.sage, bg: "rgba(124,138,107,0.15)", label: "Safe" },
     soon: { fg: c.terracotta, bg: "rgba(194,90,55,0.12)", label: "Soon" },
-    // Khatre ka laal dono theme me ek hi — halka karne par wo khatra jaisa
-    // lagna hi band ho jaata hai.
-    expired: { fg: "#B23B3B", bg: "rgba(178,59,59,0.12)", label: "Expired" },
+    /**
+     * ⚠️ Yahan pehle `#B23B3B` hardcoded tha, is soch ke saath ki "khatre ka
+     * laal dono theme me ek hi rehna chahiye". Soch theek thi par nateeja
+     * ulta: ye TEXT hai (`fg`), aur gehre card par wo gehra laal sirf 3.4:1
+     * par padhta hai — AA se neeche. Yaani "Expired" ka nishaan, jo sabse
+     * zaroori hai, dark mode me sabse kam dikhta tha.
+     *
+     * `c.danger` dark me thoda ujla shade (#E06B6B) deta hai. Wo ab bhi saaf
+     * laal hai — khatra jaisa hi lagta hai — par padha bhi jaata hai.
+     *
+     * (`bg` alpha-based hai isliye wo dono theme me apne aap theek baithta
+     * hai — wo peeche wale card ka rang le leta hai.)
+     */
+    expired: { fg: c.danger, bg: "rgba(178,59,59,0.12)", label: "Expired" },
   };
 }
 
