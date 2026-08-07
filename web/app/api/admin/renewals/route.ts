@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { translateConfigured, translateMessage } from "@/lib/translate";
 import type { Loc } from "@/lib/reminder-channels";
 
@@ -38,8 +38,10 @@ function headers(extra?: Record<string, string>) {
   };
 }
 
-function guard() {
-  if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+/** Har handler ka pehla pehra — 401/403/503 ka response, ya null (sab theek). */
+async function denied(): Promise<NextResponse | null> {
+  const g = await guard("renewals");
+  if (!g.ok) return g.res;
   if (!SUPABASE_URL || !SUPABASE_KEY)
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   return null;
@@ -48,7 +50,7 @@ function guard() {
 type RenewalText = { title: string; steps: string[]; note?: string | null };
 
 export async function GET() {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
   try {
     const res = await fetch(
@@ -100,7 +102,7 @@ function unpackText(m: { subject: string; message: string }): RenewalText {
 }
 
 export async function PUT(request: Request) {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
 
   let body: Record<string, unknown>;
@@ -197,7 +199,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
 
   const { searchParams } = new URL(request.url);

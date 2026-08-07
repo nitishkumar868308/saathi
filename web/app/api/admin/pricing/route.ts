@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import {
   getCountryPricing,
   upsertCountryPricing,
@@ -14,8 +14,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function guard() {
-  return isAuthed() ? null : NextResponse.json({ error: "unauthorized" }, { status: 401 });
+/** Har handler ka pehla pehra — 401/403 ka response, ya null (sab theek). */
+async function denied(): Promise<NextResponse | null> {
+  const g = await guard("pricing");
+  return g.ok ? null : g.res;
 }
 
 function errRes(err: unknown) {
@@ -27,7 +29,7 @@ function errRes(err: unknown) {
 }
 
 export async function GET() {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
   try {
     const [rows, config, countries] = await Promise.all([
@@ -50,7 +52,7 @@ export async function GET() {
 
 /** Rows upsert + optional base price update. */
 export async function PUT(request: Request) {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
 
   let body: { rows?: unknown; base?: { monthly?: unknown; yearly?: unknown } };
@@ -113,7 +115,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
   const code = new URL(request.url).searchParams.get("code") ?? "";
   try {

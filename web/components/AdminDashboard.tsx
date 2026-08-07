@@ -27,6 +27,9 @@ import {
   LifeBuoy,
   RotateCw,
   UserMinus,
+  Shield,
+  Send,
+  CheckCircle2,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
@@ -49,33 +52,33 @@ import AdminBlog from "@/components/AdminBlog";
 import AdminRenewals from "@/components/AdminRenewals";
 import AdminDeleteRequests from "@/components/AdminDeleteRequests";
 import AdminSupport from "@/components/AdminSupport";
+import AdminTeam from "@/components/AdminTeam";
+import Modal from "@/components/admin/Modal";
+import type { AdminMenu } from "@/lib/admin-menus";
 
 type ContactEntry = {
+  id?: string;
   name: string;
   email: string;
   message: string;
   createdAt: string;
+  repliedAt?: string | null;
+  replyBody?: string | null;
+  repliedBy?: string | null;
 };
 
 type Data = { contacts: ContactEntry[] };
-type Section =
-  | "analytics"
-  | "seo"
-  | "blog"
-  | "rewards"
-  | "pricing"
-  | "users"
-  | "usage"
-  | "spend"
-  | "notes"
-  | "documents"
-  | "reviews"
-  | "logs"
-  | "contacts"
-  | "support"
-  | "renewals"
-  | "deleteRequests"
-  | "message";
+
+/** Sidebar ke menu ki list ab `lib/admin-menus.ts` me hai (server bhi wahi padhta hai). */
+type Section = AdminMenu;
+
+type Session = {
+  id: string;
+  email: string;
+  name: string;
+  isMaster: boolean;
+  menus: Section[];
+};
 
 const NAV: { key: Section; icon: typeof Gift }[] = [
   { key: "users", icon: Users },
@@ -101,6 +104,9 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   { key: "deleteRequests", icon: UserMinus },
   { key: "pricing", icon: Globe },
   { key: "rewards", icon: Gift },
+  // Team sabse neeche — ye roz ka kaam nahi hai, aur ye aksar sirf master ke
+  // paas hota hai.
+  { key: "team", icon: Shield },
 ];
 
 /* ------------------------------ helpers ------------------------------ */
@@ -148,22 +154,39 @@ function download(filename: string, content: string) {
 /* ------------------------------- Shell ------------------------------- */
 
 export default function AdminDashboard() {
-  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Pehle `/api/admin/me`, phir contacts.
+   *
+   * ⚠️ Pehle auth ki jaanch `/api/admin/data` se hoti thi. Ab wo Contacts ka
+   * route hai aur uspe permission lagi hai — yaani jis admin ke paas Contacts
+   * na ho, wo login hi na kar paata (401 ko "logged out" samajh liya jaata).
+   * Isliye pehchan ke liye ek alag, bina menu wala route chahiye tha.
+   */
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/data", { cache: "no-store" });
-      if (res.status === 401) {
-        setAuthed(false);
+      const meRes = await fetch("/api/admin/me", { cache: "no-store" });
+      if (!meRes.ok) {
+        setSession(null);
+        setData(null);
         return;
       }
-      setData((await res.json()) as Data);
-      setAuthed(true);
+      const me = (await meRes.json()) as { session: Session };
+      setSession(me.session);
+
+      // Contacts sirf tab jab uska menu ho — warna har refresh par ek 403.
+      if (me.session.menus.includes("contacts")) {
+        const res = await fetch("/api/admin/data", { cache: "no-store" });
+        setData(res.ok ? ((await res.json()) as Data) : { contacts: [] });
+      } else {
+        setData({ contacts: [] });
+      }
     } catch {
-      setAuthed(false);
+      setSession(null);
     } finally {
       setLoading(false);
     }
@@ -175,26 +198,35 @@ export default function AdminDashboard() {
 
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
-    setAuthed(false);
+    setSession(null);
     setData(null);
   }
 
-  if (authed === null) {
+  if (session === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-cream">
         <Loader size={44} />
       </div>
     );
   }
-  if (!authed) return <LoginGate onSuccess={load} />;
+  if (!session) return <LoginGate onSuccess={load} />;
 
-  return <Dashboard data={data} loading={loading} onRefresh={load} onLogout={logout} />;
+  return (
+    <Dashboard
+      session={session}
+      data={data}
+      loading={loading}
+      onRefresh={load}
+      onLogout={logout}
+    />
+  );
 }
 
 /* ------------------------------- Login ------------------------------- */
 
 function LoginGate({ onSuccess }: { onSuccess: () => void }) {
   const t = useAdminT();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading">("idle");
   const [error, setError] = useState("");
@@ -208,10 +240,20 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        setError(t.login.wrong);
+        // Server "pending" / "disabled" alag se batata hai — wo asli wajah
+        // dikhani chahiye, warna naya member "galat password" par atka rehta
+        // hai jabki uska password bilkul sahi hai.
+        const body = (await res.json().catch(() => ({}))) as { reason?: string };
+        setError(
+          body.reason === "pending"
+            ? t.login.pending
+            : body.reason === "disabled"
+              ? t.login.disabled
+              : t.login.wrong,
+        );
         setStatus("idle");
         return;
       }
@@ -238,13 +280,23 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         <h1 className="mt-5 font-display text-2xl font-semibold">{t.login.title}</h1>
         <p className="mt-1 text-sm text-ink-soft">{t.login.sub}</p>
         <input
-          type="password"
+          type="email"
           autoFocus
+          autoComplete="username"
+          placeholder={t.login.emailPh}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mt-5 h-12 w-full rounded-2xl border border-line bg-cream px-4 text-base outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
+        />
+        <input
+          type="password"
+          autoComplete="current-password"
           placeholder={t.login.placeholder}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="mt-5 h-12 w-full rounded-2xl border border-line bg-cream px-4 text-base outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
+          className="mt-3 h-12 w-full rounded-2xl border border-line bg-cream px-4 text-base outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
         />
+        <p className="mt-2 text-xs leading-relaxed text-ink-soft">{t.login.masterHint}</p>
         {error && <p className="mt-2 text-sm font-medium text-terracotta-dark">{error}</p>}
         <button
           type="submit"
@@ -261,20 +313,36 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
 /* ----------------------------- Dashboard ----------------------------- */
 
 function Dashboard({
+  session,
   data,
   loading,
   onRefresh,
   onLogout,
 }: {
+  session: Session;
   data: Data | null;
   loading: boolean;
   onRefresh: () => void;
   onLogout: () => void;
 }) {
   const t = useAdminT();
-  const [section, setSection] = useState<Section>("users");
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
+
+  // Sirf wahi menu jo is admin ko mile hain.
+  //
+  // ⚠️ Ye sirf dikhawa hai — asli rok server par har route ke `guard()` me hai.
+  // Yahan chhupana user ke liye hai (jo kaam nahi kar sakta wo dikhe hi na),
+  // suraksha ke liye nahi.
+  const nav = useMemo(() => NAV.filter((n) => session.menus.includes(n.key)), [session.menus]);
+
+  // Pehla menu jo ise mila hai — "users" har kisi ke paas nahi hota.
+  const [section, setSection] = useState<Section | null>(() => nav[0]?.key ?? null);
+
+  // Role beech me badal jaye aur khula hua menu chhin jaye to atak mat jao.
+  useEffect(() => {
+    if (section && !session.menus.includes(section)) setSection(nav[0]?.key ?? null);
+  }, [section, session.menus, nav]);
 
   const contacts = useMemo(() => data?.contacts ?? [], [data]);
 
@@ -304,9 +372,9 @@ function Dashboard({
     setNavOpen(false);
   }
 
-  const nav = (
+  const navEl = (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ key, icon: Icon }) => {
+      {nav.map(({ key, icon: Icon }) => {
         const active = section === key;
         return (
           <button
@@ -378,7 +446,7 @@ function Dashboard({
               </button>
             </div>
             {/* Desktop jaisa hi — sirf list scroll karti hai (item 2). */}
-            <div className="-mr-2 mt-7 min-h-0 flex-1 overflow-y-auto pr-2">{nav}</div>
+            <div className="no-scrollbar mt-7 min-h-0 flex-1 overflow-y-auto">{navEl}</div>
             <LogoutBtn onLogout={onLogout} className="mt-4 shrink-0" />
           </aside>
         </div>
@@ -394,10 +462,13 @@ function Dashboard({
 
             Ab sirf nav wala hissa scroll karta hai: brand upar chipka rehta
             hai, logout neeche chipka rehta hai, aur beech me list apne aap
-            scroll ho jaati hai. */}
+            scroll ho jaati hai.
+
+            Scrollbar khud chhupi hui hai (`.no-scrollbar`) — scroll poori tarah
+            chalta hai, bas patti nahi dikhti. */}
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-hidden border-r border-line bg-surface p-5 lg:flex">
           <Brand />
-          <div className="-mr-2 mt-8 min-h-0 flex-1 overflow-y-auto pr-2">{nav}</div>
+          <div className="no-scrollbar mt-8 min-h-0 flex-1 overflow-y-auto">{navEl}</div>
           <LogoutBtn onLogout={onLogout} className="mt-4 shrink-0" />
         </aside>
 
@@ -407,12 +478,14 @@ function Dashboard({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="font-display text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {t.headings[section].title}
+                  {section ? t.headings[section].title : t.common.admin}
                 </h1>
                 <p className="mt-1 text-sm text-ink-soft">
-                  {section === "contacts"
-                    ? atpl(t.contacts.countMsg, { n: contacts.length })
-                    : t.headings[section].sub}
+                  {!section
+                    ? ""
+                    : section === "contacts"
+                      ? atpl(t.contacts.countMsg, { n: contacts.length })
+                      : t.headings[section].sub}
                 </p>
               </div>
 
@@ -472,7 +545,15 @@ function Dashboard({
               {section === "blog" && <AdminBlog />}
               {section === "renewals" && <AdminRenewals />}
               {section === "deleteRequests" && <AdminDeleteRequests />}
-              {section === "contacts" && <ContactsView rows={filteredContacts} />}
+              {section === "team" && <AdminTeam meEmail={session.email} />}
+              {section === "contacts" && (
+                <ContactsView rows={filteredContacts} onReplied={onRefresh} />
+              )}
+              {/* Kisi role me ek bhi menu na ho to yahan khaali panna aata —
+                  aur wo "toot gaya" jaisa dikhta hai. Isliye saaf batao. */}
+              {!section && (
+                <Empty label={t.team.noRole} />
+              )}
             </div>
           </div>
         </main>
@@ -506,63 +587,250 @@ function LogoutBtn({ onLogout, className = "" }: { onLogout: () => void; classNa
 
 /* ------------------------------ Contacts ----------------------------- */
 
-function ContactsView({ rows }: { rows: ContactEntry[] }) {
+/**
+ * Contact messages — aur unka jawab, yahin se.
+ *
+ * ⚠️ Pehle yahan sirf ek `mailto:` link tha. Uska matlab tha: jawab admin ke
+ * apne pate se jaata, us par koi branding na hoti, aur kis message ka jawab de
+ * diya hai iska koi nishaan hi na bachta. 200 message ho jaane par sabse pehle
+ * wahi tootta hai — "isko jawab diya tha ya nahi?" ka koi jawab hi nahi hota.
+ */
+function ContactsView({ rows, onReplied }: { rows: ContactEntry[]; onReplied: () => void }) {
   const t = useAdminT();
-  const pager = usePagination(rows, 10, rows);
-  if (!rows.length) return <Empty label={t.contacts.empty} />;
+  const [onlyPending, setOnlyPending] = useState(false);
+  const [replyTo, setReplyTo] = useState<ContactEntry | null>(null);
+
+  const shown = useMemo(
+    () => (onlyPending ? rows.filter((r) => !r.repliedAt) : rows),
+    [rows, onlyPending],
+  );
+  const pending = useMemo(() => rows.filter((r) => !r.repliedAt).length, [rows]);
+
+  const pager = usePagination(shown, 10, shown);
+
   return (
     <div className="space-y-3">
-      {pager.pageItems.map((r, i) => (
-        <div
-          key={r.email + i}
-          className="rounded-3xl border border-line bg-surface p-5 shadow-soft transition hover:shadow-warm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-3">
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ backgroundColor: ["#C25A37", "#7C8A6B", "#E0A458"][i % 3] }}
-              >
-                {r.name.charAt(0).toUpperCase()}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-ink">{r.name}</p>
-                <a
-                  href={`mailto:${r.email}`}
-                  className="block truncate text-sm text-ink-soft transition hover:text-terracotta"
-                >
-                  {r.email}
-                </a>
+      {/* Jinka jawab baaki hai — wahi asli kaam ki list hai. */}
+      <div className="flex flex-wrap gap-2">
+        <FilterChip active={!onlyPending} onClick={() => setOnlyPending(false)}>
+          {t.contacts.all} ({rows.length})
+        </FilterChip>
+        <FilterChip active={onlyPending} onClick={() => setOnlyPending(true)}>
+          {t.contacts.onlyPending} ({pending})
+        </FilterChip>
+      </div>
+
+      {!shown.length ? (
+        <Empty label={t.contacts.empty} />
+      ) : (
+        <>
+          {pager.pageItems.map((r, i) => (
+            <div
+              key={r.id ?? r.email + i}
+              className="rounded-3xl border border-line bg-surface p-5 shadow-soft transition hover:shadow-warm"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                    style={{ backgroundColor: ["#C25A37", "#7C8A6B", "#E0A458"][i % 3] }}
+                  >
+                    {r.name.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-ink">{r.name}</p>
+                    <a
+                      href={`mailto:${r.email}`}
+                      className="block truncate text-sm text-ink-soft transition hover:text-terracotta"
+                    >
+                      {r.email}
+                    </a>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {r.repliedAt && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-sage/15 px-2.5 py-1 text-xs font-bold text-sage">
+                      <CheckCircle2 size={12} />
+                      {t.contacts.repliedTag}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-ink-soft">
+                    {timeAgo(r.createdAt, t.time)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-cream-deep/30 p-4 text-sm leading-relaxed text-ink">
+                {r.message}
+              </p>
+
+              {r.repliedAt && r.replyBody && (
+                <details className="mt-2 rounded-2xl border border-sage/30 bg-sage/5 p-4">
+                  <summary className="cursor-pointer text-xs font-semibold text-ink-soft">
+                    {atpl(t.contacts.repliedBy, {
+                      who: r.repliedBy ?? "—",
+                      when: fmt(r.repliedAt),
+                    })}
+                  </summary>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
+                    {r.replyBody}
+                  </p>
+                </details>
+              )}
+
+              <div className="mt-3 flex justify-end">
+                {/* `id` sirf Supabase wale store me hota hai. File-store (dev)
+                    me jawab bhej hi nahi sakte — tab purana mailto hi theek hai. */}
+                {r.id ? (
+                  <button
+                    onClick={() => setReplyTo(r)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-terracotta px-4 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark"
+                  >
+                    <Send size={14} />
+                    {t.contacts.reply}
+                  </button>
+                ) : (
+                  <a
+                    href={`mailto:${r.email}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:underline"
+                  >
+                    <Mail size={14} />
+                    {t.contacts.reply}
+                  </a>
+                )}
               </div>
             </div>
-            <span className="shrink-0 text-xs font-medium text-ink-soft">
-              {timeAgo(r.createdAt, t.time)}
-            </span>
-          </div>
-          <p className="mt-3 whitespace-pre-wrap break-words rounded-2xl bg-cream-deep/30 p-4 text-sm leading-relaxed text-ink">
-            {r.message}
-          </p>
-          <div className="mt-3 flex justify-end">
-            <a
-              href={`mailto:${r.email}`}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-terracotta hover:underline"
+          ))}
+          <Pagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            from={pager.from}
+            to={pager.to}
+            onPage={pager.setPage}
+            label="messages"
+          />
+        </>
+      )}
+
+      {replyTo && (
+        <ReplyModal
+          contact={replyTo}
+          onClose={() => setReplyTo(null)}
+          onSent={() => {
+            setReplyTo(null);
+            onReplied();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReplyModal({
+  contact,
+  onClose,
+  onSent,
+}: {
+  contact: ContactEntry;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const t = useAdminT();
+  const [reply, setReply] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending">("idle");
+  const [error, setError] = useState("");
+
+  async function send() {
+    if (status === "sending" || reply.trim().length < 2) return;
+    setStatus("sending");
+    setError("");
+    try {
+      const res = await fetch("/api/admin/contact-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: contact.id, reply: reply.trim() }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? t.contacts.failed);
+        setStatus("idle");
+        return;
+      }
+      onSent();
+    } catch {
+      setError(t.contacts.failed);
+      setStatus("idle");
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={atpl(t.contacts.replyTitle, { name: contact.name })}
+      subtitle={contact.email}
+      size="md"
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs text-terracotta-dark">{error}</span>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={onClose}
+              className="inline-flex h-10 items-center rounded-2xl border border-line bg-surface px-5 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
             >
-              <Mail size={14} />
-              {t.contacts.reply}
-            </a>
+              {t.common.cancel}
+            </button>
+            <button
+              onClick={send}
+              disabled={status === "sending" || reply.trim().length < 2}
+              className="inline-flex h-10 items-center gap-2 rounded-2xl bg-terracotta px-5 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-50"
+            >
+              <Send size={15} />
+              {status === "sending" ? t.contacts.sending : t.contacts.send}
+            </button>
           </div>
         </div>
-      ))}
-      <Pagination
-        page={pager.page}
-        pageCount={pager.pageCount}
-        total={pager.total}
-        from={pager.from}
-        to={pager.to}
-        onPage={pager.setPage}
-        label="messages"
+      }
+    >
+      {/* Unka message saamne rehna chahiye — jawab likhte waqt uske liye upar
+          scroll karna padta to aadha jawab uske bina hi likha jaata. */}
+      <p className="mb-1.5 text-xs font-semibold text-ink-soft">{t.contacts.original}</p>
+      <p className="mb-4 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-2xl bg-cream-deep/30 p-3.5 text-sm leading-relaxed text-ink">
+        {contact.message}
+      </p>
+      <textarea
+        autoFocus
+        rows={7}
+        value={reply}
+        onChange={(e) => setReply(e.target.value)}
+        placeholder={t.contacts.replyPh}
+        className="w-full resize-y rounded-2xl border border-line bg-cream p-4 text-sm leading-relaxed outline-none transition focus:border-terracotta focus:ring-4 focus:ring-terracotta/15"
       />
-    </div>
+    </Modal>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+        active
+          ? "bg-terracotta text-white shadow-warm"
+          : "border border-line bg-surface text-ink-soft hover:text-terracotta"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

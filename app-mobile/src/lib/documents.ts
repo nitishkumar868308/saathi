@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { canAddDocument, FREE_DOC_LIMIT } from "./plan";
-import { uploadFile } from "./storage";
+import { deleteDocumentFile, uploadDocument } from "./storage";
 import {
   readCachedDocs,
   removeCachedFile,
@@ -26,7 +26,7 @@ export type Document = {
   /** AI scan ka poora samajh — kya document hai, kaunse fields mile. */
   summary: string | null;
   file_uri: string | null; // local device path (fast offline view)
-  file_path: string | null; // Supabase Storage path (cloud backup)
+  file_path: string | null; // R2 ka rasta `<uid>/<docId>.<ext>` (cloud backup)
   file_size: number | null; // bytes
   mime_type: string | null;
   /** Plus expire hone pe 3 se aage ke documents lock ho jaate hain. */
@@ -34,31 +34,23 @@ export type Document = {
   created_at: string;
 };
 
-/** Storage upload ke baad document pe file info save karo. */
-export async function setDocumentFile(
-  id: string,
-  file_path: string,
-  file_size: number,
-  mime_type: string,
-): Promise<void> {
-  const { error } = await client()
-    .from("documents")
-    .update({ file_path, file_size, mime_type })
-    .eq("id", id);
-  if (error) throw error;
+/** Local file ke naam se uska type. Server bhi in hi chaar ko maanta hai. */
+function mimeFromUri(uri: string): string {
+  const ext = (uri.split("?")[0].split(".").pop() ?? "").toLowerCase();
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "pdf") return "application/pdf";
+  return "image/jpeg";
 }
 
-/** Local image ko private `documents` bucket me upload + document pe info save. */
+/**
+ * Document ki file R2 pe chadhao.
+ *
+ * `file_path` / `file_size` / `mime_type` ab server khud bharta hai (upload ke
+ * baad R2 se asli size poochh kar) — isliye yahan koi DB update nahi hai.
+ */
 export async function uploadDocumentImage(docId: string, localUri: string): Promise<void> {
-  const sb = client();
-  const { data: u } = await sb.auth.getUser();
-  const uid = u.user?.id;
-  if (!uid) return;
-  const ext = (localUri.split(".").pop() || "jpg").split("?")[0].slice(0, 5) || "jpg";
-  const mime = ext.toLowerCase() === "png" ? "image/png" : "image/jpeg";
-  const path = `${uid}/${docId}.${ext}`;
-  const { size } = await uploadFile("documents", path, localUri, mime);
-  await setDocumentFile(docId, path, size, mime);
+  await uploadDocument(docId, localUri, mimeFromUri(localUri));
 }
 
 function client() {
@@ -162,6 +154,10 @@ export async function deleteDocument(doc: Document): Promise<void> {
   if (error) throw error;
 
   await removeCachedFile(doc);
+  // Cloud copy bhi jaani chahiye. ⚠️ Pehle sirf DB row aur local cache hatti
+  // thi — bucket me file padi rehti thi: user ke liye "delete", bill me zinda,
+  // aur kisi purane signed URL se abhi bhi khulne layak.
+  if (doc.file_path) await deleteDocumentFile(doc.file_path);
   // Metadata cache bhi turant sudhaaro — warna offline jaate hi delete kiya
   // hua document wapas list me aa jaata.
   const uid = await currentUid();

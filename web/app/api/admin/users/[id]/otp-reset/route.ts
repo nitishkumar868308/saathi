@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { otpResetUser, otpStatus } from "@/lib/phone";
 
 export const runtime = "nodejs";
@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
  * raha"). Doosre par reset dena aksar galti hoti hai.
  */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const g = await guard("users");
+  if (!g.ok) return g.res;
   try {
     return NextResponse.json({ status: await otpStatus(params.id) });
   } catch (err) {
@@ -37,7 +38,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
  * liye faydemand hai jise rokna tha.
  */
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const g = await guard("users");
+  if (!g.ok) return g.res;
   try {
     const cleared = await otpResetUser(params.id);
     return NextResponse.json({ ok: true, cleared, status: await otpStatus(params.id) });

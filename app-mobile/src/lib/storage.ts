@@ -2,28 +2,38 @@ import * as FileSystem from "expo-file-system/legacy";
 
 import { supabase } from "./supabase";
 
-/** Base64 → Uint8Array (bina kisi runtime dependency ke). */
-export function base64ToBytes(b64: string): Uint8Array {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+/**
+ * File storage — Cloudflare R2 (documents + profile photo).
+ *
+ * App khud R2 se baat NAHI karti. R2 ki access key poore bucket ka master key
+ * hai; wo app me rakh dena matlab ek APK khol kar koi bhi sabki files padh le.
+ * Isliye raasta ye hai:
+ *
+ *     1. app  -> web  : "mujhe upload karna hai" (apne Supabase token ke saath)
+ *     2. web  -> app  : ek chhoti umar (5 min) ka presigned PUT URL
+ *     3. app  -> R2   : seedha file (bytes phone se R2, beech me web nahi)
+ *     4. app  -> web  : "ho gaya" — web R2 se asli size poochh kar DB bharta hai
+ *
+ * Kadam 3 seedha isliye hai ki 10 MB ki file web server se ho kar nikalne ka
+ * koi fayda nahi — kharcha bhi, dher bhi. Kadam 4 isliye ki presigned PUT par
+ * size ki koi rok lag hi nahi sakti; sach upload ke baad hi pata chalta hai.
+ */
 
-  let len = b64.length;
-  while (len > 0 && b64[len - 1] === "=") len--; // padding
-  const outLen = (len * 3) >> 2;
-  const bytes = new Uint8Array(outLen);
+const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://www.apkasaathi.com";
 
-  let p = 0;
-  for (let i = 0; i < len; i += 4) {
-    const c0 = lookup[b64.charCodeAt(i)];
-    const c1 = lookup[b64.charCodeAt(i + 1)];
-    const c2 = i + 2 < len ? lookup[b64.charCodeAt(i + 2)] : 0;
-    const c3 = i + 3 < len ? lookup[b64.charCodeAt(i + 3)] : 0;
-    if (p < outLen) bytes[p++] = (c0 << 2) | (c1 >> 4);
-    if (p < outLen) bytes[p++] = ((c1 & 15) << 4) | (c2 >> 2);
-    if (p < outLen) bytes[p++] = ((c2 & 3) << 6) | c3;
+/** Net nahi tha — "fail" se alag, taaki user ko sahi baat batayi ja sake. */
+export class StorageOfflineError extends Error {
+  constructor() {
+    super("Net nahi hai");
+    this.name = "StorageOfflineError";
   }
-  return bytes;
+}
+
+export class StorageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageError";
+  }
 }
 
 /** Local file ka size (bytes). Na mile to 0. */
@@ -32,37 +42,125 @@ export async function fileSizeBytes(uri: string): Promise<number> {
   return info.exists && "size" in info ? info.size : 0;
 }
 
-/**
- * Local image/file ko Supabase Storage me upload karo (upsert).
- * Uploaded size (bytes) lautata hai.
- */
-export async function uploadFile(
-  bucket: string,
-  path: string,
-  uri: string,
-  contentType: string,
-): Promise<{ size: number }> {
-  if (!supabase) throw new Error("Supabase set nahi hai");
-  const b64 = await FileSystem.readAsStringAsync(uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const data = base64ToBytes(b64);
-  const { error } = await supabase.storage.from(bucket).upload(path, data, {
-    contentType,
-    upsert: true,
-  });
-  if (error) throw error;
-  return { size: data.byteLength };
+/* ------------------------------- web se baat ------------------------------- */
+
+async function api<T>(path: string, body: unknown): Promise<T> {
+  if (!supabase) throw new StorageError("Supabase set nahi hai");
+
+  // Server pehchan SIRF is token se karta hai — user id bhejne ka koi matlab
+  // nahi (aur bhejni bhi nahi chahiye).
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new StorageError("Login zaroori hai");
+
+  let res: Response;
+  try {
+    res = await fetch(`${WEB_URL}/api/storage/${path}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new StorageOfflineError();
+  }
+
+  if (!res.ok) {
+    const out = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new StorageError(out.error ?? `storage ${res.status}`);
+  }
+  return (await res.json()) as T;
 }
 
-/** Private file ka short-lived signed URL (dekhne ke liye). */
-export async function signedUrl(
-  bucket: string,
-  path: string,
-  expiresIn = 3600,
-): Promise<string | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
-  if (error) return null;
-  return data?.signedUrl ?? null;
+/* --------------------------------- upload --------------------------------- */
+
+/**
+ * Local file ko R2 pe chadhao.
+ *
+ * ⚠️ `uploadAsync` file ko seedha stream karta hai. Pehle wala tareeka file ko
+ * base64 me padh kar memory me rakhta tha — 10 MB ki PDF wahan ~13 MB ki string
+ * ban jaati thi, aur purane phone par wahi jagah app ko maar deti hai.
+ */
+async function putFile(url: string, uri: string, contentType: string): Promise<void> {
+  let res: FileSystem.FileSystemUploadResult;
+  try {
+    res = await FileSystem.uploadAsync(url, uri, {
+      httpMethod: "PUT",
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      // Content-Type signature ka hissa hai — badal diya to R2 403 dega.
+      headers: { "Content-Type": contentType },
+    });
+  } catch {
+    throw new StorageOfflineError();
+  }
+  if (res.status < 200 || res.status >= 300) {
+    throw new StorageError(`upload fail (${res.status})`);
+  }
+}
+
+/** Profile photo. Upload ke baad uska permanent URL lautata hai. */
+export async function uploadAvatar(
+  uri: string,
+  contentType = "image/jpeg",
+): Promise<{ size: number; url: string }> {
+  const { url } = await api<{ url: string }>("upload-url", {
+    kind: "avatar",
+    contentType,
+  });
+  await putFile(url, uri, contentType);
+
+  const done = await api<{ size: number }>("commit", { kind: "avatar", contentType });
+
+  const { data } = await supabase!.auth.getSession();
+  const uid = data.session?.user?.id ?? "";
+  // `?t=` isliye ki photo badalne par purani cached image chipki na rah jaye.
+  return { size: done.size, url: `${WEB_URL}/api/avatar/${uid}?t=${Date.now()}` };
+}
+
+/**
+ * Document ki file. Server khud `documents` row me path/size/type bhar deta hai.
+ * DB me jaane wala path (`<uid>/<docId>.<ext>`) lautata hai.
+ */
+export async function uploadDocument(
+  docId: string,
+  uri: string,
+  contentType: string,
+): Promise<{ path: string; size: number }> {
+  const { url } = await api<{ url: string; path: string }>("upload-url", {
+    kind: "document",
+    docId,
+    contentType,
+  });
+  await putFile(url, uri, contentType);
+  return api<{ path: string; size: number }>("commit", {
+    kind: "document",
+    docId,
+    contentType,
+  });
+}
+
+/* -------------------------------- padhna --------------------------------- */
+
+/**
+ * Apni document file ka short-lived URL (dekhne/utaarne ke liye).
+ * Kuch bhi gadbad ho to `null` — caller ko rukna nahi chahiye.
+ */
+export async function documentUrl(path: string): Promise<string | null> {
+  try {
+    const { url } = await api<{ url: string }>("download-url", { path });
+    return url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Document delete hua — R2 ki file bhi le jao. */
+export async function deleteDocumentFile(path: string): Promise<void> {
+  try {
+    await api("delete", { path });
+  } catch {
+    /* file reh gayi to reh gayi — user ka kaam yahan rukna nahi chahiye */
+  }
 }

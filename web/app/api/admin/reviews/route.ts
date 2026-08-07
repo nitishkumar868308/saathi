@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import {
   getReviews,
   setReviewStatus,
@@ -13,9 +13,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("reviews");
+  if (!g.ok) return g.res;
   try {
     const reviews = await getReviews();
     return NextResponse.json({ reviews });
@@ -35,9 +34,8 @@ export async function GET() {
  * nahi hai — wo app se sirf user khud badal sakta hai.
  */
 export async function PATCH(req: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("reviews");
+  if (!g.ok) return g.res;
   try {
     const body = (await req.json()) as { id?: unknown; status?: unknown };
     const id = typeof body.id === "string" ? body.id.trim() : "";

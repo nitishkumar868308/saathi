@@ -3,6 +3,8 @@
  * web/lib/store.ts jaisa hi Supabase REST fetch pattern.
  */
 
+import { headObject, presignDownload, r2Configured, r2Key, R2NotConfigured } from "@/lib/r2";
+
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -600,29 +602,23 @@ export async function getDocuments(
 }
 
 /**
- * Private `documents` bucket ke file_path ka short-lived signed URL (preview ke liye).
- * Sirf server (service_role). expiresIn seconds me.
+ * Document ke `file_path` ka short-lived URL (admin preview ke liye).
+ *
+ * File ab Cloudflare R2 par hai (`documents/<uid>/<docId>.<ext>`), Supabase
+ * Storage par nahi. Bucket poora private hai — dekhne ka ek hi raasta ye
+ * presigned URL hai, aur wo do minute me mar jaata hai.
  */
 export async function getDocumentSignedUrl(
   filePath: string,
   expiresIn = 120,
 ): Promise<string | null> {
-  assertConfigured();
+  if (!r2Configured()) throw new R2NotConfigured();
   const clean = filePath.replace(/^\/+/, "");
-  const res = await fetch(
-    `${SUPABASE_URL}/storage/v1/object/sign/documents/${encodeURI(clean)}`,
-    {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({ expiresIn }),
-      cache: "no-store",
-    },
-  );
-  if (!res.ok) return null;
-  const body = (await res.json()) as { signedURL?: string };
-  if (!body.signedURL) return null;
-  // signedURL relative hota hai (e.g. /object/sign/documents/...) — full bana do.
-  return `${SUPABASE_URL}/storage/v1${body.signedURL}`;
+  if (!clean || clean.includes("..") || clean.includes("\\")) return null;
+  const url = presignDownload(r2Key.documentPath(clean), expiresIn);
+  // Object hai bhi ya nahi — warna admin ko ek chalta-firta URL milta hai jo
+  // khulne par R2 ka XML error dikhata hai ("file storage me nahi" ki jagah).
+  return (await headObject(r2Key.documentPath(clean))) ? url : null;
 }
 
 export type RewardStats = {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,8 +72,10 @@ function headers(extra?: Record<string, string>) {
   };
 }
 
-function guard() {
-  if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+/** Har handler ka pehla pehra — 401/403/503 ka response, ya null (sab theek). */
+async function denied(): Promise<NextResponse | null> {
+  const g = await guard("deleteRequests");
+  if (!g.ok) return g.res;
   if (!SUPABASE_URL || !SUPABASE_KEY)
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   return null;
@@ -121,7 +123,7 @@ async function listUserFiles(uid: string): Promise<string[]> {
 }
 
 export async function GET() {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
 
   try {
@@ -187,7 +189,7 @@ async function inventory(uid: string) {
 }
 
 export async function POST(request: Request) {
-  const bad = guard();
+  const bad = await denied();
   if (bad) return bad;
 
   let body: Record<string, unknown>;

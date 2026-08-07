@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import {
   getConfig,
   setConfig,
@@ -13,9 +13,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard(["rewards", "pricing"]);
+  if (!g.ok) return g.res;
   try {
     const [config, stats] = await Promise.all([getConfig(), getRewardStats()]);
     return NextResponse.json({ config, stats });
@@ -29,9 +28,8 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard(["rewards", "pricing"]);
+  if (!g.ok) return g.res;
 
   let body: Record<string, unknown>;
   try {

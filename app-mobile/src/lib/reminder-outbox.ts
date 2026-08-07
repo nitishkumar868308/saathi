@@ -189,7 +189,31 @@ export async function saveReminder(input: OutboxInput): Promise<SaveResult> {
  * alarm bhi — warna wo alarm hamesha bajta rehta aur uske peeche koi reminder
  * hota hi nahi.
  */
-export async function flushOutbox(): Promise<{ sent: number; dropped: number }> {
+let flushing: Promise<{ sent: number; dropped: number }> | null = null;
+
+export function flushOutbox(): Promise<{ sent: number; dropped: number }> {
+  // ⚠️ Ek waqt me sirf EK flush.
+  //
+  // Ise do jagah se bulaya jaata hai (`_layout.tsx`): login hone par, aur app ke
+  // wapas saamne aane par. Ye dono aksar ek hi pal me hote hain — login ke baad
+  // permission ka dialog band hote hi AppState "active" ho jaata hai.
+  //
+  // Bina is rok ke dono `read()` se WAHI list uthate the aur dono usi reminder
+  // ko server par insert kar dete the. Natija: ek hi reminder do baar, dono ke
+  // apne alarm, aur user ko do baar bajta hua reminder — jiski wajah kahin
+  // dikhti bhi nahi. `write(left)` bhi aakhir me chalta hai, isliye ek flush
+  // doosre ka kaam mita bhi sakta tha.
+  //
+  // Chalu flush ka wahi promise wapas de dete hain: dono callers ko sahi ginti
+  // milti hai aur `.finally(syncNotifications)` bhi theek waqt par chalta hai.
+  if (flushing) return flushing;
+  flushing = runFlush().finally(() => {
+    flushing = null;
+  });
+  return flushing;
+}
+
+async function runFlush(): Promise<{ sent: number; dropped: number }> {
   const list = await read();
   if (list.length === 0) return { sent: 0, dropped: 0 };
 

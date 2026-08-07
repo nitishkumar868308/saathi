@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { getDocuments, RewardsNotConfigured } from "@/lib/rewards-server";
 
 export const runtime = "nodejs";
@@ -28,9 +28,8 @@ function rangeOf(key: string): { from?: string; to?: string } {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("documents");
+  if (!g.ok) return g.res;
   const url = new URL(request.url);
   const range = rangeOf(url.searchParams.get("range") ?? "all");
 

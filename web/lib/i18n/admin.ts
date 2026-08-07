@@ -38,6 +38,11 @@ export type AdminDict = {
     button: string;
     wrong: string;
     error: string;
+    /** Email + password wale login ke liye (admin ab ek se zyada ho sakte hain). */
+    emailPh: string;
+    masterHint: string;
+    pending: string;
+    disabled: string;
   };
   nav: {
     users: string;
@@ -57,6 +62,7 @@ export type AdminDict = {
     rewards: string;
     renewals: string;
     deleteRequests: string;
+    team: string;
   };
   headings: Record<
     | "rewards"
@@ -75,7 +81,8 @@ export type AdminDict = {
     | "seo"
     | "blog"
     | "renewals"
-    | "deleteRequests",
+    | "deleteRequests"
+    | "team",
     { title: string; sub: string }
   >;
   broadcast: {
@@ -262,6 +269,76 @@ export type AdminDict = {
     empty: string;
     searchPh: string;
     reply: string;
+    /** Panel se hi jawab bhejne wala modal. */
+    replyTitle: string;
+    replyPh: string;
+    original: string;
+    send: string;
+    sending: string;
+    sent: string;
+    failed: string;
+    repliedTag: string;
+    repliedBy: string; // {who} {when}
+    seeReply: string;
+    onlyPending: string;
+    all: string;
+  };
+  /** Admin team — roles, members, sidebar permissions. */
+  team: {
+    rolesTitle: string;
+    rolesSub: string;
+    membersTitle: string;
+    membersSub: string;
+    newRole: string;
+    editRole: string;
+    roleName: string;
+    roleNamePh: string;
+    menusLabel: string;
+    menusHint: string;
+    noRoles: string;
+    memberCount: string; // {n}
+    deleteRoleConfirm: string; // {name}
+    invite: string;
+    inviteTitle: string;
+    nameLabel: string;
+    namePh: string;
+    emailLabel: string;
+    emailPh: string;
+    roleLabel: string;
+    noRole: string;
+    inviteBtn: string;
+    inviting: string;
+    inviteSent: string; // {email}
+    inviteNoMail: string;
+    passwordIs: string; // {password}
+    copy: string;
+    copied: string;
+    statusPending: string;
+    statusActive: string;
+    statusDisabled: string;
+    approve: string;
+    disable: string;
+    enable: string;
+    newPassword: string;
+    newPasswordSent: string;
+    remove: string;
+    removeConfirm: string; // {email}
+    overrideTitle: string;
+    overrideHint: string;
+    extraLabel: string;
+    deniedLabel: string;
+    effective: string;
+    lastLogin: string;
+    never: string;
+    addedBy: string;
+    noMembers: string;
+    masterOnly: string;
+    emailOff: string;
+    saved: string;
+    failed: string;
+    you: string;
+    master: string;
+    masterNote: string;
   };
   /**
    * Data components (Users, Usage, Documents, Reviews, Logs, Pricing, Rewards).
@@ -630,6 +707,10 @@ const en: AdminDict = {
     button: "Login",
     wrong: "Wrong password 🙈",
     error: "Something went wrong.",
+    emailPh: "Email (leave blank for master)",
+    masterHint: "Master admin: leave the email blank and enter the .env password.",
+    pending: "Your account hasn't been approved yet — ask the master admin.",
+    disabled: "This account has been turned off.",
   },
   nav: {
     support: "Support",
@@ -649,6 +730,7 @@ const en: AdminDict = {
     rewards: "Rewards",
     renewals: "Renew guides",
     deleteRequests: "Delete requests",
+    team: "Admin team",
   },
   headings: {
     support: { title: "Support", sub: "Questions raised from the app — read the whole thread and reply. Your reply reaches them in the app, by email and as a notification." },
@@ -667,6 +749,7 @@ const en: AdminDict = {
     reviews: { title: "Reviews & Ratings", sub: "Reviews from the app. A review reaches the website only when the user allowed it AND you approve it — nothing goes live on its own." },
     logs: { title: "Logs & Issues", sub: "What broke in app/web — full stack + context. New errors also go to email." },
     contacts: { title: "Contact messages", sub: "" },
+    team: { title: "Admin team", sub: "Create roles, decide which menus each role sees, and invite people. New members stay pending until you approve them." },
     message: { title: "Message users", sub: "Email registered users — everyone or just inactive ones (who never used the app)." },
   },
   broadcast: {
@@ -819,6 +902,74 @@ const en: AdminDict = {
     empty: "No messages yet.",
     searchPh: "Search messages…",
     reply: "Reply",
+    replyTitle: "Reply to {name}",
+    replyPh: "Write your reply…",
+    original: "Their message",
+    send: "Send reply",
+    sending: "Sending…",
+    sent: "Reply sent ✅",
+    failed: "Could not send the reply.",
+    repliedTag: "Replied",
+    repliedBy: "Replied by {who} · {when}",
+    seeReply: "See reply",
+    onlyPending: "Not replied",
+    all: "All",
+  },
+  team: {
+    rolesTitle: "Roles",
+    rolesSub: "A role decides which sidebar menus its members see.",
+    membersTitle: "Members",
+    membersSub: "Everyone who can sign in to this panel.",
+    newRole: "New role",
+    editRole: "Edit role",
+    roleName: "Role name",
+    roleNamePh: "e.g. Support Staff",
+    menusLabel: "Menus this role can open",
+    menusHint: "Unticked menus are hidden from the sidebar and their API is blocked too.",
+    noRoles: "No roles yet.",
+    memberCount: "{n} members",
+    deleteRoleConfirm: "Delete the role “{name}”? Its members stay, but they lose all menus until you give them another role.",
+    invite: "Invite member",
+    inviteTitle: "Invite a new member",
+    nameLabel: "Name",
+    namePh: "e.g. Riya Sharma",
+    emailLabel: "Email",
+    emailPh: "name@gmail.com",
+    roleLabel: "Role",
+    noRole: "No role (no menus)",
+    inviteBtn: "Send invite",
+    inviting: "Sending…",
+    inviteSent: "Login details emailed to {email} ✅",
+    inviteNoMail: "Member added, but the email could not be sent. Share this password yourself:",
+    passwordIs: "Password: {password}",
+    copy: "Copy",
+    copied: "Copied ✅",
+    statusPending: "Pending",
+    statusActive: "Active",
+    statusDisabled: "Off",
+    approve: "Approve",
+    disable: "Turn off",
+    enable: "Turn on",
+    newPassword: "New password",
+    newPasswordSent: "A new password has been emailed ✅",
+    remove: "Remove",
+    removeConfirm: "Remove {email} from the admin team?",
+    overrideTitle: "Just for this person",
+    overrideHint: "On top of the role. A blocked menu always wins, even if the role allows it.",
+    extraLabel: "Also allow",
+    deniedLabel: "Always block",
+    effective: "Gets",
+    lastLogin: "Last login",
+    never: "Never",
+    addedBy: "Added by",
+    noMembers: "Nobody added yet.",
+    masterOnly: "Only the master admin can change the team.",
+    emailOff: "⚠️ Email is not configured (SMTP env) — invites will not go out.",
+    saved: "Saved ✅",
+    failed: "Could not save.",
+    you: "you",
+    master: "Master",
+    masterNote: "The master admin signs in with the .env password and always sees every menu.",
   },
   data: {
     shared: {
@@ -1068,6 +1219,10 @@ const hi: AdminDict = {
     button: "लॉगिन",
     wrong: "गलत पासवर्ड 🙈",
     error: "कुछ गड़बड़ हो गई।",
+    emailPh: "ईमेल (मास्टर के लिए खाली छोड़ें)",
+    masterHint: "मास्टर एडमिन: ईमेल खाली छोड़ें और .env वाला पासवर्ड डालें।",
+    pending: "आपका अकाउंट अभी अप्रूव नहीं हुआ — मास्टर एडमिन से कहिए।",
+    disabled: "यह अकाउंट बंद कर दिया गया है।",
   },
   nav: {
     support: "सपोर्ट",
@@ -1087,6 +1242,7 @@ const hi: AdminDict = {
     rewards: "रिवॉर्ड्स",
     renewals: "रिन्यू गाइड",
     deleteRequests: "डिलीट रिक्वेस्ट",
+    team: "एडमिन टीम",
   },
   headings: {
     support: { title: "सपोर्ट", sub: "ऐप से आए सवाल — पूरी बातचीत पढ़िए और जवाब दीजिए। जवाब ऐप, ईमेल और नोटिफ़िकेशन तीनों जगह पहुँचता है।" },
@@ -1105,6 +1261,7 @@ const hi: AdminDict = {
     reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़। वेबसाइट पर रिव्यू तभी जाता है जब यूज़र ने अनुमति दी हो और आप मंज़ूरी दें — अपने आप कुछ लाइव नहीं होता।" },
     logs: { title: "लॉग्स और इशू", sub: "ऐप/वेब में क्या टूटा — पूरा stack + context. नए errors ईमेल पर भी जाते हैं।" },
     contacts: { title: "कॉन्टैक्ट मैसेज", sub: "" },
+    team: { title: "एडमिन टीम", sub: "रोल बनाइए, तय कीजिए कि किस रोल को कौन-से मेन्यू दिखें, और लोगों को जोड़िए। नया मेंबर आपके अप्रूव करने तक pending रहता है।" },
     message: { title: "यूज़र्स को मैसेज", sub: "रजिस्टर्ड यूज़र्स को ईमेल भेजें — सभी को या सिर्फ़ inactive (जिन्होंने कभी उपयोग नहीं किया)।" },
   },
   broadcast: {
@@ -1258,6 +1415,74 @@ const hi: AdminDict = {
     empty: "अभी कोई मैसेज नहीं।",
     searchPh: "मैसेज खोजें…",
     reply: "जवाब दें",
+    replyTitle: "{name} को जवाब",
+    replyPh: "अपना जवाब लिखिए…",
+    original: "उनका मैसेज",
+    send: "जवाब भेजें",
+    sending: "भेज रहे हैं…",
+    sent: "जवाब भेज दिया ✅",
+    failed: "जवाब नहीं भेजा जा सका।",
+    repliedTag: "जवाब दिया",
+    repliedBy: "{who} ने जवाब दिया · {when}",
+    seeReply: "जवाब देखें",
+    onlyPending: "जिनका जवाब बाकी है",
+    all: "सभी",
+  },
+  team: {
+    rolesTitle: "रोल",
+    rolesSub: "रोल तय करता है कि उसके मेंबर को साइडबार में कौन-से मेन्यू दिखेंगे।",
+    membersTitle: "मेंबर",
+    membersSub: "वे सब जो इस पैनल में लॉगिन कर सकते हैं।",
+    newRole: "नया रोल",
+    editRole: "रोल बदलें",
+    roleName: "रोल का नाम",
+    roleNamePh: "जैसे Support Staff",
+    menusLabel: "इस रोल को कौन-से मेन्यू खुलेंगे",
+    menusHint: "बिना टिक वाले मेन्यू साइडबार में नहीं दिखते, और उनका API भी बंद रहता है।",
+    noRoles: "अभी कोई रोल नहीं।",
+    memberCount: "{n} मेंबर",
+    deleteRoleConfirm: "रोल “{name}” हटाएँ? उसके मेंबर बने रहेंगे, पर नया रोल देने तक उन्हें कोई मेन्यू नहीं मिलेगा।",
+    invite: "मेंबर जोड़ें",
+    inviteTitle: "नया मेंबर जोड़ें",
+    nameLabel: "नाम",
+    namePh: "जैसे Riya Sharma",
+    emailLabel: "ईमेल",
+    emailPh: "name@gmail.com",
+    roleLabel: "रोल",
+    noRole: "कोई रोल नहीं (कोई मेन्यू नहीं)",
+    inviteBtn: "इनवाइट भेजें",
+    inviting: "भेज रहे हैं…",
+    inviteSent: "लॉगिन की जानकारी {email} पर भेज दी ✅",
+    inviteNoMail: "मेंबर जुड़ गया, पर ईमेल नहीं जा सका। यह पासवर्ड खुद भेज दीजिए:",
+    passwordIs: "पासवर्ड: {password}",
+    copy: "कॉपी",
+    copied: "कॉपी हो गया ✅",
+    statusPending: "पेंडिंग",
+    statusActive: "चालू",
+    statusDisabled: "बंद",
+    approve: "अप्रूव करें",
+    disable: "बंद करें",
+    enable: "चालू करें",
+    newPassword: "नया पासवर्ड",
+    newPasswordSent: "नया पासवर्ड ईमेल कर दिया ✅",
+    remove: "हटाएँ",
+    removeConfirm: "{email} को एडमिन टीम से हटाएँ?",
+    overrideTitle: "सिर्फ़ इस व्यक्ति के लिए",
+    overrideHint: "रोल के ऊपर। रोक हमेशा भारी पड़ती है, चाहे रोल में वह मेन्यू हो।",
+    extraLabel: "यह भी दें",
+    deniedLabel: "यह कभी नहीं",
+    effective: "मिलता है",
+    lastLogin: "पिछला लॉगिन",
+    never: "कभी नहीं",
+    addedBy: "जोड़ा",
+    noMembers: "अभी कोई नहीं जोड़ा गया।",
+    masterOnly: "टीम सिर्फ़ मास्टर एडमिन बदल सकता है।",
+    emailOff: "⚠️ ईमेल सेट नहीं है (SMTP env) — इनवाइट नहीं जाएँगे।",
+    saved: "सेव हो गया ✅",
+    failed: "सेव नहीं हुआ।",
+    you: "आप",
+    master: "मास्टर",
+    masterNote: "मास्टर एडमिन .env वाले पासवर्ड से लॉगिन करता है और उसे हमेशा सारे मेन्यू दिखते हैं।",
   },
   data: {
     shared: {
@@ -1509,6 +1734,10 @@ const hinglish: AdminDict = {
     button: "Login",
     wrong: "Galat password 🙈",
     error: "Kuch gadbad ho gayi.",
+    emailPh: "Email (master ke liye khaali chhodo)",
+    masterHint: "Master admin: email khaali chhodo aur .env wala password daalo.",
+    pending: "Aapka account abhi approve nahi hua — master admin se kahiye.",
+    disabled: "Ye account band kar diya gaya hai.",
   },
   nav: {
     support: "Support",
@@ -1528,6 +1757,7 @@ const hinglish: AdminDict = {
     rewards: "Rewards",
     renewals: "Renew guides",
     deleteRequests: "Delete requests",
+    team: "Admin team",
   },
   headings: {
     support: { title: "Support", sub: "App se aaye sawaal — poori baatcheet padhiye aur jawab dijiye. Jawab app, email aur notification teeno jagah pahunchta hai." },
@@ -1546,6 +1776,7 @@ const hinglish: AdminDict = {
     reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews. Website par review tabhi jaata hai jab user ne anumati di ho AUR aap manzoori dein — apne aap kuch live nahi hota." },
     logs: { title: "Logs & Issues", sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain." },
     contacts: { title: "Contact messages", sub: "" },
+    team: { title: "Admin team", sub: "Role banao, tay karo kis role ko kaun se menu dikhein, aur logon ko jodo. Naya member tumhare approve karne tak pending rehta hai." },
     message: { title: "Message users", sub: "Registered users ko email bhejo — sabhi ko ya sirf inactive (jinhone kabhi use nahi kiya)." },
   },
   broadcast: {
@@ -1698,6 +1929,74 @@ const hinglish: AdminDict = {
     empty: "Abhi koi message nahi.",
     searchPh: "Message khojo…",
     reply: "Reply",
+    replyTitle: "{name} ko jawab",
+    replyPh: "Apna jawab likho…",
+    original: "Unka message",
+    send: "Jawab bhejo",
+    sending: "Bhej rahe hain…",
+    sent: "Jawab bhej diya ✅",
+    failed: "Jawab nahi ja saka.",
+    repliedTag: "Jawab diya",
+    repliedBy: "{who} ne jawab diya · {when}",
+    seeReply: "Jawab dekho",
+    onlyPending: "Jinka jawab baaki hai",
+    all: "Sab",
+  },
+  team: {
+    rolesTitle: "Roles",
+    rolesSub: "Role tay karta hai ki uske member ko sidebar me kaun se menu dikhenge.",
+    membersTitle: "Members",
+    membersSub: "Wo sab jo is panel me login kar sakte hain.",
+    newRole: "Naya role",
+    editRole: "Role badlo",
+    roleName: "Role ka naam",
+    roleNamePh: "jaise Support Staff",
+    menusLabel: "Is role ko kaun se menu khulenge",
+    menusHint: "Bina tick wale menu sidebar me nahi dikhte, aur unka API bhi band rehta hai.",
+    noRoles: "Abhi koi role nahi.",
+    memberCount: "{n} member",
+    deleteRoleConfirm: "Role “{name}” hata dein? Uske member bane rahenge, par naya role dene tak unhe koi menu nahi milega.",
+    invite: "Member jodo",
+    inviteTitle: "Naya member jodo",
+    nameLabel: "Naam",
+    namePh: "jaise Riya Sharma",
+    emailLabel: "Email",
+    emailPh: "name@gmail.com",
+    roleLabel: "Role",
+    noRole: "Koi role nahi (koi menu nahi)",
+    inviteBtn: "Invite bhejo",
+    inviting: "Bhej rahe hain…",
+    inviteSent: "Login ki jaankari {email} par bhej di ✅",
+    inviteNoMail: "Member jud gaya, par email nahi ja saka. Ye password khud bhej dijiye:",
+    passwordIs: "Password: {password}",
+    copy: "Copy",
+    copied: "Copy ho gaya ✅",
+    statusPending: "Pending",
+    statusActive: "Chalu",
+    statusDisabled: "Band",
+    approve: "Approve karo",
+    disable: "Band karo",
+    enable: "Chalu karo",
+    newPassword: "Naya password",
+    newPasswordSent: "Naya password email kar diya ✅",
+    remove: "Hatao",
+    removeConfirm: "{email} ko admin team se hata dein?",
+    overrideTitle: "Sirf is bande ke liye",
+    overrideHint: "Role ke upar. Rok hamesha bhaari padti hai, chahe role me wo menu ho.",
+    extraLabel: "Ye bhi do",
+    deniedLabel: "Ye kabhi nahi",
+    effective: "Milta hai",
+    lastLogin: "Pichhla login",
+    never: "Kabhi nahi",
+    addedBy: "Joda",
+    noMembers: "Abhi koi nahi joda gaya.",
+    masterOnly: "Team sirf master admin badal sakta hai.",
+    emailOff: "⚠️ Email set nahi hai (SMTP env) — invite nahi jayenge.",
+    saved: "Save ho gaya ✅",
+    failed: "Save nahi hua.",
+    you: "aap",
+    master: "Master",
+    masterNote: "Master admin .env wale password se login karta hai aur use hamesha saare menu dikhte hain.",
   },
   data: {
     shared: {

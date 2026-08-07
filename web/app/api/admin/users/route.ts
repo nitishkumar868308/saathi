@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { getUsers, RewardsNotConfigured } from "@/lib/rewards-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("users");
+  if (!g.ok) return g.res;
   try {
     const users = await getUsers();
     return NextResponse.json({ users });

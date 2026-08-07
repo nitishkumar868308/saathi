@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,9 +39,8 @@ async function rpc<T>(fn: string, body: Record<string, unknown>): Promise<T> {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("analytics");
+  if (!g.ok) return g.res;
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }

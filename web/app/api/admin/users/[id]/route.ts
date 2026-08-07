@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { getUserDetail, RewardsNotConfigured } from "@/lib/rewards-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("users");
+  if (!g.ok) return g.res;
   try {
     const detail = await getUserDetail(params.id);
     if (!detail) return NextResponse.json({ error: "user not found" }, { status: 404 });

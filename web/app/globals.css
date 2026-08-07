@@ -100,6 +100,19 @@
     );
     background-size: 4px 4px;
   }
+  /* Scroll chalta hai, patti nahi dikhti.
+     Admin ka sidebar chhote laptop par scroll hota hai, par uski scrollbar
+     wahan sirf ek bhadda slot ghairti hai — nav ke items ki chaudai kaat kar
+     unhe hilata bhi hai. Scroll khud kahin nahi jaata: wheel, touch, keyboard
+     aur `scrollIntoView` sab waise ke waise chalte hain. */
+  .no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* purana Edge/IE */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

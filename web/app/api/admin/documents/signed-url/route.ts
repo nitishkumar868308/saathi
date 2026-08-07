@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { getDocumentSignedUrl, RewardsNotConfigured } from "@/lib/rewards-server";
+import { R2NotConfigured } from "@/lib/r2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * ?path=<uid>/<docId>.jpg -> private documents bucket ka short-lived signed URL.
- * Sirf admin (isAuthed). Path documents/<uid>/... ke bahar nahi ja sakta.
+ * ?path=<uid>/<docId>.jpg -> R2 ke private bucket ka short-lived signed URL.
+ * Sirf wo admin jiske paas "documents" menu ho. Path documents/<uid>/… ke
+ * bahar nahi ja sakta.
  */
 export async function GET(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("documents");
+  if (!g.ok) return g.res;
   const path = new URL(request.url).searchParams.get("path") ?? "";
   // Traversal / absolute path block.
   if (!path || path.includes("..") || path.startsWith("/")) {
@@ -29,7 +30,10 @@ export async function GET(request: Request) {
     console.error("[admin/documents/signed-url]", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "sign failed" },
-      { status: err instanceof RewardsNotConfigured ? 503 : 500 },
+      {
+        status:
+          err instanceof RewardsNotConfigured || err instanceof R2NotConfigured ? 503 : 500,
+      },
     );
   }
 }

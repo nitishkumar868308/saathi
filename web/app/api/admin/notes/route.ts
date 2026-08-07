@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +24,8 @@ const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
  * jisme wahi matn aa jaata jise hum jaan-boojh ke nahi mangwa rahe.
  */
 export async function GET() {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("notes");
+  if (!g.ok) return g.res;
   if (!SUPABASE_URL || !SERVICE) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }

@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 
-import { signedUrl } from "./storage";
+import { documentUrl } from "./storage";
 import type { Document } from "./documents";
 
 /**
@@ -114,7 +114,7 @@ async function downloadToCache(
   const dest = cachePath(doc);
   if (await exists(dest)) return dest;
 
-  const url = await signedUrl("documents", doc.file_path);
+  const url = await documentUrl(doc.file_path);
   if (!url) return null;
 
   await ensureDir();

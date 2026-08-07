@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import {
   adminGet,
   adminPost,
@@ -42,9 +42,8 @@ function ticketAnswerPushTitle(locale: EmailLocale, ticketNo: string): string {
 const MAX_TICKETS = 500;
 
 export async function GET(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("support");
+  if (!g.ok) return g.res;
   if (!supportConfigured()) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }
@@ -97,9 +96,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("support");
+  if (!g.ok) return g.res;
   if (!supportConfigured()) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }

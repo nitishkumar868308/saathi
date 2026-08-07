@@ -2,9 +2,12 @@ import * as ImagePicker from "expo-image-picker";
 
 import { withoutLock } from "./app-lock";
 import { supabase } from "./supabase";
-import { uploadFile, fileSizeBytes } from "./storage";
+import { uploadAvatar, fileSizeBytes } from "./storage";
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+
+/** Server bhi yahi teen maanta hai — yahan rok dena user ke liye zyada saaf hai. */
+const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 
 export class AvatarTooLargeError extends Error {
   constructor() {
@@ -14,8 +17,8 @@ export class AvatarTooLargeError extends Error {
 }
 
 /**
- * Gallery se photo chuno, 2 MB check karo, Supabase Storage me upload karo.
- * Public URL lautata hai. Size zyada ho to AvatarTooLargeError. Cancel pe null.
+ * Gallery se photo chuno, 2 MB check karo, R2 pe upload karo.
+ * Photo ka URL lautata hai. Size zyada ho to AvatarTooLargeError. Cancel pe null.
  */
 export async function pickAndUploadAvatar(): Promise<string | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -38,13 +41,12 @@ export async function pickAndUploadAvatar(): Promise<string | null> {
   if (bytes > MAX_BYTES) throw new AvatarTooLargeError();
 
   if (!supabase) throw new Error("Supabase set nahi hai");
-  const { data: u } = await supabase.auth.getUser();
-  const uid = u.user?.id;
-  if (!uid) throw new Error("Login zaroori hai");
 
-  const path = `${uid}/avatar.jpg`;
-  await uploadFile("avatars", path, asset.uri, "image/jpeg");
+  // Crop ke baad aksar JPEG hi milta hai, par gallery kabhi PNG/WEBP bhi de
+  // deti hai. Jo sach me hai wahi batao — R2 par yahi type save hota hai, aur
+  // aage `/api/avatar/<uid>` isi type ke saath photo lautata hai.
+  const mime = asset.mimeType && ALLOWED.includes(asset.mimeType) ? asset.mimeType : "image/jpeg";
 
-  const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-  return `${pub.publicUrl}?t=${Date.now()}`;
+  const { url } = await uploadAvatar(asset.uri, mime);
+  return url;
 }

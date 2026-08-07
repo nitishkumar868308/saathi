@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { sendMail, renderEmail, emailParagraph, escapeHtml } from "@/lib/email";
 import { isFcmConfigured, sendPush } from "@/lib/fcm";
 import { logServerError } from "@/lib/errors-server";
@@ -79,9 +79,8 @@ async function usersWithDevice(): Promise<Set<string>> {
  * chune hue ids jaati hain.
  */
 export async function GET() {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("message");
+  if (!g.ok) return g.res;
   if (!SUPABASE_URL || !SERVICE) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }
@@ -192,9 +191,8 @@ async function dropDeadTokens(tokens: string[]): Promise<void> {
  * POST body: { subject, message, audience: "all" | "inactive" }
  */
 export async function POST(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("message");
+  if (!g.ok) return g.res;
   if (!SUPABASE_URL || !SERVICE) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }

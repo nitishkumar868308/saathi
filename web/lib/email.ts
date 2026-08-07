@@ -978,3 +978,166 @@ export async function sendContactEmails(
     }),
   ]);
 }
+
+/* -------------------- Contact ka jawab (admin > Contacts) ------------------- */
+
+const CONTACT_REPLY: Record<EmailLocale, {
+  title: string;
+  subject: string;
+  preheader: string;
+  /** {name} */
+  intro: (name: string) => string;
+  yourMessage: string;
+  outro: string;
+}> = {
+  hinglish: {
+    title: "Aapke message ka jawab 💬",
+    subject: "Aapke message ka jawab — Apka Saathi",
+    preheader: "Team Apka Saathi ne jawab diya hai",
+    intro: (n) => `Namaste ${n}, aapne jo poochha tha uska jawab ye raha:`,
+    yourMessage: "Aapne likha tha",
+    outro: "Aur kuch poochhna ho to isi email ka reply kar dijiye — seedha hum tak aa jayega.",
+  },
+  hi: {
+    title: "आपके मैसेज का जवाब 💬",
+    subject: "आपके मैसेज का जवाब — Apka Saathi",
+    preheader: "टीम Apka Saathi ने जवाब दिया है",
+    intro: (n) => `नमस्ते ${n}, आपने जो पूछा था उसका जवाब ये रहा:`,
+    yourMessage: "आपने लिखा था",
+    outro: "और कुछ पूछना हो तो इसी ईमेल का reply कर दीजिए — सीधा हम तक आ जाएगा।",
+  },
+  en: {
+    title: "Reply to your message 💬",
+    subject: "Reply to your message — Apka Saathi",
+    preheader: "Team Apka Saathi has replied",
+    intro: (n) => `Hi ${n}, here's the answer to what you asked:`,
+    yourMessage: "You wrote",
+    outro: "If you have more questions, just reply to this email — it comes straight to us.",
+  },
+};
+
+/**
+ * Admin ne Contacts se jawab diya — user ko email.
+ *
+ * `replyTo` support inbox par hai, `from` par nahi: user "Reply" dabaye to uska
+ * jawab wapas hum tak aaye, kisi admin ke niji pate par nahi.
+ *
+ * Purana message bhi saath jaata hai. Message aur jawab ke beech kai din nikal
+ * jaate hain — bina us hisse ke user ko yaad hi nahi aata ki baat kis baare me
+ * thi, aur wo dobara wahi sawaal likh deta hai.
+ */
+export async function sendContactReplyEmail(t: {
+  name: string;
+  email: string;
+  original: string;
+  reply: string;
+  locale?: EmailLocale;
+}) {
+  const locale = t.locale ?? "hinglish";
+  const c = CONTACT_REPLY[locale] ?? CONTACT_REPLY.hinglish;
+
+  const html = renderEmail(
+    c.title,
+    emailParagraph(c.intro(escapeHtml(t.name || ""))) +
+      quote(t.reply) +
+      `<p style="margin:22px 0 0;font-size:13px;font-weight:600;color:${SOFT};">${escapeHtml(c.yourMessage)}</p>` +
+      quote(t.original) +
+      emailParagraph(c.outro),
+    c.preheader,
+    locale,
+  );
+
+  return sendMail({
+    to: t.email,
+    replyTo: CONTACT_TO,
+    fromName: "Apka Saathi",
+    subject: c.subject,
+    html,
+    kind: "contact_reply",
+  });
+}
+
+/* ------------------------- Admin team ka invite mail ------------------------ */
+
+/**
+ * Naye admin ko uska login bheja jaata hai.
+ *
+ * Ye mail hamesha English/Hinglish me hi hai — ye team ke andar ki baat hai,
+ * user-facing nahi, isliye is par bhasha ka chunaav nahi lagta.
+ *
+ * ⚠️ Password sirf YAHIN, ek baar dikhta hai. DB me uska scrypt hash hi jaata
+ * hai — na hum use dobara padh sakte hain, na koi aur. Kho jaye to naya banana
+ * padta hai (admin > Team > "Naya password").
+ */
+export async function sendAdminInviteEmail(t: {
+  name: string;
+  email: string;
+  password: string;
+  adminUrl: string;
+  roleName: string | null;
+  pending: boolean;
+}) {
+  const rows = `<table style="width:100%;font-size:15px;color:${INK};border-collapse:collapse;">
+      <tr><td style="padding:7px 0;color:${SOFT};width:96px;">Panel</td><td style="padding:7px 0;"><a href="${escapeHtml(t.adminUrl)}" style="color:${BRAND_DARK};font-weight:600;">${escapeHtml(t.adminUrl)}</a></td></tr>
+      <tr><td style="padding:7px 0;color:${SOFT};">Email</td><td style="padding:7px 0;font-weight:600;">${escapeHtml(t.email)}</td></tr>
+      <tr><td style="padding:7px 0;color:${SOFT};">Password</td><td style="padding:7px 0;font-weight:700;font-family:monospace;font-size:16px;letter-spacing:0.5px;">${escapeHtml(t.password)}</td></tr>
+      ${t.roleName ? `<tr><td style="padding:7px 0;color:${SOFT};">Role</td><td style="padding:7px 0;font-weight:600;">${escapeHtml(t.roleName)}</td></tr>` : ""}
+    </table>`;
+
+  const note = t.pending
+    ? emailParagraph(
+        "Abhi aapka account approve hona baaki hai — tab tak login nahi chalega. " +
+          "Master admin ke approve karte hi ye password kaam karne lagega.",
+      )
+    : emailParagraph("Aap abhi login kar sakte hain.");
+
+  const html = renderEmail(
+    "Apka Saathi admin — aapka login 🔑",
+    emailParagraph(`Namaste ${escapeHtml(t.name || "")}, aapko Apka Saathi ke admin panel me joda gaya hai.`) +
+      `<div style="margin-top:14px;padding:18px;background:${CREAM};border-radius:14px;">${rows}</div>` +
+      note +
+      emailButton(t.adminUrl, "Admin panel kholo") +
+      `<p style="margin:18px 0 0;font-size:13px;line-height:1.6;color:${SOFT};">
+         Ye password sirf is email me hai — ise kisi ke saath share mat kijiye.
+         Aapko sidebar me sirf wahi menu dikhenge jo aapke role me diye gaye hain.
+       </p>`,
+    "Aapka admin login andar hai 🔑",
+  );
+
+  return sendMail({
+    to: t.email,
+    fromName: "Apka Saathi Admin",
+    subject: "Apka Saathi admin — aapka login",
+    html,
+    kind: "admin_invite",
+  });
+}
+
+/** Password reset kiya gaya — naya password bhejo. */
+export async function sendAdminPasswordEmail(t: {
+  name: string;
+  email: string;
+  password: string;
+  adminUrl: string;
+}) {
+  const html = renderEmail(
+    "Naya admin password 🔑",
+    emailParagraph(`Namaste ${escapeHtml(t.name || "")}, aapka admin password badal diya gaya hai.`) +
+      `<div style="margin-top:14px;padding:18px;background:${CREAM};border-radius:14px;">
+         <table style="width:100%;font-size:15px;color:${INK};border-collapse:collapse;">
+           <tr><td style="padding:7px 0;color:${SOFT};width:96px;">Email</td><td style="padding:7px 0;font-weight:600;">${escapeHtml(t.email)}</td></tr>
+           <tr><td style="padding:7px 0;color:${SOFT};">Password</td><td style="padding:7px 0;font-weight:700;font-family:monospace;font-size:16px;letter-spacing:0.5px;">${escapeHtml(t.password)}</td></tr>
+         </table>
+       </div>` +
+      emailButton(t.adminUrl, "Admin panel kholo"),
+    "Aapka naya admin password",
+  );
+
+  return sendMail({
+    to: t.email,
+    fromName: "Apka Saathi Admin",
+    subject: "Apka Saathi admin — naya password",
+    html,
+    kind: "admin_password",
+  });
+}

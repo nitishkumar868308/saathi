@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { getErrors } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("logs");
+  if (!g.ok) return g.res;
   const url = new URL(request.url);
   const days = Number(url.searchParams.get("days") ?? 7);
   const source = url.searchParams.get("source") ?? "all";

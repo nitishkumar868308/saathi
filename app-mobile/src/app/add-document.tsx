@@ -162,7 +162,7 @@ export default function AddDocument() {
         file_uri: savedUri,
       });
 
-      // Cloud backup — document image Supabase Storage me (private). Best-effort:
+      // Cloud backup — document image Cloudflare R2 me (private). Best-effort:
       // fail ho to local copy to hai hi. Admin/size/cross-device iske liye.
       if (savedUri) {
         uploadDocumentImage(doc.id, savedUri).catch(() => {});

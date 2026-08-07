@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/admin";
+import { guard } from "@/lib/admin-guard";
 import { adminGrantDays, RewardsNotConfigured } from "@/lib/rewards-server";
 
 export const runtime = "nodejs";
@@ -7,9 +7,8 @@ export const dynamic = "force-dynamic";
 
 /** Kisi user ko manually N din Saathi Plus do (email se). */
 export async function POST(request: Request) {
-  if (!isAuthed()) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
+  const g = await guard("rewards");
+  if (!g.ok) return g.res;
 
   let email = "";
   let days = 0;
