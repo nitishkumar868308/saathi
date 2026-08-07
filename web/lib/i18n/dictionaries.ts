@@ -791,15 +791,25 @@ const hinglish: Dict = {
         p: "Hum aapka data kabhi kisi ko bechte ya rent par dete nahi. Koi ad-tracking nahi. Aapka data sirf aapki madad ke liye use hota hai.",
       },
       {
-        h: "4. Aapka control",
+        /*
+         * ⚠️ Ye section tab joda gaya jab admin panel me notes ka poora matn
+         * dikhne laga. Isse chhupa ke rakhna do wajah se galat hota: user ne
+         * apna note is bharose par likha tha ki wo uska apna hai, aur DPDP/GDPR
+         * dono me "kaun aapka data dekh sakta hai" batana zaroori hai.
+         */
+        h: "4. Hamari team kya dekh sakti hai",
+        p: "Saathi ki team ke kuch log support aur dikkat theek karne ke liye aapka account data dekh sakte hain — isme aapke notes aur reminders ka matn bhi shamil hai. Ye sirf zaroorat padne par hota hai, aur sirf un logon ke paas hai jinhe ye permission di gayi ho. Aapke documents ki files iske alawa hain: unhe kholne ka alag record rakha jaata hai.",
+      },
+      {
+        h: "5. Aapka control",
         p: "Aap jab chaho apna data dekh, export ya delete kar sakte ho — ek tap mein. Account delete karne par aapka saara data hata diya jaata hai.",
       },
       {
-        h: "5. Email",
+        h: "6. Email",
         p: "Aapka email sirf account aur zaroori reminders/updates ke liye. Koi spam nahi — har email mein unsubscribe ka option hoga.",
       },
       {
-        h: "6. Sampark",
+        h: "7. Sampark",
         p: "Koi sawaal? info@apkasaathi.com par likho — hum khushi se madad karenge.",
       },
     ],
@@ -1356,15 +1366,19 @@ const hi: Dict = {
         p: "हम आपका डेटा कभी किसी को बेचते या किराए पर नहीं देते। कोई ऐड-ट्रैकिंग नहीं। आपका डेटा सिर्फ़ आपकी मदद के लिए इस्तेमाल होता है।",
       },
       {
-        h: "4. आपका कंट्रोल",
+        h: "4. हमारी टीम क्या देख सकती है",
+        p: "साथी की टीम के कुछ लोग सपोर्ट और दिक़्क़त ठीक करने के लिए आपका अकाउंट डेटा देख सकते हैं — इसमें आपके नोट्स और रिमाइंडर का मतन भी शामिल है। यह सिर्फ़ ज़रूरत पड़ने पर होता है, और सिर्फ़ उन लोगों के पास है जिन्हें यह अनुमति दी गई हो। आपके डॉक्युमेंट की फ़ाइलें इससे अलग हैं: उन्हें खोलने का अलग रिकॉर्ड रखा जाता है।",
+      },
+      {
+        h: "5. आपका कंट्रोल",
         p: "आप जब चाहें अपना डेटा देख, एक्सपोर्ट या डिलीट कर सकते हैं — एक टैप में। अकाउंट डिलीट करने पर आपका सारा डेटा हटा दिया जाता है।",
       },
       {
-        h: "5. ईमेल",
+        h: "6. ईमेल",
         p: "आपका ईमेल सिर्फ़ अकाउंट और ज़रूरी रिमाइंडर/अपडेट के लिए। कोई स्पैम नहीं — हर ईमेल में अनसब्सक्राइब का विकल्प होगा।",
       },
       {
-        h: "6. संपर्क",
+        h: "7. संपर्क",
         p: "कोई सवाल? info@apkasaathi.com पर लिखें — हम ख़ुशी से मदद करेंगे।",
       },
     ],
@@ -1921,15 +1935,19 @@ const en: Dict = {
         p: "We never sell or rent your data to anyone. No ad tracking. Your data is used only to help you.",
       },
       {
-        h: "4. Your control",
+        h: "4. What our team can see",
+        p: "Some people on the Saathi team can see your account data to provide support and fix problems — this includes the text of your notes and reminders. It happens only when needed, and only for staff who have been given that permission. Your document files are separate: opening one is recorded.",
+      },
+      {
+        h: "5. Your control",
         p: "You can view, export or delete your data whenever you want — in one tap. Deleting your account removes all of it.",
       },
       {
-        h: "5. Email",
+        h: "6. Email",
         p: "Your email is used only for your account and the reminders/updates that matter. No spam — every email has an unsubscribe option.",
       },
       {
-        h: "6. Contact",
+        h: "7. Contact",
         p: "Any questions? Write to info@apkasaathi.com — we're happy to help.",
       },
     ],

@@ -12,16 +12,23 @@ Kahan: <https://supabase.com/dashboard> → apna project kholo.
 ### A1. SQL files chalao (SQL Editor)
 1. Left sidebar → **SQL Editor** → **+ New query**.
 2. Neeche di file ko VSCode me kholo (`d:\my-app\supabase\<file>`), **poora content copy** karo, SQL Editor me **paste** karo, **RUN** (▶) dabao. Green "Success" aana chahiye.
-3. Ye 3 **naye** files zaroor chalao (dobara chalana safe hai):
+3. Ye **naye** files zaroor chalao (dobara chalana safe hai):
 
 | File | Kya karta hai |
 |------|----------------|
 | `fix-name-sync.sql` | User ka **naam** DB + admin me sahi dikhe |
 | `admin-documents.sql` | Admin ka **Documents tab** chale |
 | `document-summary.sql` | Document scan ka **AI summary** save ho |
+| `renewal-master.sql` | Renew page ka **master** (fields/tags/languages). ⚠️ Ye purane renewal guides **khaali kar deta hai** — backup pehle banata hai |
+| `notes-admin-content.sql` | Admin me **notes ka poora matn** dikhe. ⚠️ Pehle privacy policy me ye baat likhi honi chahiye |
 
-> Agar app **pehle se live** hai to baaki purani files (schema/profiles/storage/rewards…) already chal chuki hongi — bas ye 3 naye chalao.
-> Agar **naya project** hai to pehle ye order chalao: `schema.sql` → `profiles.sql` → `auth-rls.sql` → `storage.sql` → `locations-billing.sql` → `plans.sql` → `plan-limits.sql` → `rewards-referrals.sql` → `reviews.sql` → `error-logs.sql` → `country-pricing.sql` → `landing.sql` → `welcome-email.sql` → `document-notify.sql` → `reminders-notify.sql` → `admin-usage.sql` → `admin-usage-detail.sql` → phir upar wale **3 naye**.
+> Agar app **pehle se live** hai to baaki purani files (schema/profiles/storage/rewards…) already chal chuki hongi — bas ye naye chalao.
+>
+> Agar **naya project** hai to poora kram `docs/DEPLOYMENT.md` → section **1a** me hai.
+> ⚠️ Wahi dekhna — yahan ki chhoti list se kaam nahi chalega. Pehle yahan ek
+> chhota kram likha tha jisme aadhi files thi hi nahi (notes, support, device,
+> phone OTP, renewal…), aur usse naya project hamesha aadha toota hua khada
+> hota tha.
 
 ### A2. Extensions ON karo (cron ke liye)
 - Left → **Database** → **Extensions**.
@@ -74,7 +81,7 @@ Har file kholo → usme `<CRON_SECRET>` ko apni value se **replace** karo → **
 | File | Kaam | Kaunsa URL call karta hai | Kitni baar |
 |------|------|----------------------------|------------|
 | `cron-reminders.sql` | Reminders bhejta | `…/api/cron/send-reminders` | har **minute** |
-| `cron-document-whatsapp.sql` | Document expiry WhatsApp | `…/api/cron/document-whatsapp` | har **ghanta** |
+| `cron-document-expiry.sql` | Document expiry (WhatsApp/email) | `…/api/cron/document-expiry` | har **ghanta** |
 | `cron-error-digest.sql` | Error email digest | `…/api/cron/error-digest` | har **30 min** |
 
 > URL me domain **apna** hona chahiye. Files me `https://www.apkasaathi.com/...` hai — agar tumhara Vercel domain alag hai to file me URL badal do.

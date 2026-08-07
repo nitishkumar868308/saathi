@@ -5,7 +5,7 @@ import {
   Image,
   Pressable,
   ScrollView,
-  Dimensions,
+  useWindowDimensions,
   Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -34,7 +34,20 @@ export default function DocumentView() {
     name?: string;
     type?: string;
   }>();
-  const { width, height } = Dimensions.get("window");
+  /**
+   * ⚠️ `useWindowDimensions` — `Dimensions.get()` nahi.
+   *
+   * `Dimensions.get()` ek baar padhta hai aur phir kabhi nahi badalta. Poori app
+   * me har jagah `useWindowDimensions` hai; sirf yahi screen chhoot gayi thi, aur
+   * yahan uska asar sabse zyada dikhta hai kyunki document ki image ki naap
+   * seedhe isi se banti hai.
+   *
+   * Jo tootta tha: phone ghumate hi (ya foldable kholte hi, ya split-screen me)
+   * image purani naap par chipki reh jaati thi — landscape me screen se bahar
+   * nikal jaati, aur tablet par aadhi screen khaali chhod deti. User ko lagta ki
+   * document theek se scan hi nahi hua.
+   */
+  const { width, height } = useWindowDimensions();
   const [busy, setBusy] = useState<null | "share" | "save">(null);
 
   /**
@@ -190,7 +203,12 @@ export default function DocumentView() {
         )}
 
         {/* Renew kaise karein — document dikhne ke theek neeche, kyunki expiry
-            dekhne ke baad ka pehla sawaal yahi hota hai. */}
+            dekhne ke baad ka pehla sawaal yahi hota hai.
+
+            ⚠️ Yahan ka dhaancha ab CODE me tay nahi hai. Pehle sirf teen cheezein
+            dikh sakti thi — heading, steps, note — kyunki wo teen naam yahin
+            likhe the. Ab admin jitne khaane banata hai (Fees, Kagaz, Chetavni…)
+            utne dikhte hain, usi tarteeb me jo usne master me tay ki. */}
         {!!guide && (
           <View style={styles.renewCard}>
             <View style={styles.renewHead}>
@@ -198,7 +216,10 @@ export default function DocumentView() {
                 <Ionicons name="refresh" size={17} color={tc.terracotta} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.renewTitle}>{guide.text.title}</Text>
+                {/* Admin `title` khaana band kar sakta hai — tab card ka header
+                    khaali reh jaata. Wo bina heading wale ek dabbe jaisa dikhta
+                    hai, isliye app ki apni line par gir jaate hain. */}
+                <Text style={styles.renewTitle}>{guide.title || d.renewShowSteps}</Text>
                 {!!guide.authority && (
                   <Text style={styles.renewAuthority}>{guide.authority}</Text>
                 )}
@@ -216,37 +237,88 @@ export default function DocumentView() {
               </Pressable>
             )}
 
-            <Pressable
-              onPress={() => setShowSteps((v) => !v)}
-              style={styles.renewToggle}
-            >
-              <Text style={styles.renewToggleText}>
-                {showSteps ? d.renewHideSteps : d.renewShowSteps}
-              </Text>
-              <Ionicons
-                name={showSteps ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={tc.terracotta}
-              />
-            </Pressable>
+            {/* Baaki sab khaane toggle ke peeche — card chhota rehta hai, aur
+                jise sach me padhna hai wahi kholta hai. */}
+            {guide.parts.length > 0 && (
+              <Pressable onPress={() => setShowSteps((v) => !v)} style={styles.renewToggle}>
+                <Text style={styles.renewToggleText}>
+                  {showSteps ? d.renewHideSteps : d.renewShowSteps}
+                </Text>
+                <Ionicons
+                  name={showSteps ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={tc.terracotta}
+                />
+              </Pressable>
+            )}
 
             {showSteps && (
               <View style={styles.steps}>
-                {guide.text.steps.map((s, i) => (
-                  <View key={i} style={styles.step}>
-                    <View style={styles.stepNum}>
-                      <Text style={styles.stepNumText}>{i + 1}</Text>
-                    </View>
-                    <Text style={styles.stepText}>{s}</Text>
-                  </View>
-                ))}
+                {guide.parts.map((p) => {
+                  if (p.kind === "list") {
+                    return (
+                      <View key={p.key} style={styles.partBlock}>
+                        {/* Ek hi list ho to uska label bekaar shor hai — "Steps"
+                            likhne se koi baat nahi banti. Do ya zyada hon tab
+                            label hi batata hai ki ye kis cheez ki list hai. */}
+                        {guide.parts.filter((x) => x.kind === "list").length > 1 && (
+                          <Text style={styles.partLabel}>{p.label}</Text>
+                        )}
+                        {p.items.map((s, i) => (
+                          <View key={i} style={styles.step}>
+                            <View style={styles.stepNum}>
+                              <Text style={styles.stepNumText}>{i + 1}</Text>
+                            </View>
+                            <Text style={styles.stepText}>{s}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  }
 
-                {!!guide.text.note && (
-                  <View style={styles.note}>
-                    <Ionicons name="bulb-outline" size={15} color={tc.amber} />
-                    <Text style={styles.noteText}>{guide.text.note}</Text>
-                  </View>
-                )}
+                  if (p.kind === "note") {
+                    return (
+                      <View key={p.key} style={styles.note}>
+                        <Ionicons
+                          // Icon master se aata hai — admin ne kuch aisa likh
+                          // diya jo hai hi nahi to Ionicons khaali jagah
+                          // chhod deta hai, crash nahi karta.
+                          name={(p.icon || "bulb-outline") as never}
+                          size={15}
+                          color={tc.amber}
+                        />
+                        <Text style={styles.noteText}>{p.value}</Text>
+                      </View>
+                    );
+                  }
+
+                  if (p.kind === "link") {
+                    return (
+                      <Pressable
+                        key={p.key}
+                        onPress={() => Linking.openURL(p.value).catch(() => {})}
+                        style={({ pressed }) => [styles.partLink, pressed && { opacity: 0.7 }]}
+                      >
+                        <Ionicons
+                          name={(p.icon || "open-outline") as never}
+                          size={15}
+                          color={tc.terracotta}
+                        />
+                        <Text style={styles.partLinkText} numberOfLines={2}>
+                          {p.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  }
+
+                  // text / longtext
+                  return (
+                    <View key={p.key} style={styles.partBlock}>
+                      <Text style={styles.partLabel}>{p.label}</Text>
+                      <Text style={styles.partText}>{p.value}</Text>
+                    </View>
+                  );
+                })}
 
                 {/*
                  * ⚠️ Ye line jaan-boojh ke dikhti hai. Do soorat me ye zaroori
@@ -352,6 +424,27 @@ const useStyles = makeStyles((c) => ({
   },
   renewToggleText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
   steps: { gap: 11 },
+  /* Master ka ek khaana — label + uska matn. */
+  partBlock: { gap: 8 },
+  partLabel: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    color: c.inkSoft,
+  },
+  partText: { fontSize: 14, lineHeight: 21, color: c.ink },
+  partLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.line,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  partLinkText: { flex: 1, fontSize: 13.5, fontWeight: "700", color: c.terracotta },
   step: { flexDirection: "row", gap: 10 },
   stepNum: {
     height: 22,

@@ -131,3 +131,131 @@ export async function translateMessage(
 
   return out;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Free-form fields ka anuvaad (renewal guides)                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ek guide ke SAARE khaane, kai bhashaon me — ek hi call me.
+ *
+ * ⚠️ `translateMessage` yahan kaam nahi aata, aur wajah do hain:
+ *
+ *   1. Wo `Loc` par bandha hai — teen tay bhashayein. Renewal ka language
+ *      master admin ke haath me hai; wahan kal Tamil ya Arabic bhi ho sakti
+ *      hai, aur uske liye code badalna hi wo cheez thi jise hataana tha.
+ *   2. Wo {subject, message} ki jodi leta hai. Guide ke khaane ab admin tay
+ *      karta hai — kitne bhi, kisi bhi naam se, aur kuch list bhi hote hain.
+ *
+ * Isliye yahan shape hi bhej dete hain: jo JSON gaya, waisa hi wapas maangte
+ * hain. List list rehti hai, string string — model ko dhaancha badalne ki
+ * chhoot nahi.
+ *
+ * Fail hone par ORIGINAL lautta hai, khaali kabhi nahi. Adhoora anuvaad save na
+ * hone se behtar hai: app waise bhi default bhasha par gir jaati hai, par save
+ * hi na ho to admin ka likha hua poora chala jaata.
+ */
+export type FieldMap = Record<string, string | string[]>;
+
+export async function translateFields(
+  src: FieldMap,
+  targets: { code: string; label: string }[],
+  opts: { sourceLabel?: string; skipKeys?: string[] } = {},
+): Promise<Record<string, FieldMap>> {
+  const out: Record<string, FieldMap> = {};
+  for (const t of targets) out[t.code] = { ...src };
+
+  if (!KEY || targets.length === 0) return out;
+
+  /*
+   * ⚠️ URL kabhi anuvaad nahi hone chahiye. Model bade aaram se
+   * "parivahan.gov.in/renew" ko "parivahan.gov.in/नवीनीकरण" bana deta hai —
+   * aur toota hua sarkari link, link na hone se bura hai. Isliye ye khaane
+   * request se BAHAR hi rakhe jaate hain; upar wali copy me original pade hain.
+   */
+  const skip = new Set(opts.skipKeys ?? []);
+  const payload: FieldMap = {};
+  for (const [k, v] of Object.entries(src)) {
+    if (skip.has(k)) continue;
+    if (Array.isArray(v) ? v.some((s) => s.trim()) : String(v ?? "").trim()) payload[k] = v;
+  }
+  if (Object.keys(payload).length === 0) return out;
+
+  const asked = targets.map((t) => `"${t.code}": ${t.label}`).join("\n");
+  const prompt =
+    `Neeche ek document-renewal guide ke khaane JSON me hain${
+      opts.sourceLabel ? ` (${opts.sourceLabel} me)` : ""
+    }.\n\n` +
+    `Inka anuvaad in bhashaon me karo:\n${asked}\n\n` +
+    `JSON is shakl me lautao (aur kuch nahi) — har bhasha ke andar BILKUL wahi ` +
+    `keys, aur wahi shape (jo array hai wo array hi rahe, utne hi item):\n` +
+    `{${targets.map((t) => `"${t.code}":{ …wahi keys… }`).join(",")}}\n\n` +
+    `INPUT:\n${JSON.stringify(payload, null, 2)}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${KEY}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [
+              {
+                text:
+                  SYSTEM +
+                  `\n- Ye ek sarkari process ka tareeka hai. Step ka KRAM aur ginti bilkul mat badlo — ek step ka anuvaad ek hi step rahe.` +
+                  `\n- Sanstha/portal ka naam (jaise "Passport Seva", "RTO") jaisa hai waisa rehne do, chahe script badal rahi ho.`,
+              },
+            ],
+          },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json",
+            // Guide me kai khaane × kai bhasha — 2048 me poora jawab kat jaata
+            // hai, aur kata hua JSON parse hi nahi hota (yaani anuvaad chup-chaap
+            // gayab). Isliye yahan khula haath.
+            maxOutputTokens: 8192,
+          },
+        }),
+        cache: "no-store",
+      },
+    );
+
+    if (!res.ok) {
+      logServiceUsage("gemini", "translate-fields", { ok: false, meta: { status: res.status } });
+      return out;
+    }
+
+    const data = (await res.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const parsed = JSON.parse(
+      data.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
+    ) as Record<string, FieldMap>;
+
+    for (const t of targets) {
+      const got = parsed[t.code];
+      if (!got || typeof got !== "object") continue;
+      const merged: FieldMap = { ...src };
+      for (const [k, v] of Object.entries(payload)) {
+        const g = got[k];
+        // Shape badal gaya (list ki jagah string aa gayi, ya ulta) to us khaane
+        // ka anuvaad chhod do — original hi rehne do. Aadha-badla dhaancha app
+        // me render hi nahi hota.
+        if (Array.isArray(v)) {
+          if (Array.isArray(g) && g.length > 0) merged[k] = g.map((s) => String(s));
+        } else if (typeof g === "string" && g.trim()) {
+          merged[k] = g.trim();
+        }
+      }
+      out[t.code] = merged;
+    }
+    logServiceUsage("gemini", "translate-fields", { meta: { languages: targets.length } });
+  } catch {
+    logServiceUsage("gemini", "translate-fields", { ok: false, meta: { parse: "failed" } });
+  }
+
+  return out;
+}

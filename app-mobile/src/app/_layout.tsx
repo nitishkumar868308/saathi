@@ -17,6 +17,7 @@ import { LockGate } from "@/components/lock-gate";
 import { OfflineGate } from "@/components/offline-gate";
 import { LockOffer } from "@/components/lock-offer";
 import { NetworkBanner } from "@/components/network-banner";
+import { useNetworkStatus } from "@/lib/network";
 import { ThemeFab } from "@/components/theme-fab";
 import { NetAlertModal } from "@/components/net-alert-modal";
 import { ScreenLoader } from "@/components/loader";
@@ -121,6 +122,9 @@ function RootNavigator() {
   const tc = useColors();
   const { session, loading } = useAuth();
   const { ready: langReady, chosen: langChosen } = useLocale();
+  // Sirf "net wapas aaya" wale pal ke liye — neeche outbox flush isi par chalta
+  // hai. Banner apna alag probe chalata hai; ye hook usi ek sach ko padhta hai.
+  const { offline } = useNetworkStatus();
   const segments = useSegments();
   const router = useRouter();
   // Pichhli baar session tha ya nahi — logout (tha→null) ko fresh launch se alag
@@ -253,6 +257,34 @@ function RootNavigator() {
     });
     return () => sub.remove();
   }, [uid]);
+
+  /**
+   * Net wapas aate hi kataar khaali karo — app band kiye bina.
+   *
+   * ⚠️ Iske bina ek asli khaali jagah thi. Flush sirf DO mauke par chalta tha:
+   * login par, aur app ke wapas saamne aane par. Par sabse aam soorat yahi hoti
+   * hai ki user app KHOLE HUE hi signal se bahar nikal jaye (lift, basement,
+   * train), wahan reminder banaye — wo kataar me chala jaata hai — aur phir
+   * signal wapas aa jaye. Banner apne aap hat jaata tha, sab theek dikhta tha,
+   * par reminder phone me hi pada rehta tha jab tak user kisi doosri app par
+   * na jaye.
+   *
+   * Alarm us beech bhi bajta hai (wo poora local hai), isliye kuch "tootta"
+   * nahi tha — par reminder doosre phone par nahi dikhta tha, aur app uninstall
+   * ho jaye to wo hamesha ke liye chala jaata.
+   *
+   * Sirf offline → online wale MOD par chalta hai, har render par nahi. Flush
+   * khud bhi ek waqt me ek hi chalta hai (`flushOutbox` me rok lagi hai),
+   * isliye AppState wale se takrane par bhi dono ek hi kaam do baar nahi karte.
+   */
+  const wasOffline = useRef(false);
+  useEffect(() => {
+    if (!uid) return;
+    if (wasOffline.current && !offline) {
+      void flushOutbox().finally(() => void syncNotifications());
+    }
+    wasOffline.current = offline;
+  }, [offline, uid]);
 
   /**
    * App wapas saamne aayi — plan bhi dobara poochho.

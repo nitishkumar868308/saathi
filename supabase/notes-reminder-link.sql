@@ -27,10 +27,17 @@ create index if not exists notes_reminder_idx
 /**
  * Admin: notes ka hisaab — per user.
  *
- * ⚠️ Yahan note ka MATN (title/body) jaan-boojh ke NAHI aata. Wo user ki apni
- * niji baat hai — bazaar ki list, ek idea, kisi ka number. Admin ko ye jaanna
- * chahiye ki feature chal raha hai ya nahi; kisne kya likha, ye jaanna uska
- * kaam hai hi nahi. Ginti aur waqt se wo poora sawaal hal ho jaata hai.
+ * ⚠️ Is function me note ka MATN (title/body) NAHI aata, aur ye ab bhi
+ * jaan-boojh ke hai. Admin panel khulte hi jo hisaab dikhta hai, uske liye matn
+ * chahiye hi nahi — "feature chal raha hai ya nahi, aur note se reminder banta
+ * hai ya nahi" ka poora jawab ginti aur waqt se mil jaata hai. Matn har baar
+ * saath bhejne ka matlab hota ki kisi ka likha hua tab bhi load ho jaye jab
+ * kisi ne use maanga hi na ho.
+ *
+ * Matn padhne ka apna alag raasta hai — `admin_notes_list()` in
+ * `supabase/notes-admin-content.sql`. Wo alag isliye hai ki padhna ek
+ * jaan-boojh ke uthaya kadam rahe, ek ittefaq nahi. Us file me ye bhi likha
+ * hai ki use chalane se pehle privacy policy me kya hona chahiye.
  *
  * Sirf service_role (admin API).
  */

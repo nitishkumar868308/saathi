@@ -537,6 +537,24 @@ export type AdminDict = {
       empty: string;
       privacyNote: string;
       migrationMissing: string;
+      /* ---- Poora matn — kisne kya likha ---- */
+      tabStats: string;
+      tabContent: string;
+      searchPh: string;
+      /** {n} = kitne note mile. */
+      foundN: string;
+      noMatch: string;
+      allUsers: string;
+      viewNotes: string;
+      pinned: string;
+      hasReminder: string;
+      untitled: string;
+      created: string;
+      edited: string;
+      contentMigrationMissing: string;
+      /** ⚠️ Ye ab ek chetavni hai, "hum nahi dekhte" wala vaada nahi. */
+      contentWarn: string;
+      loadMore: string;
     };
     documents: {
       viewAll: string;
@@ -597,6 +615,54 @@ export type AdminDict = {
       autoTranslate: string;
       unreviewed: string;
       deleteAsk: string;
+      /* ---- Master: guide ka dhaancha khud (fields / tags / languages) ---- */
+      tabGuides: string;
+      tabMaster: string;
+      masterSub: string;
+      fields: string;
+      fieldsSub: string;
+      tags: string;
+      tagsSub: string;
+      languages: string;
+      languagesSub: string;
+      /** ⚠️ Ye SIRF renewal content ki bhasha hai, app ki UI ki nahi. */
+      languagesWarn: string;
+      keyLabel: string;
+      keyHint: string;
+      keyLocked: string;
+      labelLabel: string;
+      nativeLabel: string;
+      kindLabel: string;
+      kindText: string;
+      kindLongtext: string;
+      kindList: string;
+      kindLink: string;
+      kindNote: string;
+      sortLabel: string;
+      requiredLabel: string;
+      iconLabel: string;
+      iconHint: string;
+      hintLabel: string;
+      colorLabel: string;
+      enabledLabel: string;
+      disabledBadge: string;
+      lockedBadge: string;
+      lockedHint: string;
+      addField: string;
+      addTag: string;
+      addLanguage: string;
+      noFields: string;
+      noTags: string;
+      noLanguages: string;
+      deleteFieldAsk: string;
+      deleteTagAsk: string;
+      deleteLangAsk: string;
+      /** {n} = kitne guides me ye khaana bhara hai. */
+      fieldInUse: string;
+      migrationMissing: string;
+      entryTags: string;
+      noGuides: string;
+      needMaster: string;
     };
     /** Account delete requests — dekhna aur poora karna. */
     deleteRequests: {
@@ -1068,9 +1134,25 @@ const en: AdminDict = {
       users: "people",
       empty: "Nobody has written a note yet.",
       privacyNote:
-        "What people write in their notes is never shown here, and the API never sends it. Notes hold shopping lists, ideas, phone numbers, sometimes money. Counts and timestamps answer the question that matters — is the feature being used, and do notes turn into reminders.",
+        "Counts and timestamps answer the question that matters most — is the feature being used, and do notes turn into reminders. The full text is under Content.",
       migrationMissing:
         "Run supabase/notes.sql and supabase/notes-reminder-link.sql in the Supabase SQL editor first.",
+      tabStats: "Numbers",
+      tabContent: "Content",
+      searchPh: "Search inside notes…",
+      foundN: "{n} notes",
+      noMatch: "Nothing matched.",
+      allUsers: "Everyone",
+      viewNotes: "Read",
+      pinned: "pinned",
+      hasReminder: "reminder set",
+      untitled: "(no title)",
+      created: "written",
+      edited: "edited",
+      contentMigrationMissing: "Run supabase/notes-admin-content.sql in the Supabase SQL editor first.",
+      contentWarn:
+        "This is what people wrote, word for word. Notes hold shopping lists, ideas, phone numbers, sometimes money — things written in the belief that they were private. Read only what you actually need for the job in front of you, and make sure the privacy policy says this can happen.",
+      loadMore: "Load more",
     },
     documents: {
       viewAll: "All", byUser: "By user", inStorage: "In storage",
@@ -1120,6 +1202,55 @@ const en: AdminDict = {
       autoTranslate: "Translate into the other languages on save",
       unreviewed: "unchecked",
       deleteAsk: "Remove this country's guide?",
+      tabGuides: "Guides",
+      tabMaster: "Master",
+      masterSub:
+        "The shape of a guide. Fields you add here become the boxes you fill in on every guide — and the app shows them in this order.",
+      fields: "Fields",
+      fieldsSub: "What a guide is made of. Order here is the order in the app.",
+      tags: "Tags",
+      tagsSub: "Labels you can put on a guide. Handy for finding things later.",
+      languages: "Languages",
+      languagesSub: "Which languages a guide can be written in.",
+      languagesWarn:
+        "This is the language of the renewal content only — not the app's own menus and buttons. Adding a language here lets you write guides in it; the app's interface stays in the languages it ships with. For the app to pick a language up, the code must match the app's own (hinglish, hi, en).",
+      keyLabel: "Key",
+      keyHint: "a-z, 0-9 and _ only. Cannot be changed later.",
+      keyLocked: "The key is what the saved content is filed under — changing it would orphan everything already written in this field.",
+      labelLabel: "Label",
+      nativeLabel: "In its own language",
+      kindLabel: "Kind",
+      kindText: "Text — one line",
+      kindLongtext: "Paragraph",
+      kindList: "List — numbered steps",
+      kindLink: "Link — becomes a button",
+      kindNote: "Note — highlighted box",
+      sortLabel: "Order",
+      requiredLabel: "Required",
+      iconLabel: "Icon",
+      iconHint: "Ionicons name, e.g. bulb-outline. Leave empty for none.",
+      hintLabel: "Help text",
+      colorLabel: "Colour",
+      enabledLabel: "On",
+      disabledBadge: "off",
+      lockedBadge: "locked",
+      lockedHint: "The app's renewal card is built on this one — it can be turned off, but not removed.",
+      addField: "Add field",
+      addTag: "Add tag",
+      addLanguage: "Add language",
+      noFields: "No fields yet. Add one to start — a guide with no fields has nothing to show.",
+      noTags: "No tags yet.",
+      noLanguages: "No languages yet. Add at least one before writing a guide.",
+      deleteFieldAsk:
+        "Remove this field? What is already written in it stays in the database but stops showing — add the field back and it returns.",
+      deleteTagAsk: "Remove this tag?",
+      deleteLangAsk: "Remove this language? Guides already written in it stop showing.",
+      fieldInUse: "used in {n} guides",
+      migrationMissing: "Run supabase/renewal-master.sql first.",
+      entryTags: "Tags",
+      noGuides: "No guides yet. Add one above.",
+      needMaster:
+        "Add at least one field and one language in Master first — without them there is nothing to fill in.",
     },
     deleteRequests: {
       title: "Delete requests",
@@ -1581,9 +1712,25 @@ const hi: AdminDict = {
       users: "लोग",
       empty: "अभी तक किसी ने नोट नहीं लिखा।",
       privacyNote:
-        "लोग नोट में क्या लिखते हैं वह यहाँ कभी नहीं दिखता, और API उसे भेजती भी नहीं। नोट में बाज़ार की लिस्ट, आइडिया, फ़ोन नंबर, कभी पैसों का हिसाब होता है। जो सवाल असल में मायने रखता है — फ़ीचर इस्तेमाल हो रहा है या नहीं, और नोट से रिमाइंडर बनता है या नहीं — उसका जवाब गिनती और समय से मिल जाता है।",
+        "जो सवाल सबसे ज़्यादा मायने रखता है — फ़ीचर इस्तेमाल हो रहा है या नहीं, और नोट से रिमाइंडर बनता है या नहीं — उसका जवाब गिनती और समय से मिल जाता है। पूरा मतन Content में है।",
       migrationMissing:
         "पहले Supabase SQL editor में supabase/notes.sql और supabase/notes-reminder-link.sql चलाइए।",
+      tabStats: "गिनती",
+      tabContent: "मतन",
+      searchPh: "नोट्स के अंदर खोजें…",
+      foundN: "{n} नोट्स",
+      noMatch: "कुछ नहीं मिला।",
+      allUsers: "सब लोग",
+      viewNotes: "पढ़ें",
+      pinned: "पिन",
+      hasReminder: "रिमाइंडर लगा है",
+      untitled: "(बिना टाइटल)",
+      created: "लिखा",
+      edited: "बदला",
+      contentMigrationMissing: "पहले Supabase SQL editor में supabase/notes-admin-content.sql चलाइए।",
+      contentWarn:
+        "यह लोगों का लिखा हुआ है, हूबहू। नोट में बाज़ार की लिस्ट, आइडिया, फ़ोन नंबर, कभी पैसों का हिसाब होता है — यह सब इस भरोसे पर लिखा गया था कि यह उनका अपना है। सिर्फ़ उतना पढ़िए जितना सामने के काम के लिए सच में ज़रूरी है, और यह पक्का कीजिए कि प्राइवेसी पॉलिसी में यह बात लिखी हो।",
+      loadMore: "और लाएँ",
     },
     documents: {
       viewAll: "सारे", byUser: "यूज़र अनुसार", inStorage: "स्टोरेज में",
@@ -1633,6 +1780,56 @@ const hi: AdminDict = {
       autoTranslate: "सेव करते ही बाक़ी भाषाओं में अनुवाद करें",
       unreviewed: "अनजाँची",
       deleteAsk: "इस देश की गाइड हटा दें?",
+      tabGuides: "गाइड्स",
+      tabMaster: "मास्टर",
+      masterSub:
+        "गाइड का ढाँचा। यहाँ जो खाने बनाएँगे वही हर गाइड में भरने को मिलेंगे — और ऐप उन्हें इसी क्रम में दिखाएगा।",
+      fields: "खाने (Fields)",
+      fieldsSub: "गाइड किन खानों से बनी है। यहाँ का क्रम ही ऐप का क्रम है।",
+      tags: "टैग",
+      tagsSub: "गाइड पर लगाने के लेबल। बाद में ढूँढने में काम आते हैं।",
+      languages: "भाषाएँ",
+      languagesSub: "गाइड किन भाषाओं में लिखी जा सकती है।",
+      languagesWarn:
+        "यह सिर्फ़ रिन्यूअल कंटेंट की भाषा है — ऐप के अपने मेन्यू और बटन की नहीं। यहाँ भाषा जोड़ने से आप उसमें गाइड लिख सकेंगे; ऐप का इंटरफ़ेस अपनी ही भाषाओं में रहेगा। ऐप उसी भाषा का कंटेंट उठाती है जिसका कोड उसके अपने कोड से मिलता हो (hinglish, hi, en)।",
+      keyLabel: "Key",
+      keyHint: "सिर्फ़ a-z, 0-9 और _ । बाद में बदली नहीं जा सकती।",
+      keyLocked:
+        "सेव किया हुआ कंटेंट इसी key के नीचे रखा जाता है — इसे बदलते ही इस खाने में लिखा सब कुछ अनाथ हो जाएगा।",
+      labelLabel: "नाम",
+      nativeLabel: "अपनी ही भाषा में",
+      kindLabel: "किस्म",
+      kindText: "टेक्स्ट — एक लाइन",
+      kindLongtext: "पैराग्राफ़",
+      kindList: "सूची — गिनती वाले स्टेप्स",
+      kindLink: "लिंक — बटन बन जाता है",
+      kindNote: "नोट — हाइलाइट बॉक्स",
+      sortLabel: "क्रम",
+      requiredLabel: "ज़रूरी",
+      iconLabel: "आइकॉन",
+      iconHint: "Ionicons का नाम, जैसे bulb-outline। न चाहिए तो खाली छोड़ दें।",
+      hintLabel: "मदद की लाइन",
+      colorLabel: "रंग",
+      enabledLabel: "चालू",
+      disabledBadge: "बंद",
+      lockedBadge: "लॉक",
+      lockedHint: "ऐप का रिन्यूअल कार्ड इसी पर टिका है — बंद कर सकते हैं, हटा नहीं सकते।",
+      addField: "खाना जोड़ें",
+      addTag: "टैग जोड़ें",
+      addLanguage: "भाषा जोड़ें",
+      noFields: "अभी कोई खाना नहीं। एक जोड़कर शुरू करें — बिना खानों की गाइड में दिखाने को कुछ नहीं होता।",
+      noTags: "अभी कोई टैग नहीं।",
+      noLanguages: "अभी कोई भाषा नहीं। गाइड लिखने से पहले कम से कम एक जोड़ें।",
+      deleteFieldAsk:
+        "यह खाना हटा दें? इसमें लिखा हुआ डेटाबेस में रहेगा पर दिखना बंद हो जाएगा — खाना दोबारा बनाते ही वापस आ जाएगा।",
+      deleteTagAsk: "यह टैग हटा दें?",
+      deleteLangAsk: "यह भाषा हटा दें? इसमें लिखी गाइड्स दिखनी बंद हो जाएँगी।",
+      fieldInUse: "{n} गाइड्स में भरा है",
+      migrationMissing: "पहले supabase/renewal-master.sql चलाएँ।",
+      entryTags: "टैग",
+      noGuides: "अभी कोई गाइड नहीं। ऊपर से एक जोड़ें।",
+      needMaster:
+        "पहले मास्टर में कम से कम एक खाना और एक भाषा जोड़ें — उनके बिना भरने को कुछ नहीं होता।",
     },
     deleteRequests: {
       title: "डिलीट रिक्वेस्ट",
@@ -2095,9 +2292,25 @@ const hinglish: AdminDict = {
       users: "log",
       empty: "Abhi tak kisi ne note nahi likha.",
       privacyNote:
-        "Log note me kya likhte hain wo yahan kabhi nahi dikhta, aur API use bhejti bhi nahi. Note me bazaar ki list, idea, phone number, kabhi paise ka hisaab hota hai. Jo sawaal sach me matlab rakhta hai — feature chal raha hai ya nahi, aur note se reminder banta hai ya nahi — uska jawab ginti aur waqt se mil jaata hai.",
+        "Jo sawaal sabse zyada matlab rakhta hai — feature chal raha hai ya nahi, aur note se reminder banta hai ya nahi — uska jawab ginti aur waqt se mil jaata hai. Poora matn Content me hai.",
       migrationMissing:
         "Pehle Supabase SQL editor me supabase/notes.sql aur supabase/notes-reminder-link.sql chalao.",
+      tabStats: "Ginti",
+      tabContent: "Matn",
+      searchPh: "Notes ke andar dhoondho…",
+      foundN: "{n} notes",
+      noMatch: "Kuch nahi mila.",
+      allUsers: "Sab log",
+      viewNotes: "Padho",
+      pinned: "pin",
+      hasReminder: "reminder laga hai",
+      untitled: "(bina title)",
+      created: "likha",
+      edited: "badla",
+      contentMigrationMissing: "Pehle Supabase SQL editor me supabase/notes-admin-content.sql chalao.",
+      contentWarn:
+        "Ye logon ka likha hua hai, hu-ba-hu. Note me bazaar ki list, idea, phone number, kabhi paise ka hisaab hota hai — ye sab is bharose par likha gaya tha ki ye unka apna hai. Sirf utna padho jitna saamne ke kaam ke liye sach me zaroori hai, aur ye pakka karo ki privacy policy me ye baat likhi ho.",
+      loadMore: "Aur laao",
     },
     documents: {
       viewAll: "Saare", byUser: "User-wise", inStorage: "Storage me",
@@ -2147,6 +2360,56 @@ const hinglish: AdminDict = {
       autoTranslate: "Save karte hi baaki bhashaon me anuvaad karo",
       unreviewed: "bin-jaanchi",
       deleteAsk: "Is desh ki guide hata dein?",
+      tabGuides: "Guides",
+      tabMaster: "Master",
+      masterSub:
+        "Guide ka dhaancha. Yahan jo khaane banayenge wahi har guide me bharne ko milenge — aur app unhe isi tarteeb me dikhayegi.",
+      fields: "Khaane (Fields)",
+      fieldsSub: "Guide kin khaanon se banti hai. Yahan ka kram hi app ka kram hai.",
+      tags: "Tags",
+      tagsSub: "Guide par lagane ke label. Baad me dhoondhne me kaam aate hain.",
+      languages: "Bhashayein",
+      languagesSub: "Guide kin bhashaon me likhi ja sakti hai.",
+      languagesWarn:
+        "Ye sirf renewal content ki bhasha hai — app ke apne menu aur button ki nahi. Yahan bhasha jodne se aap usme guide likh sakenge; app ka interface apni hi bhashaon me rahega. App usi bhasha ka content uthati hai jiska code uske apne code se milta ho (hinglish, hi, en).",
+      keyLabel: "Key",
+      keyHint: "Sirf a-z, 0-9 aur _ . Baad me badli nahi ja sakti.",
+      keyLocked:
+        "Save kiya hua content isi key ke neeche rakha jaata hai — ise badalte hi is khaane me likha sab kuch anaath ho jayega.",
+      labelLabel: "Naam",
+      nativeLabel: "Apni hi bhasha me",
+      kindLabel: "Kism",
+      kindText: "Text — ek line",
+      kindLongtext: "Paragraph",
+      kindList: "Soochi — ginti wale steps",
+      kindLink: "Link — button ban jaata hai",
+      kindNote: "Note — highlight box",
+      sortLabel: "Kram",
+      requiredLabel: "Zaroori",
+      iconLabel: "Icon",
+      iconHint: "Ionicons ka naam, jaise bulb-outline. Na chahiye to khaali chhod dein.",
+      hintLabel: "Madad ki line",
+      colorLabel: "Rang",
+      enabledLabel: "Chalu",
+      disabledBadge: "band",
+      lockedBadge: "lock",
+      lockedHint: "App ka renewal card isi par tika hai — band kar sakte hain, hata nahi sakte.",
+      addField: "Khaana jodein",
+      addTag: "Tag jodein",
+      addLanguage: "Bhasha jodein",
+      noFields: "Abhi koi khaana nahi. Ek jod ke shuru karein — bina khaanon ki guide me dikhane ko kuch nahi hota.",
+      noTags: "Abhi koi tag nahi.",
+      noLanguages: "Abhi koi bhasha nahi. Guide likhne se pehle kam se kam ek jodein.",
+      deleteFieldAsk:
+        "Ye khaana hata dein? Isme likha hua database me rahega par dikhna band ho jayega — khaana dobara banate hi wapas aa jayega.",
+      deleteTagAsk: "Ye tag hata dein?",
+      deleteLangAsk: "Ye bhasha hata dein? Isme likhi guides dikhni band ho jayengi.",
+      fieldInUse: "{n} guides me bhara hai",
+      migrationMissing: "Pehle supabase/renewal-master.sql chalayein.",
+      entryTags: "Tags",
+      noGuides: "Abhi koi guide nahi. Upar se ek jodein.",
+      needMaster:
+        "Pehle Master me kam se kam ek khaana aur ek bhasha jodein — unke bina bharne ko kuch nahi hota.",
     },
     deleteRequests: {
       title: "Delete requests",

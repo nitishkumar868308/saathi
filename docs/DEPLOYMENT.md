@@ -9,8 +9,16 @@ phir Vercel, phir app build.
 ## 1. Supabase (backend)
 
 ### 1a. SQL files — SQL Editor me is order me Run karo
-Har file idempotent hai (dobara chalana safe). Order matters (FK/trigger dependencies):
+Har file idempotent hai (dobara chalana safe). Order matters (FK/trigger dependencies).
 
+> ⚠️ Ye list POORI honi chahiye. Pehle ismein sirf 20 file thi jabki `supabase/`
+> me 40+ hain — yaani naye project par ye guide follow karne wale ko app aadhi
+> chalti milti thi: notes, support tickets, device management, phone OTP aur
+> renewal guides me se koi table banta hi nahi tha. Wo har dikkat baad me
+> "feature toota hua hai" jaisi dikhti hai, jabki wajah sirf ek na chali hui
+> migration hoti hai. Nayi `.sql` file banao to use YAHAN bhi jodo.
+
+**Buniyaad (ye kram badalna mat — FK/trigger isi par tike hain):**
 1. `schema.sql`            — documents / reminders / messages + RLS
 2. `profiles.sql`          — profiles table + new-user trigger
 3. `auth-rls.sql`
@@ -18,14 +26,40 @@ Har file idempotent hai (dobara chalana safe). Order matters (FK/trigger depende
 5. `locations-billing.sql` — countries/states/cities + user_details
 6. `plans.sql`, `plan-limits.sql`
 7. `rewards-referrals.sql` — plans, referrals, admin_grant_days, admin_user_detail
-8. `reviews.sql`
+
+**Feature tables:**
+8. `reviews.sql`, `reviews-public.sql`
 9. `error-logs.sql`
-10. `country-pricing.sql`, `add-country-currency.sql`
+10. `country-pricing.sql`, `add-country-currency.sql`, `country-phone-codes.sql`, `country-pricing-data.sql`
 11. `landing.sql`, `welcome-email.sql`
 12. `document-notify.sql`, `reminders-notify.sql`
-13. `admin-usage.sql`, `admin-usage-detail.sql`
-14. `remove-launch-offer.sql`, `drop-waitlist.sql`
-15. **`fix-name-sync.sql`**  ← naam (full_name) DB + admin me sahi dikhe (#7). profiles/locations/rewards ke BAAD chalao.
+13. `admin-usage.sql`, `admin-usage-detail.sql`, `service-usage.sql`
+14. `notes.sql` → `notes-reminder-link.sql`  ← is kram me; doosri file pehli ki table par tiki hai
+15. `support-tickets.sql`, `contact-reply.sql`
+16. `phone-otp.sql`, `phone-verify.sql`
+17. `device-tokens.sql`, `device-owner.sql`, `device-multi-login.sql`, `device-hardware.sql`, `devices-analytics.sql`
+18. `document-renewal.sql`, `document-summary.sql`
+19. `reminder-repeat.sql`, `reminder-note.sql`
+20. `message-tracking.sql`
+21. `seo-blog.sql`
+22. `admin-team.sql`, `admin-documents.sql`
+23. `account-delete-requests.sql`
+24. `language-column.sql`
+
+**Renewal guides (dhaancha + content):**
+25. `document-renewal-guides.sql` — table + RLS
+26. **`renewal-master.sql`** — field/tag/language master. ⚠️ Ye file `document_renewal_guides` ko **khaali kar deti hai** (backup pehle banati hai). Seed content chahiye to ise mat chalao, ya backup se wapas le lo — file ke andar poora tareeka likha hai.
+
+**Admin: notes ka matn**
+27. **`notes-admin-content.sql`** — ⚠️ Isse admin panel me har user ka likha hua note dikhne lagta hai. Chalane se PEHLE privacy policy me ye baat likhi honi chahiye (file ke andar wajah likhi hai).
+
+**Aakhir me:**
+28. `remove-launch-offer.sql`, `drop-waitlist.sql`
+29. **`fix-name-sync.sql`**  ← naam (full_name) DB + admin me sahi dikhe (#7). profiles/locations/rewards ke BAAD chalao.
+
+> `build-country-currency.js` / `prep-location-csv.mjs` SQL nahi hain — wo CSV se
+> data file banane wale script hain, ek hi baar chalte hain aur upar wali
+> `country-*.sql` unka nateeja hain.
 
 ### 1b. Storage
 `storage.sql` do bucket banata hai — `avatars` (public) aur `documents` (private, 10MB, jpeg/png/webp/pdf). Per-user RLS already set. Kuch manual nahi karna.
@@ -35,7 +69,7 @@ Har file idempotent hai (dobara chalana safe). Order matters (FK/trigger depende
 
 Cron jobs (SQL Editor, har file me `<CRON_SECRET>` ko apni asli value se replace karke):
 - `cron-reminders.sql`        — har minute reminder sender
-- `cron-document-whatsapp.sql`— har ghanta document expiry WhatsApp
+- `cron-document-expiry.sql`  — har ghanta document expiry (WhatsApp/email)
 - `cron-error-digest.sql`     — har 30 min error email digest
 
 > ⚠️ `schema "cron" does not exist` = extension enable nahi. Upar wali do `create extension` lines pehle chala do.

@@ -17,6 +17,7 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { useToast } from "@/components/toast";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { Loader, LoaderOverlay } from "@/components/loader";
+import { VoiceButton } from "@/components/voice-button";
 import { reportError } from "@/lib/report-error";
 import { reportIfNetwork } from "@/lib/net-alert";
 import {
@@ -49,7 +50,7 @@ export default function NoteEdit() {
   const styles = useStyles();
   const router = useRouter();
   const toast = useToast();
-  const { notes: n, common: c } = useT();
+  const { notes: n, common: c, voice: v } = useT();
   const { locale } = useLocale();
   const bcp = locale === "hi" ? "hi-IN" : "en-IN";
 
@@ -330,6 +331,29 @@ export default function NoteEdit() {
           />
         </ScrollView>
 
+        {/**
+         * Bolo — Saathi likh lega.
+         *
+         * ⚠️ Note wahi ek jagah thi jahan sabse zyada likhna padta hai aur mic
+         * tha hi nahi. Chat aur reminder me wo pehle se tha, isliye jo user
+         * wahan bol ke kaam nikaal leta tha, wo note par aake ruk jaata tha —
+         * aur bade akshar wale phone par lamba note type karna hi wo kaam hai
+         * jo log sabse pehle chhod dete hain.
+         *
+         * Matn BODY me jaata hai, title me nahi: bola hua aksar poora wakya
+         * hota hai, aur title ki ek line usse kaat deti. Title waise bhi list
+         * me pehli line se apne aap ban jaata hai.
+         *
+         * ⚠️ Space ke saath jodte hain, seedha chipka ke nahi — warna do baar
+         * bol ke jodne par "dawai lenibills bharna" ban jaata hai.
+         */}
+        <View style={styles.voiceRow}>
+          <VoiceButton onText={(t) => setBody((prev) => (prev.trim() ? `${prev.trim()} ${t}` : t))} />
+          <Text style={styles.voiceHint} numberOfLines={2}>
+            {v.micHint}
+          </Text>
+        </View>
+
         {/* Reminder pehle se laga ho to button ki jagah uska haal — dobara
             lagane ka mauka hi na mile. */}
         {reminder ? (
@@ -422,6 +446,15 @@ const useStyles = makeStyles((c) => ({
     minHeight: 320,
     padding: 0,
   },
+  /* Mic + uske saath ek line ki samajh — "isse bol ke likhwa sakte ho". */
+  voiceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 20,
+    marginBottom: 10,
+  },
+  voiceHint: { flex: 1, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
   remindBtn: {
     flexDirection: "row",
     alignItems: "center",

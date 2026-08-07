@@ -393,7 +393,13 @@
       "Bash(netstat -ano)",
       "PowerShell($c = Get-NetTCPConnection -LocalPort 3987 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { Stop-Process -Id $c[0].OwningProcess -Force }; Start-Sleep -Milliseconds 800; \"ok\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/83c17ef1-428c-479b-9fee-bffd38fd6067/scratchpad/storage-e2e.mjs\")",
-      "PowerShell($c = Get-NetTCPConnection -LocalPort 3987 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { Stop-Process -Id $c[0].OwningProcess -Force }; \"server band\")"
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 3987 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { Stop-Process -Id $c[0].OwningProcess -Force }; \"server band\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const r=JSON.parse\\(s\\);const by={};const byfile={};r.forEach\\(f=>{f.messages.forEach\\(m=>{by[m.ruleId]=\\(by[m.ruleId]||0\\)+1;const k=f.filePath.split\\('src'\\)[1];byfile[k]=\\(byfile[k]||0\\)+1;}\\);}\\);console.log\\('BY RULE:'\\);Object.entries\\(by\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).forEach\\(\\([k,v]\\)=>console.log\\(v,k\\)\\);console.log\\('\\\\nBY FILE:'\\);Object.entries\\(byfile\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).slice\\(0,25\\).forEach\\(\\([k,v]\\)=>console.log\\(v,k\\)\\);}\\)\")",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(node -e \"console.log\\('expo-speech-recognition:', require\\('./node_modules/expo-speech-recognition/package.json'\\).version\\); console.log\\('expo-speech:', require\\('./node_modules/expo-speech/package.json'\\).version\\); console.log\\('notifee:', require\\('./node_modules/@notifee/react-native/package.json'\\).version\\)\")",
+      "Bash(xargs grep -ln \"SUPABASE_SERVICE_ROLE_KEY *= *ey\\\\|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\\\|sk_live\\\\|AIza[0-9A-Za-z_-]\\\\{30\\\\}\")",
+      "Bash(grep -o \"AIza[0-9A-Za-z_-]\\\\{30,\\\\}\\\\|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9[A-Za-z0-9._-]\\\\{0,20\\\\}\" .claude/settings.json)",
+      "Bash(grep -o \"AIza[0-9A-Za-z_-]\\\\{30,\\\\}\" app-mobile/google-services.json)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",
