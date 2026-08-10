@@ -27,11 +27,9 @@ import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
 import { logEvent } from "@/lib/analytics";
 import { useOffers } from "@/lib/use-offers";
 import {
+  DEFAULT_PRICE,
   detectCountry,
-  getPricingRow,
   getPlayPrices,
-  localAmount,
-  type LocalPricing,
   type PlayPrices,
 } from "@/lib/pricing";
 import { countryFromTimezone } from "@/lib/tz-country";
@@ -60,9 +58,8 @@ export default function Upgrade() {
   const { isPlus, loading } = usePlan();
   const [paying, setPaying] = useState(false);
 
-  // Country-wise pricing (#11): IP se country → local price. Profile se mismatch
-  // ho to ek baar modal poochhta hai kaunse desh ka price dikhaayein.
-  const [pricing, setPricing] = useState<LocalPricing | null>(null);
+  // IP se country → us desh ka daam. Profile se mismatch ho to ek baar modal
+  // poochhta hai kaunse desh ka price dikhaayein.
   const [ipCode, setIpCode] = useState<string | null>(null);
   const [profileCode, setProfileCode] = useState<string | null>(null);
   const [showMismatch, setShowMismatch] = useState(false);
@@ -70,9 +67,9 @@ export default function Upgrade() {
    * Us desh ka Play Console wala daam (server ke `play_prices` se).
    *
    * Ye beech ka kadam hai: store ka apna `priceString` sabse accha hai, par wo
-   * Expo Go / billing-off build me milta hi nahi. Aise me purane manual hisaab
-   * par girne se app aur website alag-alag number dikhane lagte the. Ab dono ek
-   * hi jagah se padhte hain — Play Console.
+   * Expo Go / billing-off build me milta hi nahi. Aise me bhi daam Play Console
+   * ka hi rehna chahiye — website bhi yahi table padhti hai, isliye dono par ek
+   * number dikhta hai.
    */
   const [playPrices, setPlayPrices] = useState<PlayPrices | null>(null);
 
@@ -115,12 +112,8 @@ export default function Upgrade() {
       setIpCode(ip);
       setProfileCode(prof);
       const useCode = ip || prof || "IN";
-      const [row, play] = await Promise.all([
-        getPricingRow(useCode),
-        getPlayPrices(useCode),
-      ]);
+      const play = await getPlayPrices(useCode);
       if (!alive) return;
-      setPricing(row);
       setPlayPrices(play);
       if (ip && prof && ip !== prof) setShowMismatch(true);
     })();
@@ -131,11 +124,7 @@ export default function Upgrade() {
 
   async function chooseCountry(code: string) {
     setShowMismatch(false);
-    const [row, play] = await Promise.all([getPricingRow(code), getPlayPrices(code)]);
-    setPricing(row);
-    // Dono ek saath — warna desh badalne par currency ek jagah se aati aur
-    // number doosri jagah se, jo bilkul galat daam bana deta hai.
-    setPlayPrices(play);
+    setPlayPrices(await getPlayPrices(code));
   }
 
   // rewardsVersion dep: first-N / referral grant background me hota hai. Iske
@@ -166,12 +155,7 @@ export default function Upgrade() {
     );
   }
 
-  // Price aur Free limits admin se (app_config) aate hain.
-  const base = yearly ? offers.plusPriceYearly : offers.plusPriceMonthly;
   const period = yearly ? u.perYear : u.perMonth;
-  // Country-wise local price (base × multiplier × conversion). Row na ho to ₹base.
-  const sym = pricing?.symbol ?? "₹";
-  const localLabel = `${sym}${localAmount(base, pricing).toLocaleString("en-IN")}`;
 
   /**
    * Jo dikhega wahi kata jayega — teen sahare, isi tarteeb me.
@@ -181,18 +165,20 @@ export default function Upgrade() {
    *    kata jaata hai, isliye iske hote hue kuch aur dekhna hi nahi chahiye.
    * 2. **`play_prices`** — wahi Play Console ka daam, par server ke raaste. Ye
    *    tab kaam aata hai jab store hi na mile: Expo Go, ya billing off wali
-   *    build. Website bhi bilkul yahi padhti hai, isliye dono par ek number.
-   * 3. **Manual hisaab** — purana base × multiplier × conversion_rate. Sirf tab
-   *    jab Play ka data kahin se bhi na mile.
+   *    build. Website bhi bilkul yahi table padhti hai, isliye dono par ek
+   *    number dikhta hai.
+   * 3. **`DEFAULT_PRICE`** — sirf tab jab sync ek baar bhi na chala ho.
    *
-   * ⚠️ Tarteeb kabhi ulti mat karna. Manual number admin haath se bharta hai
-   *    aur wo Play se hamesha thoda alag ho jaata hai. Us halat me screen ek
-   *    daam dikhati hai aur Play doosra kaat leta hai — bharosa to jaata hi
-   *    hai, Play ki policy bhi yahi maangti hai ki jo dikhe wahi kate.
+   * ⚠️ Tarteeb kabhi ulti mat karna, aur beech me koi "apna hisaab" mat ghusana.
+   *    Pehle yahan admin ka manual base × multiplier × conversion_rate tha; wo
+   *    Play se hamesha thoda alag ho jaata tha, yaani screen ek daam dikhati aur
+   *    Play doosra kaat leta. Bharosa to jaata hi hai, Play ki policy bhi yahi
+   *    maangti hai ki jo dikhe wahi kate.
    */
   const storePrice = String(packageFor(yearly)?.product?.priceString ?? "").trim();
   const playLabel = (yearly ? playPrices?.yearly : playPrices?.monthly) ?? "";
-  const priceLabel = storePrice || playLabel || localLabel;
+  const fallback = yearly ? DEFAULT_PRICE.yearlyLabel : DEFAULT_PRICE.monthlyLabel;
+  const priceLabel = storePrice || playLabel || fallback;
 
   const FREE_FEATURES = u.freeFeatures.map((f) =>
     tpl(f, { rem: offers.freeReminders, docs: offers.freeDocuments }),

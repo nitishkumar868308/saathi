@@ -8,14 +8,18 @@ import { headObject, presignDownload, r2Configured, r2Key, R2NotConfigured } fro
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Launch offer (first_n_*) hata diya gaya. Referral + plan limits + price.
+// Launch offer (first_n_*) hata diya gaya. Referral + plan limits.
+//
+// ⚠️ `plus_price_monthly` / `plus_price_yearly` yahan se HATA diye gaye. Plus ka
+//    daam ab sirf Google Play Console me set hota hai aur `play_prices` table
+//    me sync hota hai (`lib/play-prices.ts`). Inhe wapas jodne ka matlab hoga
+//    daam ke do maalik — aur ek din website ₹99 dikhayegi jabki Play ₹149
+//    kaatega. Purani rows DB me padi reh sakti hain; unhe koi padhta nahi.
 export const CONFIG_KEYS = [
   "referrals_enabled",
   "referral_days",
   "free_reminders",
   "free_documents",
-  "plus_price_monthly",
-  "plus_price_yearly",
   /**
    * SMS OTP ki haddein — `supabase/phone-otp.sql` inhe `cfg_int` se padhta hai.
    *
@@ -341,61 +345,22 @@ export async function setReviewStatus(id: string, status: ReviewStatus): Promise
   }
 }
 
-/* --------------------------- country pricing --------------------------- */
+/* ------------------------------ countries ------------------------------ */
 
-export type CountryPricingRow = {
-  country_code: string;
-  country_name: string;
-  currency: string;
-  symbol: string;
-  conversion_rate: number;
-  multiplier: number;
-  enabled: boolean;
-};
-
-/** Saari country pricing rows (admin). */
-export async function getCountryPricing(): Promise<CountryPricingRow[]> {
-  assertConfigured();
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/country_pricing?select=country_code,country_name,currency,symbol,conversion_rate,multiplier,enabled&order=country_name.asc`,
-    { headers: headers(), cache: "no-store" },
-  );
-  if (!res.ok) await fail("pricing read (supabase/country-pricing.sql run kiya?)", res);
-  const rows = (await res.json()) as Record<string, unknown>[];
-  return rows.map((r) => ({
-    country_code: String(r.country_code),
-    country_name: String(r.country_name),
-    currency: String(r.currency),
-    symbol: String(r.symbol),
-    conversion_rate: Number(r.conversion_rate ?? 1),
-    multiplier: Number(r.multiplier ?? 1),
-    enabled: Boolean(r.enabled),
-  }));
-}
-
-/** Rows upsert (country_code pe merge). */
-export async function upsertCountryPricing(rows: CountryPricingRow[]): Promise<void> {
-  assertConfigured();
-  if (!rows.length) return;
-  const payload = rows.map((r) => ({
-    country_code: r.country_code.toUpperCase(),
-    country_name: r.country_name,
-    currency: r.currency,
-    symbol: r.symbol,
-    conversion_rate: r.conversion_rate,
-    multiplier: r.multiplier,
-    enabled: r.enabled,
-    updated_at: new Date().toISOString(),
-  }));
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/country_pricing?on_conflict=country_code`, {
-    method: "POST",
-    headers: headers({ Prefer: "resolution=merge-duplicates,return=minimal" }),
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  });
-  if (!res.ok) await fail("pricing write", res);
-}
-
+/**
+ * ⚠️ Yahan pehle `country_pricing` ka poora CRUD tha — per-country multiplier,
+ *    conversion rate, enable/disable. Wo sab hata diya gaya.
+ *
+ *    Plus ka daam ab sirf Google Play Console me set hota hai aur `play_prices`
+ *    me sync hota hai. Wo purani table haath se bhari jaati thi aur Play se
+ *    hamesha thoda alag ho jaati (conversion rate roz badalti hai) — yaani
+ *    website ek daam dikhati aur Play doosra kaat leta.
+ *
+ *    Table DB me chhod di gayi hai (kisi ka data mitana nahi tha), bas ab use
+ *    koi padhta-likhta nahi. Neeche wali `getCountriesList` bachi hai kyunki
+ *    admin ki Play table me desh ka NAAM isi se aata hai (Play sirf "IN" jaisa
+ *    code deta hai, "India" nahi).
+ */
 export type CountryOption = {
   /** Hamesha ISO2 — IP-country isi se match hota hai. */
   code: string;
@@ -442,18 +407,6 @@ export async function getCountriesList(): Promise<CountryOption[]> {
     })
     // Sirf ISO2 — 3-letter code pricing me daala to IP se kabhi match nahi hoga.
     .filter((c) => /^[A-Z]{2}$/.test(c.code) && c.name);
-}
-
-/** Ek country hatao (India ke alawa). */
-export async function deleteCountryPricing(code: string): Promise<void> {
-  assertConfigured();
-  const c = code.toUpperCase();
-  if (c === "IN") throw new Error("India base row nahi hataya jaa sakta");
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/country_pricing?country_code=eq.${c}`,
-    { method: "DELETE", headers: headers({ Prefer: "return=minimal" }), cache: "no-store" },
-  );
-  if (!res.ok) await fail("pricing delete", res);
 }
 
 /* ------------------------------- usage ------------------------------- */

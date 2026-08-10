@@ -1,4 +1,21 @@
--- #11 — Country-wise pricing.
+-- ⚠️ AB ISTEMAAL ME NAHI HAI — ise chalane ki zaroorat nahi.
+--
+-- Plus ka daam ab sirf Google Play Console me set hota hai aur `play_prices`
+-- table me sync hota hai (`supabase/play-prices.sql`, docs/play-prices.md).
+-- Neeche wala haath se bhara jaane wala hisaab poora hata diya gaya: koi code
+-- ab is table ko na padhta hai na likhta hai, aur admin panel me iska editor
+-- bhi nahi raha.
+--
+-- Wajah: conversion rate roz badalti hai aur admin mahine me ek baar hi use
+-- chhoo paata tha. Natija hamesha ek — website ek daam dikhati aur Play doosra
+-- kaat leta. Play ki policy yahi maangti hai ki jo dikhe wahi kate.
+--
+-- Table jaan-boojh ke DROP nahi ki gayi (kisi ka data mitana nahi tha). Jab
+-- pakka ho jaye ki wapas nahi chahiye, tab:
+--   drop table if exists public.country_pricing;
+--
+-- ─────────────────────────────────────────────────────────────────────────────
+-- (purana) #11 — Country-wise pricing.
 -- Formula: local_amount = round( base_INR * multiplier * conversion_rate )
 --   base_INR         = app_config.plus_price_monthly / _yearly (jaise 99 / 999)
 --   multiplier       = us country ke liye (India=1, bahar=jaise 3)

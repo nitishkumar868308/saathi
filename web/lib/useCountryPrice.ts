@@ -10,11 +10,11 @@ export type CountryPrice = {
   yearly: number;
   isIndia: boolean;
   /**
-   * 'play' = Google Play Console ka apna daam (asli sach).
-   * 'manual' = purana base × multiplier wala hisaab (fallback).
+   * 'play' = Google Play Console ka apna daam.
+   * 'default' = sync abhi ek baar bhi nahi chala.
    * UI isse badalta kuch nahi — ye sirf debug ke liye hai.
    */
-  source: "play" | "manual";
+  source: "play" | "default";
   /**
    * Bana-banaya label — "₹99", "$1.99", "99 kr".
    *

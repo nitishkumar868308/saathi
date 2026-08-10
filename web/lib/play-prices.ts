@@ -434,9 +434,9 @@ const SELECT = "product_id,base_plan_id,region_code,region_currency,amount_micro
 /**
  * Ek desh ka Play price — monthly aur yearly.
  *
- * Us desh ka price na ho to `null`. Caller (`lib/pricing.ts`) tab purane
- * country_pricing wale hisaab par gir jaata hai — website ka price kabhi khaali
- * nahi dikhna chahiye.
+ * Us desh ka price na ho to `null`. Caller (`lib/pricing.ts`) tab India ke Play
+ * price par girta hai, aur wo bhi na ho to `DEFAULT_PRICE` par — website ka daam
+ * kabhi khaali nahi dikhna chahiye.
  */
 export async function getPlayPricesForRegion(
   region: string,

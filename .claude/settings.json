@@ -418,7 +418,9 @@
       "Bash(echo \"APP_EXIT=$?\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/probe.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/set-env.js\")",
-      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/live-check.js\")"
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/live-check.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/dictcheck.mjs\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/review.mjs\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

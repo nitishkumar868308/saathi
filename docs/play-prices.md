@@ -160,9 +160,9 @@ sync hafton tak sahi lagta rehta hai.
 
 | Jagah | Pehla sahara | Doosra | Teesra |
 |---|---|---|---|
-| **App** | Store ka `priceString` (Play khud deta hai) | `play_prices` | manual hisaab |
-| **Website** | `play_prices` us desh ka | `play_prices` India ka | manual hisaab |
-| **Admin** | `play_prices` (read-only table) | — | manual table alag se dikhti hai |
+| **App** | Store ka `priceString` (Play khud deta hai) | `play_prices` | `DEFAULT_PRICE` |
+| **Website** | `play_prices` us desh ka | `play_prices` India ka | `DEFAULT_PRICE` |
+| **Admin** | `play_prices` (read-only table) | — | — |
 
 App me pehla sahara sirf tab milta hai jab RevenueCat ka native module aur key
 dono hon — yaani asli build me. Expo Go me ya `PLAY_BILLING_ENABLED` off hone
@@ -170,9 +170,26 @@ par doosra sahara chalta hai, jo daam phir bhi Play Console ka hi hai (bas
 server ke raaste aata hai). Isliye app aur website par hamesha ek hi number
 dikhta hai.
 
-Purana manual hisaab (`country_pricing`: base × multiplier × conversion_rate)
-hataya nahi gaya — wo ab sirf **aakhri fallback** hai, taaki daam kabhi khaali
-na dikhe.
+`DEFAULT_PRICE` ek static ₹99/₹999 hai
+([web/lib/price-default.ts](../web/lib/price-default.ts),
+[app-mobile/src/lib/pricing.ts](../app-mobile/src/lib/pricing.ts)). Uski ek hi
+naukri hai: pehli deploy par, sync chalne se pehle, daam ka khaana khaali na
+dikhe. Wo **admin se editable nahi hai** — aur yahi uska poora point hai.
+
+### Manual pricing poora hata diya gaya
+
+Pehle ek doosra raasta bhi tha: admin panel me base price (₹99/₹999) aur 250
+desh ki `country_pricing` table (per-country multiplier + conversion rate). Wo
+sab hata diya gaya — UI, API ke write endpoints, aur dono taraf ka code.
+
+Wajah seedhi hai: wo table haath se bhari jaati thi. Conversion rate roz badalti
+hai aur admin mahine me ek baar hi use chhoo paata tha. Natija hamesha ek hota —
+website ek daam dikhati aur Play doosra kaat leta. Play ki policy yahi maangti
+hai ki jo dikhe wahi kate.
+
+`country_pricing` table DB me chhod di gayi hai (kisi ka data mitana nahi tha),
+bas ab use koi padhta-likhta nahi. `app_config` ki `plus_price_monthly` /
+`plus_price_yearly` rows bhi wahin padi hain aur bekaar hain.
 
 ---
 

@@ -238,14 +238,19 @@ export async function checkReferralQualification(): Promise<string> {
   }
 }
 
-// Launch offer hata diya. Referral (bina cap) + Free limits + Plus price.
+// Launch offer hata diya. Referral (bina cap) + Free limits.
+//
+// ⚠️ Plus ka DAAM yahan nahi hai, aur jaan-boojh ke nahi hai. Wo Google Play
+//    Console se aata hai — store se seedha (`priceString`) ya server ke
+//    `play_prices` table se (`lib/pricing.ts`). Pehle yahan
+//    `plus_price_monthly/_yearly` the jo admin panel se badalte the; wo poora
+//    raasta hata diya gaya, kyunki daam do jagah set hone ka natija hamesha ek
+//    hi tha: screen ek number dikhati aur Play doosra kaat leta.
 export type Offers = {
   referralsEnabled: boolean;
   referralDays: number;
   freeReminders: number;
   freeDocuments: number;
-  plusPriceMonthly: number;
-  plusPriceYearly: number;
 };
 
 export const DEFAULT_OFFERS: Offers = {
@@ -253,8 +258,6 @@ export const DEFAULT_OFFERS: Offers = {
   referralDays: 15,
   freeReminders: 5,
   freeDocuments: 3,
-  plusPriceMonthly: 99,
-  plusPriceYearly: 999,
 };
 
 /**
@@ -287,8 +290,6 @@ export async function getOffers(): Promise<Offers> {
       referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
       freeReminders: num("free_reminders", DEFAULT_OFFERS.freeReminders),
       freeDocuments: num("free_documents", DEFAULT_OFFERS.freeDocuments),
-      plusPriceMonthly: num("plus_price_monthly", DEFAULT_OFFERS.plusPriceMonthly),
-      plusPriceYearly: num("plus_price_yearly", DEFAULT_OFFERS.plusPriceYearly),
     };
   } catch {
     return DEFAULT_OFFERS;

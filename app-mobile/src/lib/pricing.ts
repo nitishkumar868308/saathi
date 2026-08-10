@@ -1,21 +1,32 @@
 import { supabase } from "./supabase";
 
 /**
- * Country-wise pricing (#11) — app side.
- * IP se country pata karo, uska pricing row (public read) lo, aur local price
- * banao: base_INR × multiplier × conversion_rate.
+ * Daam dikhane ka app-side hissa.
  *
- * Ye sirf DISPLAY hai. Actual charge Google Play user ke account-country se hota
- * hai — VPN/fake-GPS se sirf display badalta hai, asli paisa nahi (fraud-safe).
+ * ── Ek hi source ───────────────────────────────────────────────────────────
+ * Google Play Console. Store se seedha (`product.priceString`) ya server ke
+ * `play_prices` table se — dono me daam wahi ek hai.
+ *
+ * ⚠️ Yahan pehle ek doosra raasta bhi tha: `country_pricing` table se
+ *    base_INR × multiplier × conversion_rate. Wo poora hata diya gaya. Wo
+ *    number admin haath se bharta tha aur Play se hamesha thoda alag ho jaata
+ *    — yaani screen ek daam dikhati aur Play doosra kaat leta. Ye sirf bharosa
+ *    todne wali baat nahi, Play ki policy bhi yahi maangti hai ki jo dikhe
+ *    wahi kate.
+ *
+ * Ye sab sirf DISPLAY hai. Asli charge Play user ke ACCOUNT wale desh se karta
+ * hai — VPN/fake-GPS se sirf display badalta hai, paisa nahi (fraud-safe).
  */
 
-export type LocalPricing = {
-  code: string;
-  currency: string;
-  symbol: string;
-  multiplier: number;
-  rate: number;
-};
+/**
+ * Aakhri sahara — jab store bhi na mile aur `play_prices` bhi khaali ho
+ * (yaani sync ek baar bhi na chala ho). Admin se editable NAHI, jaan-boojh ke:
+ * editable hote hi daam ke do maalik ban jaate hain.
+ */
+export const DEFAULT_PRICE = {
+  monthlyLabel: "₹99",
+  yearlyLabel: "₹999",
+} as const;
 
 const IP_API = "https://ipapi.co/json/";
 
@@ -32,41 +43,10 @@ export async function detectCountry(): Promise<string | null> {
   }
 }
 
-/** Ek country ka pricing row (enabled). Na mile to null. */
-export async function getPricingRow(code: string): Promise<LocalPricing | null> {
-  if (!supabase || !code) return null;
-  try {
-    const { data, error } = await supabase
-      .from("country_pricing")
-      .select("country_code,currency,symbol,conversion_rate,multiplier")
-      .eq("country_code", code.toUpperCase())
-      .eq("enabled", true)
-      .maybeSingle();
-    if (error || !data) return null;
-    return {
-      code: data.country_code,
-      currency: data.currency,
-      symbol: data.symbol,
-      multiplier: Number(data.multiplier) || 1,
-      rate: Number(data.conversion_rate) || 1,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/** base (INR) → local amount. Row na ho to base hi (₹). */
-export function localAmount(baseInr: number, p: LocalPricing | null): number {
-  if (!p) return Math.round(baseInr);
-  const n = baseInr * p.multiplier * p.rate;
-  if (!Number.isFinite(n) || n <= 0) return 0;
-  return n >= 20 ? Math.round(n) : Math.round(n * 10) / 10;
-}
-
 /* --------------------------- Play Console ka daam --------------------------- */
 
 /**
- * Play Console ka apna price — `play_prices` table se.
+ * Play Console ka apna price — server ke `play_prices` table se.
  *
  * ── Ye kyun chahiye jab app Play se seedha price le leti hai ───────────────
  * Play Billing chalu ho to sabse accha price wahi hai jo store khud deta hai
@@ -74,13 +54,11 @@ export function localAmount(baseInr: number, p: LocalPricing | null): number {
  * TAB hi milta hai jab RevenueCat ka native module aur key dono maujood hon:
  * Expo Go me nahi, aur `PLAY_BILLING_ENABLED` off ho tab bhi nahi.
  *
- * Un halaton me pehle app purane manual hisaab (base × multiplier × rate) par
- * gir jaati thi — aur wo number Play Console se hamesha thoda alag hota hai.
- * Ye table beech ka sahi kadam hai: daam phir bhi Play Console ka hi rehta hai,
- * bas server ke raaste aata hai. Website bhi bilkul yahi padhti hai, isliye
- * app aur website par ek hi number dikhta hai.
+ * Un halaton me daam phir bhi Play Console ka hi rehna chahiye, bas server ke
+ * raaste. Website bhi bilkul yahi table padhti hai, isliye app aur website par
+ * hamesha ek hi number dikhta hai.
  *
- * Tarteeb: store ka priceString → ye → manual hisaab.
+ * Tarteeb: store ka priceString → ye → DEFAULT_PRICE.
  */
 export type PlayPrices = {
   monthly: string | null;

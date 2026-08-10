@@ -12,15 +12,19 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Launch offer (pehle-N users ko X mahine free) poori tarah HATA diya gaya —
-// spec item 1. Har naya user Free se shuru. Referral + plan limits + price.
+// spec item 1. Har naya user Free se shuru. Referral + plan limits.
 // Referral pe koi cap nahi — jitne chaaho refer karo (cap hata diya gaya).
+//
+// ⚠️ Plus ka DAAM yahan nahi hai, aur jaan-boojh ke nahi hai. Wo Google Play
+//    Console se aata hai (`lib/pricing.ts` → `play_prices`). Pehle yahan
+//    `plus_price_monthly/_yearly` the jo admin panel se badalte the — wo poora
+//    raasta hata diya gaya, kyunki daam do jagah set hone ka natija hamesha ek
+//    hi tha: website ek number dikhati aur Play doosra kaat leta.
 export type Offers = {
   referralsEnabled: boolean;
   referralDays: number;
   freeReminders: number;
   freeDocuments: number;
-  plusPriceMonthly: number;
-  plusPriceYearly: number;
 };
 
 export const DEFAULT_OFFERS: Offers = {
@@ -28,8 +32,6 @@ export const DEFAULT_OFFERS: Offers = {
   referralDays: 15,
   freeReminders: 5,
   freeDocuments: 3,
-  plusPriceMonthly: 99,
-  plusPriceYearly: 999,
 };
 
 export async function getOffers(): Promise<Offers> {
@@ -61,8 +63,6 @@ export async function getOffers(): Promise<Offers> {
       referralDays: num("referral_days", DEFAULT_OFFERS.referralDays),
       freeReminders: num("free_reminders", DEFAULT_OFFERS.freeReminders),
       freeDocuments: num("free_documents", DEFAULT_OFFERS.freeDocuments),
-      plusPriceMonthly: num("plus_price_monthly", DEFAULT_OFFERS.plusPriceMonthly),
-      plusPriceYearly: num("plus_price_yearly", DEFAULT_OFFERS.plusPriceYearly),
     };
   } catch {
     return DEFAULT_OFFERS;

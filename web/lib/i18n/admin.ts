@@ -780,26 +780,20 @@ export type AdminDict = {
       tableView: string;
       chartView: string;
     };
+    /**
+     * Pricing tab — poora sirf PADHNE ke liye.
+     *
+     * ⚠️ Yahan pehle `basePrice`, `addCountry`, `multiplier`, `applyToAll`
+     *    jaisi keys thi — ek manual pricing editor ki. Wo poora editor hata
+     *    diya gaya: daam ab sirf Play Console me set hota hai. Do jagah daam
+     *    rakhne ka natija hamesha ek tha — website ek number dikhati aur Play
+     *    doosra kaat leta.
+     */
     pricing: {
-      basePrice: string;
       monthly: string;
       yearly: string;
-      addCountry: string;
-      choose: string;
-      multiplier: string;
       country: string;
       currency: string;
-      symbol: string;
-      display: string;
-      remove: string;
-      applyToAll: string;
-      /**
-       * Google Play wala hissa — jahan ASLI daam rehta hai.
-       *
-       * Yahan sab kuch sirf padhne ke liye hai. Price badalne ki jagah ek hi
-       * hai: Play Console. Admin panel ka kaam itna hai ki wo dikha de ki Play
-       * par abhi kya laga hua hai aur wo khabar kitni taazi hai.
-       */
       play: {
         title: string;
         sub: string;
@@ -812,8 +806,6 @@ export type AdminDict = {
         offBody: string;
         openConsole: string;
         staleWarn: string;
-        fallbackTitle: string;
-        fallbackBody: string;
       };
     };
   };
@@ -880,7 +872,7 @@ const en: AdminDict = {
     deleteRequests: { title: "Delete requests", sub: "People asking to have their account deleted. See everything of theirs, then hide it or remove it for good." },
     analytics: { title: "Analytics", sub: "Where people go on the website and in the app — and what one user actually did." },
     rewards: { title: "Rewards & Referrals", sub: "Change offer and referral numbers here — they go live instantly." },
-    pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. Users see their country's price + currency by IP." },
+    pricing: { title: "Pricing", sub: "Prices come from Google Play Console — set them there, sync them here. Visitors see their own country's price by IP." },
     users: { title: "Users", sub: "Who's on which plan, when they joined, and how active they are." },
     usage: { title: "Usage", sub: "Who uses how much — documents, reminders, chats. And who not at all." },
     spend: { title: "AI & WhatsApp", sub: "How much we are actually consuming — Gemini tokens, WhatsApp messages and emails." },
@@ -1405,25 +1397,20 @@ const en: AdminDict = {
       chartView: "Chart",
     },
     pricing: {
-      basePrice: "Base price (INR)", monthly: "Monthly", yearly: "Yearly",
-      addCountry: "Add a country", choose: "Choose…",
-      multiplier: "Multiplier (outside India)", country: "Country",
-      currency: "Currency", symbol: "Symbol", display: "display",
-      remove: "Remove", applyToAll: "Apply to all",
+      monthly: "Monthly", yearly: "Yearly",
+      country: "Country", currency: "Currency",
       play: {
         title: "Google Play — live price",
-        sub: "These are the real prices from Play Console. To change a price, change it there and sync — this table is read-only on purpose.",
+        sub: "These are the real prices from Play Console — the same ones the app charges. To change a price, change it there and sync. This table is read-only on purpose.",
         syncNow: "Sync now",
         syncing: "Syncing…",
         lastSync: "Last synced",
         never: "never",
         regions: "regions",
         offTitle: "Play price sync is off",
-        offBody: "Until it is set up, the website falls back to the manual table below. Setup: docs/play-prices.md",
+        offBody: "Until it is set up, the website shows the default ₹99 / ₹999. Setup: docs/play-prices.md",
         openConsole: "Open Play Console",
         staleWarn: "Last successful sync was over 3 days ago — the prices below may be out of date.",
-        fallbackTitle: "Fallback price (manual)",
-        fallbackBody: "Used only when Play has no price for a country, or the sync is down. When Play data is available, this is ignored.",
       },
     },
   },
@@ -1490,7 +1477,7 @@ const hi: AdminDict = {
     deleteRequests: { title: "डिलीट रिक्वेस्ट", sub: "जो लोग अकाउंट डिलीट करवाना चाहते हैं। उनका सब कुछ देखें, फिर छुपाएँ या हमेशा के लिए हटाएँ।" },
     analytics: { title: "एनालिटिक्स", sub: "लोग वेबसाइट और ऐप में कहाँ जाते हैं — और एक यूज़र ने क्या किया।" },
     rewards: { title: "रिवॉर्ड्स और रेफरल", sub: "ऑफर और रेफरल के नंबर यहीं से बदलें — तुरंत लाइव हो जाते हैं।" },
-    pricing: { title: "देश अनुसार प्राइसिंग", sub: "Base × multiplier × conversion rate. IP से यूज़र को उसके देश का प्राइस + करेंसी दिखता है।" },
+    pricing: { title: "प्राइसिंग", sub: "दाम Google Play Console से आते हैं — सेट वहीं करें, यहाँ sync करें। IP से यूज़र को उसके देश का प्राइस दिखता है।" },
     users: { title: "यूज़र्स", sub: "कौन किस प्लान पर है, कब जुड़ा, और कितना एक्टिव है।" },
     usage: { title: "उपयोग", sub: "कौन कितना उपयोग करता है — डॉक्युमेंट्स, रिमाइंडर, चैट। और कौन बिलकुल नहीं।" },
     spend: { title: "AI और WhatsApp", sub: "हमारा कितना इस्तेमाल हो रहा है — Gemini टोकन, WhatsApp मैसेज और ईमेल।" },
@@ -2019,25 +2006,20 @@ const hi: AdminDict = {
       chartView: "चार्ट",
     },
     pricing: {
-      basePrice: "बेस प्राइस (INR)", monthly: "मासिक", yearly: "सालाना",
-      addCountry: "देश जोड़ें", choose: "चुनें…",
-      multiplier: "मल्टीप्लायर (बाहर के लिए)", country: "देश",
-      currency: "करेंसी", symbol: "चिह्न", display: "display",
-      remove: "हटाएँ", applyToAll: "सब पर लगाएँ",
+      monthly: "मासिक", yearly: "सालाना",
+      country: "देश", currency: "करेंसी",
       play: {
         title: "Google Play — लाइव प्राइस",
-        sub: "ये Play Console के असली दाम हैं। दाम बदलना हो तो वहीं बदलिए और sync कीजिए — यह टेबल जान-बूझकर सिर्फ़ पढ़ने के लिए है।",
+        sub: "ये Play Console के असली दाम हैं — वही जो ऐप में कटते हैं। दाम बदलना हो तो वहीं बदलिए और sync कीजिए। यह टेबल जान-बूझकर सिर्फ़ पढ़ने के लिए है।",
         syncNow: "अभी sync करें",
         syncing: "sync हो रहा है…",
         lastSync: "आख़िरी sync",
         never: "कभी नहीं",
         regions: "देश",
         offTitle: "Play प्राइस sync बंद है",
-        offBody: "जब तक यह सेट नहीं होता, वेबसाइट नीचे वाली मैनुअल टेबल से दाम दिखाएगी। सेटअप: docs/play-prices.md",
+        offBody: "जब तक यह सेट नहीं होता, वेबसाइट डिफ़ॉल्ट ₹99 / ₹999 दिखाएगी। सेटअप: docs/play-prices.md",
         openConsole: "Play Console खोलें",
         staleWarn: "आख़िरी कामयाब sync 3 दिन से ज़्यादा पुराना है — नीचे के दाम पुराने हो सकते हैं।",
-        fallbackTitle: "फ़ॉलबैक प्राइस (मैनुअल)",
-        fallbackBody: "यह सिर्फ़ तब काम आता है जब किसी देश का दाम Play पर न हो, या sync बंद हो। Play का डेटा मौजूद हो तो यह अनदेखा रहता है।",
       },
     },
   },
@@ -2104,7 +2086,7 @@ const hinglish: AdminDict = {
     deleteRequests: { title: "Delete requests", sub: "Jo log account delete karwana chahte hain. Unka sab kuch dekho, phir chhupao ya hamesha ke liye hatao." },
     analytics: { title: "Analytics", sub: "Log website aur app me kahan jaate hain — aur ek user ne asal me kya kiya." },
     rewards: { title: "Rewards & Referrals", sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain." },
-    pricing: { title: "Country pricing", sub: "Base × multiplier × conversion rate. IP se user ko uske desh ka price + currency dikhta hai." },
+    pricing: { title: "Pricing", sub: "Daam Google Play Console se aate hain — set wahin karo, yahan sync karo. IP se user ko uske desh ka price dikhta hai." },
     users: { title: "Users", sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai." },
     usage: { title: "Usage", sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi." },
     spend: { title: "AI & WhatsApp", sub: "Humara kitna istemaal ho raha hai — Gemini token, WhatsApp message aur email." },
@@ -2631,25 +2613,20 @@ const hinglish: AdminDict = {
       chartView: "Chart",
     },
     pricing: {
-      basePrice: "Base price (INR)", monthly: "Monthly", yearly: "Yearly",
-      addCountry: "Country add karo", choose: "Choose…",
-      multiplier: "Multiplier (bahar ke liye)", country: "Country",
-      currency: "Currency", symbol: "Symbol", display: "display",
-      remove: "Remove", applyToAll: "Apply to all",
+      monthly: "Monthly", yearly: "Yearly",
+      country: "Country", currency: "Currency",
       play: {
         title: "Google Play — live price",
-        sub: "Ye Play Console ke ASLI daam hain. Daam badalna ho to wahin badlo aur sync karo — ye table jaan-boojh ke sirf padhne ke liye hai.",
+        sub: "Ye Play Console ke ASLI daam hain — wahi jo app me kate jaate hain. Daam badalna ho to wahin badlo aur sync karo. Ye table jaan-boojh ke sirf padhne ke liye hai.",
         syncNow: "Sync now",
         syncing: "Sync ho raha hai…",
         lastSync: "Aakhri sync",
         never: "kabhi nahi",
         regions: "desh",
         offTitle: "Play price sync band hai",
-        offBody: "Jab tak ye set nahi hota, website neeche wali manual table se daam dikhati hai. Setup: docs/play-prices.md",
+        offBody: "Jab tak ye set nahi hota, website default ₹99 / ₹999 dikhati hai. Setup: docs/play-prices.md",
         openConsole: "Play Console kholo",
         staleWarn: "Aakhri kaamyab sync 3 din se zyada purana hai — neeche ke daam purane ho sakte hain.",
-        fallbackTitle: "Fallback price (manual)",
-        fallbackBody: "Ye sirf tab kaam aata hai jab kisi desh ka daam Play par na ho, ya sync band ho. Play ka data maujood ho to isse koi matlab nahi.",
       },
     },
   },

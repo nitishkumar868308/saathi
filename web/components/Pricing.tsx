@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { PLAY_STORE_URL } from "@/lib/links";
 import { useOffers } from "@/lib/useOffers";
 import { useCountryPrice } from "@/lib/useCountryPrice";
+import { DEFAULT_PRICE } from "@/lib/price-default";
 import { tpl } from "@/lib/offers";
 
 // GST abhi comment out — humare paas GST registration nahi, isliye user se nahi lenge.
@@ -95,12 +96,21 @@ export default function Pricing() {
       <div className="mx-auto mt-8 grid max-w-3xl gap-5 sm:grid-cols-2">
         {t.plans.map((plan) => {
           const highlight = plan.highlight;
-          // Plus ka daam Play Console se (uske desh ki currency me); Free ₹0.
+          /**
+           * Plus ka daam Play Console se, visitor ke desh ki currency me.
+           *
+           * `cp` null hai matlab `/api/pricing` ka jawab abhi aaya nahi.
+           * Us ek pal ke liye India ka default dikhta hai — khaali jagah ya
+           * skeleton se behtar, kyunki 90% visitor India se hi aate hain aur
+           * unke liye ye number badalta bhi nahi.
+           */
           const plusLocal = cp
             ? yearly
               ? cp.yearlyLabel
               : cp.monthlyLabel
-            : `₹${yearly ? offers.plusPriceYearly : offers.plusPriceMonthly}`;
+            : yearly
+              ? DEFAULT_PRICE.yearlyLabel
+              : DEFAULT_PRICE.monthlyLabel;
           const price = highlight
             ? plusLocal
             : yearly && plan.priceYearly
