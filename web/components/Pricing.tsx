@@ -23,7 +23,15 @@ export default function Pricing() {
 
   // Admin se numbers badalte hi ye copy khud badal jaati hai.
   const offers = useOffers();
-  // IP-country ka local price + currency (na aaye to ₹ base fallback).
+  /**
+   * Visitor ke desh ka daam.
+   *
+   * Andar se ye pehle **Google Play Console** ka apna price dekhta hai (wahi jo
+   * app me kata jaata hai), aur wo na mile tabhi purane manual hisaab par girta
+   * hai. Yahi wajah hai ki ab yahan `symbol + number` jodne ki zaroorat nahi —
+   * server bana-banaya label bhejta hai. Load hone tak `null`, tab tak ₹ wala
+   * fallback dikhta hai taaki jagah khaali na rahe.
+   */
   const cp = useCountryPrice();
   const vars = { d: offers.referralDays };
 
@@ -87,11 +95,12 @@ export default function Pricing() {
       <div className="mx-auto mt-8 grid max-w-3xl gap-5 sm:grid-cols-2">
         {t.plans.map((plan) => {
           const highlight = plan.highlight;
-          // Plus ka daam admin (app_config) se + IP-country ki currency; Free ₹0.
-          const plusLocal =
-            cp
-              ? `${cp.symbol}${(yearly ? cp.yearly : cp.monthly).toLocaleString("en-IN")}`
-              : `₹${yearly ? offers.plusPriceYearly : offers.plusPriceMonthly}`;
+          // Plus ka daam Play Console se (uske desh ki currency me); Free ₹0.
+          const plusLocal = cp
+            ? yearly
+              ? cp.yearlyLabel
+              : cp.monthlyLabel
+            : `₹${yearly ? offers.plusPriceYearly : offers.plusPriceMonthly}`;
           const price = highlight
             ? plusLocal
             : yearly && plan.priceYearly

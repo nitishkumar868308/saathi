@@ -793,6 +793,28 @@ export type AdminDict = {
       display: string;
       remove: string;
       applyToAll: string;
+      /**
+       * Google Play wala hissa — jahan ASLI daam rehta hai.
+       *
+       * Yahan sab kuch sirf padhne ke liye hai. Price badalne ki jagah ek hi
+       * hai: Play Console. Admin panel ka kaam itna hai ki wo dikha de ki Play
+       * par abhi kya laga hua hai aur wo khabar kitni taazi hai.
+       */
+      play: {
+        title: string;
+        sub: string;
+        syncNow: string;
+        syncing: string;
+        lastSync: string;
+        never: string;
+        regions: string;
+        offTitle: string;
+        offBody: string;
+        openConsole: string;
+        staleWarn: string;
+        fallbackTitle: string;
+        fallbackBody: string;
+      };
     };
   };
 };
@@ -1388,6 +1410,21 @@ const en: AdminDict = {
       multiplier: "Multiplier (outside India)", country: "Country",
       currency: "Currency", symbol: "Symbol", display: "display",
       remove: "Remove", applyToAll: "Apply to all",
+      play: {
+        title: "Google Play — live price",
+        sub: "These are the real prices from Play Console. To change a price, change it there and sync — this table is read-only on purpose.",
+        syncNow: "Sync now",
+        syncing: "Syncing…",
+        lastSync: "Last synced",
+        never: "never",
+        regions: "regions",
+        offTitle: "Play price sync is off",
+        offBody: "Until it is set up, the website falls back to the manual table below. Setup: docs/play-prices.md",
+        openConsole: "Open Play Console",
+        staleWarn: "Last successful sync was over 3 days ago — the prices below may be out of date.",
+        fallbackTitle: "Fallback price (manual)",
+        fallbackBody: "Used only when Play has no price for a country, or the sync is down. When Play data is available, this is ignored.",
+      },
     },
   },
 };
@@ -1987,6 +2024,21 @@ const hi: AdminDict = {
       multiplier: "मल्टीप्लायर (बाहर के लिए)", country: "देश",
       currency: "करेंसी", symbol: "चिह्न", display: "display",
       remove: "हटाएँ", applyToAll: "सब पर लगाएँ",
+      play: {
+        title: "Google Play — लाइव प्राइस",
+        sub: "ये Play Console के असली दाम हैं। दाम बदलना हो तो वहीं बदलिए और sync कीजिए — यह टेबल जान-बूझकर सिर्फ़ पढ़ने के लिए है।",
+        syncNow: "अभी sync करें",
+        syncing: "sync हो रहा है…",
+        lastSync: "आख़िरी sync",
+        never: "कभी नहीं",
+        regions: "देश",
+        offTitle: "Play प्राइस sync बंद है",
+        offBody: "जब तक यह सेट नहीं होता, वेबसाइट नीचे वाली मैनुअल टेबल से दाम दिखाएगी। सेटअप: docs/play-prices.md",
+        openConsole: "Play Console खोलें",
+        staleWarn: "आख़िरी कामयाब sync 3 दिन से ज़्यादा पुराना है — नीचे के दाम पुराने हो सकते हैं।",
+        fallbackTitle: "फ़ॉलबैक प्राइस (मैनुअल)",
+        fallbackBody: "यह सिर्फ़ तब काम आता है जब किसी देश का दाम Play पर न हो, या sync बंद हो। Play का डेटा मौजूद हो तो यह अनदेखा रहता है।",
+      },
     },
   },
 };
@@ -2584,6 +2636,21 @@ const hinglish: AdminDict = {
       multiplier: "Multiplier (bahar ke liye)", country: "Country",
       currency: "Currency", symbol: "Symbol", display: "display",
       remove: "Remove", applyToAll: "Apply to all",
+      play: {
+        title: "Google Play — live price",
+        sub: "Ye Play Console ke ASLI daam hain. Daam badalna ho to wahin badlo aur sync karo — ye table jaan-boojh ke sirf padhne ke liye hai.",
+        syncNow: "Sync now",
+        syncing: "Sync ho raha hai…",
+        lastSync: "Aakhri sync",
+        never: "kabhi nahi",
+        regions: "desh",
+        offTitle: "Play price sync band hai",
+        offBody: "Jab tak ye set nahi hota, website neeche wali manual table se daam dikhati hai. Setup: docs/play-prices.md",
+        openConsole: "Play Console kholo",
+        staleWarn: "Aakhri kaamyab sync 3 din se zyada purana hai — neeche ke daam purane ho sakte hain.",
+        fallbackTitle: "Fallback price (manual)",
+        fallbackBody: "Ye sirf tab kaam aata hai jab kisi desh ka daam Play par na ho, ya sync band ho. Play ka data maujood ho to isse koi matlab nahi.",
+      },
     },
   },
 };

@@ -412,7 +412,13 @@
       "Bash(grep -c '\\\\\\\\\\\\\\\\u003c' lib/json-ld.ts)",
       "Bash(echo \"WEB EXIT:$?\")",
       "Bash(echo \"MOBILE EXIT:$?\")",
-      "Bash(timeout 540 npx next build)"
+      "Bash(timeout 540 npx next build)",
+      "Bash(xargs cat)",
+      "Bash(echo \"WEB_EXIT=$?\")",
+      "Bash(echo \"APP_EXIT=$?\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/probe.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/set-env.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/live-check.js\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

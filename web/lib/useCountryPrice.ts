@@ -9,6 +9,22 @@ export type CountryPrice = {
   monthly: number;
   yearly: number;
   isIndia: boolean;
+  /**
+   * 'play' = Google Play Console ka apna daam (asli sach).
+   * 'manual' = purana base × multiplier wala hisaab (fallback).
+   * UI isse badalta kuch nahi — ye sirf debug ke liye hai.
+   */
+  source: "play" | "manual";
+  /**
+   * Bana-banaya label — "₹99", "$1.99", "99 kr".
+   *
+   * ⚠️ `symbol + number` khud mat jodna. Har currency apne niyam se chalti hai
+   *    (symbol aage, peeche, space ke saath ya bina), aur wo jodna India-USA ke
+   *    liye chal jaata hai par baaki aadhi duniya ke liye galat dikhta hai.
+   *    Server `Intl` se ye label pehle hi sahi bana ke bhejta hai.
+   */
+  monthlyLabel: string;
+  yearlyLabel: string;
 };
 
 /**

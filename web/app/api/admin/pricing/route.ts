@@ -10,6 +10,13 @@ import {
   RewardsNotConfigured,
   type CountryPricingRow,
 } from "@/lib/rewards-server";
+import {
+  PLAY_PRODUCTS,
+  formatMicros,
+  getAllPlayPrices,
+  getPlaySyncMeta,
+  periodOf,
+} from "@/lib/play-prices";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,14 +35,66 @@ function errRes(err: unknown) {
   );
 }
 
+/**
+ * Play ki flat rows ko ek desh = ek line me samet do.
+ *
+ * DB me har (product, base plan, region) ki apni row hoti hai — yaani ek desh
+ * ki do rows (monthly + yearly). Admin ko table me ek hi line chahiye jisme
+ * dono daam hon.
+ */
+function groupPlayRows(
+  rows: Awaited<ReturnType<typeof getAllPlayPrices>>,
+): PlayRegionRow[] {
+  const byRegion = new Map<string, PlayRegionRow>();
+  for (const row of rows) {
+    const period = periodOf(row);
+    if (!period) continue;
+    const entry = byRegion.get(row.region) ?? {
+      region: row.region,
+      currency: row.currency,
+      monthly: null,
+      yearly: null,
+      monthlyLabel: null,
+      yearlyLabel: null,
+    };
+    entry.currency = row.currency;
+    if (period === "monthly") {
+      entry.monthly = row.micros;
+      entry.monthlyLabel = formatMicros(row.currency, row.micros);
+    } else {
+      entry.yearly = row.micros;
+      entry.yearlyLabel = formatMicros(row.currency, row.micros);
+    }
+    byRegion.set(row.region, entry);
+  }
+  // India pehle (base market), baaki alphabetical.
+  // (`Array.from` — tsconfig ka target ES5 hai, spread yahan chalta nahi.)
+  return Array.from(byRegion.values()).sort((a, b) =>
+    a.region === "IN" ? -1 : b.region === "IN" ? 1 : a.region.localeCompare(b.region),
+  );
+}
+
+type PlayRegionRow = {
+  region: string;
+  currency: string;
+  monthly: number | null;
+  yearly: number | null;
+  monthlyLabel: string | null;
+  yearlyLabel: string | null;
+};
+
 export async function GET() {
   const bad = await denied();
   if (bad) return bad;
   try {
-    const [rows, config, countries] = await Promise.all([
+    const [rows, config, countries, playRows, playMeta] = await Promise.all([
       getCountryPricing(),
       getConfig(),
       getCountriesList().catch(() => []),
+      // Play ka hissa poore page ko na girae — table na bana ho ya env na ho to
+      // baaki pricing screen pehle ki tarah chalti rehni chahiye.
+      getAllPlayPrices().catch(() => []),
+      getPlaySyncMeta(),
     ]);
     return NextResponse.json({
       rows,
@@ -43,6 +102,11 @@ export async function GET() {
       base: {
         monthly: Number(config.plus_price_monthly ?? 99),
         yearly: Number(config.plus_price_yearly ?? 999),
+      },
+      play: {
+        ...playMeta,
+        products: [PLAY_PRODUCTS.monthly, PLAY_PRODUCTS.yearly],
+        regions: groupPlayRows(playRows),
       },
     });
   } catch (err) {

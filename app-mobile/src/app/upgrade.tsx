@@ -29,8 +29,10 @@ import { useOffers } from "@/lib/use-offers";
 import {
   detectCountry,
   getPricingRow,
+  getPlayPrices,
   localAmount,
   type LocalPricing,
+  type PlayPrices,
 } from "@/lib/pricing";
 import { countryFromTimezone } from "@/lib/tz-country";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -64,6 +66,15 @@ export default function Upgrade() {
   const [ipCode, setIpCode] = useState<string | null>(null);
   const [profileCode, setProfileCode] = useState<string | null>(null);
   const [showMismatch, setShowMismatch] = useState(false);
+  /**
+   * Us desh ka Play Console wala daam (server ke `play_prices` se).
+   *
+   * Ye beech ka kadam hai: store ka apna `priceString` sabse accha hai, par wo
+   * Expo Go / billing-off build me milta hi nahi. Aise me purane manual hisaab
+   * par girne se app aur website alag-alag number dikhane lagte the. Ab dono ek
+   * hi jagah se padhte hain — Play Console.
+   */
+  const [playPrices, setPlayPrices] = useState<PlayPrices | null>(null);
 
   /**
    * Store ke apne packages — inme Google Play ka ASLI, uske hisaab se local
@@ -104,9 +115,13 @@ export default function Upgrade() {
       setIpCode(ip);
       setProfileCode(prof);
       const useCode = ip || prof || "IN";
-      const row = await getPricingRow(useCode);
+      const [row, play] = await Promise.all([
+        getPricingRow(useCode),
+        getPlayPrices(useCode),
+      ]);
       if (!alive) return;
       setPricing(row);
+      setPlayPrices(play);
       if (ip && prof && ip !== prof) setShowMismatch(true);
     })();
     return () => {
@@ -116,8 +131,11 @@ export default function Upgrade() {
 
   async function chooseCountry(code: string) {
     setShowMismatch(false);
-    const row = await getPricingRow(code);
+    const [row, play] = await Promise.all([getPricingRow(code), getPlayPrices(code)]);
     setPricing(row);
+    // Dono ek saath — warna desh badalne par currency ek jagah se aati aur
+    // number doosri jagah se, jo bilkul galat daam bana deta hai.
+    setPlayPrices(play);
   }
 
   // rewardsVersion dep: first-N / referral grant background me hota hai. Iske
@@ -156,14 +174,25 @@ export default function Upgrade() {
   const localLabel = `${sym}${localAmount(base, pricing).toLocaleString("en-IN")}`;
 
   /**
-   * Jo dikhega wahi kata jayega.
+   * Jo dikhega wahi kata jayega — teen sahare, isi tarteeb me.
    *
-   * Play chalu hone par store ka apna `priceString` hi sach hai — wo pehle se
-   * user ke desh aur currency me hota hai (₹, $, £ — sab). Play band ho (aaj)
-   * to hamesha ki tarah country-pricing wala label.
+   * 1. **Store ka apna `priceString`** — sabse sahi. Ye Play khud deta hai, user
+   *    ke ACCOUNT wale desh aur currency me (₹, $, £). Jo yahan likha hai wahi
+   *    kata jaata hai, isliye iske hote hue kuch aur dekhna hi nahi chahiye.
+   * 2. **`play_prices`** — wahi Play Console ka daam, par server ke raaste. Ye
+   *    tab kaam aata hai jab store hi na mile: Expo Go, ya billing off wali
+   *    build. Website bhi bilkul yahi padhti hai, isliye dono par ek number.
+   * 3. **Manual hisaab** — purana base × multiplier × conversion_rate. Sirf tab
+   *    jab Play ka data kahin se bhi na mile.
+   *
+   * ⚠️ Tarteeb kabhi ulti mat karna. Manual number admin haath se bharta hai
+   *    aur wo Play se hamesha thoda alag ho jaata hai. Us halat me screen ek
+   *    daam dikhati hai aur Play doosra kaat leta hai — bharosa to jaata hi
+   *    hai, Play ki policy bhi yahi maangti hai ki jo dikhe wahi kate.
    */
   const storePrice = String(packageFor(yearly)?.product?.priceString ?? "").trim();
-  const priceLabel = storePrice || localLabel;
+  const playLabel = (yearly ? playPrices?.yearly : playPrices?.monthly) ?? "";
+  const priceLabel = storePrice || playLabel || localLabel;
 
   const FREE_FEATURES = u.freeFeatures.map((f) =>
     tpl(f, { rem: offers.freeReminders, docs: offers.freeDocuments }),

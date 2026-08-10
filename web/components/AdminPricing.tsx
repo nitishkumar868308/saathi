@@ -1,7 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Plus, Trash2, Save, Globe, Check, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Save,
+  Globe,
+  Check,
+  Search,
+  RefreshCw,
+  ExternalLink,
+  Lock,
+} from "lucide-react";
 import Loader from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
@@ -19,6 +30,47 @@ type Row = {
 type CountryOption = { code: string; name: string; currency?: string; symbol?: string };
 type Base = { monthly: number; yearly: number };
 
+/** Ek desh ki ek line — monthly + yearly, dono Play Console se. */
+type PlayRegion = {
+  region: string;
+  currency: string;
+  monthly: number | null;
+  yearly: number | null;
+  monthlyLabel: string | null;
+  yearlyLabel: string | null;
+};
+
+type PlayState = {
+  /** Saare env set hain? Na hon to neeche wali manual table hi chalti hai. */
+  configured: boolean;
+  /** Band hone ki asli wajah (ya "on") — setup me yahi sabse kaam ka hai. */
+  status: string;
+  syncedAt: string | null;
+  attemptedAt: string | null;
+  ok: boolean;
+  message: string | null;
+  rowsCount: number;
+  products: string[];
+  regions: PlayRegion[];
+};
+
+const PLAY_CONSOLE_URL = "https://play.google.com/console";
+
+/** "2 ghante pehle" — poori date se ye jaldi samajh aata hai. */
+function ago(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "abhi";
+  if (min < 60) return `${min} min pehle`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} ghante pehle`;
+  return `${Math.floor(hr / 24)} din pehle`;
+}
+
+const STALE_MS = 3 * 24 * 60 * 60 * 1000;
+
 function roundPrice(n: number): number {
   if (!Number.isFinite(n) || n <= 0) return 0;
   return n >= 20 ? Math.round(n) : Math.round(n * 10) / 10;
@@ -31,6 +83,7 @@ export default function AdminPricing() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [countries, setCountries] = useState<CountryOption[]>([]);
   const [base, setBase] = useState<Base>({ monthly: 99, yearly: 999 });
+  const [play, setPlay] = useState<PlayState | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -46,12 +99,14 @@ export default function AdminPricing() {
         rows?: Row[];
         countries?: CountryOption[];
         base?: Base;
+        play?: PlayState;
         error?: string;
       };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setRows(body.rows ?? []);
       setCountries(body.countries ?? []);
       if (body.base) setBase(body.base);
+      if (body.play) setPlay(body.play);
     } catch (e) {
       setError(e instanceof Error ? e.message : sh.loadFailed);
       setRows([]);
@@ -196,9 +251,15 @@ export default function AdminPricing() {
         </div>
       )}
 
-      {/* Base price (INR) */}
+      {/* Google Play — ASLI daam. Sabse upar, kyunki yahi sach hai. */}
+      <PlaySection play={play} countries={countries} onSynced={load} />
+
+      {/* Base price (INR) — ab sirf FALLBACK */}
       <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
-        <h3 className="font-display text-lg font-semibold">{d.basePrice}</h3>
+        <h3 className="font-display text-lg font-semibold">
+          {d.play.fallbackTitle}
+        </h3>
+        <p className="mt-1 text-sm text-ink-soft">{d.play.fallbackBody}</p>
         <p className="mt-1 text-sm text-ink-soft">
           Har country ka price = base × multiplier × conversion rate.
         </p>
@@ -419,7 +480,221 @@ export default function AdminPricing() {
       <p className="text-xs leading-relaxed text-ink-soft">
         Note: ye sirf <b>display</b> price hai. Actual charge Google Play user ke
         account-country se leta hai — VPN/fake-GPS se display badal sakta hai, charge nahi.
+        Jahan Play ka price maujood hai, wahan website upar wali table se dikhati
+        hai — ye manual hisaab tab bhi chalta hai jab Play par us desh ka daam na ho.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Play Console ka live price — sirf padhne ke liye.
+ *
+ * ⚠️ Yahan koi input box jaan-boojh ke nahi hai. Ek baar bhi admin ko yahan se
+ *    daam badalne diya, to do maalik ban jaate hain aur ek din website ₹99
+ *    dikhayegi jabki Play ₹149 kaat lega. Ye sirf user ka bharosa todne wali
+ *    baat nahi — Play ki policy bhi yahi maangti hai ki jo dikhe wahi kate.
+ *    Daam badalne ka ek hi raasta hai: Play Console → phir "Sync now".
+ */
+function PlaySection({
+  play,
+  countries,
+  onSynced,
+}: {
+  play: PlayState | null;
+  countries: CountryOption[];
+  onSynced: () => Promise<void> | void;
+}) {
+  const t = useAdminT();
+  const d = t.data.pricing.play;
+  const sh = t.data.shared;
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState("");
+  const [query, setQuery] = useState("");
+
+  const nameOf = useMemo(() => {
+    const m = new Map(countries.map((c) => [c.code, c.name]));
+    return (code: string) => m.get(code) ?? code;
+  }, [countries]);
+
+  const regions = play?.regions ?? [];
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return regions;
+    return regions.filter(
+      (r) =>
+        r.region.toLowerCase().includes(q) ||
+        r.currency.toLowerCase().includes(q) ||
+        nameOf(r.region).toLowerCase().includes(q),
+    );
+  }, [regions, query, nameOf]);
+
+  const pg = usePagination(filtered, 15, query);
+
+  async function sync() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncError("");
+    try {
+      const res = await fetch("/api/admin/pricing/sync", { method: "POST" });
+      const body = (await res.json()) as { ok?: boolean; error?: string; message?: string };
+      if (!res.ok || !body.ok) throw new Error(body.error ?? body.message ?? `HTTP ${res.status}`);
+      // Poora page dobara load — sync ke baad table, ginti aur "aakhri sync"
+      // teenon badalte hain, aur unhe alag-alag patch karna sirf teen naye bug
+      // ka mauka hai.
+      await onSynced();
+    } catch (e) {
+      setSyncError(e instanceof Error ? e.message : "sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const syncedAgo = ago(play?.syncedAt ?? null);
+  const stale =
+    Boolean(play?.syncedAt) && Date.now() - new Date(play!.syncedAt!).getTime() > STALE_MS;
+
+  return (
+    <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="flex items-center gap-2 font-display text-lg font-semibold">
+            {d.title}
+            <span className="inline-flex items-center gap-1 rounded-full bg-cream-deep/50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
+              <Lock size={11} /> read-only
+            </span>
+          </h3>
+          <p className="mt-1 max-w-2xl text-sm text-ink-soft">{d.sub}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={PLAY_CONSOLE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
+          >
+            <ExternalLink size={15} /> {d.openConsole}
+          </a>
+          <button
+            onClick={sync}
+            disabled={syncing || !play?.configured}
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-terracotta px-4 text-sm font-semibold text-white shadow-warm transition hover:bg-terracotta-dark disabled:opacity-50"
+          >
+            {syncing ? <Loader size={16} /> : <RefreshCw size={15} />}
+            {syncing ? d.syncing : d.syncNow}
+          </button>
+        </div>
+      </div>
+
+      {/* Chalu hai ya nahi — aur nahi to KYUN. Ye ek line poore setup ka
+          sabse kaam ka hissa hai. */}
+      {play && !play.configured && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-line bg-cream-deep/25 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-ink-soft" />
+          <div className="min-w-0 text-sm">
+            <p className="font-semibold text-ink">{d.offTitle}</p>
+            <p className="mt-0.5 text-ink-soft">{play.status}</p>
+            <p className="mt-1 text-ink-soft">{d.offBody}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Sync chal to raha hai par fail ho raha hai — ye chup-chaap nahi rehna
+          chahiye, warna purana price hafton tak sahi lagta rehta hai. */}
+      {play?.configured && play.message && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-terracotta/30 bg-terracotta/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-terracotta-dark" />
+          <p className="text-sm leading-relaxed text-terracotta-dark">{play.message}</p>
+        </div>
+      )}
+
+      {syncError && (
+        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-terracotta/30 bg-terracotta/10 p-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-terracotta-dark" />
+          <p className="text-sm leading-relaxed text-terracotta-dark">{syncError}</p>
+        </div>
+      )}
+
+      {stale && (
+        <p className="mt-4 rounded-2xl border border-terracotta/30 bg-terracotta/10 px-4 py-3 text-sm font-semibold text-terracotta-dark">
+          {d.staleWarn}
+        </p>
+      )}
+
+      <p className="mt-4 text-sm text-ink-soft">
+        {d.lastSync}: <b className="text-ink">{syncedAgo ?? d.never}</b>
+        {regions.length > 0 && (
+          <>
+            {" · "}
+            {regions.length} {d.regions}
+          </>
+        )}
+        {play?.products?.length ? <> · {play.products.join(", ")}</> : null}
+      </p>
+
+      {regions.length > 0 && (
+        <>
+          <div className="relative mt-4">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={sh.searchPh}
+              className="w-full rounded-2xl border border-line bg-cream py-2.5 pl-10 pr-4 text-sm text-ink outline-none transition focus:border-terracotta"
+            />
+          </div>
+
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-line">
+            <table className="w-full min-w-[480px] text-left text-sm">
+              <thead className="border-b border-line bg-cream-deep/25 text-xs uppercase tracking-wider text-ink-soft">
+                <tr>
+                  <th className="px-3 py-2.5 font-semibold">{t.data.pricing.country}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t.data.pricing.currency}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t.data.pricing.monthly}</th>
+                  <th className="px-3 py-2.5 font-semibold">{t.data.pricing.yearly}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pg.pageItems.map((r) => (
+                  <tr key={r.region} className="border-b border-line/60">
+                    <td className="px-3 py-2 font-semibold text-ink">
+                      {nameOf(r.region)}
+                      <span className="ml-1 text-xs font-normal text-ink-soft">{r.region}</span>
+                    </td>
+                    <td className="px-3 py-2 text-ink-soft">{r.currency}</td>
+                    {/* Label seedha server se aata hai (Intl se bana) — symbol ki
+                        jagah har currency me alag hoti hai, isliye yahan number
+                        aur symbol dobara jodne ki koshish nahi karte. */}
+                    <td className="px-3 py-2 font-bold text-ink">{r.monthlyLabel ?? "—"}</td>
+                    <td className="px-3 py-2 font-bold text-ink">{r.yearlyLabel ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="mt-3 rounded-2xl border border-line px-4 py-4 text-center text-sm text-ink-soft">
+              {sh.emptyFilter}
+            </p>
+          ) : (
+            <div className="mt-3">
+              <Pagination
+                page={pg.page}
+                pageCount={pg.pageCount}
+                total={pg.total}
+                from={pg.from}
+                to={pg.to}
+                onPage={pg.setPage}
+                label={sh.countries}
+              />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
