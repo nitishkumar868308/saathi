@@ -558,6 +558,20 @@ export type Dict = {
      * screen khul rahi hai, title pehle se bhara hua.
      */
     reminderNeedsTime: string;
+    /**
+     * Bol ke chhoda — message apne aap ja raha hai, par abhi roka ja sakta hai.
+     *
+     * ⚠️ Ye do line isliye hain kyunki bola hua message SEEDHA bhej dena
+     * khatarnak hai: recognizer aadha ya galat likh de to wo galat baat AI ko
+     * chali jaati hai aur chat me hamesha ke liye dikhti rehti hai. Aur seedha
+     * na bhejna bhi galat tha — user bolta tha, text dikhta tha, aur usse phir
+     * bhi send dabana padta tha (yaani voice ka aadha faayda hi mila).
+     *
+     * Beech ka raasta: bhej to apne aap rahe hain, par do second ka mauka
+     * rahega.
+     */
+    voiceSending: string;
+    voiceStop: string;
   };
   upgrade: {
     title: string;
@@ -875,6 +889,8 @@ export type Dict = {
     bannerTitle: string;
     /** {who} — naam ya mask kiya hua email */
     bannerBody: string;
+    /** Patti ke neeche ka link — tap par poori baat khulti hai. */
+    bannerMore: string;
   };
 
   /**
@@ -1413,6 +1429,8 @@ const hinglish: Dict = {
     offlineReminderSet: "Net nahi tha, par maine reminder laga diya",
     reminderFailed: "Reminder ban nahi paaya",
     reminderNeedsTime: "Time thoda check kar lo — bas ek tap me set ho jayega",
+    voiceSending: "Bhej raha hoon…",
+    voiceStop: "Roko",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -1680,8 +1698,13 @@ const hinglish: Dict = {
     ok: "Samajh gaya, phir bhi chalu rakho",
     logout: "Logout karo",
     bannerTitle: "Ye phone pehle se set hai",
+    // ⚠️ "tap karke poori baat padho" yahan se hata diya gaya. Wo line patti ke
+    // andar thi, aur patti tap hoti hi nahi thi — user dabata tha, kuch nahi
+    // hota tha. Ab wo baat apne alag link me hai (`bannerMore`), jo sach me
+    // khulta hai.
     bannerBody:
-      "{who} ke liye. Doosri ID se login karoge to notification aur AI unke liye band ho jayenge — tap karke poori baat padho.",
+      "{who} ke liye. Doosri ID se login karoge to notification aur AI unke liye band ho jayenge.",
+    bannerMore: "Poori baat padho",
   },
   multiDevice: {
     title: "Aapki ID aur phones par bhi login hai",
@@ -2170,6 +2193,8 @@ const hi: Dict = {
     offlineReminderSet: "नेट नहीं था, फिर भी मैंने रिमाइंडर लगा दिया",
     reminderFailed: "रिमाइंडर बन नहीं पाया",
     reminderNeedsTime: "समय एक बार देख लीजिए — बस एक टैप में सेट हो जाएगा",
+    voiceSending: "भेज रहा हूँ…",
+    voiceStop: "रोकें",
   },
   upgrade: {
     title: "साथी प्लस",
@@ -2438,7 +2463,8 @@ const hi: Dict = {
     logout: "लॉगआउट करें",
     bannerTitle: "यह फ़ोन पहले से सेट है",
     bannerBody:
-      "{who} के लिए। दूसरी ID से लॉगिन करेंगे तो नोटिफ़िकेशन और AI उनके लिए बंद हो जाएँगे — टैप करके पूरी बात पढ़िए।",
+      "{who} के लिए। दूसरी ID से लॉगिन करेंगे तो नोटिफ़िकेशन और AI उनके लिए बंद हो जाएँगे।",
+    bannerMore: "पूरी बात पढ़िए",
   },
   multiDevice: {
     title: "आपकी ID और फ़ोनों पर भी लॉगिन है",
@@ -2926,6 +2952,8 @@ const en: Dict = {
     offlineReminderSet: "No internet, but I've set the reminder",
     reminderFailed: "Couldn't create the reminder",
     reminderNeedsTime: "Just check the time — one tap and it's set",
+    voiceSending: "Sending…",
+    voiceStop: "Stop",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -3194,7 +3222,8 @@ const en: Dict = {
     logout: "Sign out",
     bannerTitle: "This phone is already set up",
     bannerBody:
-      "For {who}. Signing in with a different ID turns off their notifications and AI — tap to read why.",
+      "For {who}. Signing in with a different ID turns off their notifications and AI.",
+    bannerMore: "Read what changes",
   },
   multiDevice: {
     title: "Your ID is signed in on other phones too",

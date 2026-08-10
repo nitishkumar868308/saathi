@@ -18,6 +18,7 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { alertUser, stopAlert } from "@/lib/alert-mode";
 import { completeReminder, listReminders } from "@/lib/reminders";
 import { cancelReminder, scheduleReminderSeries, takePendingAlert } from "@/lib/notifications";
+import { alreadySpokenInBackground } from "@/lib/notification-background";
 import { acknowledgeDocument, renewDocument } from "@/lib/doc-ack";
 import { emitDataChanged } from "@/lib/data-events";
 import { documentFollowUp, type DocFollowUp } from "@/lib/ai";
@@ -176,9 +177,18 @@ export function ReminderAlertHost() {
       easing: Easing.out(Easing.back(1.4)),
       useNativeDriver: true,
     }).start();
-    // Naam le ke bulao, phir reminder/document ka kaam bolo — user ko phone
-    // uthake padhna na pade. Ring/vibrate/silent Settings se tay hota hai.
-    void alertUser(alert.body);
+    /**
+     * Naam le ke bulao, phir reminder/document ka kaam bolo — user ko phone
+     * uthake padhna na pade. Ring/vibrate/silent Settings se tay hota hai.
+     *
+     * ⚠️ Par sirf tab jab background me ye baat pehle se boli na ja chuki ho.
+     * Ab notification aate hi (app khule bina) `notification-background.ts`
+     * bolta hai; uske turant baad full-screen intent app ko saamne le aata hai
+     * aur ye modal khulta hai. Bina is shart ke user ko wahi ek reminder do
+     * baar sunayi deta — ek baar tray se, ek baar popup se — aur dono aawazein
+     * ek doosre ke upar chadh jaati thi.
+     */
+    if (!alreadySpokenInBackground()) void alertUser(alert.body);
   }, [alert, scale]);
 
   /**

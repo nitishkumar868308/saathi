@@ -34,6 +34,7 @@ import { useOffers } from "@/lib/use-offers";
 import { emitDataChanged, useDataChanged } from "@/lib/data-events";
 import { usePlan } from "@/lib/use-plan";
 import { dailyBrief } from "@/lib/ai";
+import { Reveal3D, Press3D } from "@/components/reveal-3d";
 
 function isToday(iso: string | null): boolean {
   if (!iso) return false;
@@ -110,18 +111,50 @@ export default function Home() {
   // ke liye "Plus lo" wala upsell jhalak jaata — bilkul wahi cheez jiske uske
   // paise lag chuke hain. UpgradeBanner bhi thik yahi guard lagata hai.
   const { isPlus, loading: planLoading } = usePlan();
-  const [brief, setBrief] = useState<string | null>(null);
+  /**
+   * Saathi ka brief — aur wo KIS BHASHA ka hai.
+   *
+   * ⚠️ Bhasha yahan saath me rakhna zaroori hai. Sirf cache key me locale daal
+   * dena kaafi nahi tha: wo agli baar sahi text laata hai, par SCREEN par
+   * purani bhasha wala brief tab tak chipka rehta hai jab tak naya aa na jaye —
+   * aur AI fail ho jaye (net na ho) to hamesha ke liye. Home ka sabse upar wala
+   * card poore din galat bhasha me pada rehta tha jabki baaki screen badal
+   * chuki hoti thi.
+   *
+   * Ise ek effect se reset karne ke bajaye SAATH rakhte hain, taaki render me
+   * hi pata ho ki ye brief abhi kaam ka hai ya nahi — ek extra render bachta
+   * hai aur "kabhi-kabhi ek pal ke liye purana text jhalak jaata hai" wali
+   * soorat ban hi nahi sakti.
+   */
+  const [brief, setBriefState] = useState<{ text: string; locale: string } | null>(null);
+  const setBrief = useCallback(
+    (text: string, forLocale: string) => setBriefState({ text, locale: forLocale }),
+    [],
+  );
+  /** Abhi ki bhasha ka brief — doosri bhasha ka ho to hai hi nahi. */
+  const briefText = brief && brief.locale === locale ? brief.text : null;
 
   const loadBrief = useCallback(
     async (documents: Document[], reminders: Reminder[]) => {
       const uid = session?.user?.id;
       if (!isPlus || !uid) return;
       const day = new Date().toISOString().slice(0, 10);
-      const key = `saathi-brief:${uid}:${day}`;
+      /**
+       * ⚠️ Key me `locale` hona ZAROORI hai.
+       *
+       * Pehle key sirf `uid:day` thi. Brief AI se user ki bhasha me banta hai
+       * aur din bhar ke liye cache ho jaata hai — yaani subah Hinglish me brief
+       * banne ke baad user din me bhasha English kar de, to `loadBrief` dobara
+       * chalta to tha (dep me `locale` hai) par usi purani key se wahi purana
+       * Hinglish text wapas padh leta tha. Home ka sabse upar wala card poore
+       * din galat bhasha me chipka rehta tha, aur baaki screen badal chuki
+       * hoti thi. Ab har bhasha ka apna cache hai.
+       */
+      const key = `saathi-brief:${uid}:${day}:${locale}`;
       try {
         const cached = await AsyncStorage.getItem(key);
         if (cached) {
-          setBrief(cached);
+          setBrief(cached, locale);
           return;
         }
       } catch {
@@ -144,11 +177,11 @@ export default function Home() {
         locale,
       );
       if (!text) return; // net/AI fail — neeche wali template line hi chalegi
-      setBrief(text);
+      setBrief(text, locale);
       // Purane dinon ki keys apne aap bekaar ho jaati hain (date key me hai).
       AsyncStorage.setItem(key, text).catch(() => {});
     },
-    [isPlus, session?.user?.id, firstName, locale],
+    [isPlus, session?.user?.id, firstName, locale, setBrief],
   );
 
   const load = useCallback(
@@ -267,49 +300,54 @@ export default function Home() {
 
         <UpgradeBanner flush />
 
-        {/* Daily brief card */}
-        <View style={styles.briefCard}>
-          <View style={styles.briefTag}>
-            <Ionicons name="sunny" size={13} color={tc.amber} />
-            <Text style={styles.briefTagText}>{h.briefLabel}</Text>
-          </View>
-          {/* Plus me Saathi ka apna brief; na aaya ho (ya free plan ho) to
-              wahi purani template line — card kabhi khaali nahi rehta. */}
-          <Text style={styles.briefBody}>
-            {loading
-              ? h.briefLoading
-              : brief
-                ? brief
-                : attention.length > 0
-                  ? tpl(h.briefAttention, {
-                      name: firstName ? " " + firstName : "",
-                      n: attention.length,
-                    }) + " 🙂"
-                  : docs.length === 0
-                    ? tpl(h.briefStart, { name: firstName ? " " + firstName : "" }) + " 📄"
-                    : tpl(h.briefAllSet, { name: firstName ? " " + firstName : "" }) + " 🌿"}
-          </Text>
-
-          {/* Free plan — batao ki Saathi ye khud likh ke de sakta hai.
-              Card hataya nahi: aaj ki asli baat upar dikhti hi rehti hai. */}
-          {!loading && !planLoading && !isPlus && (
-            <Pressable
-              onPress={() => router.push("/upgrade" as never)}
-              style={({ pressed }) => [styles.briefUpsell, pressed && { opacity: 0.85 }]}
-            >
-              <Ionicons name="sparkles" size={14} color={tc.amber} />
-              <Text style={styles.briefUpsellText}>{h.briefPlusHook}</Text>
-              <View style={styles.briefUpsellCta}>
-                <Text style={styles.briefUpsellCtaText}>{h.briefPlusCta}</Text>
-                <Ionicons name="arrow-forward" size={12} color={tc.ink} />
+        {/* Daily brief card — home ka sabse pehla card, isliye 3D me sabse
+            pehle aata hai (index 0). */}
+        <Reveal3D index={0}>
+          <View style={styles.briefCard}>
+            <View style={styles.briefTag}>
+              <View style={styles.briefTagIcon}>
+                <Ionicons name="sunny" size={12} color={tc.amber} />
               </View>
-            </Pressable>
-          )}
-        </View>
+              <Text style={styles.briefTagText}>{h.briefLabel}</Text>
+            </View>
+            {/* Plus me Saathi ka apna brief; na aaya ho (ya free plan ho) to
+                wahi purani template line — card kabhi khaali nahi rehta. */}
+            <Text style={styles.briefBody}>
+              {loading
+                ? h.briefLoading
+                : briefText
+                  ? briefText
+                  : attention.length > 0
+                    ? tpl(h.briefAttention, {
+                        name: firstName ? " " + firstName : "",
+                        n: attention.length,
+                      }) + " 🙂"
+                    : docs.length === 0
+                      ? tpl(h.briefStart, { name: firstName ? " " + firstName : "" }) + " 📄"
+                      : tpl(h.briefAllSet, { name: firstName ? " " + firstName : "" }) + " 🌿"}
+            </Text>
+
+            {/* Free plan — batao ki Saathi ye khud likh ke de sakta hai.
+                Card hataya nahi: aaj ki asli baat upar dikhti hi rehti hai. */}
+            {!loading && !planLoading && !isPlus && (
+              <Pressable
+                onPress={() => router.push("/upgrade" as never)}
+                style={({ pressed }) => [styles.briefUpsell, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="sparkles" size={14} color={tc.amber} />
+                <Text style={styles.briefUpsellText}>{h.briefPlusHook}</Text>
+                <View style={styles.briefUpsellCta}>
+                  <Text style={styles.briefUpsellCtaText}>{h.briefPlusCta}</Text>
+                  <Ionicons name="arrow-forward" size={12} color={tc.ink} />
+                </View>
+              </Pressable>
+            )}
+          </View>
+        </Reveal3D>
 
         {/* Aaj ke reminders — kaam + kitne time ke liye set + "kiya?" */}
         {!loading && today.length > 0 && (
-          <View style={styles.todayCard}>
+          <Reveal3D index={1} style={styles.todayCard}>
             <View style={styles.todayHead}>
               <Ionicons name="alarm" size={16} color={tc.terracotta} />
               <Text style={styles.todayTitle}>{h.todayTitle}</Text>
@@ -331,47 +369,66 @@ export default function Home() {
                 </Pressable>
               </View>
             ))}
-          </View>
+          </Reveal3D>
         )}
 
-        {/* Quick actions */}
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => router.push("/add-document")}
-            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: "rgba(194,90,55,0.12)" }]}>
-              <Ionicons name="add-circle" size={22} color={tc.terracotta} />
-            </View>
-            <Text style={styles.actionText}>{h.quickDoc}</Text>
-          </Pressable>
+        {/*
+          Quick actions.
 
-          <Pressable
-            onPress={() => router.push("/chat")}
-            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+          ⚠️ Teenon label ki lambai teen bhashaon me bahut alag hai — English
+          "Notes" ek shabd hai, Hinglish "Chat with Saathi" do line leta hai,
+          aur Hindi "दस्तावेज़ जोड़ें" usse bhi lamba. Pehle label ek hi line me
+          kaat diya jaata tha aur icon ke neeche adhoora sa dikhta tha
+          (screenshot me "Add document" / "Chat with Saathi" wahi tha).
+          `numberOfLines={2}` + tay oonchai se teenon card ek jaise dikhte hain,
+          chahe bhasha koi bhi ho.
+        */}
+        <Reveal3D index={2} style={styles.actions}>
+          <Press3D
+            onPress={() => router.push("/add-document")}
+            style={styles.actionSlot}
           >
-            <View style={[styles.actionIcon, { backgroundColor: "rgba(124,138,107,0.15)" }]}>
-              <Ionicons name="chatbubble-ellipses" size={20} color={tc.sage} />
+            <View style={styles.action}>
+              <View style={[styles.actionIcon, { backgroundColor: "rgba(194,90,55,0.12)" }]}>
+                <Ionicons name="add-circle" size={22} color={tc.terracotta} />
+              </View>
+              <Text style={styles.actionText} numberOfLines={2}>
+                {h.quickDoc}
+              </Text>
             </View>
-            <Text style={styles.actionText}>{h.quickChat}</Text>
-          </Pressable>
+          </Press3D>
+
+          <Press3D onPress={() => router.push("/chat")} style={styles.actionSlot}>
+            <View style={styles.action}>
+              <View style={[styles.actionIcon, { backgroundColor: "rgba(124,138,107,0.15)" }]}>
+                <Ionicons name="chatbubble-ellipses" size={20} color={tc.sage} />
+              </View>
+              <Text style={styles.actionText} numberOfLines={2}>
+                {h.quickChat}
+              </Text>
+            </View>
+          </Press3D>
 
           {/* Notes ko tab bar me nahi daala — wahan pehle se paanch tab hain aur
               chhathe ka label Hindi me tab bar todd deta hai. Home se ek tap
               par hona hi kaafi hai: note likhne wala aksar app kholta hi isi
               kaam ke liye hai. */}
-          <Pressable
+          <Press3D
             // `as never` — naya route hai, expo ke generated route types dev server
             // chalne par hi banti hain (codebase idiom, jaise _layout.tsx me).
             onPress={() => router.push("/notes" as never)}
-            style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+            style={styles.actionSlot}
           >
-            <View style={[styles.actionIcon, { backgroundColor: "rgba(224,164,88,0.18)" }]}>
-              <Ionicons name="create" size={20} color={tc.amber} />
+            <View style={styles.action}>
+              <View style={[styles.actionIcon, { backgroundColor: "rgba(224,164,88,0.18)" }]}>
+                <Ionicons name="create" size={20} color={tc.amber} />
+              </View>
+              <Text style={styles.actionText} numberOfLines={2}>
+                {nt.title}
+              </Text>
             </View>
-            <Text style={styles.actionText}>{nt.title}</Text>
-          </Pressable>
-        </View>
+          </Press3D>
+        </Reveal3D>
 
         {/* Attention */}
         <View style={styles.sectionHead}>
@@ -479,25 +536,44 @@ const useStyles = makeStyles((c) => ({
   },
   briefCard: {
     marginTop: 20,
-    borderRadius: 24,
+    borderRadius: 26,
     // ⚠️ `c.ink` NAHI. Wo text ka rang hai aur dark theme me ULTA (lagbhag
     // safed) ho jaata hai — card cream ka ban jaata tha aur uspar cream text
     // bilkul gayab. `inkCard` dono theme me gehra rehta hai.
     backgroundColor: c.inkCard,
-    padding: 20,
+    padding: 22,
+    // Halka sa uthaav — 3D wali entry ke baad card ka apni jagah par "khada"
+    // rehna isi se lagta hai. Bina shadow ke wo animation ke khatam hote hi
+    // wapas flat ho jaata tha.
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  briefTag: { flexDirection: "row", alignItems: "center", gap: 6 },
+  briefTag: { flexDirection: "row", alignItems: "center", gap: 8 },
+  // Icon ko apna chhota dabba — akela sunny icon amber text ke bagal me
+  // chipka hua lagta tha.
+  briefTagIcon: {
+    height: 22,
+    width: 22,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(224,164,88,0.18)",
+  },
   briefTagText: {
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 11.5,
+    fontWeight: "800",
     color: c.amber,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   briefBody: {
-    marginTop: 10,
-    fontSize: 15.5,
-    lineHeight: 23,
+    marginTop: 12,
+    fontSize: 16.5,
+    lineHeight: 25,
+    fontWeight: "600",
     color: c.onInk,
   },
   briefUpsell: {
@@ -556,17 +632,23 @@ const useStyles = makeStyles((c) => ({
   },
   doneText: { fontSize: 12.5, fontWeight: "700", color: c.white },
   actions: { flexDirection: "row", gap: 12, marginTop: 16 },
+  // `Press3D` ek Pressable hai — chaudai isi par baithti hai, andar wale card
+  // par nahi (warna teenon apni-apni chaudai le lete aur pankti tedhi ho jaati).
+  actionSlot: { flex: 1 },
   action: {
-    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     gap: 10,
-    borderRadius: 20,
+    // Tay oonchai: teen bhashaon me label ek se do line ka hota hai, aur uske
+    // bina teen card teen alag oonchai ke ho jaate the.
+    minHeight: 122,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: c.line,
     backgroundColor: c.surface,
-    paddingVertical: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
   },
-  pressed: { opacity: 0.8 },
   actionIcon: {
     height: 44,
     width: 44,
@@ -574,7 +656,13 @@ const useStyles = makeStyles((c) => ({
     justifyContent: "center",
     borderRadius: 14,
   },
-  actionText: { fontSize: 14, fontWeight: "600", color: c.ink },
+  actionText: {
+    fontSize: 13.5,
+    fontWeight: "700",
+    color: c.ink,
+    textAlign: "center",
+    lineHeight: 18,
+  },
   sectionHead: {
     flexDirection: "row",
     alignItems: "center",

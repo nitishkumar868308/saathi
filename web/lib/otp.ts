@@ -62,9 +62,82 @@ const PEPPER = process.env.OTP_PEPPER || "saathi-dev-pepper-set-OTP_PEPPER-in-pr
 
 const BRAND = process.env.OTP_BRAND || "Apka Saathi";
 
-export function otpConfigured(): boolean {
-  return Boolean(SID && TOKEN && smsSender().value);
+/* ─────────────────────────── kaunsa raasta ─────────────────────────── */
+
+/**
+ * OTP kis raaste se jaayega.
+ *
+ *   "sms"    — apna code + saada Twilio SMS. Sabse sasta, aur default yahi hai.
+ *   "verify" — Twilio Verify (wo khud code banata, bhejta aur check karta hai).
+ *   null     — kuch bhi set nahi; app ko "not_configured" milta hai.
+ *
+ * ── Verify wapas kyun aaya ──────────────────────────────────────────────
+ *
+ * ⚠️ Ye is file ka sabse zaroori sudhaar hai. Verify se apne OTP par aate waqt
+ * DO cheezein chhoot gayi thi, aur dono ka nateeja user ke liye bilkul ek hi
+ * tha — profile me number verify karte hi "SMS isn't switched on yet":
+ *
+ *   1. `otpConfigured()` sirf `smsSender()` dekhta tha, jo SIRF
+ *      `TWILIO_MESSAGING_SERVICE_SID` aur `TWILIO_SMS_FROM` padhta hai. Par is
+ *      file ka apna doc `TWILIO_SMS_FROM_IN` jaisa desh-wise number bhi ek
+ *      valid raasta batata hai, aur `senderFor()` use theek use bhi karta hai.
+ *      Yaani sirf desh-wise number set karne wala setup POORI TARAH sahi hone
+ *      ke baawajood "configured hi nahi" mana jaata tha.
+ *
+ *   2. Asli setup me `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` aur
+ *      `TWILIO_VERIFY_SERVICE_SID` — teenon maujood the, par koi SMS sender
+ *      kabhi jodha hi nahi gaya (Verify ko uski zaroorat nahi thi). Migration
+ *      me sirf code badla, env nahi — aur phone verification us din se band
+ *      pada tha.
+ *
+ * Isliye ab: SMS sender ho to wahi (sasta), warna Verify se kaam chala lo. Jo
+ * bhi maujood hai, usse verification CHALNA chahiye — chup-chaap band pade
+ * rehne se har soorat behtar hai.
+ */
+export type OtpTransport = "sms" | "verify" | null;
+
+const VERIFY_SID = process.env.TWILIO_VERIFY_SERVICE_SID;
+
+/**
+ * Koi bhi SMS sender set hai?
+ *
+ * `smsSender()` se alag: wo bhejte waqt EK sender chunta hai, ye sirf ye dekhta
+ * hai ki koi raasta hai ya nahi. Desh-wise number (`TWILIO_SMS_FROM_IN`) yahan
+ * ginta hai — `senderFor()` use use karta hai, isliye use "hai hi nahi" maanna
+ * galat tha.
+ */
+function hasAnySmsSender(): boolean {
+  if (process.env.TWILIO_MESSAGING_SERVICE_SID) return true;
+  if (process.env.TWILIO_SMS_FROM) return true;
+  return Object.keys(process.env).some(
+    (k) => k.startsWith("TWILIO_SMS_FROM_") && !!process.env[k],
+  );
 }
+
+export function otpTransport(): OtpTransport {
+  if (!SID || !TOKEN) return null;
+  if (hasAnySmsSender()) return "sms";
+  if (VERIFY_SID) return "verify";
+  return null;
+}
+
+export function otpConfigured(): boolean {
+  return otpTransport() !== null;
+}
+
+/**
+ * Verify wale raaste me DB row me kya likha jaata hai.
+ *
+ * ⚠️ Wahan asli code Twilio ke paas hota hai — hamare paas kuch bhi aisa nahi
+ * hota jise hash kiya ja sake. Par row phir bhi banti hai, kyunki rate-limit /
+ * cooldown / fraud ki ginti dono raaston me apne hi DB se chalti hai.
+ *
+ * Isliye ek tay sentinel: `generateCode()` hamesha 6 ANK deta hai, aur ye value
+ * ank hai hi nahi — yaani iska hash kisi bhi asli code ke hash se kabhi nahi
+ * milega. Agar kal ko koi galti se `otp_check` ko is raaste par bhi laga de, to
+ * wo "wrong" hi kahega, chup-chaap paas nahi karega.
+ */
+export const VERIFY_SENTINEL = "twilio-verify";
 
 /* ─────────────────────────── code banana ─────────────────────────── */
 
@@ -301,4 +374,107 @@ export async function sendOtpSms(
   // 20429 = Twilio ka apna rate limit.
   if (body.code === 20429 || res.status === 429) return { ok: false, reason: "rate_limited" };
   return { ok: false, reason: "failed" };
+}
+
+/* ─────────────────────── Twilio Verify wala raasta ─────────────────────── */
+
+/**
+ * Verify tab chalta hai jab koi SMS sender set hi na ho (upar `otpTransport()`).
+ *
+ * ⚠️ Yahan bhi wahi purana niyam poori tarah lagu hai, aur ise todna sabse aam
+ * galti hoti: **code kabhi app tak nahi jaata aur milaan kabhi app me nahi
+ * hota.** Verify me code Twilio ke paas rehta hai aur milaan Twilio karta hai;
+ * hum sirf "approved" ya "nahi" sunte hain. Uske baad `phone_verified_at`
+ * likhne ka haq waise hi sirf server ke paas hai (`mark_phone_verified`,
+ * service_role only) — wo hissa dono raaston me bilkul ek jaisa hai.
+ *
+ * Rate-limit, cooldown aur fraud ki ginti YAHAN BHI apne DB se hi chalti hai
+ * (route me `otp_issue`). Verify ki apni bhi hoti hai, par uspar chhod dene ka
+ * matlab hota ki do raaste do alag niyam se chalein — aur user ko kabhi 30
+ * second ka intezaar milta, kabhi kuch aur.
+ */
+async function twilioForm(
+  path: string,
+  form: URLSearchParams,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const res = await fetch(
+    `https://verify.twilio.com/v2/Services/${VERIFY_SID}/${path}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${SID}:${TOKEN}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: form.toString(),
+      cache: "no-store",
+    },
+  );
+  const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return { status: res.status, body };
+}
+
+/** Verify se OTP bhejo. */
+export async function verifySendOtp(
+  phone: string,
+  userId?: string | null,
+): Promise<SendResult> {
+  if (!SID || !TOKEN || !VERIFY_SID) return { ok: false, reason: "not_configured" };
+
+  const country = countryOf(phone);
+  if (country && blockedCountries().has(country)) {
+    logServiceUsage("twilio", "otp_send", { ok: false, userId, meta: { blocked: country } });
+    return { ok: false, reason: "blocked" };
+  }
+
+  const { status, body } = await twilioForm(
+    "Verifications",
+    new URLSearchParams({ To: phone, Channel: "sms" }),
+  );
+
+  if (status < 400) {
+    logServiceUsage("twilio", "otp_send", { userId, meta: { country, via: "verify" } });
+    return { ok: true };
+  }
+
+  logServiceUsage("twilio", "otp_send", {
+    ok: false,
+    userId,
+    meta: { code: body.code, http: status, country, via: "verify" },
+  });
+
+  // 60200 = "To" ki shakal galat, 60205 = ye number SMS le hi nahi sakta,
+  // 60410 = ye number Verify me block hai, 60203 = ek hi number par bahut
+  // koshishein (Twilio ka apna rate limit).
+  if (body.code === 60200 || body.code === 60205) return { ok: false, reason: "bad_number" };
+  if (body.code === 60410) return { ok: false, reason: "blocked" };
+  if (body.code === 60203 || status === 429) return { ok: false, reason: "rate_limited" };
+  return { ok: false, reason: "failed" };
+}
+
+/** Verify se code jaancho. */
+export type VerifyCheck = "approved" | "wrong" | "expired" | "failed";
+
+export async function verifyCheckOtp(phone: string, code: string): Promise<VerifyCheck> {
+  if (!SID || !TOKEN || !VERIFY_SID) return "failed";
+
+  const { status, body } = await twilioForm(
+    "VerificationCheck",
+    new URLSearchParams({ To: phone, Code: code }),
+  );
+
+  if (status < 400) return body.status === "approved" ? "approved" : "wrong";
+
+  /**
+   * 404 ka matlab yahan "URL galat hai" nahi hai.
+   *
+   * Verify har verification ko approve/expire hote hi hata deta hai. Uske baad
+   * usi number par check karne par 404 aata hai — yaani "is number ka koi
+   * zinda code hai hi nahi". User ke liye wo `expired` hai, `wrong` nahi: use
+   * naya code mangwana hai, wahi purana dobara nahi daalna. Ise `wrong` batane
+   * par user apna BILKUL SAHI code baar-baar daal ke "galat code" padhta rehta
+   * hai — theek wahi galti jo apne OTP wale raaste me pehle ho chuki hai.
+   */
+  if (status === 404 || body.code === 20404) return "expired";
+  if (body.code === 60202) return "wrong"; // max check attempts
+  return "failed";
 }

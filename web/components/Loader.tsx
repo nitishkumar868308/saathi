@@ -7,8 +7,16 @@
 
 /**
  * BrandLoader — logo apni jagah par (center me) halke se saans leta hai, aur
- * uske PEECHE se "Apka Saathi" sarak ke bahar aata hai, thoda ruk ke wapas
- * logo ke peeche chhup jaata hai.
+ * uske PEECHE se brand ka naam DONO taraf nikalta hai:
+ *
+ *      "Apka"  ←  [LOGO]  →  "Saathi"
+ *
+ * ...thoda ruk ke dono wapas logo ke peeche chhup jaate hain.
+ *
+ * ⚠️ Pehle poora "Apka Saathi" ek hi tukda tha jo sirf DAAYI taraf nikalta tha.
+ * Wo ek-tarfa lagta tha — logo beech me hota tha par naam hamesha daaye jhukta
+ * tha. Dono taraf se nikalne par logo sach me beech ka lang bana rehta hai.
+ * Wapas ek tukde par mat le jaana (app wala loader bhi ab yahi karta hai).
  *
  * ⚠️ Logo ke liye `/icon-256.png` — `/logo-128.png` NAHI. logo-128 ke andar
  * "Apka Saathi" pehle se baked hai, to us par ye animation do baar naam dikha
@@ -24,15 +32,16 @@
  *
  *   1. Logo ki image OPAQUE hai (teal square) aur `z-index` me upar hai — jo
  *      text uske x-range me hai wo apne aap dhak jaata hai.
- *   2. Logo ke baaye wala hissa `.sa-window` kaat deti hai (`overflow: hidden`,
- *      jiska baayan kinara theek logo ke baaye kinare par hai).
+ *   2. Har taraf ek khidki (`overflow: hidden`) hai jo logo ke us kinare par
+ *      khatam hoti hai: `.sa-win-l` ka DAAYAN kinara logo ke baaye kinare par,
+ *      `.sa-win-r` ka BAAYAN kinara logo ke daaye kinare par.
  *
- * `translateX(-100%)` element ki APNI chaudai jitna khiskata hai — yaani us
- * haalat me naam ka daayan kinara theek logo ke daaye kinare par baithta hai,
- * to naam poora ya logo ke neeche hai ya khidki ke bahar. Bilkul gayab. Wahan
- * se wo daaye sarakta hai — "logo ke peeche se nikalta hua".
+ * `translateX(±100%)` element ki APNI chaudai jitna khiskata hai — yaani us
+ * haalat me tukda apni khidki se poora bahar (logo ke peeche) hota hai. Bilkul
+ * gayab. Wahan se wo apni disha me sarakta hai — "logo ke peeche se nikalta
+ * hua".
  *
- * `.sa-window` absolute hai, isliye layout me jagah nahi leti: LOGO HAMESHA
+ * Dono khidki absolute hain, isliye layout me jagah nahi leti: LOGO HAMESHA
  * CENTER ME RAHTA HAI, naam bahar aane par bhi khiskta nahi.
  *
  * Responsive: `size` sirf upper bound hai. Asli size `clamp()` se aata hai —
@@ -70,9 +79,14 @@ export default function Loader({
         style={{ ["--sa-box" as string]: box }}
       >
         {showName && (
-          <span className="sa-window" aria-hidden>
-            <span className="sa-name text-ink">Apka Saathi</span>
-          </span>
+          <>
+            <span className="sa-win sa-win-l" aria-hidden>
+              <span className="sa-name sa-name-l text-ink">Apka</span>
+            </span>
+            <span className="sa-win sa-win-r" aria-hidden>
+              <span className="sa-name sa-name-r text-ink">Saathi</span>
+            </span>
+          </>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="sa-logo" src="/icon-256.png" alt={label || "Loading"} width={256} height={256} />
@@ -80,13 +94,19 @@ export default function Loader({
       {label ? <span className="text-center text-sm font-semibold text-ink-soft">{label}</span> : null}
       <style>{`
         @keyframes sa-breathe { 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.05); } }
-        @keyframes sa-reveal {
-          /* chhupa (logo ke peeche) -> bahar -> ruko -> wapas peeche */
-          /* .67em yahan naam ke apne font-size (.24 box) par hai = ~.16 box —
-             app wale GAP_RATIO ke barabar. */
+        /* Daaya tukda ("Saathi"): chhupa (logo ke peeche) -> bahar -> ruko -> wapas peeche.
+           .67em yahan naam ke apne font-size (.24 box) par hai = ~.16 box —
+           app wale GAP_RATIO ke barabar. */
+        @keyframes sa-reveal-r {
           0%, 6%    { transform: translateX(-100%); }
           30%, 68%  { transform: translateX(.67em); }
           90%, 100% { transform: translateX(-100%); }
+        }
+        /* Baaya tukda ("Apka") — bilkul wahi safar, ulti disha me. */
+        @keyframes sa-reveal-l {
+          0%, 6%    { transform: translateX(100%); }
+          30%, 68%  { transform: translateX(-.67em); }
+          90%, 100% { transform: translateX(100%); }
         }
         .sa-box {
           position: relative;
@@ -104,28 +124,34 @@ export default function Loader({
           animation: sa-breathe 1.8s ease-in-out infinite;
           will-change: transform;
         }
-        /* Khidki ka baayan kinara = logo ka baayan kinara. Daayi taraf udaar
-           chaudai, taaki naam poora bahar aa sake. */
-        .sa-window {
-          position: absolute; left: 0; top: 0; z-index: 1;
-          height: 100%; width: 400%;
+        /* Dono khidki: 3x chaudi, taaki tukda poora bahar aa sake. Logo ke
+           kinare par hi khatam hoti hain — wahi "peeche se nikalna" banata hai. */
+        .sa-win {
+          position: absolute; top: 0; z-index: 1;
+          height: 100%; width: 300%;
           overflow: hidden;
-          display: flex; align-items: center;
           pointer-events: none;
         }
+        /* Daayan kinara = logo ka baayan kinara. */
+        .sa-win-l { right: 100%; }
+        /* Baayan kinara = logo ka daayan kinara. */
+        .sa-win-r { left: 100%; }
         .sa-name {
-          position: absolute; left: 25%;   /* = 100% of .sa-box (window 4x hai) */
+          position: absolute; top: 0; bottom: 0;
+          display: flex; align-items: center;
           white-space: nowrap;
           font-size: .24em; font-weight: 800; letter-spacing: .012em;
           line-height: 1.1;
-          animation: sa-reveal 2.8s cubic-bezier(.4,0,.2,1) infinite;
           will-change: transform;
         }
+        .sa-name-l { right: 0; animation: sa-reveal-l 2.8s cubic-bezier(.4,0,.2,1) infinite; }
+        .sa-name-r { left: 0;  animation: sa-reveal-r 2.8s cubic-bezier(.4,0,.2,1) infinite; }
         @media (prefers-reduced-motion: reduce) {
           .sa-logo { animation: none; }
           /* Naam chhupa hi rehne do — warna wo logo ke bagal me chipka hua
              dikhta hai, jo animation ke bina bekaar lagta hai. */
-          .sa-name { animation: none; transform: translateX(-100%); }
+          .sa-name-l { animation: none; transform: translateX(100%); }
+          .sa-name-r { animation: none; transform: translateX(-100%); }
         }
       `}</style>
     </div>

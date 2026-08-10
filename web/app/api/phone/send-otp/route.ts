@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { appUserId } from "@/lib/app-auth";
 import { logServerError } from "@/lib/errors-server";
 import { isE164, otpIssue, phoneTakenByOther } from "@/lib/phone";
-import { countryOf, generateCode, hashCode, otpConfigured, sendOtpSms } from "@/lib/otp";
+import {
+  countryOf,
+  generateCode,
+  hashCode,
+  otpTransport,
+  sendOtpSms,
+  verifySendOtp,
+  VERIFY_SENTINEL,
+} from "@/lib/otp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +37,8 @@ export async function POST(request: Request) {
   const userId = await appUserId(request);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (!otpConfigured()) {
+  const transport = otpTransport();
+  if (!transport) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -66,7 +75,19 @@ export async function POST(request: Request) {
   }
 
   const country = countryOf(phone);
-  const code = generateCode();
+
+  /**
+   * Code.
+   *
+   * Verify wale raaste me code TWILIO banata hai — hum use na dekhte hain na
+   * bhejte hain. Phir bhi `otp_issue` chalta hai, kyunki rate-limit, cooldown
+   * aur fraud ki ginti dono raaston me apne hi DB se hoti hai (warna do raaste
+   * do alag niyam se chalte, aur user ko kabhi 30 second ka intezaar milta,
+   * kabhi kuch aur). Us row me ek SENTINEL hash jaata hai — ek aisi value jo
+   * kisi asli code se kabhi nahi banti, taaki galti se bhi koi use "sahi code"
+   * na maan le. Milaan us raaste me Twilio karta hai, ye row nahi.
+   */
+  const code = transport === "sms" ? generateCode() : VERIFY_SENTINEL;
 
   /**
    * Hadd + code, dono ek hi DB call me.
@@ -107,8 +128,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "failed" }, { status: 500 });
   }
 
-  const res = await sendOtpSms(phone, code, issued.ttl, userId).catch((e) => {
-    void logServerError(e, { where: "phone/send-otp", step: "twilio" });
+  const res = await (transport === "sms"
+    ? sendOtpSms(phone, code, issued.ttl, userId)
+    : verifySendOtp(phone, userId)
+  ).catch((e) => {
+    void logServerError(e, { where: "phone/send-otp", step: "twilio", transport });
     return { ok: false, reason: "failed" } as const;
   });
 

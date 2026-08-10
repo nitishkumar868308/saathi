@@ -31,23 +31,32 @@ import SaathiLogo from "@/components/saathi-logo";
  * wo dhyaan logo se hata leti thi aur har bg par apna alag rang dikhati thi.
  * Ab peeche se sirf naam nikalta hai.
  *
- * ── Naam "peeche se" kaise nikalta hai ──────────────────────────────────
+ * ── Naam DONO taraf se nikalta hai ──────────────────────────────────────
  *
- * Trick do cheezon ki hai:
+ * Brand ka naam do tukdon me toota hua hai, aur dono ulti disha me chalte hain:
+ *
+ *      "Apka"  ←  [LOGO]  →  "Saathi"
+ *
+ * ⚠️ Pehle poora "Apka Saathi" ek hi tukda tha jo sirf DAAYI taraf se nikalta
+ * tha. Wo dekhne me ek-tarfa lagta tha — logo screen ke beech me hota tha par
+ * naam usse hamesha daaye khisak jaata, aur poora loader ek taraf jhuka hua
+ * dikhta. Dono taraf se nikalne par logo sach me beech ka lang bana rehta hai
+ * aur animation santulit lagti hai. Wapas ek tukde par mat le jaana.
+ *
+ * Trick do cheezon ki hai (dono taraf bilkul mirror me):
  *
  *   1. Logo ki image OPAQUE hai (teal bg wala square). To jo text logo ke
  *      x-range me hai, wo apne aap dhak jaata hai — logo upar (zIndex) hai.
- *   2. Logo ke BAAYE jo hissa bachta hai use ek `overflow: "hidden"` wali
- *      khidki kaat deti hai, jiska baayan kinara theek logo ke baaye kinare
- *      par hai.
+ *   2. Har taraf ek `overflow: "hidden"` wali khidki hai jo logo ke us kinare
+ *      par khatam hoti hai. Baayi khidki ka DAAYAN kinara logo ke baaye kinare
+ *      par hai; daayi khidki ka BAAYAN kinara logo ke daaye kinare par.
  *
- * Dono milke: text jab `translateX = -textW` par hota hai to uska daayan
- * kinara logo ke daaye kinare par hota hai — poora text ya to logo ke neeche
- * hai ya khidki ke bahar. Yaani bilkul gayab. Wahan se wo daaye sarakta hai
- * aur logo ke peeche se nikalta hua dikhta hai.
+ * Chhupi hui haalat me har tukda apni khidki se poora bahar hota hai (baaya
+ * `+textW` par, daaya `-textW` par) — yaani bilkul gayab. Wahan se wo apni
+ * disha me sarak ke "logo ke peeche se" nikalta hua dikhta hai.
  *
- * Khidki `position: "absolute"` hai, isliye layout me jagah nahi leti — LOGO
- * HAMESHA CENTER ME RAHTA HAI, naam bahar aane par bhi wo khiskta nahi.
+ * Dono khidki `position: "absolute"` hain, isliye layout me jagah nahi leti —
+ * LOGO HAMESHA CENTER ME RAHTA HAI, naam bahar aane par bhi wo khiskta nahi.
  *
  * Sab kuch `translateX`/`opacity` par hai (width par nahi), isliye poori
  * animation native driver par chalti hai — JS thread busy ho tab bhi (jaise AI
@@ -80,11 +89,17 @@ function BrandLoader({
   const beat = useRef(new Animated.Value(0)).current;
   const reveal = useRef(new Animated.Value(0)).current;
   /**
-   * Naam ki asli chaudai. Jab tak naapi nahi jaati, animation ki manzil pata
-   * nahi — isliye tab tak naam chhupa rehta hai (`opacity: 0`), warna wo pehle
-   * frame me logo ke bagal me chipka hua dikh jaata.
+   * Dono tukdon ki asli chaudai. Jab tak naapi nahi jaati, animation ki manzil
+   * pata nahi — isliye tab tak naam chhupa rehta hai (`opacity: 0`), warna wo
+   * pehle frame me logo ke bagal me chipka hua dikh jaata.
+   *
+   * Do alag naap isliye ki dono shabd alag lambai ke hain ("Apka" chhota,
+   * "Saathi" bada) — ek hi naap dono par lagane se chhota wala poora chhupta
+   * nahi tha aur logo ke kinare se ek tukda jhaankta rehta.
    */
-  const [textW, setTextW] = useState(0);
+  const [leftW, setLeftW] = useState(0);
+  const [rightW, setRightW] = useState(0);
+  const measured = leftW > 0 && rightW > 0;
 
   useEffect(() => {
     beat.setValue(0);
@@ -111,7 +126,7 @@ function BrandLoader({
   }, [beat]);
 
   useEffect(() => {
-    if (!brand || textW === 0) return;
+    if (!brand || !measured) return;
     reveal.setValue(0);
     // Linear clock 0 -> 1; nikalna/rukna/chhupna sab neeche interpolate ke
     // keyframes me hai. Clock linear isliye ki loop ka jodh (1 -> 0) exactly
@@ -126,22 +141,34 @@ function BrandLoader({
     );
     r.start();
     return () => r.stop();
-  }, [reveal, brand, textW]);
+  }, [reveal, brand, measured]);
 
   const radius = Math.round(size * 0.3);
   const gap = Math.round(size * GAP_RATIO);
   const scale = beat.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] });
+  const fontSize = Math.max(13, Math.round(size * 0.24));
 
-  // Chhupa hua = text ka daayan kinara logo ke daaye kinare par. Bahar = logo
-  // ke daaye kinare se `gap` aage.
-  const hidden = -textW;
-  const shown = gap;
-  const nameX = reveal.interpolate({
-    //      nikalna      ruko            chhupna       ruko (poora chhupa)
-    inputRange: [0, 0.06, 0.3, 0.68, 0.9, 1],
-    outputRange: [hidden, hidden, shown, shown, hidden, hidden],
-    extrapolate: "clamp",
-  });
+  /**
+   * Ek tukde ka safar — chhupe se bahar, ruko, wapas chhup jao.
+   *
+   * `dir` = kis taraf nikalna hai: -1 baaye, +1 daaye. Baaki poora hisaab dono
+   * ke liye bilkul ek jaisa hai, isliye ek hi jagah likha hai — warna do lagbhag
+   * ek jaise blocks ban jaate aur unme se ek chupchaap purana pad jaata.
+   *
+   * Chhupa hua = tukda apni khidki se poora bahar (logo ke peeche). Bahar =
+   * logo ke us kinare se `gap` aage.
+   */
+  const slide = (width: number, dir: -1 | 1) => {
+    const hidden = -dir * width;
+    const shown = dir * gap;
+    return reveal.interpolate({
+      //      nikalna      ruko            chhupna       ruko (poora chhupa)
+      inputRange: [0, 0.06, 0.3, 0.68, 0.9, 1],
+      outputRange: [hidden, hidden, shown, shown, hidden, hidden],
+      extrapolate: "clamp",
+    });
+  };
+
   // Nikalte waqt halka sa fade-in; wapas jaate waqt aakhir tak dikhta rahe
   // (kyunki wo logo ke peeche chhup raha hai, gayab nahi ho raha).
   const nameOpacity = reveal.interpolate({
@@ -150,10 +177,16 @@ function BrandLoader({
     extrapolate: "clamp",
   });
 
-  const onNameLayout = (e: LayoutChangeEvent) => {
+  const measure = (set: (w: number) => void, current: number) => (e: LayoutChangeEvent) => {
     const w = Math.ceil(e.nativeEvent.layout.width);
-    if (w > 0 && w !== textW) setTextW(w);
+    if (w > 0 && w !== current) set(w);
   };
+
+  const nameStyle = [
+    styles.name,
+    onDark ? styles.nameOnDark : styles.nameOnLight,
+    { fontSize },
+  ];
 
   return (
     <View style={styles.wrap}>
@@ -161,39 +194,64 @@ function BrandLoader({
           neeche ka label upar-neeche nahi kaudta. */}
       <View style={[styles.logoBox, { width: size, height: size }]}>
         {brand && (
-          /* Khidki: baayan kinara = logo ka baayan kinara. Isse baayi taraf
-             nikla text kat jaata hai. Daayi taraf khuli hai (isliye chaudai
-             udaar rakhi hai) taaki naam poora bahar aa sake. `absolute` hone
-             se layout par koi asar nahi — logo center me hi rahta hai. */
-          <View
-            pointerEvents="none"
-            style={[styles.nameWindow, { width: size + gap + textW + 8, height: size }]}
-          >
-            <Animated.View
-              onLayout={onNameLayout}
+          <>
+            {/* ── "Apka" — BAAYI taraf ──────────────────────────────────
+                Khidki ka daayan kinara theek logo ke baaye kinare par hai
+                (`right: size`, kyunki parent ki chaudai hi `size` hai). Usse
+                daaye nikla text kat jaata hai — yaani logo ke peeche chhupa
+                rehta hai. Baayi taraf udaar chaudai, taaki shabd poora bahar
+                aa sake. */}
+            <View
+              pointerEvents="none"
               style={[
-                styles.nameSlider,
-                {
-                  left: size,
-                  // Naapne se pehle chhupa hi rehne do — warna pehla frame
-                  // logo ke bagal me chipka hua naam dikha deta hai.
-                  opacity: textW === 0 ? 0 : nameOpacity,
-                  transform: [{ translateX: textW === 0 ? -9999 : nameX }],
-                },
+                styles.nameWindow,
+                { right: size, width: gap + leftW + 8, height: size },
               ]}
             >
-              <Text
-                numberOfLines={1}
+              <Animated.View
+                onLayout={measure(setLeftW, leftW)}
                 style={[
-                  styles.name,
-                  onDark ? styles.nameOnDark : styles.nameOnLight,
-                  { fontSize: Math.max(13, Math.round(size * 0.24)) },
+                  styles.nameSlider,
+                  {
+                    right: 0,
+                    // Naapne se pehle chhupa hi rehne do — warna pehla frame
+                    // logo ke bagal me chipka hua naam dikha deta hai.
+                    opacity: measured ? nameOpacity : 0,
+                    transform: [{ translateX: measured ? slide(leftW, -1) : 9999 }],
+                  },
                 ]}
               >
-                Apka Saathi
-              </Text>
-            </Animated.View>
-          </View>
+                <Text numberOfLines={1} style={nameStyle}>
+                  Apka
+                </Text>
+              </Animated.View>
+            </View>
+
+            {/* ── "Saathi" — DAAYI taraf (upar wale ka aaina) ───────────── */}
+            <View
+              pointerEvents="none"
+              style={[
+                styles.nameWindow,
+                { left: size, width: gap + rightW + 8, height: size },
+              ]}
+            >
+              <Animated.View
+                onLayout={measure(setRightW, rightW)}
+                style={[
+                  styles.nameSlider,
+                  {
+                    left: 0,
+                    opacity: measured ? nameOpacity : 0,
+                    transform: [{ translateX: measured ? slide(rightW, 1) : -9999 }],
+                  },
+                ]}
+              >
+                <Text numberOfLines={1} style={nameStyle}>
+                  Saathi
+                </Text>
+              </Animated.View>
+            </View>
+          </>
         )}
         <Animated.View style={[styles.logoTop, { transform: [{ scale }] }]}>
           <SaathiLogo size={size} radius={radius} />
@@ -374,11 +432,14 @@ const useStyles = makeStyles((c) => ({
   /** Logo hamesha naam ke UPAR — naam iske "peeche" se nikalta hai. */
   logoTop: { zIndex: 2 },
   /**
-   * Naam ki khidki. Baayan kinara theek logo ke baaye kinare par (left: 0),
-   * isliye us se baaya nikla text kat jaata hai. `absolute` — layout me jagah
-   * nahi leti, to logo center se nahi hilta.
+   * Naam ke tukde ki khidki.
+   *
+   * `left`/`right` aur `width` inline aate hain (dono taraf alag hain), yahan
+   * sirf wo cheezein hain jo dono me ek jaisi hain. `overflow: hidden` hi wo
+   * kainchi hai jo tukde ko logo ke peeche "chhupa" deti hai, aur `absolute`
+   * hone se ye layout me koi jagah nahi leti — logo center se nahi hilta.
    */
-  nameWindow: { position: "absolute", left: 0, top: 0, overflow: "hidden", zIndex: 1 },
+  nameWindow: { position: "absolute", top: 0, overflow: "hidden", zIndex: 1 },
   nameSlider: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
   name: { fontWeight: "800", letterSpacing: 0.3 },
   nameOnDark: {

@@ -399,7 +399,11 @@
       "Bash(node -e \"console.log\\('expo-speech-recognition:', require\\('./node_modules/expo-speech-recognition/package.json'\\).version\\); console.log\\('expo-speech:', require\\('./node_modules/expo-speech/package.json'\\).version\\); console.log\\('notifee:', require\\('./node_modules/@notifee/react-native/package.json'\\).version\\)\")",
       "Bash(xargs grep -ln \"SUPABASE_SERVICE_ROLE_KEY *= *ey\\\\|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\\\\|sk_live\\\\|AIza[0-9A-Za-z_-]\\\\{30\\\\}\")",
       "Bash(grep -o \"AIza[0-9A-Za-z_-]\\\\{30,\\\\}\\\\|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9[A-Za-z0-9._-]\\\\{0,20\\\\}\" .claude/settings.json)",
-      "Bash(grep -o \"AIza[0-9A-Za-z_-]\\\\{30,\\\\}\" app-mobile/google-services.json)"
+      "Bash(grep -o \"AIza[0-9A-Za-z_-]\\\\{30,\\\\}\" app-mobile/google-services.json)",
+      "Bash(node -e \"const p=require\\('./node_modules/expo-speech-recognition/package.json'\\); console.log\\(p.name,p.version\\); console.log\\(JSON.stringify\\(p.peerDependencies||{},null,1\\)\\); console.log\\(JSON.stringify\\(p.devDependencies&&p.devDependencies.expo,null,1\\)\\);\")",
+      "Bash(awk '/^  deviceOwner: \\\\{/{f=1} f{print} f&&/^  \\\\},/{c++; if\\(c==1\\) exit}' src/lib/i18n/dictionaries.ts)",
+      "Bash(grep -E \"network\\\\.ts:|reveal-3d|save-to-device|toast\\\\.tsx:|loader\\\\.tsx:|voice-button\\\\.tsx:|notification-background|\\\\\\(tabs\\\\\\)\\\\\\\\\\\\\\\\index\\\\.tsx:\")",
+      "Bash(grep -rnoE \"\\\\\"[A-Z][a-z][a-zA-Z ,'!?.-]{14,}\\\\\"\" components/Faq.tsx components/DownloadApp.tsx components/AppScreenshots.tsx components/LiveDemo.tsx)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

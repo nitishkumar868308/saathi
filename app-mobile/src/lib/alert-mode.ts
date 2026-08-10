@@ -3,7 +3,23 @@ import { Platform, Vibration } from "react-native";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { DEFAULT_LOCALE, type Locale } from "./i18n/dictionaries";
+/**
+ * ⚠️ Ye file JAAN-BOOJH KE `i18n/dictionaries` import nahi karti, chahe wahan
+ * `Locale` aur `DEFAULT_LOCALE` dono maujood hain.
+ *
+ * Wajah: ab notifee ka **background/headless** handler bhi ise bulata hai
+ * (`notification-background.ts`) taaki reminder ki awaaz app khole bina aaye.
+ * Headless task ek chhota sa JS environment hota hai jo har notification par
+ * naye sire se boot hota hai — wahan 3000+ line ki dictionaries load karna
+ * bekaar ka waqt aur memory hai, aur sasta phone us der me alarm ka pehla
+ * lamha hi kha jaata hai.
+ *
+ * Yahan sirf teen locale ke naam chahiye, poori dictionary nahi. Naya locale
+ * jodo to `i18n/dictionaries.ts` ke saath yahan bhi jodna hoga — ye chhoti si
+ * dohraav is duri ke badle sasti hai.
+ */
+type Locale = "hinglish" | "hi" | "en";
+const DEFAULT_LOCALE: Locale = "hinglish";
 
 /**
  * App ke apne popup kaise "sunayi" dein — ring, vibrate, ya chup.
@@ -179,7 +195,17 @@ async function savedLocale(): Promise<Locale> {
   return DEFAULT_LOCALE;
 }
 
-/** User ka naam — TTS greeting me. App start pe auth-provider ise bhar deta hai. */
+/**
+ * User ka naam — TTS greeting me.
+ *
+ * ⚠️ Ye AsyncStorage me bhi likha jaata hai, sirf memory me nahi. Wajah: ab
+ * awaaz background/headless task se bhi aati hai (app khule bina), aur wahan
+ * `auth-provider` chalta hi nahi — memory wala naam hamesha khaali hota. Us
+ * soorat me user ko "Hello, notification from Apka Saathi" milta, jabki app
+ * khulne par usi reminder me uska naam aata tha. Ek hi cheez do jagah do tarah
+ * se sunayi deti thi.
+ */
+const NAME_KEY = "saathi-alert-name";
 let userName: string | null = null;
 
 export function setAlertUserName(name: string | null | undefined): void {
@@ -187,6 +213,19 @@ export function setAlertUserName(name: string | null | undefined): void {
   // Email ya khaali naam se greeting bhaddi lagti hai ("Hello aapka@mail.com") —
   // aise me sirf "Hello" hi behtar hai.
   userName = n && !n.includes("@") ? n.split(/\s+/)[0] : null;
+  if (userName) AsyncStorage.setItem(NAME_KEY, userName).catch(() => {});
+  else AsyncStorage.removeItem(NAME_KEY).catch(() => {});
+}
+
+/** Headless task ke liye — memory khaali ho to storage se utha lo. */
+async function ensureUserName(): Promise<void> {
+  if (userName) return;
+  try {
+    const saved = await AsyncStorage.getItem(NAME_KEY);
+    if (saved) userName = saved;
+  } catch {
+    /* naam na mile to greeting bina naam ke — wo bhi theek hai */
+  }
 }
 
 /**
@@ -221,6 +260,8 @@ export function greetingLine(): string {
 export async function alertUser(message?: string): Promise<void> {
   const mode = loaded ? cached : await loadAlertMode();
   if (mode === "silent") return;
+  // Background me chala ho to naam memory me nahi hota — storage se le aao.
+  await ensureUserName();
 
   if (Platform.OS !== "web") {
     try {

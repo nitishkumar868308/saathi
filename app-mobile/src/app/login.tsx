@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +24,37 @@ import { useOffers } from "@/lib/use-offers";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { deviceOwner, type DeviceOwner } from "@/lib/device";
+
+/**
+ * Owner-warning card ka ek point — icon, heading, aur wajah.
+ *
+ * Login ke BAAD wale modal (`components/device-owner-warning.tsx`) me bilkul
+ * yahi dikhta hai. Dono ek hi dictionary se padhte hain, isliye baat kabhi do
+ * jagah do tarah se nahi likhi jaati.
+ */
+function OwnerPoint({
+  icon,
+  title,
+  body,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+}) {
+  const tc = useColors();
+  const styles = useStyles();
+  return (
+    <View style={styles.ownerPoint}>
+      <View style={styles.ownerPointIcon}>
+        <Ionicons name={icon} size={16} color={tc.terracotta} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.ownerPointTitle}>{title}</Text>
+        <Text style={styles.ownerPointBody}>{body}</Text>
+      </View>
+    </View>
+  );
+}
 
 /** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
 function referralFromUrl(url: string | null): string | null {
@@ -54,6 +86,8 @@ export default function Login() {
    * Fail ho to `null` — chetavni na dikhna login rokne se kahin behtar hai.
    */
   const [owner, setOwner] = useState<DeviceOwner | null>(null);
+  /** Patti par tap — poori baat wala card. */
+  const [ownerDetails, setOwnerDetails] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -157,20 +191,80 @@ export default function Login() {
           </Text>
           <Text style={styles.sub}>{mode === "login" ? l.loginSub : l.signupSub}</Text>
 
-          {/* Ye phone pehle se kisi aur ke naam par set hai — login se PEHLE.
-              Poori baat login ke baad wale modal me hai; yahan sirf itna ki
-              banda galat phone par apni ID daalne se pehle ruk ke soch le. */}
+          {/*
+            Ye phone pehle se kisi aur ke naam par set hai — login se PEHLE.
+
+            ⚠️ Ye patti pehle ek saada `View` thi, aur uska text kehta tha "tap
+            karke poori baat padho" — jabki tap par kuch hota hi nahi tha. User
+            dabata tha, kuch nahi hota tha, aur wo baat ek bekaar si chetavni
+            bankar reh jaati thi (wahi jo screenshot me dikhi). Ab wo sach me
+            khulti hai: wahi teen baatein jo login ke BAAD wala modal dikhata
+            hai, yahan login se PEHLE — jo asal me sahi waqt hai, kyunki uske
+            baad banda apni ID daal chuka hota hai aur nuksaan ho chuka hota hai.
+          */}
           {!!owner && (
-            <View style={styles.ownerNote}>
-              <Ionicons name="phone-portrait-outline" size={16} color={tc.terracotta} />
+            <Pressable
+              onPress={() => setOwnerDetails(true)}
+              style={({ pressed }) => [styles.ownerNote, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+            >
+              <View style={styles.ownerIcon}>
+                <Ionicons name="phone-portrait" size={17} color={tc.terracotta} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.ownerTitle}>{d.bannerTitle}</Text>
                 <Text style={styles.ownerBody}>
                   {tpl(d.bannerBody, { who: owner.email ?? owner.name ?? "" })}
                 </Text>
+                <View style={styles.ownerMore}>
+                  <Text style={styles.ownerMoreText}>{d.bannerMore}</Text>
+                  <Ionicons name="chevron-forward" size={13} color={tc.terracotta} />
+                </View>
+              </View>
+            </Pressable>
+          )}
+
+          {/* Poori baat — wahi teen point jo login ke baad wala modal dikhata
+              hai. Ek hi dictionary se, taaki dono jagah ek hi baat rahe. */}
+          <Modal
+            visible={ownerDetails}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => setOwnerDetails(false)}
+          >
+            <View style={styles.ownerBackdrop}>
+              <View style={styles.ownerCard}>
+                <View style={styles.ownerCardIcon}>
+                  <Ionicons name="phone-portrait" size={24} color={tc.terracotta} />
+                </View>
+                <Text style={styles.ownerCardTitle}>{d.title}</Text>
+                <ScrollView
+                  style={{ flexShrink: 1 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={styles.ownerCardBody}>
+                    {owner?.name
+                      ? tpl(d.intro, { name: owner.name, email: owner.email ?? "" })
+                      : tpl(d.introNoName, { email: owner?.email ?? "" })}
+                  </Text>
+                  <OwnerPoint icon="notifications" title={d.notifTitle} body={d.notifBody} />
+                  <OwnerPoint icon="sparkles" title={d.aiTitle} body={d.aiBody} />
+                  <OwnerPoint icon="gift" title={d.rewardTitle} body={d.rewardBody} />
+                  <View style={styles.ownerAdvice}>
+                    <Ionicons name="bulb" size={16} color={tc.terracotta} />
+                    <Text style={styles.ownerAdviceText}>{d.advice}</Text>
+                  </View>
+                </ScrollView>
+                <Pressable
+                  onPress={() => setOwnerDetails(false)}
+                  style={({ pressed }) => [styles.ownerCardBtn, pressed && { opacity: 0.9 }]}
+                >
+                  <Text style={styles.ownerCardBtnText}>{d.ok}</Text>
+                </Pressable>
               </View>
             </View>
-          )}
+          </Modal>
 
           {/* name (signup only) */}
           {mode === "signup" && (
@@ -348,8 +442,101 @@ const useStyles = makeStyles((c) => ({
     paddingHorizontal: 13,
     paddingVertical: 11,
   },
-  ownerTitle: { fontSize: 13.5, fontWeight: "800", color: c.ink },
-  ownerBody: { marginTop: 2, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
+  ownerIcon: {
+    height: 34,
+    width: 34,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(194,90,55,0.14)",
+  },
+  ownerTitle: { fontSize: 14, fontWeight: "800", color: c.ink },
+  ownerBody: { marginTop: 3, fontSize: 12.5, lineHeight: 18, color: c.inkSoft },
+  ownerMore: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 7 },
+  ownerMoreText: { fontSize: 12.5, fontWeight: "800", color: c.terracotta },
+
+  ownerBackdrop: {
+    flex: 1,
+    backgroundColor: c.scrim,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  ownerCard: {
+    width: "100%",
+    maxWidth: 440,
+    maxHeight: "86%",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: c.line,
+    backgroundColor: c.surface,
+    padding: 22,
+  },
+  ownerCardIcon: {
+    height: 56,
+    width: 56,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(194,90,55,0.12)",
+  },
+  ownerCardTitle: {
+    marginTop: 14,
+    marginBottom: 10,
+    fontSize: 20,
+    lineHeight: 27,
+    fontWeight: "800",
+    color: c.ink,
+  },
+  ownerCardBody: { fontSize: 14, lineHeight: 21, color: c.inkSoft },
+  ownerPoint: {
+    flexDirection: "row",
+    gap: 11,
+    marginTop: 13,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.line,
+    backgroundColor: c.cream,
+    padding: 12,
+  },
+  ownerPointIcon: {
+    height: 32,
+    width: 32,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(194,90,55,0.12)",
+  },
+  ownerPointTitle: { fontSize: 13.5, fontWeight: "700", color: c.ink },
+  ownerPointBody: { marginTop: 3, fontSize: 12.5, lineHeight: 18.5, color: c.inkSoft },
+  ownerAdvice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9,
+    marginTop: 15,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.3)",
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  ownerAdviceText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: "600",
+    color: c.ink,
+  },
+  ownerCardBtn: {
+    marginTop: 16,
+    height: 50,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: c.terracotta,
+  },
+  ownerCardBtnText: { fontSize: 15.5, fontWeight: "800", color: c.white },
   label: {
     marginTop: 20,
     marginBottom: 8,

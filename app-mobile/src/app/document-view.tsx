@@ -133,7 +133,10 @@ export default function DocumentView() {
     if (busy) return;
     setBusy("save");
     try {
-      const res = await saveDocumentToDevice(doc);
+      // Naam bhi bhejte hain — SAF wali file ka naam isi se banta hai. Bina
+      // iske har download "document.jpg" ban jaata aur user ke phone me kuch
+      // pehchana hi nahi jaata.
+      const res = await saveDocumentToDevice({ ...doc, name: name || "Document" });
       if (res === "saved") toast.show(d.savedToDevice, "success");
       else if (res === "denied") toast.show(d.saveNeedsPermission, "info");
       else if (res === "nofile") toast.show(d.noFileSaved, "error");

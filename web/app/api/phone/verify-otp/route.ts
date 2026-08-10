@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { appUserId } from "@/lib/app-auth";
 import { logServerError } from "@/lib/errors-server";
 import { isE164, markPhoneVerified, otpCheck } from "@/lib/phone";
-import { hashCode, otpConfigured } from "@/lib/otp";
+import { hashCode, otpTransport, verifyCheckOtp, VERIFY_SENTINEL } from "@/lib/otp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,8 @@ export async function POST(request: Request) {
   const userId = await appUserId(request);
   if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  if (!otpConfigured()) {
+  const transport = otpTransport();
+  if (!transport) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
 
@@ -47,9 +48,48 @@ export async function POST(request: Request) {
 
   let verdict: string;
   try {
-    verdict = await otpCheck(userId, phone, hashCode(phone, code));
+    if (transport === "sms") {
+      verdict = await otpCheck(userId, phone, hashCode(phone, code));
+    } else {
+      /**
+       * Twilio Verify wala raasta.
+       *
+       * ⚠️ Faisla Twilio ka hai (code usi ke paas hai), par ginti hamari apni
+       * DB me hi hoti hai — aur wo `otp_check` ke bina badhti hi nahi. Isliye
+       * dono soorat me use bulate hain:
+       *
+       *   • Twilio ne approve kiya  → SENTINEL hash bhejte hain, jo us row se
+       *     milta hai. Row "used" ho jaati hai, yaani wahi verification dobara
+       *     nahi chalega.
+       *   • Twilio ne mana kiya     → ek jaan-boojh ke galat hash bhejte hain,
+       *     taaki `attempts` badhe. Bina iske 6 ank ki brute-force par sirf
+       *     Twilio ki apni hadd bachti, aur hamare "5 galat koshish ke baad
+       *     code marr jaata hai" wale niyam ka koi matlab hi na rehta.
+       *
+       * `verdict` ko wahi shabd banate hain jo `otp_check` deta hai, taaki
+       * neeche ka jawab dono raaston me bilkul ek jaisa rahe.
+       */
+      const twilio = await verifyCheckOtp(phone, code);
+      if (twilio === "failed") {
+        void logServerError(new Error("verify check failed"), {
+          where: "phone/verify-otp",
+          step: "twilio",
+          userId,
+        });
+        return NextResponse.json({ error: "failed" }, { status: 502 });
+      }
+      const dbVerdict = await otpCheck(
+        userId,
+        phone,
+        hashCode(phone, twilio === "approved" ? VERIFY_SENTINEL : `bad:${code}`),
+      );
+      // Approve hote hue bhi hamari row lock/expire ho chuki ho (5 galat
+      // koshish, ya 10 minute) — to hadd hamari hi chalegi. Twilio ki apni
+      // expiry lambi hoti hai; do alag hadd me se kadi wali maanna hi theek hai.
+      verdict = twilio === "approved" ? dbVerdict : twilio;
+    }
   } catch (e) {
-    void logServerError(e, { where: "phone/verify-otp", step: "check", userId });
+    void logServerError(e, { where: "phone/verify-otp", step: "check", userId, transport });
     return NextResponse.json({ error: "failed" }, { status: 502 });
   }
 

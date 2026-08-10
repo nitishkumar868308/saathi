@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import * as Network from "expo-network";
 
@@ -183,13 +183,129 @@ async function confirmSlow(stillPending: () => boolean): Promise<void> {
 
 export type NetStatus = { offline: boolean; slow: boolean };
 
+/* --------------------------- offline: ek hi sach --------------------------- */
+
+/**
+ * `offline` poore app ka EK sajha sach hai — har hook ka apna nahi.
+ *
+ * ⚠️ Ye module-level hona zaroori hai. `useNetworkStatus()` teen jagah se
+ * bulaya jaata hai (`_layout`, `NetworkBanner`, `OfflineGate`). Pehle har
+ * instance ka apna `useState` aur apna probe-loop tha, yaani teen alag jawab
+ * ek doosre se ladte the: Gate "offline" kehta tha aur usi pal doosra hook
+ * "online" par pahunch jaata tha. Screen offline aur home ke beech jhilmilaati
+ * thi. Ab ek hi jagah faisla hota hai aur teenon usse padhte hain.
+ */
+let offlineNow = false;
+const offlineListeners = new Set<(v: boolean) => void>();
+
+function setOffline(v: boolean): void {
+  if (offlineNow === v) return;
+  offlineNow = v;
+  offlineListeners.forEach((l) => l(v));
+}
+
+/** Lagatar kitne probe fail hue — do se kam par offline nahi maante. */
+let probeFails = 0;
+/** Ek waqt me ek hi probe-chakkar. */
+let monitorRunning = false;
+
+/**
+ * OS ke flag ki aakhri haalat.
+ *
+ * ⚠️ Ye faisla nahi karte (upar `monitorLoop` me wajah likhi hai) — ye sirf ye
+ * batate hain ki probe ki ZAROORAT hai ya nahi. Sab theek dikh raha ho aur hum
+ * offline bhi na hon, to har 15 second me ek probe bhejna sirf battery aur data
+ * kharch karna hai; wahan chup rehna hi theek hai. Shak hote hi probe wapas
+ * chalu ho jaata hai.
+ */
+let flagsHealthy = true;
+
+/**
+ * Net ka pehra — app ke chalte rehne tak.
+ *
+ * ⚠️ Iska sabse zaroori niyam: **offline sirf ek KAAMYAB probe se hatta hai,
+ * kisi flag se nahi.** Purana code ulta karta tha —
+ *
+ *     } else { fails.current = 0; setOffline(false); }
+ *
+ * yaani jaise hi `expo-network` ke dono flag theek dikhte, offline turant band
+ * kar diya jaata tha, bina kuch jaanche. Aur wahi flags sabse zyada jhooth
+ * bolte hain: data band karte hi Android kuch second ke liye `isConnected:
+ * true` / `isInternetReachable: undefined` bhejta rehta hai (Wi-Fi jo juda to
+ * hai par internet nahi de raha, ya SIM ka transition). Uska seedha natija
+ * wahi tha jo user ne dekha — **offline screen ek pal ke liye aati thi aur
+ * uske baad app ka home page wapas aa jaata tha.**
+ *
+ * Ab flags sirf itna tay karte hain ki AGLA probe kitni jaldi chale. Faisla
+ * hamesha probe ka hai.
+ */
+async function monitorLoop(): Promise<void> {
+  if (monitorRunning) return;
+  monitorRunning = true;
+
+  try {
+    while (offlineListeners.size > 0) {
+
+      /**
+       * App ki koi asli request abhi-abhi kaamyab hui thi — wo probe se bhi
+       * bada saboot hai.
+       *
+       * ⚠️ Par ye chhoot sirf tab hai jab hum PEHLE SE offline na hon. Purana
+       * code offline hote hue bhi is raaste par `setOffline(false)` kar deta
+       * tha, yaani ek 10 second purani kaamyabi offline screen ko hata deti thi
+       * — chahe net abhi bhi na ho.
+       */
+      if (!offlineNow && Date.now() - lastSuccessAt < FRESH_SUCCESS_MS) {
+        probeFails = 0;
+        await wait(6000);
+        continue;
+      }
+
+      // Online hain aur OS ko bhi koi shak nahi — bekaar me probe mat bhejo.
+      if (!offlineNow && flagsHealthy) {
+        await wait(10_000);
+        continue;
+      }
+
+      const ok = await isReachable();
+      if (ok) {
+        probeFails = 0;
+        setOffline(false);
+        // Online hai — ab aaram se dekhte rahenge.
+        await wait(15_000);
+        continue;
+      }
+
+      probeFails += 1;
+      // Ek akela fail aksar sirf ek flaky request hota hai, offline nahi.
+      if (probeFails >= 2) setOffline(true);
+      // Offline hone ke baad thodi-thodi der me dekhte raho — net wapas aate hi
+      // screen khud hat jaati hai.
+      await wait(4000);
+    }
+  } finally {
+    monitorRunning = false;
+  }
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** "Abhi dekho" — retry button aur foreground par aane ke liye. */
+export async function recheckNow(): Promise<boolean> {
+  const ok = await isReachable();
+  if (ok) {
+    probeFails = 0;
+    setOffline(false);
+  }
+  return ok;
+}
+
 export function useNetworkStatus(): NetStatus {
   const net = Network.useNetworkState();
   const [slow, setSlow] = useState(false);
-  const [offline, setOffline] = useState(false);
-  // Lagatar kitni baar probe fail hua. Do se kam par banner nahi dikhate — ek
-  // akela fail aksar sirf ek flaky request hota hai, offline nahi.
-  const fails = useRef(0);
+  const [offline, setOfflineState] = useState(offlineNow);
 
   useEffect(() => {
     // `aiBusy` ek plain module variable hai (reactive nahi), isliye use yahan
@@ -204,77 +320,69 @@ export function useNetworkStatus(): NetStatus {
     };
   }, []);
 
+  // Sajhe sach se judo, aur pehra chalu rakho.
+  useEffect(() => {
+    offlineListeners.add(setOfflineState);
+    /**
+     * ⚠️ `useState(offlineNow)` upar pehli value de chuka hai, par uske aur is
+     * effect ke beech me wo badal sakti hai (probe doosre hook ke loop se chal
+     * raha hota hai) — aur us beech hum listener me the hi nahi. Isliye ek
+     * baar mila lete hain.
+     *
+     * Functional update se React barabar hone par render skip kar deta hai, to
+     * ye "cascading render" wali baat nahi banti — lint us farak ko dekh nahi
+     * paata, isliye rule yahan band hai.
+     */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOfflineState((prev) => (prev === offlineNow ? prev : offlineNow));
+    void monitorLoop();
+    return () => {
+      offlineListeners.delete(setOfflineState);
+    };
+  }, []);
+
   const connected = net.isConnected;
   const reachable = net.isInternetReachable;
 
+  /**
+   * OS ka ishaara — sirf "abhi jaancho" ke liye.
+   *
+   * Flag kabhi apne aap offline nahi banata aur na hi hataata hai (upar wali
+   * wajah). Wo bas ek jaldi probe chala deta hai, taaki data band karte hi
+   * offline screen 15 second ka intezaar na kare.
+   */
   useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    function verify(delay: number) {
-      timer = setTimeout(async () => {
+    flagsHealthy = connected !== false && reachable !== false;
+    if (!flagsHealthy) {
+      let cancelled = false;
+      const t = setTimeout(() => {
         if (cancelled) return;
-
-        // App ki koi request abhi-abhi chali thi? To net pakka hai — probe skip.
-        if (Date.now() - lastSuccessAt < FRESH_SUCCESS_MS) {
-          fails.current = 0;
-          setOffline(false);
-          verify(6000);
-          return;
-        }
-
-        const ok = await isReachable();
-        if (cancelled) return;
-
-        if (ok) {
-          fails.current = 0;
-          setOffline(false);
-          // Online hai — dobara check karne ki jaldi nahi.
-          return;
-        }
-
-        fails.current += 1;
-        // Do lagatar fail ke baad hi banner. Uske baad har 5s me dobara check,
-        // taaki net wapas aate hi banner khud hat jaye.
-        if (fails.current >= 2) setOffline(true);
-        verify(5000);
-      }, delay);
+        void isReachable(OFFLINE_PROBE_MS).then((ok) => {
+          if (cancelled) return;
+          if (ok) {
+            probeFails = 0;
+            setOffline(false);
+          } else {
+            probeFails += 1;
+            if (probeFails >= 2) setOffline(true);
+          }
+        });
+      }, connected === false ? 500 : 1500);
+      return () => {
+        cancelled = true;
+        clearTimeout(t);
+      };
     }
-
-    // OS kehta hai connection hi nahi hai — sabse strong ishaara, par phir bhi
-    // confirm karte hain (flags galat hote hain), bas jaldi.
-    if (connected === false) {
-      verify(800);
-    } else if (reachable === false) {
-      // Connection hai par reachability `false` — yahi flag sabse zyada jhooth
-      // bolta hai, isliye aaram se confirm karo.
-      verify(2500);
-    } else {
-      // Sab theek lag raha hai — banner turant hata do.
-      fails.current = 0;
-      setOffline(false);
-    }
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
   }, [connected, reachable]);
 
   // App wapas foreground me aayi — purana "offline" leke mat baitho, dobara jaancho.
   useEffect(() => {
-    if (!offline) return;
     const sub = AppState.addEventListener("change", (s: AppStateStatus) => {
-      if (s !== "active") return;
-      void isReachable().then((ok) => {
-        if (ok) {
-          fails.current = 0;
-          setOffline(false);
-        }
-      });
+      if (s !== "active" || !offlineNow) return;
+      void recheckNow();
     });
     return () => sub.remove();
-  }, [offline]);
+  }, []);
 
   return { offline, slow: slow && !offline };
 }

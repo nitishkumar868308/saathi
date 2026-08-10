@@ -17,7 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { useToast } from "@/components/toast";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
-import { isReachable } from "@/lib/network";
+import { recheckNow } from "@/lib/network";
 import { readCachedDocs, resolveDocUri } from "@/lib/doc-cache";
 import { saveDocumentToDevice } from "@/lib/save-to-device";
 import { shareDocument } from "@/lib/share";
@@ -72,15 +72,16 @@ export function OfflineScreen() {
   /**
    * "Dobara jaancho".
    *
-   * Ye khud kuch nahi badalta — `useNetworkStatus` apne probe se offline flag
-   * hatata hai aur screen apne aap chali jaati hai. Button ka kaam sirf ek
-   * turant probe chalana hai, taaki user ko 5 second wale agle cycle ka
-   * intezaar na karna pade.
+   * ⚠️ Ye pehle sirf `isReachable()` chalata tha — ek probe jiska nateeja kahin
+   * likha hi nahi jaata tha. Net wapas aa chuka ho tab bhi screen wahin khadi
+   * rehti thi jab tak agla cycle na aa jaye, aur user button dabata rehta tha.
+   * `recheckNow()` probe bhi karta hai aur kaamyabi par sajha offline flag bhi
+   * turant hata deta hai — screen usi pal chali jaati hai.
    */
   const recheck = useCallback(async () => {
     setChecking(true);
     try {
-      await isReachable();
+      await recheckNow();
     } finally {
       setChecking(false);
     }

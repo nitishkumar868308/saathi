@@ -122,8 +122,22 @@ function TypingBubble({ lines }: { lines: ThinkingLines }) {
 const CHAT_KEY_PREFIX = "saathi-chat:";
 const MAX_STORED = 60;
 
-/** Greeting ka tay id — history banate waqt isi se pehchana jaata hai. */
-const GREETING_ID = "1";
+/**
+ * Greeting ka tay id.
+ *
+ * ⚠️ Greeting ab `messages` me hai hi nahi — wo har render par abhi ki bhasha se
+ * banta hai (neeche `greeting` dekho). Ye id sirf DO kaam ke liye bacha hai:
+ * purani save ki hui chat me se use pehchaan ke HATANA, aur uska React key.
+ *
+ * Wajah: pehle greeting ek asli message tha jo baaki chat ke saath AsyncStorage
+ * me save ho jaata tha. Bhasha badalne par purana text wahin chipka rehta tha —
+ * user English chunta tha aur Saathi phir bhi "Namaste Nitish! Main aapka
+ * Saathi…" se milta tha, hamesha ke liye. App dobara install karne par hi wo
+ * jaata tha.
+ */
+const GREETING_ID = "greeting";
+/** Sabse pehle wala id — purani save ki hui chat me greeting yahi tha. */
+const LEGACY_GREETING_ID = "1";
 
 /**
  * Har message ka apna, kabhi na dohraaya jaane wala id.
@@ -148,6 +162,27 @@ function newMsgId(): string {
 
 /** Chat me ek turn ke liye zaroori sab kuch — retry isi se dobara chalta hai. */
 type Pending = { text: string; history: ChatTurn[] };
+
+/**
+ * Bola hua message apne aap jaane me kitni der.
+ *
+ * ⚠️ Ye number ek asli tanaav ka hal hai, aur dono taraf galat jawab hain:
+ *
+ *   • **0 (seedha bhej do)** — recognizer aksar aadha ya galat likhta hai
+ *     ("dawai" → "the way"). Wo galat baat AI ko chali jaati hai, jawab bhi
+ *     galat aata hai, aur wo message chat me hamesha ke liye pada rehta hai.
+ *     User ke paas use rokne ka koi mauka hi nahi hota.
+ *   • **kabhi nahi (jaisa pehle tha)** — user bolta tha, text dikh jaata tha,
+ *     aur phir bhi use send dabana padta tha. Yaani bolne ka aadha faayda hi
+ *     mila; jise likhne me dikkat hai (jinke liye ye button banaya hi gaya
+ *     tha) uske liye kuch nahi badla.
+ *
+ * 2.2 second: itne me ek nazar text par pad jaati hai, aur itna intezaar
+ * mehsoos bhi nahi hota. Text ko haath lagate hi (edit karte hi) ginti khud
+ * ruk jaati hai — us waqt user ka iraada saaf hota hai ki wo theek karna
+ * chahta hai.
+ */
+const VOICE_SEND_DELAY_MS = 2200;
 
 function isSameDay(a: Date, b: Date) {
   return (
@@ -179,14 +214,53 @@ export default function Chat() {
   const [failReason, setFailReason] = useState<AiFailure | null>(null);
   /** Chat se pehla reminder banne par "reminder time pe aaye" wala setup. */
   const [permModal, setPermModal] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>(() => [
-    {
-      id: GREETING_ID,
-      role: "saathi",
-      text: tpl(ch.greeting, { name: name ? " " + name : "" }),
-    },
-  ]);
+  /**
+   * Sirf ASLI messages — greeting isme nahi hai.
+   *
+   * Greeting neeche `greeting` me har render par abhi ki bhasha aur abhi ke naam
+   * se banta hai, aur sirf dikhane ke waqt jod diya jaata hai. Isse do purani
+   * dikkatein ek saath khatam hoti hain: bhasha badalne par wo bhi badal jaata
+   * hai, aur naam set hone par ("Namaste!" → "Namaste Nitish!") bhi.
+   */
+  const [messages, setMessages] = useState<Msg[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+
+  /**
+   * Bol ke chhoda hua message apne aap jaa raha hai — abhi roka ja sakta hai.
+   *
+   * Timer ref me hai (state me nahi) taaki use kahin se bhi turant kaata ja sake
+   * bina ek render ka intezaar kiye — user "Roko" dabaye aur message phir bhi
+   * chala jaye, usse bura kuch nahi.
+   */
+  const [voiceSending, setVoiceSending] = useState(false);
+  const voiceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Abhi input me kya likha hai.
+   *
+   * ⚠️ Timer ke andar `input` (state) padhna kaam nahi karta — wo us closure me
+   * wahi purani value hoti hai jo timer lagte waqt thi. Voice ke do tukde
+   * pass-pass aa jaayein to doosra tukda gir jaata aur aadha wakya AI ko chala
+   * jaata.
+   */
+  const inputRef = useRef("");
+
+  const cancelVoiceSend = useCallback(() => {
+    if (voiceTimer.current) {
+      clearTimeout(voiceTimer.current);
+      voiceTimer.current = null;
+    }
+    setVoiceSending(false);
+  }, []);
+
+  // Screen chhod di — kataar me pada message chup-chaap na chala jaye.
+  useEffect(() => cancelVoiceSend, [cancelVoiceSend]);
+
+  /** Pehla bubble — save nahi hota, isliye hamesha taaza hota hai. */
+  const greeting: Msg = {
+    id: GREETING_ID,
+    role: "saathi",
+    text: tpl(ch.greeting, { name: name ? " " + name : "" }),
+  };
 
   // Chat ko device par save/restore karo — app band karke kholne par gayab na ho.
   const storeKey = CHAT_KEY_PREFIX + (session?.user?.id ?? "guest");
@@ -200,7 +274,14 @@ export default function Chat() {
         const raw = await AsyncStorage.getItem(storeKey);
         if (alive && raw) {
           const saved = JSON.parse(raw) as Msg[];
-          if (Array.isArray(saved) && saved.length > 0) setMessages(saved);
+          if (Array.isArray(saved)) {
+            // Purani chat me greeting ek save kiya hua message tha — use yahin
+            // gira dete hain, warna do greeting dikhte (ek purani bhasha ka,
+            // ek nayi ka).
+            setMessages(
+              saved.filter((m) => m.id !== GREETING_ID && m.id !== LEGACY_GREETING_ID),
+            );
+          }
         }
       } catch {
         // corrupt/purana data — chhod do, greeting hi dikhega.
@@ -262,12 +343,19 @@ export default function Chat() {
   async function sendText(text: string) {
     const t = text.trim();
     if (!t || sending) return;
+    // Manually bheja ja raha ho to kataar wala timer bekaar hai — warna wo
+    // thodi der baad khaali input dobara bhejne ki koshish karta.
+    cancelVoiceSend();
     setInput("");
+    inputRef.current = "";
     setFailedTurn(null);
 
-    const history: ChatTurn[] = messages
-      .filter((m) => m.id !== GREETING_ID)
-      .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
+    // Greeting `messages` me hai hi nahi, isliye yahan chhaanne ki zaroorat bhi
+    // nahi — history me sirf asli baatcheet jaati hai.
+    const history: ChatTurn[] = messages.map((m) => ({
+      role: m.role === "user" ? "user" : "assistant",
+      content: m.text,
+    }));
 
     setMessages((m) => [...m, { id: newMsgId(), role: "user", text: t }]);
     await ask({ text: t, history });
@@ -497,7 +585,7 @@ export default function Chat() {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
-          {messages.map((m) =>
+          {[greeting, ...messages].map((m) =>
             m.role === "saathi" ? (
               <View key={m.id} style={styles.saathiRow}>
                 <View style={styles.miniAvatar}>
@@ -588,12 +676,69 @@ export default function Chat() {
           ))}
         </ScrollView>
 
+        {/*
+          Bola hua message ja raha hai — do second ka mauka.
+
+          ⚠️ Ye pattī input ke THEEK upar hai, kahin beech screen me nahi. Wo
+          jagah maayne rakhti hai: nazar us waqt input par hi hoti hai (wahin
+          transcript aaya hai), aur "Roko" wahi angootha dabata hai jo abhi mic
+          se hata hai.
+        */}
+        {voiceSending && (
+          <View style={styles.voiceBar}>
+            <Ionicons name="mic" size={14} color={tc.terracotta} />
+            <Text style={styles.voiceBarText} numberOfLines={1}>
+              {ch.voiceSending}
+            </Text>
+            <Pressable
+              onPress={cancelVoiceSend}
+              hitSlop={10}
+              style={({ pressed }) => [styles.voiceStop, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.voiceStopText}>{ch.voiceStop}</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* input */}
         <View style={styles.inputBar}>
-          <VoiceButton onText={(t) => setInput((prev) => (prev ? prev + " " + t : t))} />
+          <VoiceButton
+            onText={(t) => {
+              /**
+               * Transcript aa gaya — input me jodo aur ginti shuru.
+               *
+               * `inputRef` se merge hota hai, `input` state se nahi: do
+               * transcript pass-pass aa jaayein to state abhi purani hoti hai
+               * aur pehla tukda kho jaata hai. (Add-reminder screen par bhi
+               * bilkul yahi wajah se `titleRef` use hota hai.)
+               */
+              const merged = inputRef.current ? inputRef.current + " " + t : t;
+              inputRef.current = merged;
+              setInput(merged);
+
+              // Nayi baat aayi — purani ginti hata ke nayi shuru karo, warna
+              // doosra tukda aane par message pehle wali ginti par hi chala
+              // jaata aur aadha wakya jaata.
+              if (voiceTimer.current) clearTimeout(voiceTimer.current);
+              setVoiceSending(true);
+              voiceTimer.current = setTimeout(() => {
+                voiceTimer.current = null;
+                setVoiceSending(false);
+                // Beech me AI ka jawab aa raha ho to `sendText` khud ruk jaata
+                // hai; text input me pada rehta hai aur user bhej sakta hai.
+                void sendText(inputRef.current);
+              }, VOICE_SEND_DELAY_MS);
+            }}
+          />
           <TextInput
             value={input}
-            onChangeText={setInput}
+            onChangeText={(t) => {
+              setInput(t);
+              inputRef.current = t;
+              // Text ko haath lagate hi ginti ruk jaati hai — us waqt iraada
+              // saaf hai ki user use theek karna chahta hai, bhejna nahi.
+              cancelVoiceSend();
+            }}
             placeholder={ch.inputPlaceholder}
             placeholderTextColor={tc.inkSoft}
             style={styles.input}
@@ -725,6 +870,26 @@ const useStyles = makeStyles((c) => ({
     marginRight: 8,
   },
   chipText: { fontSize: 13, color: c.ink, fontWeight: "500" },
+  voiceBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: c.line,
+    backgroundColor: "rgba(194,90,55,0.08)",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  voiceBarText: { flex: 1, fontSize: 13, fontWeight: "700", color: c.terracotta },
+  voiceStop: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(194,90,55,0.4)",
+    backgroundColor: c.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  voiceStopText: { fontSize: 12.5, fontWeight: "800", color: c.terracotta },
   inputBar: {
     flexDirection: "row",
     alignItems: "flex-end",
