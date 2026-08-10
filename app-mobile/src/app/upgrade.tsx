@@ -13,7 +13,7 @@ import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
-import { markProfilePlus, enforcePlanLimits, type PlanId } from "@/lib/plan";
+import { waitForPlusFromServer, enforcePlanLimits, type PlanId } from "@/lib/plan";
 import { usePlan } from "@/lib/use-plan";
 import { refreshPlan } from "@/lib/plan-store";
 import {
@@ -217,16 +217,33 @@ export default function Upgrade() {
       }
       const result = await purchasePlus(pkg);
       if (result.active) {
-        // Asli expiry bhejo — warna plan "hamesha" jaisa reh jaata hai.
-        await markProfilePlus(result.expiresAt);
-        // Plus wapas lete hi pehle se locked docs / paused reminders turant
+        /**
+         * Plan ab APP nahi likhti — SERVER likhta hai.
+         *
+         * ⚠️ Yahan pehle `markProfilePlus(result.expiresAt)` tha, yaani app khud
+         * `profiles.plan = 'plus'` set kar deti thi. Wo "webhook aane tak ka
+         * bridge" nahi, ek khula darwaza tha: wahi do line koi bhi bhej sakta tha
+         * (anon key APK me hai), bina kuch kharide, `plan_expires_at` 2099 ke
+         * saath. Ab wo column app se band hai (supabase/column-grants.sql), aur
+         * Plus dene ka ek hi raasta hai — RevenueCat ka webhook.
+         *
+         * Isliye ab likhte nahi, poochte hain. Webhook aksar kuch second me aa
+         * jaata hai, isliye 99% baar user ko farak bhi nahi padta.
+         */
+        const active = await waitForPlusFromServer();
+        // Plus milte hi pehle se locked docs / paused reminders turant
         // unlock/unpause ho jaayein (warna agle session tak locked rehte the).
-        await enforcePlanLimits();
+        if (active) await enforcePlanLimits();
         // Saanjhe store ko taaza karo — ye screen AUR peeche khule saare tab,
         // dono ek hi call se sahi ho jaate hain.
         await refreshPlan();
         logEvent("plus_purchased", { plan: yearly ? "yearly" : "monthly" });
-        toast.show(u.activated, "success");
+        /**
+         * ⚠️ Webhook der se aaya to "purchase fail" kehna jhooth hoga — paisa
+         * kat chuka hai. Alag line dena hi imaandaari hai, aur wo user ko
+         * dobara kharidne se bhi rokti hai.
+         */
+        toast.show(active ? u.activated : u.activating, active ? "success" : "info");
       } else {
         toast.show(u.purchaseFailed, "error");
       }

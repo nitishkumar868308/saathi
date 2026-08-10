@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ldJson } from "@/lib/json-ld";
 import { pageMetadata } from "@/lib/seo-server";
 import Link from "next/link";
 import { Mail, MessageCircle, BellRing, ShieldCheck, ArrowRight } from "lucide-react";
@@ -71,7 +72,7 @@ export default function SupportPage() {
     <div className="relative min-h-screen overflow-hidden bg-cream">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: ldJson(jsonLd) }}
       />
       <div aria-hidden className="absolute inset-0 -z-10">
         <div className="blob -left-32 -top-24 h-80 w-80 bg-amber-warm/15 sm:h-96 sm:w-96" />

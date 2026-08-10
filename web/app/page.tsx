@@ -1,4 +1,5 @@
 import HomeContent from "@/components/HomeContent";
+import { ldJson } from "@/lib/json-ld";
 import BlogTeaser from "@/components/BlogTeaser";
 import { getPublicReviews, getReviewStats } from "@/lib/reviews-server";
 import { SITE_URL, SITE_NAME } from "@/lib/seo-server";
@@ -59,7 +60,7 @@ export default async function Page() {
       {ratingLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ratingLd) }}
+          dangerouslySetInnerHTML={{ __html: ldJson(ratingLd) }}
         />
       )}
       <HomeContent

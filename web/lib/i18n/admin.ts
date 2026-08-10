@@ -53,6 +53,8 @@ export type AdminDict = {
     message: string;
     usage: string;
     spend: string;
+    /** Play/RevenueCat ke payments — kamai (spend = kharcha). */
+    payments: string;
     notes: string;
     documents: string;
     reviews: string;
@@ -70,6 +72,7 @@ export type AdminDict = {
     | "users"
     | "usage"
     | "spend"
+    | "payments"
     | "notes"
     | "documents"
     | "reviews"
@@ -512,6 +515,54 @@ export type AdminDict = {
       rows: string;
     };
     /**
+     * Play / RevenueCat ke payments — hamari KAMAI.
+     *
+     * ⚠️ `spend` se ulta sawaal hai aur dono ko alag rakhna zaroori hai: `spend`
+     * batata hai humara kitna KHARCH ho raha hai, ye batata hai kitna AA raha
+     * hai. Ek hi screen me daal dene par permission ki baat ulti ho jaati —
+     * jise bill dekhna hai use har user ka transaction bhi dikh jaata.
+     */
+    payments: {
+      today: string;
+      days7: string;
+      days30: string;
+      days90: string;
+      all: string;
+      /** Upar ke card. */
+      revenue: string;
+      payers: string;
+      events: string;
+      refunds: string;
+      trials: string;
+      sandbox: string;
+      /** Table ke sir. */
+      when: string;
+      user: string;
+      event: string;
+      product: string;
+      amount: string;
+      status: string;
+      txn: string;
+      till: string;
+      rows: string;
+      /** Koi row hi nahi — par wajah do alag ho sakti hain (neeche). */
+      none: string;
+      /**
+       * Webhook abhi chalu hi nahi hai.
+       *
+       * ⚠️ Ye `none` se alag hona ZAROORI hai. "Abhi tak koi payment nahi hua"
+       * aur "payment ho bhi jaye to hum tak khabar aayegi hi nahi" — dono ek
+       * jaisi khaali screen dikhate hain, par doosri ek toota hua setup hai. Use
+       * pehli wali ki tarah dikhana wo galti hai jisme sabse zyada din jaate
+       * hain.
+       */
+      offTitle: string;
+      /** {status} — kaunsa env missing hai. */
+      offBody: string;
+      /** Sandbox row par chhota nishaan — asli kamai me ye ginti nahi. */
+      testTag: string;
+    };
+    /**
      * Notes ka haal — kisne kitne note banaye aur unme se kitno ka reminder bhi
      * bana.
      *
@@ -787,6 +838,7 @@ const en: AdminDict = {
     message: "Message",
     usage: "Usage",
     spend: "AI & WhatsApp",
+    payments: "Payments",
     notes: "Notes",
     documents: "Documents",
     reviews: "Reviews",
@@ -810,6 +862,7 @@ const en: AdminDict = {
     users: { title: "Users", sub: "Who's on which plan, when they joined, and how active they are." },
     usage: { title: "Usage", sub: "Who uses how much — documents, reminders, chats. And who not at all." },
     spend: { title: "AI & WhatsApp", sub: "How much we are actually consuming — Gemini tokens, WhatsApp messages and emails." },
+    payments: { title: "Payments", sub: "Every Play Store purchase, renewal and refund — who paid, when, and how much." },
     notes: { title: "Notes", sub: "Who writes notes, and how many turn into a reminder. What people write is never shown." },
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
     reviews: { title: "Reviews & Ratings", sub: "Reviews from the app. A review reaches the website only when the user allowed it AND you approve it — nothing goes live on its own." },
@@ -1121,6 +1174,19 @@ const en: AdminDict = {
         "No usage recorded yet. If you're sure AI/WhatsApp is running, you still need to run {file} in Supabase.",
       service: "Service", what: "What", units: "Units", last: "Last", rows: "rows",
     },
+    payments: {
+      today: "Today", days7: "7 days", days30: "30 days", days90: "90 days", all: "All",
+      revenue: "Revenue", payers: "Paying users", events: "Events",
+      refunds: "Refunds", trials: "Trials", sandbox: "Test purchases",
+      when: "When", user: "User", event: "Event", product: "Plan",
+      amount: "Amount", status: "Status", txn: "Transaction", till: "Valid till",
+      rows: "payments",
+      none: "No payments in this period yet.",
+      offTitle: "Play Billing is switched off",
+      offBody:
+        "Purchases can happen in the app, but no webhook will reach us — so nothing will be recorded here. Reason: {status}. Set PLAY_BILLING_ENABLED=1 and REVENUECAT_WEBHOOK_SECRET once you go live on Play Console.",
+      testTag: "test",
+    },
     notes: {
       title: "Notes",
       sub: "Who is writing notes, and how many of those turned into a reminder.",
@@ -1367,6 +1433,7 @@ const hi: AdminDict = {
     message: "मैसेज",
     usage: "उपयोग",
     spend: "AI और WhatsApp",
+    payments: "पेमेंट",
     notes: "नोट्स",
     documents: "डॉक्युमेंट्स",
     reviews: "रिव्यूज़",
@@ -1390,6 +1457,7 @@ const hi: AdminDict = {
     users: { title: "यूज़र्स", sub: "कौन किस प्लान पर है, कब जुड़ा, और कितना एक्टिव है।" },
     usage: { title: "उपयोग", sub: "कौन कितना उपयोग करता है — डॉक्युमेंट्स, रिमाइंडर, चैट। और कौन बिलकुल नहीं।" },
     spend: { title: "AI और WhatsApp", sub: "हमारा कितना इस्तेमाल हो रहा है — Gemini टोकन, WhatsApp मैसेज और ईमेल।" },
+    payments: { title: "पेमेंट", sub: "हर Play Store परचेज़, रिन्यूअल और रिफ़ंड — किसने, कब, कितना दिया।" },
     notes: { title: "नोट्स", sub: "कौन नोट लिखता है, और उनमें से कितनों का रिमाइंडर बनता है। लोग क्या लिखते हैं वह कभी नहीं दिखता।" },
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
     reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़। वेबसाइट पर रिव्यू तभी जाता है जब यूज़र ने अनुमति दी हो और आप मंज़ूरी दें — अपने आप कुछ लाइव नहीं होता।" },
@@ -1702,6 +1770,19 @@ const hi: AdminDict = {
         "अभी तक कोई उपयोग रिकॉर्ड नहीं हुआ। अगर आपको यक़ीन है कि AI/WhatsApp चल रहा है, तो Supabase में {file} चलाना बाक़ी है।",
       service: "सर्विस", what: "क्या", units: "यूनिट", last: "आख़िरी", rows: "रो",
     },
+    payments: {
+      today: "आज", days7: "7 दिन", days30: "30 दिन", days90: "90 दिन", all: "सब",
+      revenue: "कमाई", payers: "पैसे देने वाले", events: "इवेंट",
+      refunds: "रिफ़ंड", trials: "ट्रायल", sandbox: "टेस्ट परचेज़",
+      when: "कब", user: "यूज़र", event: "इवेंट", product: "प्लान",
+      amount: "रक़म", status: "स्टेटस", txn: "ट्रांज़ैक्शन", till: "कब तक",
+      rows: "पेमेंट",
+      none: "इस अवधि में अभी कोई पेमेंट नहीं।",
+      offTitle: "Play Billing बंद है",
+      offBody:
+        "ऐप में परचेज़ हो सकती है, पर webhook हम तक आएगा ही नहीं — यानी यहाँ कुछ रिकॉर्ड नहीं होगा। वजह: {status}. Play Console पर live होते ही PLAY_BILLING_ENABLED=1 और REVENUECAT_WEBHOOK_SECRET सेट करें।",
+      testTag: "टेस्ट",
+    },
     notes: {
       title: "नोट्स",
       sub: "कौन नोट लिख रहा है, और उनमें से कितनों का रिमाइंडर भी बना।",
@@ -1951,6 +2032,7 @@ const hinglish: AdminDict = {
     message: "Message",
     usage: "Usage",
     spend: "AI & WhatsApp",
+    payments: "Payments",
     notes: "Notes",
     documents: "Documents",
     reviews: "Reviews",
@@ -1974,6 +2056,7 @@ const hinglish: AdminDict = {
     users: { title: "Users", sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai." },
     usage: { title: "Usage", sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi." },
     spend: { title: "AI & WhatsApp", sub: "Humara kitna istemaal ho raha hai — Gemini token, WhatsApp message aur email." },
+    payments: { title: "Payments", sub: "Har Play Store kharidari, renewal aur refund — kisne, kab, kitna diya." },
     notes: { title: "Notes", sub: "Kaun note likhta hai, aur unme se kitno ka reminder banta hai. Log kya likhte hain wo kabhi nahi dikhta." },
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
     reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews. Website par review tabhi jaata hai jab user ne anumati di ho AUR aap manzoori dein — apne aap kuch live nahi hota." },
@@ -2284,6 +2367,19 @@ const hinglish: AdminDict = {
       nothingYet:
         "Abhi tak koi usage record nahi hui. Agar aapko yakeen hai ki AI/WhatsApp chal raha hai, to Supabase me {file} run karna baaki hai.",
       service: "Service", what: "Kya", units: "Units", last: "Aakhri", rows: "rows",
+    },
+    payments: {
+      today: "Aaj", days7: "7 din", days30: "30 din", days90: "90 din", all: "Sab",
+      revenue: "Kamai", payers: "Paise dene wale", events: "Events",
+      refunds: "Refund", trials: "Trial", sandbox: "Test purchase",
+      when: "Kab", user: "User", event: "Event", product: "Plan",
+      amount: "Rakam", status: "Status", txn: "Transaction", till: "Kab tak",
+      rows: "payments",
+      none: "Is range me abhi koi payment nahi.",
+      offTitle: "Play Billing band hai",
+      offBody:
+        "App me kharidari ho sakti hai, par webhook hum tak aayega hi nahi — yaani yahan kuch record nahi hoga. Wajah: {status}. Play Console par live hote hi PLAY_BILLING_ENABLED=1 aur REVENUECAT_WEBHOOK_SECRET set karo.",
+      testTag: "test",
     },
     notes: {
       title: "Notes",

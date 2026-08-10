@@ -130,3 +130,86 @@ export async function recordPayment(entry: {
     cache: "no-store",
   });
 }
+
+/* ------------------------- Play / RevenueCat record ------------------------ */
+
+/** Ek RevenueCat event ka poora nishaan — `supabase/play-payments.sql` dekho. */
+export type PlayPaymentRecord = {
+  userId: string | null;
+  eventId: string | null;
+  eventType: string;
+  transactionId: string | null;
+  originalTransactionId: string | null;
+  productId: string | null;
+  store: string | null;
+  amount: number | null;
+  currency: string | null;
+  periodType: string | null;
+  environment: string | null;
+  expiresAt: string | null;
+  eventAt: string | null;
+  /** Poora kaccha payload — naye field kal kaam aa sakte hain. */
+  raw: unknown;
+};
+
+/**
+ * Har webhook event `payments` me likho — grant, revoke, aur wo bhi jo hum
+ * anadekha karte hain.
+ *
+ * ⚠️ **Har** event, sirf paise wale nahi.** BILLING_ISSUE, CANCELLATION,
+ * PRODUCT_CHANGE — inpar plan nahi badalta, par jab koi user likhta hai "maine
+ * paisa diya tha, ab Plus nahi hai", to jawab theek inhi rows me hota hai. Sirf
+ * kharidari likhne par woh poori kahani aadhi reh jaati hai.
+ *
+ * ⚠️ Ye best-effort hai aur JAAN-BOOJH KE throw nahi karta. Record na ban paane
+ * par plan dena nahi rukna chahiye: user ne paisa de diya hai, aur uske liye
+ * "Plus mila" sabse zaroori baat hai — hisaab uske baad ki cheez hai.
+ *
+ * @returns `true` = nayi row bani. `false` = pehle se thi (duplicate webhook)
+ *          ya likhi nahi ja saki.
+ */
+export async function recordPlayEvent(entry: PlayPaymentRecord): Promise<boolean> {
+  if (!planDbConfigured()) return false;
+  try {
+    const res = await fetch(
+      // ⚠️ `on_conflict=event_id` + `ignore-duplicates` — RevenueCat webhook ko
+      // "at least once" bhejta hai (hamara 500, hamari der, ya Vercel ka function
+      // beech me marna — teenon retry karate hain). Bina is do-line ke ek hi
+      // kharidari do-teen rows banati aur kamai ka number hamesha bada dikhta.
+      `${SUPABASE_URL}/rest/v1/payments?on_conflict=event_id`,
+      {
+        method: "POST",
+        headers: headers({ Prefer: "resolution=ignore-duplicates,return=representation" }),
+        body: JSON.stringify([
+          {
+            user_id: entry.userId,
+            plan: entry.productId?.includes("yearly") ? "plus_yearly" : "plus_monthly",
+            event_id: entry.eventId,
+            event_type: entry.eventType,
+            transaction_id: entry.transactionId,
+            original_transaction_id: entry.originalTransactionId,
+            product_id: entry.productId,
+            store: entry.store,
+            amount_decimal: entry.amount,
+            currency: entry.currency,
+            period_type: entry.periodType,
+            environment: entry.environment,
+            expires_at: entry.expiresAt,
+            event_at: entry.eventAt,
+            // `status` purana column hai — usme wahi shabd rakhte hain jo
+            // Razorpay ke zamane me the, taaki purani rows ke saath padha ja sake.
+            status: entry.eventType === "REFUND" ? "refunded" : "paid",
+            raw: entry.raw ?? null,
+          },
+        ]),
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as unknown[];
+    // ignore-duplicates me pehle se maujood row par khaali array aata hai.
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}

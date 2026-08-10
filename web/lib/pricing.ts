@@ -44,6 +44,17 @@ export function localeForCountry(code?: string): "hinglish" | "en" {
 
 async function pricingRow(code: string): Promise<Row | null> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  /**
+   * ⚠️ `code` seedha PUBLIC query se aata hai (`/api/pricing?country=…`) aur
+   * neeche URL me chipak jaata hai. Bina jaanch ke `&`, `,` ya `.` daal kar
+   * PostgREST ke apne filter/parameter jode ja sakte hain — service-role key ke
+   * saath, yaani us request ke paas poora DB access hota hai.
+   *
+   * Country code ki shakal ISO2 hai aur bas. Jo us shakal ka nahi, wo hai hi
+   * nahi — `null` lauta dena `resolvePrice` ko apne aap India/base par le jaata
+   * hai (wahi jo unknown desh ke liye hota hai).
+   */
+  if (!/^[A-Z]{2}$/.test(code)) return null;
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/country_pricing?country_code=eq.${code}&enabled=eq.true` +

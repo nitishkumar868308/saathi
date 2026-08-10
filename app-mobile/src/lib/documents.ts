@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { canAddDocument, FREE_DOC_LIMIT } from "./plan";
+import { canAddDocument, getOffers } from "./plan";
 import { deleteDocumentFile, uploadDocument } from "./storage";
 import {
   addToCachedDocs,
@@ -10,11 +10,19 @@ import {
   writeCachedDocs,
 } from "./doc-cache";
 
-/** Free-plan document limit cross hone par throw hota hai. */
+/**
+ * Free-plan document limit cross hone par throw hota hai.
+ *
+ * ⚠️ `limit` constructor me aata hai, code me tay nahi hai. Pehle yahan
+ * `FREE_DOC_LIMIT` (3) likha tha jabki ASLI hadd `app_config.free_documents` se
+ * aati hai (`canAddDocument` wahi padhta hai). Admin ne 3 se 10 kiya to rok 10
+ * par lagti thi par message phir bhi "sirf 3 documents" kehta tha — yaani app
+ * user se jhooth bolti thi, aur support par wahi sawaal aata tha.
+ */
 export class DocLimitError extends Error {
-  constructor() {
+  constructor(readonly limit: number) {
     super(
-      `Free plan mein sirf ${FREE_DOC_LIMIT} documents rakh sakte ho. Unlimited ke liye Saathi Plus lo.`,
+      `Free plan mein sirf ${limit} documents rakh sakte ho. Unlimited ke liye Saathi Plus lo.`,
     );
     this.name = "DocLimitError";
   }
@@ -135,8 +143,9 @@ export async function addDocument(input: {
   summary?: string | null;
   file_uri?: string | null;
 }): Promise<Document> {
-  // Free plan limit check
-  if (!(await canAddDocument())) throw new DocLimitError();
+  // Free plan limit check. Hadd rok se hi aati hai — message ke liye alag se
+  // padhna hi wo galti thi jisse dono kabhi milte nahi the.
+  if (!(await canAddDocument())) throw new DocLimitError((await getOffers()).freeDocuments);
 
   const sb = client();
   // Referral qualification (document upload) server-side isi se verify hota hai.

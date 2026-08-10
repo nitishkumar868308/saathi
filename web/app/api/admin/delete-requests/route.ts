@@ -63,6 +63,25 @@ const USER_TABLES: { table: string; col: string; label: string }[] = [
 /** Documents ki asli files yahan padi hain (private bucket). */
 const DOC_BUCKET = "documents";
 
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/**
+ * `user_id` / `id` body se aate hain aur seedha PostgREST ke URL me chipakte
+ * hain — `profiles?id=eq.<uid>`, `documents?user_id=eq.<uid>`, aur (sabse
+ * zaroori) DELETE wale filter me.
+ *
+ * ⚠️ Ye route service_role se chalta hai, yaani us request ke paas poora DB
+ * hai. Guard peeche khada hai (sirf `deleteRequests` menu wala admin), par jo
+ * request 20 table par DELETE chalati ho uske filter ko bina jaanche URL me
+ * jodna theek nahi — ek `&` ya `,` filter ka matlab badal sakta hai, aur us
+ * galti ko wapas nahi laaya ja sakta.
+ *
+ * Shakal ki jaanch sabse sasta taala hai: dono asli me UUID hain.
+ */
+function badId(v: string): boolean {
+  return !UUID.test(v);
+}
+
 function headers(extra?: Record<string, string>) {
   return {
     apikey: SUPABASE_KEY as string,
@@ -202,6 +221,14 @@ export async function POST(request: Request) {
   const action = String(body.action ?? "");
   const id = String(body.id ?? "").trim();
   const uid = String(body.user_id ?? "").trim();
+
+  // Shakal pehle — dono aage URL filter me jaate hain (upar `badId` dekho).
+  if (uid && badId(uid)) {
+    return NextResponse.json({ error: "bad user_id" }, { status: 400 });
+  }
+  if (id && badId(id)) {
+    return NextResponse.json({ error: "bad id" }, { status: 400 });
+  }
 
   try {
     /* ---- kya-kya delete hoga (sirf dikhane ke liye) ---- */

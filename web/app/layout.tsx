@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { ldJson } from "@/lib/json-ld";
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Mulish } from "next/font/google";
 import "./globals.css";
@@ -166,7 +167,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: ldJson(jsonLd) }}
         />
       </head>
       <body>

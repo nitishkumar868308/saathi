@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { canAddReminder, FREE_REMINDER_LIMIT } from "./plan";
+import { canAddReminder, getOffers } from "./plan";
 
 export type Reminder = {
   id: string;
@@ -34,11 +34,17 @@ export type Reminder = {
   created_at: string;
 };
 
-/** Free limit (5) cross karne pe. */
+/**
+ * Free limit cross karne pe.
+ *
+ * ⚠️ `limit` constructor me aata hai, code me tay nahi hai — bilkul wahi wajah
+ * jo `DocLimitError` par likhi hai: asli hadd `app_config.free_reminders` se
+ * aati hai, aur admin ke use badalte hi ye message purana number bolta rehta tha.
+ */
 export class ReminderLimitError extends Error {
-  constructor() {
+  constructor(readonly limit: number) {
     super(
-      `Free plan me sirf ${FREE_REMINDER_LIMIT} active reminders. Unlimited ke liye Saathi Plus lo.`,
+      `Free plan me sirf ${limit} active reminders. Unlimited ke liye Saathi Plus lo.`,
     );
     this.name = "ReminderLimitError";
   }
@@ -98,8 +104,8 @@ export async function addReminder(input: {
   /** Aakhri din (YYYY-MM-DD) — "90 din tak" wali baat. */
   repeat_until?: string | null;
 }): Promise<Reminder> {
-  // Free plan limit (5) — Plus na ho to naya reminder block.
-  if (!(await canAddReminder())) throw new ReminderLimitError();
+  // Free plan limit — Plus na ho to naya reminder block.
+  if (!(await canAddReminder())) throw new ReminderLimitError((await getOffers()).freeReminders);
 
   const sb = client();
   // WhatsApp/email reminder ke liye backend ko user chahiye.

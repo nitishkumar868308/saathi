@@ -20,6 +20,15 @@ export const ADMIN_MENUS = [
   "support",
   "usage",
   "spend",
+  /**
+   * Play / RevenueCat ke payments.
+   *
+   * ⚠️ `spend` se alag hai aur alag hi rehna chahiye: `spend` hamara KHARCHA
+   * hai (Gemini, Twilio, email), `payments` hamari KAMAI. Dono ek menu me daal
+   * dene ka matlab hota ki jise bill dekhna hai use har user ka transaction bhi
+   * dikhe — aur wo permission ki poori baat hi ulti kar deta hai.
+   */
+  "payments",
   "notes",
   "documents",
   "renewals",

@@ -409,36 +409,51 @@ export async function getMyRewards(): Promise<MyRewards | null> {
 }
 
 /**
- * Purchase success ke baad profiles.plan = plus (webhook aane tak bridge).
+ * Purchase ke baad server ka wo jawab aane ka intezaar karo jisme plan `plus` ho.
  *
- * @param expiresAt  RevenueCat entitlement ki expiry (ISO).
- *                   `null` = lifetime. `undefined` = pata nahi, mat chhedo.
+ * ⚠️ Yahan pehle app KHUD `profiles` me `plan = 'plus'` likh deti thi — "webhook
+ * aane tak bridge" ke naam par. Wo bridge nahi, ek khula darwaza tha.
  *
- * Expiry kabhi CHHOTI nahi karte — user ke paas referral/first-N ke din pehle se
- * subscription se aage ke ho sakte hain.
+ * `profiles` ki RLS policy row par lagti hai ("apni row badal sakte ho"), aur
+ * `plan` bhi usi row me hai. Yaani ye do line likh sakne ka matlab tha ki koi
+ * bhi ye do line likh sakta hai — app ki anon key APK me padi hai aur nikaali ja
+ * sakti hai, uske baad ek `PATCH /rest/v1/profiles?id=eq.<apni uid>` bhejna hi
+ * kaafi tha:
+ *
+ *     { "plan": "plus", "plan_expires_at": "2099-01-01" }
+ *
+ * …bina kuch kharide, hamesha ke liye. Aur uske peeche ki har deewar isi ek
+ * column par tiki hai — `is_plus_active()`, free limits, AI ka daily brief,
+ * reminder ka email/WhatsApp — to poora paid hissa ek hi request me khul jaata.
+ *
+ * Ab wo column app se poori tarah band hai (`supabase/column-grants.sql`), aur
+ * plan dene ka EK hi raasta bacha hai: RevenueCat ka webhook → `/api/play/webhook`
+ * → `activatePlus()` (service_role se). Wahi sahi bhi hai — "kya sach me paisa
+ * aaya" ka jawab sirf Play/RevenueCat de sakta hai, app nahi.
+ *
+ * Isliye ye function ab likhta nahi, POOCHTA hai. Webhook aam taur par kuch hi
+ * second me pahunchta hai, isliye thodi der poochte rehna user ko wahi turant
+ * "Plus chalu ho gaya" wala ehsaas deta hai — bina kisi bharose ke jise tod
+ * kar chura liya ja sake.
+ *
+ * @returns `true` = server ne Plus maan liya. `false` = abhi tak nahi (kharidari
+ *          phir bhi ho chuki hai; webhook der se aaya to agli baar app khulte hi
+ *          plan sahi dikhega).
  */
-export async function markProfilePlus(expiresAt?: string | null): Promise<void> {
-  const sb = client();
-  const { data: userData } = await sb.auth.getUser();
-  const uid = userData.user?.id;
-  if (!uid) return;
-
-  const patch: Record<string, unknown> = { plan: "plus", plan_source: "google_play" };
-
-  if (expiresAt === null) {
-    patch.plan_expires_at = null; // lifetime
-  } else if (expiresAt) {
-    const { data } = await sb
-      .from("profiles")
-      .select("plan_expires_at")
-      .eq("id", uid)
-      .single();
-    const current = data?.plan_expires_at as string | null | undefined;
-    patch.plan_expires_at =
-      current && new Date(current) > new Date(expiresAt) ? current : expiresAt;
+export async function waitForPlusFromServer(
+  { tries = 6, gapMs = 2000 }: { tries?: number; gapMs?: number } = {},
+): Promise<boolean> {
+  for (let i = 0; i < tries; i++) {
+    // Pehli koshish turant — aksar webhook purchase se pehle hi pahunch chuka
+    // hota hai (RevenueCat ise app ke jawab ke saath-saath bhejta hai).
+    if (i > 0) await new Promise((r) => setTimeout(r, gapMs));
+    try {
+      if ((await getPlan()).isPlus) return true;
+    } catch {
+      /* net ka jhatka — agli koshish me phir dekh lenge */
+    }
   }
-
-  await sb.from("profiles").update(patch).eq("id", uid);
+  return false;
 }
 
 /**

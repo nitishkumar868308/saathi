@@ -603,6 +603,15 @@ export type Dict = {
     notAvailable: string;
     purchaseFailed: string;
     activated: string;
+    /**
+     * Kharidari ho gayi, par server ne abhi tak Plus nahi likha.
+     *
+     * Plan sirf Play/RevenueCat ke webhook se chalu hota hai (app khud plan
+     * nahi likh sakti — dekho supabase/column-grants.sql). Wo aksar kuch
+     * second me aata hai, par kabhi der bhi kar deta hai. Us soorat me
+     * "purchase fail" kehna jhooth hoga — paisa kat chuka hai.
+     */
+    activating: string;
     loginFirst: string;
     noPlan: string;
     paymentFailed: string;
@@ -1476,6 +1485,7 @@ const hinglish: Dict = {
     notAvailable: "Payment abhi is build me available nahi (dev build chahiye)",
     purchaseFailed: "Purchase complete nahi hua",
     activated: "Saathi Plus active ho gaya!",
+    activating: "Payment ho gaya — Plus thodi der me chalu ho jayega",
     loginFirst: "Pehle login karo",
     noPlan: "Koi plan available nahi",
     paymentFailed: "Payment shuru nahi hua",
@@ -2241,6 +2251,7 @@ const hi: Dict = {
     notAvailable: "पेमेंट अभी इस build में available नहीं (dev build चाहिए)",
     purchaseFailed: "परचेज़ पूरा नहीं हुआ",
     activated: "साथी प्लस active हो गया!",
+    activating: "पेमेंट हो गया — प्लस थोड़ी देर में चालू हो जाएगा",
     loginFirst: "पहले लॉगिन करें",
     noPlan: "कोई प्लान available नहीं",
     paymentFailed: "पेमेंट शुरू नहीं हुई",
@@ -3001,6 +3012,7 @@ const en: Dict = {
     notAvailable: "Payments aren't available in this build yet (needs a dev build)",
     purchaseFailed: "Purchase didn't complete",
     activated: "Saathi Plus is active!",
+    activating: "Payment received — Plus will switch on shortly",
     loginFirst: "Please sign in first",
     noPlan: "No plan available",
     paymentFailed: "Couldn't start the payment",

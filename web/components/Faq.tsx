@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ldJson } from "@/lib/json-ld";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -33,7 +34,7 @@ export default function Faq() {
     <div className="mx-auto max-w-3xl divide-y divide-line overflow-hidden rounded-4xl border border-line bg-surface">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: ldJson(jsonLd) }}
       />
       {faq.items.map((f, i) => {
         const isOpen = open === i;

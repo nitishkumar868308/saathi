@@ -406,7 +406,13 @@
       "Bash(grep -rnoE \"\\\\\"[A-Z][a-z][a-zA-Z ,'!?.-]{14,}\\\\\"\" components/Faq.tsx components/DownloadApp.tsx components/AppScreenshots.tsx components/LiveDemo.tsx)",
       "Bash(sed -i 's/import { DICTS } from \".\\\\/src\\\\/lib\\\\/i18n\\\\/dictionaries\";/import { dictionaries as DICTS } from \".\\\\/src\\\\/lib\\\\/i18n\\\\/dictionaries\";/' keycheck.ts)",
       "Bash(npx tsx *)",
-      "Bash(sed -i 's/import { adminDict } from \".\\\\/lib\\\\/i18n\\\\/admin\";/import { ADMIN as adminDict } from \".\\\\/lib\\\\/i18n\\\\/admin\";/' keycheck.ts)"
+      "Bash(sed -i 's/import { adminDict } from \".\\\\/lib\\\\/i18n\\\\/admin\";/import { ADMIN as adminDict } from \".\\\\/lib\\\\/i18n\\\\/admin\";/' keycheck.ts)",
+      "Bash(awk '{print $1}')",
+      "Bash(perl -0pi -e 's/\\\\* terminator maane jaate hain, aur kuch purane parser inpar toot jaate hain\\\\.\\\\n\\\\n/* terminator maane jaate hain, aur kuch purane parser inpar toot jaate hain.\\\\n *\\\\/\\\\n\\\\n/' lib/json-ld.ts)",
+      "Bash(grep -c '\\\\\\\\\\\\\\\\u003c' lib/json-ld.ts)",
+      "Bash(echo \"WEB EXIT:$?\")",
+      "Bash(echo \"MOBILE EXIT:$?\")",
+      "Bash(timeout 540 npx next build)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

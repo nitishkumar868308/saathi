@@ -102,12 +102,61 @@ export type PlayEvent = {
   action: "grant" | "revoke" | "ignore";
   /** Supabase user id — app RevenueCat ko yahi `appUserID` deti hai. */
   userId: string | null;
-  /** Subscription kab tak (ISO). `null` = lifetime. */
+  /**
+   * Subscription kab tak (ISO). `null` = expiry ki koi khabar hi nahi aayi.
+   *
+   * ⚠️ Ise "lifetime" mat maano. Dekho `activatePlus()` ka call neeche
+   * (`app/api/play/webhook/route.ts`) — wahan `until` sirf tab bheja jaata hai
+   * jab wo sach me aaya ho.
+   */
   until: string | null;
   type: string;
+
+  /* ------- neeche sab sirf RECORD ke liye — faisla inpar nahi hota ------- */
+
+  /** Har event ka apna id. Duplicate rokne ka taala isi par hai. */
+  eventId: string | null;
+  /** Store ka transaction (Play ka orderId) — refund isi se dhoonda jaata hai. */
+  transactionId: string | null;
+  /** Pehli kharidari ka transaction — poori renewal chain isse judti hai. */
+  originalTransactionId: string | null;
+  /** 'plus_monthly' / 'plus_yearly'. */
+  productId: string | null;
+  store: string | null;
+  /** ⚠️ Decimal (99.00), paise nahi. Purana `payments.amount` int-paise hai. */
+  amount: number | null;
+  currency: string | null;
+  /** 'NORMAL' | 'TRIAL' | 'INTRO' | 'PROMOTIONAL'. */
+  periodType: string | null;
+  /** 'PRODUCTION' | 'SANDBOX' — test kharidari kamai me nahi ginni chahiye. */
+  environment: string | null;
+  /** Event store par kab hua (ISO) — hamne kab likha, usse alag. */
+  eventAt: string | null;
 };
 
-/** RevenueCat ke webhook body ko apni bhasha me badlo. */
+/** Kaccha value string me — khaali/galat ho to null. */
+function str(v: unknown): string | null {
+  if (typeof v === "string" && v.trim()) return v.trim();
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return null;
+}
+
+/** ms se ISO. 0 / null / bakwaas ho to null. */
+function iso(v: unknown): string | null {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const d = new Date(n);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/**
+ * RevenueCat ke webhook body ko apni bhasha me badlo.
+ *
+ * ⚠️ Do hisse jaan-boojh ke alag rakhe hain: `action`/`userId`/`until` par
+ * FAISLA hota hai (Plus dena ya lena), baaki sab sirf RECORD ke liye hai. Isse
+ * ek baat pakki rehti hai — koi naya field jodne se plan dene ka niyam galti se
+ * nahi badalta.
+ */
 export function parsePlayEvent(payload: unknown): PlayEvent {
   const ev = (payload as { event?: Record<string, unknown> })?.event ?? {};
   const type = String(ev.type ?? "");
@@ -119,10 +168,32 @@ export function parsePlayEvent(payload: unknown): PlayEvent {
   const userId =
     typeof raw === "string" && raw && !raw.startsWith("$RCAnonymousID") ? raw : null;
 
-  const ms = ev.expiration_at_ms;
-  const until =
-    typeof ms === "number" && ms > 0 ? new Date(ms).toISOString() : null;
+  const priceRaw = ev.price_in_purchased_currency ?? ev.price;
+  const price = Number(priceRaw);
 
   const action = GRANTS.has(type) ? "grant" : REVOKES.has(type) ? "revoke" : "ignore";
-  return { action, userId, until, type };
+
+  return {
+    action,
+    userId,
+    until: iso(ev.expiration_at_ms),
+    type,
+
+    eventId: str(ev.id),
+    transactionId: str(ev.transaction_id),
+    originalTransactionId: str(ev.original_transaction_id),
+    // RevenueCat kabhi `product_id` deta hai, kabhi array me `product_ids`.
+    productId:
+      str(ev.product_id) ??
+      (Array.isArray(ev.product_ids) ? str(ev.product_ids[0]) : null),
+    store: str(ev.store),
+    // ⚠️ 0 bhi ek asli value hai (trial / promotional), isliye `|| null` nahi.
+    // Wo poora farak hi mita deta ki "muft tha" aur "pata hi nahi" alag baatein
+    // hain — aur kamai ka hisaab usi farak par tika hai.
+    amount: Number.isFinite(price) ? price : null,
+    currency: str(ev.currency),
+    periodType: str(ev.period_type),
+    environment: str(ev.environment),
+    eventAt: iso(ev.event_timestamp_ms) ?? iso(ev.purchased_at_ms),
+  };
 }

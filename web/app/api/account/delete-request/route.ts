@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server";
 import { sendAccountDeletionEmails } from "@/lib/email";
 import { asLocale } from "@/lib/user-locale";
+import { hit, requestKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+// Rate-limit ki ginti memory me rehti hai — cache/prerender ho gaya to wo
+// kabhi chalti hi nahi.
+export const dynamic = "force-dynamic";
+
+/**
+ * Ek ghante me ek jagah se itni hi delete request.
+ *
+ * Yahan hadd contact se thodi kadi hai (3): ye form asli zindagi me ek hi baar
+ * bhara jaata hai, aur har request ek email bhejti hai us pate par jo FORM me
+ * likha ho — yaani bina rok ke ye bhi ek mail-bomb ka auzaar tha. `alreadyPending`
+ * sirf UNHI par lagta hai jo pehle se darj hain; naye pate har baar nayi row
+ * banate hain.
+ */
+const MAX_PER_HOUR = 3;
+const WINDOW_MS = 60 * 60_000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -79,6 +95,14 @@ async function alreadyPending(email: string): Promise<boolean> {
 }
 
 export async function POST(request: Request) {
+  const gate = hit("delete-request", requestKey(request), MAX_PER_HOUR, WINDOW_MS);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      { error: "bahut zyada request — thodi der baad try karo" },
+      { status: 429, headers: { "Retry-After": String(gate.retryAfter) } },
+    );
+  }
+
   let name = "";
   let email = "";
   let reason = "";
