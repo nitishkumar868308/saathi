@@ -15,6 +15,7 @@ import { DeviceOwnerWarning } from "@/components/device-owner-warning";
 import { MultiDeviceWarning } from "@/components/multi-device-warning";
 import { LockGate } from "@/components/lock-gate";
 import { OfflineGate } from "@/components/offline-gate";
+import { AccountGate } from "@/components/account-gate";
 import { LockOffer } from "@/components/lock-offer";
 import { NetworkBanner } from "@/components/network-banner";
 import { useNetworkStatus } from "@/lib/network";
@@ -75,7 +76,17 @@ export default function RootLayout() {
                 bajta hai.
               */}
               <OfflineGate>
-                <RootNavigator />
+                {/*
+                  Admin ne account band kar diya ho to poori app ki jagah ek
+                  saaf baat. ⚠️ OfflineGate ke ANDAR hai: ye jaanch server se
+                  hoti hai, aur net na hone par uska jawab "pata nahi" hota hai
+                  — us haalat me user ko "account band hai" dikhana sabse bura
+                  jhooth hota. Offline screen apne cached documents ke saath
+                  pehle aati hai; account ka sach net aane par hi bolta hai.
+                */}
+                <AccountGate>
+                  <RootNavigator />
+                </AccountGate>
               {/* Har screen par theme switch — daayen kinare, beech ki oonchai
                   par. Settings ka teen-wala chunav apni jagah rehta hai. */}
               <ThemeFab />

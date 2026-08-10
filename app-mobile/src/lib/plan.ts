@@ -5,7 +5,8 @@ import { getDeviceId, getHardwareId } from "./device";
 /**
  * Plan / subscription helpers.
  *
- * Free: 5 active reminders, 3 documents. AI + premium locked.
+ * Free: 5 active reminders, sabse naye N documents (N admin ke config se).
+ * AI + premium locked.
  * Plus: sab unlimited (₹99/mahina, ₹999/saal).
  *
  * Plan Supabase `profiles.plan` mein store hota hai. Limits `app_config` se
@@ -108,9 +109,15 @@ export async function canAddReminder(): Promise<boolean> {
 
 /**
  * Access ko current plan ke hisaab se sync karo (server pe).
- * Plus expire ho gaya to 5 se aage ke reminders pause + 3 se aage ke documents
- * lock ho jaate hain; Plus wapas milte hi sab khul jaata hai. Data delete nahi
- * hota — sirf access badalta hai (spec item 6-14).
+ *
+ * Plus expire ho gaya to admin ke `free_reminders` se aage ke reminders pause,
+ * aur `free_documents` se aage ke documents lock ho jaate hain — documents me
+ * sabse NAYE utne khule rehte hain. Plus wapas milte hi sab khul jaata hai.
+ * Data delete nahi hota — sirf access badalta hai (spec item 6-14).
+ *
+ * ⚠️ Ye ab downgrade ka EKMATRA raasta nahi hai. `supabase/cron-plan-expiry.sql`
+ * har ghante wahi kaam server par karta hai, taaki jo user app kholta hi nahi
+ * uska downgrade bhi waqt par lage.
  *
  * Login ke baad aur plan badalne pe call karo. Best-effort.
  */

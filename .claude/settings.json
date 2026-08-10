@@ -403,7 +403,10 @@
       "Bash(node -e \"const p=require\\('./node_modules/expo-speech-recognition/package.json'\\); console.log\\(p.name,p.version\\); console.log\\(JSON.stringify\\(p.peerDependencies||{},null,1\\)\\); console.log\\(JSON.stringify\\(p.devDependencies&&p.devDependencies.expo,null,1\\)\\);\")",
       "Bash(awk '/^  deviceOwner: \\\\{/{f=1} f{print} f&&/^  \\\\},/{c++; if\\(c==1\\) exit}' src/lib/i18n/dictionaries.ts)",
       "Bash(grep -E \"network\\\\.ts:|reveal-3d|save-to-device|toast\\\\.tsx:|loader\\\\.tsx:|voice-button\\\\.tsx:|notification-background|\\\\\\(tabs\\\\\\)\\\\\\\\\\\\\\\\index\\\\.tsx:\")",
-      "Bash(grep -rnoE \"\\\\\"[A-Z][a-z][a-zA-Z ,'!?.-]{14,}\\\\\"\" components/Faq.tsx components/DownloadApp.tsx components/AppScreenshots.tsx components/LiveDemo.tsx)"
+      "Bash(grep -rnoE \"\\\\\"[A-Z][a-z][a-zA-Z ,'!?.-]{14,}\\\\\"\" components/Faq.tsx components/DownloadApp.tsx components/AppScreenshots.tsx components/LiveDemo.tsx)",
+      "Bash(sed -i 's/import { DICTS } from \".\\\\/src\\\\/lib\\\\/i18n\\\\/dictionaries\";/import { dictionaries as DICTS } from \".\\\\/src\\\\/lib\\\\/i18n\\\\/dictionaries\";/' keycheck.ts)",
+      "Bash(npx tsx *)",
+      "Bash(sed -i 's/import { adminDict } from \".\\\\/lib\\\\/i18n\\\\/admin\";/import { ADMIN as adminDict } from \".\\\\/lib\\\\/i18n\\\\/admin\";/' keycheck.ts)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

@@ -10,7 +10,6 @@ import { UserAvatar } from "@/components/user-avatar";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { signOut } from "@/lib/auth";
 import { useToast } from "@/components/toast";
@@ -23,8 +22,8 @@ import { PermissionModal } from "@/components/permission-modal";
 import { getLockState } from "@/lib/app-lock";
 import { ALERT_MODES, alertUser, useAlertMode, type AlertMode } from "@/lib/alert-mode";
 import { THEME_MODES, useThemeMode, type ThemeMode } from "@/theme/theme";
-import { cacheSizeBytes, clearDocCache, clearFileCache, formatBytes } from "@/lib/doc-cache";
-import { reportError } from "@/lib/report-error";
+import { clearDocCache } from "@/lib/doc-cache";
+import { deletionAsked, requestAccountDeletion } from "@/lib/account";
 
 /**
  * "You" tab — account, plan aur settings.
@@ -49,7 +48,6 @@ type RowId =
   | "alert_mode"
   | "theme"
   | "language"
-  | "offline_docs"
   | "privacy"
   | "contact"
   | "support"
@@ -119,25 +117,19 @@ export default function Settings() {
   const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
 
   /**
-   * Offline documents kitni jagah le rahe hain. `null` = abhi naapa nahi.
+   * Account delete ki request pehle se ja chuki hai?
    *
-   * `useFocusEffect` isliye ki document delete karke wapas aane par ya
-   * background sync ke baad naya size dikhe — purana number jhoot bolta hai.
+   * Sirf row ke daayin ek chhota nishaan dikhane ke liye. Iske bina user ko
+   * pata hi nahi chalta ki uski baat pahunchi ya nahi, aur wo har din wahi
+   * button dabata rehta hai.
    */
-  const [cacheSize, setCacheSize] = useState<number | null>(null);
-  const [clearAsk, setClearAsk] = useState(false);
+  const [askedBefore, setAskedBefore] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   useFocusEffect(
     useCallback(() => {
-      void cacheSizeBytes().then(setCacheSize);
-    }, []),
+      void deletionAsked(session?.user?.id).then(setAskedBefore);
+    }, [session?.user?.id]),
   );
-
-  async function clearOfflineDocs() {
-    setClearAsk(false);
-    await clearFileCache();
-    setCacheSize(await cacheSizeBytes());
-    toast.show(s.offlineDocsCleared, "success");
-  }
 
   const THEME_COPY: Record<
     ThemeMode,
@@ -206,15 +198,6 @@ export default function Settings() {
           label: s.language,
           value: LOCALE_META[locale].native,
         },
-        // Offline documents phone ki jagah lete hain — user ko dikhna chahiye
-        // kitni, aur ek tap me khaali karne ka raasta bhi. Documents khud
-        // server par surakshit hain, isliye clear karna khatarnak nahi hai.
-        {
-          id: "offline_docs",
-          icon: "cloud-download-outline",
-          label: s.offlineDocs,
-          value: cacheSize === null ? undefined : formatBytes(cacheSize),
-        },
       ],
     },
     {
@@ -227,9 +210,16 @@ export default function Settings() {
         { id: "help", icon: "help-circle-outline", label: s.help },
         { id: "privacy", icon: "lock-closed-outline", label: s.privacy },
         { id: "about", icon: "information-circle-outline", label: s.about },
-        // Apna saara data ek jagah se hata sakein — Play Store ki data-deletion
-        // requirement bhi yahi maangti hai.
-        { id: "delete_all", icon: "trash-outline", label: s.deleteAll, danger: true },
+        // Account delete karwane ka raasta — Play Store ki data-deletion
+        // requirement bhi yahi maangti hai. Yahan se sirf REQUEST jaati hai;
+        // asli delete admin panel se hota hai (wajah `lib/account.ts` me).
+        {
+          id: "delete_all",
+          icon: "trash-outline",
+          label: s.deleteAll,
+          value: askedBefore ? s.deleteAsked : undefined,
+          danger: true,
+        },
       ],
     },
   ];
@@ -250,24 +240,36 @@ export default function Settings() {
     }
   }
 
-  /** Sirf apna data (documents + reminders) delete — account bana rehta hai. */
-  async function deleteAllData() {
+  /**
+   * Account delete ki REQUEST bhejo — yahan se kuch delete nahi hota.
+   *
+   * ⚠️ Pehle ye function seedha `documents` aur `reminders` delete kar deta tha.
+   * Poori wajah `lib/account.ts` ke upar likhi hai; chhota roop:
+   *
+   *   • ek galti se laga tap par saara data hamesha ke liye chala jaata tha,
+   *   • wo delete adhoora tha (notes, chat, tickets, aur storage ki asli files
+   *     wahin padi rehti thi) — yaani "delete ho gaya" ek jhooth tha,
+   *   • aur "kab maanga, kab poora hua" ka koi record nahi bachta tha.
+   *
+   * Ab request admin panel me jaati hai, jahan se do me se ek kaam hota hai —
+   * hide (soft, wapas laaya ja sakta hai) ya purge (files + har table + login).
+   */
+  async function askDeleteAccount() {
     setDeleteAsk(false);
+    setDeleting(true);
     try {
-      const sb = supabase;
-      const uid = session?.user?.id;
-      if (!sb || !uid) throw new Error("no session");
-      // Do alag deletes — ek fail ho to bhi doosre ka pata chale.
-      const [docs, rems] = await Promise.all([
-        sb.from("documents").delete().eq("user_id", uid),
-        sb.from("reminders").delete().eq("user_id", uid),
-      ]);
-      if (docs.error) throw docs.error;
-      if (rems.error) throw rems.error;
-      toast.show(s.deleted, "success");
-    } catch (e) {
-      reportError(e, { screen: "settings", action: "delete_all_data" });
-      toast.show(`${s.deleteAll} ✕`, "error");
+      const res = await requestAccountDeletion({ locale });
+      if (res === "sent") {
+        setAskedBefore(true);
+        toast.show(s.deleted, "success");
+      } else if (res === "pending") {
+        setAskedBefore(true);
+        toast.show(s.deletePending, "info");
+      } else {
+        toast.show(s.deleteFailed, "error");
+      }
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -307,10 +309,6 @@ export default function Settings() {
       case "privacy":
         router.push("/privacy" as never);
         return;
-      case "offline_docs":
-        // Kuch cached hi nahi to confirm poochna bemtlab hai.
-        if (cacheSize) setClearAsk(true);
-        return;
       case "contact":
         router.push("/contact" as never);
         return;
@@ -324,7 +322,8 @@ export default function Settings() {
         router.push("/about" as never);
         return;
       case "delete_all":
-        setDeleteAsk(true);
+        // Request ja chuki ho ya abhi ja rahi ho to dobara poochhna bekaar hai.
+        if (!deleting) setDeleteAsk(true);
         return;
     }
   }
@@ -452,19 +451,6 @@ export default function Settings() {
           battery, auto-start. Ek hi jagah (item 14). */}
       <PermissionModal visible={permModal} onClose={() => setPermModal(false)} />
 
-      {/* Cached files hatana — documents server par surakshit hain, isliye ye
-          destructive nahi hai. Net aane par wo dobara utar jaayengi. */}
-      <ConfirmModal
-        visible={clearAsk}
-        title={s.offlineDocs}
-        message={s.offlineDocsClearAsk}
-        confirmLabel={s.offlineDocsClear}
-        cancelLabel={t.common.cancel}
-        icon="cloud-download"
-        onConfirm={clearOfflineDocs}
-        onCancel={() => setClearAsk(false)}
-      />
-
       <ConfirmModal
         visible={logoutAsk}
         title={s.logout}
@@ -476,7 +462,7 @@ export default function Settings() {
         onCancel={() => setLogoutAsk(false)}
       />
 
-      {/* Sab data delete — wapas nahi aata, isliye poochh ke hi. */}
+      {/* Account delete ki request — wapas nahi aata, isliye poochh ke hi. */}
       <ConfirmModal
         visible={deleteAsk}
         title={s.deleteTitle}
@@ -485,7 +471,7 @@ export default function Settings() {
         cancelLabel={t.common.cancel}
         icon="trash"
         destructive
-        onConfirm={deleteAllData}
+        onConfirm={askDeleteAccount}
         onCancel={() => setDeleteAsk(false)}
       />
 

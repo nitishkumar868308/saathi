@@ -69,7 +69,9 @@ export default function ReferralSection() {
             </li>
           ))}
           <li className="flex items-start gap-4 rounded-2xl border border-sage/40 bg-sage/10 p-4 sm:p-5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sage text-white">
+            {/* Sage par safed nishaan dono theme me kamzor hai — `text-on-accent`
+                gehra rehta hai. */}
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sage text-on-accent">
               <Gift size={16} />
             </span>
             <span className="pt-1 text-[15px] font-semibold leading-snug text-ink sm:text-base">

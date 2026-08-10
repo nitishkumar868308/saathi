@@ -49,11 +49,33 @@ function client() {
   return supabase;
 }
 
+/**
+ * Abhi kaun logged-in hai — bina network ke.
+ *
+ * ⚠️ Yahan pehle `auth.getUser()` tha, aur wo ek NETWORK call hai: supabase-js
+ * JWT ko har baar server se verify karwata hai. `documents.ts` me theek yahi
+ * kaanta pehle nikala ja chuka hai; reminders me reh gaya tha, aur uske do
+ * nateeje the:
+ *
+ *   • `syncNotifications()` app ke saamne aate hi chalta hai. Dheeme ya toote
+ *     net par `getUser()` apne timeout tak latakta tha aur phir khaali user
+ *     deta tha — yaani `listReminders()` khaali list, yaani us baar KOI alarm
+ *     dobara schedule nahi hota. Uske baad 60 second ka throttle bhi lag jaata
+ *     tha. Reminder app me sabse mehnga chup-chaap fail yahi hai.
+ *   • Har reminder save par ek fizool round-trip, sirf apni hi id jaanne ke liye.
+ *
+ * `getSession()` local storage se padhta hai. Suraksha me koi farq nahi — rows
+ * server par RLS se waise bhi apne-apne user tak seemit hain.
+ */
+async function currentUid(): Promise<string | null> {
+  const { data } = await client().auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
 /** Sirf apne reminders (RLS ke saath double safety). */
 export async function listReminders(): Promise<Reminder[]> {
   const sb = client();
-  const { data: u } = await sb.auth.getUser();
-  const uid = u.user?.id;
+  const uid = await currentUid();
   if (!uid) return [];
 
   const { data, error } = await sb
@@ -81,10 +103,11 @@ export async function addReminder(input: {
 
   const sb = client();
   // WhatsApp/email reminder ke liye backend ko user chahiye.
-  const { data: u } = await sb.auth.getUser();
+  // (Session se — wajah `currentUid()` ke upar likhi hai.)
+  const uid = await currentUid();
   const { data, error } = await sb
     .from("reminders")
-    .insert({ ...input, user_id: u.user?.id ?? null })
+    .insert({ ...input, user_id: uid })
     .select()
     .single();
   if (error) throw error;

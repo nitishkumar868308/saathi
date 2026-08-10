@@ -2,13 +2,15 @@
 -- Supabase SQL Editor me Run karo. Dobara run safe hai.
 -- Pehle chala lena: schema.sql, profiles.sql, plans.sql, rewards-referrals.sql
 --
--- Free : 5 active reminders, 3 documents, AI locked, premium locked
+-- Free : reminders + documents ki ginti ADMIN ke `app_config` se aati hai
+--        (free_reminders / free_documents). Documents me sabse NAYE utne khulte
+--        hain; AI locked, premium locked.
 -- Plus : sab unlimited (₹99/mahina, ₹999/saal)
 -- Launch offer (first-1000) HATA diya — har naya user Free se shuru.
 --
 -- DATA KABHI DELETE NAHI HOTA. Plus expire hone pe sirf ACCESS badalta hai:
---   - pehle 5 reminders active rehte hain, baaki PAUSE (is_paused = true)
---   - pehle 3 documents khulte hain, baaki LOCK (is_locked = true)
+--   - pehle N reminders active rehte hain (N = admin ka free_reminders), baaki PAUSE
+--   - AAKHRI N documents khulte hain (N = admin ka free_documents), baaki LOCK
 -- Wapas Plus milte hi sab dobara active/unlock ho jaata hai — automatically.
 
 /* ------------------------------------------------------------------ */
@@ -21,6 +23,11 @@ insert into public.app_config(key, value) values
   ('plus_price_monthly',  '99'::jsonb),
   ('plus_price_yearly',   '999'::jsonb)
 on conflict (key) do nothing;
+
+-- ⚠️ `do nothing` jaan-boojh ke hai. Ye sirf PEHLI baar ka beej hai; uske baad
+-- in numbers ka maalik ADMIN hai (panel > Rewards). Yahan `do update` likh dene
+-- par har deploy admin ke chune hue number chupke se wapas default par laut
+-- deta — aur wo baat kahin dikhti bhi nahi.
 
 -- Launch offer poori tarah hata diya gaya — dekho supabase/remove-launch-offer.sql.
 -- Referral cap bhi hata diya gaya — jitne chaaho referral karo, koi limit nahi.
@@ -55,7 +62,9 @@ $$;
 --
 -- Plus active  -> sab unpause + unlock (kuch chhoota nahi).
 -- Free         -> pehle N reminders active, baaki pause;
---                 pehle M documents khule, baaki lock.
+--                 AAKHRI M documents khule, baaki lock.
+-- N aur M dono admin ke `app_config` se aate hain (free_reminders /
+-- free_documents) — yahan koi number hardcode nahi hai.
 -- created_at ke order pe — "no manual selection" (spec item 7, 8).
 create or replace function public.enforce_plan_limits(p_uid uuid)
 returns void language plpgsql security definer set search_path = public as $$
@@ -86,9 +95,27 @@ begin
    where r.id = ranked.id
      and r.is_paused <> (ranked.rn > rem_lim);
 
-  -- Free: documents — pehle doc_lim khule, baaki lock
+  /*
+   * Free: documents — AAKHRI doc_lim khule, baaki lock.
+   *
+   * ⚠️ Tarteeb `desc` hai, `asc` nahi — aur ye badlaav soch samajh ke hai.
+   *
+   * Pehle sabse PURANE doc_lim document khule rehte the. Plus khatam hote hi
+   * user ko wahi purane dikhte the jo usne mahino pehle daale the (aksar test
+   * wale), aur jo usne kal daala tha — is hafte ka bijli ka bill, naya
+   * insurance — wo lock ho jaata tha. Yaani theek wo cheez chhup jaati thi
+   * jiski abhi zaroorat hai.
+   *
+   * ⚠️ Ginti (`doc_lim`) yahan nahi badli — wo admin ka faisla hai aur
+   * `app_config` se aata hai. Sirf ye badla ki UN me se kaun se document khulte
+   * hain: sabse naye.
+   *
+   * Reminders me ulta hai aur wahan `asc` hi theek hai: reminder ek chalti hui
+   * cheez hai (roz ki dawai), aur purana reminder aksar sabse zaroori hota hai.
+   * Document ek record hai — wahan naya hi kaam ka hota hai.
+   */
   with ranked as (
-    select id, row_number() over (order by created_at asc, id asc) as rn
+    select id, row_number() over (order by created_at desc, id desc) as rn
     from public.documents where user_id = p_uid
   )
   update public.documents d

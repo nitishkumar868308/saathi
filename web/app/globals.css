@@ -26,6 +26,16 @@
     --c-amber-warm: 224 164 88;
     --c-sage: 124 138 107;
     --c-line: 229 219 201;
+    /*
+     * Ujle accent (amber / sage) par ka rang — dono theme me GEHRA.
+     *
+     * ⚠️ `amber-warm` aur `sage` dono theme me ujle hain (dark me aur bhi
+     * ujle). Un par `text-white` kabhi chala hi nahi: amber par 1.9:1, sage par
+     * 3.4:1 — aur dark me 1.6:1 / 2.4:1. Aur `text-ink` yahan kaam nahi karta
+     * kyunki wo theme ke saath ULTA hota hai. Isliye ek alag token jo palatta
+     * hi nahi. App me bhi bilkul yahi hai (`theme/colors.ts` ka `onAccent`).
+     */
+    --c-on-accent: 36 31 26;
     color-scheme: light;
   }
 
@@ -53,6 +63,8 @@
     --c-amber-warm: 232 181 112;
     --c-sage: 157 174 138;
     --c-line: 58 50 43;
+    /* Light jaisa hi — palatna hi is token ka ulta kaam hoga (upar wajah). */
+    --c-on-accent: 36 31 26;
     color-scheme: dark;
   }
 

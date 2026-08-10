@@ -256,7 +256,9 @@ export default function Upgrade() {
         ) : isPlus ? (
           <View style={styles.plusActive}>
             <View style={styles.plusBadge}>
-              <Ionicons name="checkmark-circle" size={30} color={tc.white} />
+              {/* Badge sage ka hai — safed nishaan uspar dono theme me kamzor
+                  tha (3.4:1 / 2.4:1). */}
+              <Ionicons name="checkmark-circle" size={30} color={tc.onAccent} />
             </View>
             <Text style={styles.plusActiveTitle}>{u.activeTitle} 🎉</Text>
             <Text style={styles.plusActiveSub}>{u.activeSub}</Text>

@@ -99,7 +99,9 @@ export default function Contact() {
       {sent ? (
         <View style={styles.doneWrap}>
           <View style={styles.doneIcon}>
-            <Ionicons name="checkmark" size={34} color={tc.white} />
+            {/* Sage dono theme me ujla hai — safed nishaan uspar 3.4:1 (light)
+                aur 2.4:1 (dark) par gir jaata tha. */}
+            <Ionicons name="checkmark" size={34} color={tc.onAccent} />
           </View>
           <Text style={styles.doneTitle}>{c.sentTitle}</Text>
           <Text style={styles.doneBody}>{c.sentBody}</Text>

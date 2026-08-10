@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,7 +26,7 @@ import { listRemindersWithPending, saveReminder } from "@/lib/reminder-outbox";
 import { listDocuments, type Document } from "@/lib/documents";
 import { scheduleReminderSeries, ensureNotifPermission } from "@/lib/notifications";
 import { PermissionModal } from "@/components/permission-modal";
-import { reliabilityPromptShown } from "@/lib/reliability";
+import { shouldShowReliabilityPrompt } from "@/lib/reliability";
 import { formatWhen } from "@/utils/parse-time";
 import { reportNetFailure, reportIfNetwork } from "@/lib/net-alert";
 import { markFirstReminder } from "@/lib/reviews";
@@ -480,12 +479,10 @@ export default function Chat() {
       // turant dikhna chahiye, tab badalne ka intezaar kiye bina.
       emitDataChanged();
 
-      // Pehli baar reminder banne par reliability setup — bilkul waise hi jaise
-      // add-reminder screen par. Android par hamesha (permission mil bhi jaye to
-      // exact-alarm/battery/auto-start baaki rehte hain), iOS par sirf tab jab
-      // permission mili hi na ho.
-      const needsSetup = Platform.OS === "android" || !allowed;
-      if (needsSetup && !(await reliabilityPromptShown())) setPermModal(true);
+      // Reliability setup — bilkul wahi niyam jo add-reminder aur add-document
+      // par hai: sab allow ho to kuch nahi, ek bhi baaki ho to modal. Platform
+      // ka farak `shouldShowReliabilityPrompt()` khud sambhalta hai.
+      if (await shouldShowReliabilityPrompt()) setPermModal(true);
       return true;
     } catch (e) {
       if (e instanceof ReminderLimitError) {

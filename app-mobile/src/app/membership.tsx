@@ -240,7 +240,9 @@ function ReferralRow({ r, m }: { r: MyReferral; m: Dict["membership"] }) {
         <Ionicons
           name={done ? "checkmark" : "time-outline"}
           size={16}
-          color={done ? tc.white : tc.inkSoft}
+          // Ho chuka wala gola sage ka hai — uspar safed nishaan dono theme
+          // me kamzor tha (3.4:1 / 2.4:1).
+          color={done ? tc.onAccent : tc.inkSoft}
         />
       </View>
       <View style={{ flex: 1 }}>
@@ -290,6 +292,8 @@ function Row({
 
 /* ------------------------------- styles ------------------------------- */
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
   header: {
@@ -301,7 +305,7 @@ const useStyles = makeStyles((c) => ({
   },
   back: { padding: 4 },
   title: { fontSize: 18, fontWeight: "700", color: c.ink },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 40, ...CONTENT },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30 },
   muted: { fontSize: 14, color: c.inkSoft, textAlign: "center" },
 

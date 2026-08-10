@@ -499,6 +499,8 @@ export default function ProfileDetails() {
 }
 
 // Simple inline select (chips-wrap). Chhoti lists ke liye theek.
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
   header: {
@@ -510,7 +512,7 @@ const useStyles = makeStyles((c) => ({
   },
   back: { padding: 4 },
   title: { fontSize: 18, fontWeight: "700", color: c.ink },
-  content: { padding: 20, paddingBottom: 20 },
+  content: { padding: 20, paddingBottom: 20, ...CONTENT },
   avatarWrap: { alignItems: "center", marginBottom: 8 },
   avatar: {
     height: 92,

@@ -632,7 +632,16 @@ function ContactsView({ rows, onReplied }: { rows: ContactEntry[]; onReplied: ()
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-3">
                   <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                    /*
+                      ⚠️ Rang gol ke hisaab se. Teen me se do gol ujle hain —
+                      sage (#7C8A6B) aur amber (#E0A458) — aur un par safed
+                      akshar 3.4:1 aur 1.9:1 par tha. Yaani har teesre user ka
+                      pehla akshar dikhta hi nahi tha. Terracotta gehra hai,
+                      wahan safed hi theek hai.
+                    */
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                      i % 3 === 0 ? "text-white" : "text-on-accent"
+                    }`}
                     style={{ backgroundColor: ["#C25A37", "#7C8A6B", "#E0A458"][i % 3] }}
                   >
                     {r.name.charAt(0).toUpperCase()}

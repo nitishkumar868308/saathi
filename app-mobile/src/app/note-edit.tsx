@@ -405,6 +405,8 @@ export default function NoteEdit() {
   );
 }
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.surface },
   header: {
@@ -430,7 +432,7 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.terracotta,
   },
   saveText: { fontSize: 14, fontWeight: "800", color: c.white },
-  scroll: { paddingHorizontal: 20, paddingBottom: 24 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 24, ...CONTENT },
   titleInput: {
     fontSize: 22,
     fontWeight: "800",

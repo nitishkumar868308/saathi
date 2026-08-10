@@ -29,7 +29,7 @@ import { repeatLine } from "@/lib/repeat-label";
 import { reportIfNetwork } from "@/lib/net-alert";
 import { logEvent } from "@/lib/analytics";
 import { markFirstReminder } from "@/lib/reviews";
-import { reliabilityPromptShown } from "@/lib/reliability";
+import { shouldShowReliabilityPrompt } from "@/lib/reliability";
 import { PermissionModal } from "@/components/permission-modal";
 import { VoiceButton } from "@/components/voice-button";
 import { ReminderAskModal, type AskSlot } from "@/components/reminder-ask-modal";
@@ -532,8 +532,9 @@ export default function AddReminder() {
       // hote hi nahi, to sab theek hote hue modal kholna bekaar hai. Pehle ye
       // block Android-only tha, isliye iOS par notification band hone par user
       // ko kabhi pata hi nahi chalta ki reminder aayega hi nahi.
-      const needsSetup = Platform.OS === "android" || !allowed;
-      if (needsSetup && !(await reliabilityPromptShown())) {
+      // Sab allow ho to seedha wapas; ek bhi step baaki ho to pehle modal.
+      // Wahi niyam chat aur add-document par bhi.
+      if (await shouldShowReliabilityPrompt()) {
         setPermModal(true);
         return;
       }

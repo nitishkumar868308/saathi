@@ -209,7 +209,9 @@ function Condition({
         <Ionicons
           name={done ? "checkmark" : "ellipse-outline"}
           size={16}
-          color={done ? tc.white : tc.inkSoft}
+          // Ho chuka wala gola sage ka hai — uspar safed nishaan dono theme
+          // me kamzor tha (3.4:1 / 2.4:1).
+          color={done ? tc.onAccent : tc.inkSoft}
         />
       </View>
       <Text style={[styles.condLabel, done && styles.condLabelDone]}>{label}</Text>
@@ -223,6 +225,8 @@ function Condition({
   );
 }
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
   header: {
@@ -234,7 +238,7 @@ const useStyles = makeStyles((c) => ({
   },
   back: { padding: 4 },
   title: { fontSize: 18, fontWeight: "700", color: c.ink },
-  content: { padding: 20, paddingBottom: 40 },
+  content: { padding: 20, paddingBottom: 40, ...CONTENT },
   hero: { alignItems: "center", paddingVertical: 8 },
   giftIcon: {
     height: 64,

@@ -321,10 +321,17 @@ export function ReminderAlertHost() {
       <View style={styles.backdrop}>
         <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
           <View style={[styles.iconWrap, isExpiry && styles.iconExpiry]}>
+            {/*
+              ⚠️ Rang icon ke saath badalta hai. Reminder ka gol terracotta ka
+              hai (gehra) — uspar safed theek hai. Par expiry wala AMBER ka
+              hai, jo dono theme me ujla hai: wahan safed icon 1.9:1 (light)
+              aur 1.6:1 (dark) par tha — yaani app ki sabse zaroori screen ka
+              sabse bada icon hi sabse dhundhla.
+            */}
             <Ionicons
               name={isExpiry ? "document-text" : "alarm"}
               size={34}
-              color={tc.white}
+              color={isExpiry ? tc.onAccent : tc.white}
             />
           </View>
           <Text style={styles.kicker}>{isExpiry ? n.alertExpiry : n.alertReminder}</Text>

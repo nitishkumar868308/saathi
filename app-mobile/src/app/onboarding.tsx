@@ -62,9 +62,11 @@ export default function Onboarding() {
   );
 }
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
-  content: { flex: 1, padding: 28, paddingTop: 40 },
+  content: { flex: 1, padding: 28, paddingTop: 40, ...CONTENT },
   logo: {
     height: 76,
     width: 76,

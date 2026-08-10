@@ -260,6 +260,8 @@ export default function AppLock() {
   );
 }
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
   header: {
@@ -272,7 +274,7 @@ const useStyles = makeStyles((c) => ({
   },
   back: { padding: 4 },
   title: { fontSize: 21, fontWeight: "800", color: c.ink },
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 40, ...CONTENT },
   hero: { alignItems: "center", paddingVertical: 18 },
   heroIcon: {
     height: 66,

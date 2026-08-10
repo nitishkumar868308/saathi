@@ -51,6 +51,33 @@ async function findUserId(email: string): Promise<string | null> {
   }
 }
 
+/**
+ * Is email ki koi request pehle se pending to nahi?
+ *
+ * ⚠️ Ye ab zaroori hai. Pehle form sirf website par tha aur user usse ek hi baar
+ * bharta tha. Ab app ke profile me bhi wahi button hai — aur wahan user usse
+ * dobara, teesri baar dabata hai ("kuch hua hi nahi lagta"). Har tap par ek nayi
+ * row banti to admin ke saamne ek hi banda das baar pending dikhta, aur asli
+ * pending requests unme dab jaati.
+ *
+ * Fail hone par `false` — dobara poochhna ek request kho dene se behtar hai.
+ */
+async function alreadyPending(email: string): Promise<boolean> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return false;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/account_delete_requests` +
+        `?email=eq.${encodeURIComponent(email)}&status=eq.pending&select=id&limit=1`,
+      { headers: headers(), cache: "no-store" },
+    );
+    if (!res.ok) return false;
+    const rows = (await res.json()) as { id: string }[];
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   let name = "";
   let email = "";
@@ -74,6 +101,17 @@ export async function POST(request: Request) {
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return NextResponse.json({ error: "not configured" }, { status: 503 });
+  }
+
+  /**
+   * Pehle se pending hai — nayi row mat banao, par user ko "fail" bhi mat kaho.
+   *
+   * Uske liye dono ka matlab ek hi hai: "meri baat pahunch chuki hai". `pending`
+   * flag app ko ye batane deta hai ki "aapki request pehle se darj hai" — ek
+   * duplicate confirmation email bhejne ki bhi zaroorat nahi.
+   */
+  if (await alreadyPending(email)) {
+    return NextResponse.json({ ok: true, pending: true });
   }
 
   try {

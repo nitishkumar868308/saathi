@@ -45,6 +45,9 @@ const config: Config = {
         },
         sage: "rgb(var(--c-sage) / <alpha-value>)",
         line: "rgb(var(--c-line) / <alpha-value>)", // borders
+        // Amber/sage jaise ujle accent par ka text-icon rang — dono theme me
+        // gehra rehta hai (wajah globals.css me likhi hai).
+        "on-accent": "rgb(var(--c-on-accent) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-fraunces)", "Georgia", "serif"],

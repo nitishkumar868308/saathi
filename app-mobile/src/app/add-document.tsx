@@ -27,6 +27,8 @@ import { markFirstDocument } from "@/lib/reviews";
 import { isValidDate } from "@/utils/expiry";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
+import { PermissionModal } from "@/components/permission-modal";
+import { shouldShowReliabilityPrompt } from "@/lib/reliability";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 
@@ -60,6 +62,17 @@ export default function AddDocument() {
   /** AI scan ka poora samajh — DB me save hota hai. */
   const [summary, setSummary] = useState("");
   const [saving, setSaving] = useState(false);
+  /**
+   * Reminder-reliability modal khula hai kya.
+   *
+   * ⚠️ Ye screen par tha hi nahi, aur document ke liye wo utna hi zaroori
+   * hai jitna reminder ke liye. Expiry wala document APNI notification
+   * lagata hai (7 din pehle / 1 din pehle / us din) — wahi teen khabrein
+   * jinke liye user ne document daala hi tha. Permission ya exact-alarm
+   * baaki ho to un teenon me se ek bhi nahi aati, aur user ko sirf ek
+   * chhota sa toast milta tha jo wo padhta bhi nahi.
+   */
+  const [permModal, setPermModal] = useState(false);
 
   async function pickImage(source: "camera" | "gallery") {
     try {
@@ -182,6 +195,20 @@ export default function AddDocument() {
       // Review popup ka padav — document + reminder dono ho jaayein to poochho.
       markFirstDocument().catch(() => {});
       toast.show(notifOk ? d.added : d.addedNoNotif, notifOk ? "success" : "info");
+
+      /**
+       * Expiry wale document par wahi reliability check jo reminder par hai.
+       *
+       * Sirf `doc.expiry` hone par — bina expiry ke document ki koi notification
+       * hoti hi nahi, to wahan permission maangna bekaar aur chidhchida hoga.
+       *
+       * Sab allow ho to modal khulta hi nahi aur screen seedha band ho jaati
+       * hai; ek bhi step baaki ho to pehle modal, band karne par wapas.
+       */
+      if (doc.expiry && (await shouldShowReliabilityPrompt())) {
+        setPermModal(true);
+        return;
+      }
       router.back();
     } catch (e) {
       if (e instanceof DocLimitError) {
@@ -304,6 +331,17 @@ export default function AddDocument() {
 
       {/* Scan + save — dono ke liye wahi ek center overlay loader. */}
       <LoaderOverlay visible={scanning || saving} />
+
+      {/* Expiry ki khabar sach me pahunche iske liye — notification, exact
+          alarm, full-screen alert, battery aur OEM auto-start, ek hi jagah.
+          Band karte hi screen bhi band, kyunki document save ho chuka hai. */}
+      <PermissionModal
+        visible={permModal}
+        onClose={() => {
+          setPermModal(false);
+          router.back();
+        }}
+      />
     </SafeAreaView>
   );
 }

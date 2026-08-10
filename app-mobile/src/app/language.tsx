@@ -122,9 +122,11 @@ export default function LanguageSelect() {
   );
 }
 
+const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream, justifyContent: "space-between" },
-  content: { paddingHorizontal: 26, paddingTop: 30 },
+  content: { paddingHorizontal: 26, paddingTop: 30, ...CONTENT },
   hero: { alignItems: "center" },
   logoGlow: {
     position: "absolute",

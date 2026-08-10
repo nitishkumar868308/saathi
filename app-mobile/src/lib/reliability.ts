@@ -257,12 +257,64 @@ async function requestStepInner(key: StepKey): Promise<void> {
   }
 }
 
-/** Kya humne reliability modal pehle dikhaya tha? */
+/**
+ * Kya humne reliability modal pehle dikhaya tha?
+ *
+ * ⚠️ Ab ye faisla NAHI karta ki modal khulega ya nahi — wo `shouldShowReliability
+ * Prompt()` karta hai, aur wo sirf ye dekhta hai ki koi step baaki hai ya nahi.
+ * Ye sirf ek nishaan hai ("user ne ye screen kabhi dekhi hai kya"), jo doosri
+ * jagah kaam aa sakta hai.
+ */
 export async function reliabilityPromptShown(): Promise<boolean> {
   try {
     return (await AsyncStorage.getItem(ASKED_KEY)) === "1";
   } catch {
     return true; // storage na chale to baar-baar mat poochho
+  }
+}
+
+/**
+ * Reminder banne ke baad reliability modal kholna chahiye ya nahi.
+ *
+ * **Niyam ek hi hai: sab allow hai to nahi, kuch bhi baaki hai to haan.**
+ * Aur ye niyam DONO jagah ek jaisa lagta hai — chat se bana reminder ho ya
+ * Add-reminder screen se.
+ *
+ * ⚠️ Pehle yahan `!(await reliabilityPromptShown())` tha — yaani modal poore
+ * app me EK HI BAAR, kabhi bhi. Wo do tarah se galat tha:
+ *
+ *  1. **Chat se bana reminder chup reh jaata tha.** User pehle Add-reminder
+ *     screen se ek reminder banata, wahan modal dikh jaata, jhanda lag jaata —
+ *     aur uske baad chat se bane HAR reminder par kuch nahi dikhta. Ek hi kaam
+ *     ke do raaste, do alag vyavhaar.
+ *
+ *  2. **Aur usse bada:** modal ek baar DIKHA dene ka matlab ye nahi ki kaam ho
+ *     gaya. User use band kar sakta hai bina kuch allow kiye. Uske baad wo
+ *     reminder par reminder banata rehta hai, app har baar "set kar diya"
+ *     kehti hai, aur ek bhi alarm kabhi nahi bajta — aur use kabhi pata hi
+ *     nahi chalta ki kyun. Jhanda "user ne dekh liya" ka tha, "kaam ho gaya"
+ *     ka nahi; aur faisla hamesha doosri baat par hona chahiye tha.
+ *
+ * Isliye ab jawab seedha `checkReadiness()` se aata hai — yaani OS ki asli
+ * haalat se, kisi yaad rakhe hue jhande se nahi. Sab steps ho chuke to modal
+ * kabhi nahi khulta (bilkul bhi nag nahi), aur ek bhi baaki ho to har reminder
+ * par khulta hai — kyunki us haalat me user ka reminder sach me ya to aayega
+ * hi nahi, ya der se aayega.
+ *
+ * ⚠️ Platform ka farak yahan alag se sambhalne ki zaroorat nahi: `checkReadiness()`
+ * khud iOS par sirf notification wala step deta hai aur web par kuch bhi nahi.
+ * Isliye caller me `Platform.OS === "android" || !allowed` jaisa guard ab
+ * bekaar (aur galat) hai — wo iOS par ek allow ho chuke user ko bhi modal
+ * dikha deta tha.
+ */
+export async function shouldShowReliabilityPrompt(): Promise<boolean> {
+  try {
+    const { allOk } = await checkReadiness();
+    return !allOk;
+  } catch {
+    // Haalat padhi hi na ja sake to chup rehna behtar hai — bina wajah har
+    // reminder par modal kholna sabse chidhchida vyavhaar hoga.
+    return false;
   }
 }
 

@@ -814,6 +814,9 @@ const en: AdminDict = {
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
     reviews: { title: "Reviews & Ratings", sub: "Reviews from the app. A review reaches the website only when the user allowed it AND you approve it — nothing goes live on its own." },
     logs: { title: "Logs & Issues", sub: "What broke in app/web — full stack + context. New errors also go to email." },
+    // ⚠️ `sub` jaan-boojh ke khaali hai — AdminDashboard is EK section par
+    // subtitle ki jagah "{n} messages" wali live ginti dikhata hai
+    // (`t.contacts.countMsg`). Ise bharne par wo ginti dab jaayegi.
     contacts: { title: "Contact messages", sub: "" },
     team: { title: "Admin team", sub: "Create roles, decide which menus each role sees, and invite people. New members stay pending until you approve them." },
     message: { title: "Message users", sub: "Email registered users — everyone or just inactive ones (who never used the app)." },
@@ -1391,6 +1394,9 @@ const hi: AdminDict = {
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
     reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़। वेबसाइट पर रिव्यू तभी जाता है जब यूज़र ने अनुमति दी हो और आप मंज़ूरी दें — अपने आप कुछ लाइव नहीं होता।" },
     logs: { title: "लॉग्स और इशू", sub: "ऐप/वेब में क्या टूटा — पूरा stack + context. नए errors ईमेल पर भी जाते हैं।" },
+    // ⚠️ `sub` jaan-boojh ke khaali hai — AdminDashboard is EK section par
+    // subtitle ki jagah "{n} messages" wali live ginti dikhata hai
+    // (`t.contacts.countMsg`). Ise bharne par wo ginti dab jaayegi.
     contacts: { title: "कॉन्टैक्ट मैसेज", sub: "" },
     team: { title: "एडमिन टीम", sub: "रोल बनाइए, तय कीजिए कि किस रोल को कौन-से मेन्यू दिखें, और लोगों को जोड़िए। नया मेंबर आपके अप्रूव करने तक pending रहता है।" },
     message: { title: "यूज़र्स को मैसेज", sub: "रजिस्टर्ड यूज़र्स को ईमेल भेजें — सभी को या सिर्फ़ inactive (जिन्होंने कभी उपयोग नहीं किया)।" },
@@ -1972,6 +1978,9 @@ const hinglish: AdminDict = {
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
     reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews. Website par review tabhi jaata hai jab user ne anumati di ho AUR aap manzoori dein — apne aap kuch live nahi hota." },
     logs: { title: "Logs & Issues", sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain." },
+    // ⚠️ `sub` jaan-boojh ke khaali hai — AdminDashboard is EK section par
+    // subtitle ki jagah "{n} messages" wali live ginti dikhata hai
+    // (`t.contacts.countMsg`). Ise bharne par wo ginti dab jaayegi.
     contacts: { title: "Contact messages", sub: "" },
     team: { title: "Admin team", sub: "Role banao, tay karo kis role ko kaun se menu dikhein, aur logon ko jodo. Naya member tumhare approve karne tak pending rehta hai." },
     message: { title: "Message users", sub: "Registered users ko email bhejo — sabhi ko ya sirf inactive (jinhone kabhi use nahi kiya)." },
@@ -2483,7 +2492,15 @@ const hinglish: AdminDict = {
   },
 };
 
-const ADMIN: Record<Locale, AdminDict> = { hinglish, hi, en };
+/**
+ * Export isliye ki iski JAANCH ho sake.
+ *
+ * Teen bhashaon ki dictionary me sabse aam bug ek hi hota hai: kisi ek bhasha me
+ * key jodna bhool jaana. Type system usse pakad leta hai, par khaali string
+ * ("") ya sirf ek bhasha me maujood nested block usse nikal jaate hain. Bina
+ * export ke koi script in teenon ko aamne-saamne rakh hi nahi sakti.
+ */
+export const ADMIN: Record<Locale, AdminDict> = { hinglish, hi, en };
 
 export function useAdminT(): AdminDict {
   const { locale } = useLanguage();

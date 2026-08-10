@@ -18,6 +18,7 @@ import { useToast } from "@/components/toast";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/loader";
 import { ConfirmModal } from "@/components/confirm-modal";
+import { UpgradeBanner } from "@/components/upgrade-banner";
 import { reportError } from "@/lib/report-error";
 import { reportIfNetwork } from "@/lib/net-alert";
 import {
@@ -236,6 +237,11 @@ export default function Notes() {
           )}
         </View>
       )}
+
+      {/* Free user ko har mukhya screen par ek hi jagah upgrade ka raasta —
+          Documents, Reminders, Chat aur Home par pehle se hai; Notes ekmatra
+          aisi list screen thi jahan wo chhoot gaya tha. */}
+      <UpgradeBanner compact />
 
       <ScrollView
         contentContainerStyle={styles.scroll}

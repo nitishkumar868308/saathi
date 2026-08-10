@@ -541,7 +541,8 @@ function ReferralItem({ r }: { r: UserReferral }) {
   const done = Boolean(r.rewarded_at);
 
   const Icon = done ? Check : Clock;
-  const iconCls = done ? "bg-sage text-white" : "bg-cream-deep text-ink-soft";
+  // ⚠️ Sage par safed nahi — wo dono theme me ujla hai (3.4:1 / 2.4:1).
+  const iconCls = done ? "bg-sage text-on-accent" : "bg-cream-deep text-ink-soft";
 
   const note = done
     ? `${fmtDate(r.rewarded_at)} · +${r.days} din`

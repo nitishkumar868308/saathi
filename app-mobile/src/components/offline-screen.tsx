@@ -62,7 +62,17 @@ export function OfflineScreen() {
     let alive = true;
     void (async () => {
       const list = uid ? await readCachedDocs(uid) : null;
-      if (alive) setDocs(list ?? []);
+      /**
+       * ⚠️ Locked documents yahan nahi aane chahiye.
+       *
+       * Plus khatam hone par free plan ki ginti se aage ke documents lock ho
+       * jaate hain, aur poore app me wo sirf upgrade screen kholte hain. Par
+       * unki file phone par pehle se padi hoti hai (jab wo khule the tab cache
+       * ho chuki thi) — yaani offline screen unhe khol ke, download karke aur
+       * share karke poori lock hi bypass kar deti thi. Bas flight mode on
+       * karna kaafi tha.
+       */
+      if (alive) setDocs((list ?? []).filter((d) => !d.is_locked));
     })();
     return () => {
       alive = false;

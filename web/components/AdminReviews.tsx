@@ -345,7 +345,7 @@ export default function AdminReviews() {
                       <button
                         onClick={() => void setStatus(r, "approved")}
                         disabled={busyId === r.id}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sage px-3 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sage px-3 text-xs font-bold text-on-accent transition hover:opacity-90 disabled:opacity-50"
                       >
                         <Check size={13} />
                         {d.approveBtn}
@@ -442,7 +442,9 @@ function StatusBadge({
       label: d.badgePending,
     },
     approved: {
-      cls: "bg-sage text-white",
+      // Sage dono theme me ujla hai — safed text uspar 3.4:1 (light) aur
+      // 2.4:1 (dark) par gir jaata tha.
+      cls: "bg-sage text-on-accent",
       icon: <Check size={12} />,
       label: d.badgeApproved,
     },

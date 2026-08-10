@@ -2,6 +2,8 @@ import { supabase } from "./supabase";
 import { canAddDocument, FREE_DOC_LIMIT } from "./plan";
 import { deleteDocumentFile, uploadDocument } from "./storage";
 import {
+  addToCachedDocs,
+  primeCachedFile,
   readCachedDocs,
   removeCachedFile,
   syncDocumentFiles,
@@ -50,7 +52,21 @@ function mimeFromUri(uri: string): string {
  * baad R2 se asli size poochh kar) — isliye yahan koi DB update nahi hai.
  */
 export async function uploadDocumentImage(docId: string, localUri: string): Promise<void> {
-  await uploadDocument(docId, localUri, mimeFromUri(localUri));
+  const mime = mimeFromUri(localUri);
+  /**
+   * Offline copy PEHLE, upload BAAD me.
+   *
+   * ⚠️ Tarteeb maayne rakhti hai. Cache aam taur par upload ke baad bharta hai
+   * (R2 se file WAPAS utaar ke), aur us poore chakkar ke liye net chahiye. Par
+   * user document tab daalta hai jab wo saamne hota hai — bank ke bahar, RTO ke
+   * bahar — jahan signal aata-jaata rehta hai. Wahan upload fail ho jaata tha
+   * aur document apne hi phone par "offline nahi khulta" ban jaata tha.
+   *
+   * File to abhi is phone par padi hi hai; use copy karne me na net lagta hai
+   * na intezaar. Isliye offline ka intezaam pehle, cloud backup uske baad.
+   */
+  await primeCachedFile(docId, localUri, mime);
+  await uploadDocument(docId, localUri, mime);
 }
 
 function client() {
@@ -138,7 +154,21 @@ export async function addDocument(input: {
     .select()
     .single();
   if (error) throw error;
-  return data as Document;
+
+  const doc = data as Document;
+  /**
+   * Naya document turant offline list me bhi.
+   *
+   * ⚠️ List cache SIRF `listDocuments()` likhta hai, aur wo tabhi chalta hai jab
+   * user Documents tab kholta hai. Home se document add karke wapas Home par
+   * rehne wala user — jo aam raasta hai — us list me kabhi aata hi nahi tha. Net
+   * jaate hi offline screen par uska abhi-abhi save kiya hua document gayab
+   * rehta tha. Uske liye wo "app ne save hi nahi kiya" hai.
+   */
+  const uid = u.user?.id;
+  if (uid) await addToCachedDocs(uid, doc);
+
+  return doc;
 }
 
 /**

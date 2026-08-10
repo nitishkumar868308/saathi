@@ -71,10 +71,27 @@ function cachePath(doc: Pick<DocFile, "id" | "file_path" | "mime_type">): string
   // hi aana chahiye.
   const ext = /^[a-z0-9]{1,5}$/i.test(raw)
     ? raw.toLowerCase()
-    : doc.mime_type === "image/png"
-      ? "png"
-      : "jpg";
+    : extForMime(doc.mime_type);
   return `${DIR}${doc.id}.${ext}`;
+}
+
+/**
+ * Mime → extension. Bilkul wahi map jo server ke `extFor()` me hai
+ * (`web/lib/storage-server.ts`).
+ *
+ * ⚠️ Dono ka ek jaisa hona ZAROORI hai, aur ye baat dikhti nahi hai. Upload ke
+ * baad `file_path` ka ext SERVER tay karta hai, aur uske baad `cachePath()`
+ * wahi ext use karta hai. Agar hum file cache me kisi aur naam se rakh dein, to
+ * upload ke baad wahi document "cache me nahi hai" gina jaayega aur dobara
+ * download hoga — yaani jo file phone par pehle se padi hai, uske liye net ka
+ * intezaar. Pehle yahan sirf png/jpg tha, isliye har PDF aur WEBP par theek
+ * yahi hota tha.
+ */
+function extForMime(mime: string | null | undefined): string {
+  if (mime === "image/png") return "png";
+  if (mime === "image/webp") return "webp";
+  if (mime === "application/pdf") return "pdf";
+  return "jpg";
 }
 
 async function ensureDir(): Promise<void> {
@@ -155,6 +172,53 @@ export async function resolveDocUri(doc: DocFile): Promise<string | null> {
   if (doc.file_uri && (await exists(doc.file_uri))) return doc.file_uri;
 
   return downloadToCache(doc);
+}
+
+/**
+ * Abhi-abhi bani document ki file ko turant cache me rakh do.
+ *
+ * ⚠️ Iske bina "save karo, phir net chala jaye" wali soorat tooti hui thi, aur
+ * wo bilkul aam soorat hai (log document tab daalte hain jab wo saamne hota
+ * hai — bank ke bahar, RTO ke bahar, jahan signal aata-jaata rehta hai).
+ *
+ * Cache aam taur par `downloadToCache()` bharta hai — yaani pehle file R2 par
+ * chadhti hai, phir signed URL se WAPAS utarti hai. Us poore chakkar ke liye
+ * net chahiye. Par file to abhi is phone par padi hi hai; use ek jagah se doosri
+ * jagah copy karne me na net lagta hai na koi intezaar.
+ *
+ * `file_uri` par bharosa yahan kaafi nahi tha: wo sirf USI phone par kaam karta
+ * hai, aur `resolveDocUri` use cache ke BAAD dekhta hai. Cache seedha bhar dene
+ * se offline screen, share aur download — teenon ek hi raaste par aa jaate hain.
+ */
+export async function primeCachedFile(
+  docId: string,
+  localUri: string,
+  mime: string,
+): Promise<void> {
+  try {
+    // ⚠️ `file_path` yahan jaan-boojh ke null hai — upload abhi hua hi nahi.
+    // Naam mime se banta hai, aur wahi mime server ko bhi jaata hai, isliye
+    // upload ke baad bhi rasta bilkul yahi rahega.
+    const dest = cachePath({ id: docId, file_path: null, mime_type: mime });
+    if (await exists(dest)) return;
+    await ensureDir();
+    await FileSystem.copyAsync({ from: localUri, to: dest });
+  } catch {
+    /* copy na ho paye to bhi `file_uri` wala raasta bacha hua hai */
+  }
+}
+
+/**
+ * Ek document ko cached list me jod do (ya badal do).
+ *
+ * ⚠️ Ye zaroori hai kyunki list cache SIRF `listDocuments()` likhta hai. User
+ * Home se document add karta tha, Documents tab par jaata hi nahi tha, aur us
+ * beech net chala jaata tha — offline screen par uska abhi-abhi save kiya hua
+ * document hota hi nahi tha. Uske liye wo "gum ho gaya" hi hai.
+ */
+export async function addToCachedDocs(uid: string, doc: Document): Promise<void> {
+  const cached = (await readCachedDocs(uid)) ?? [];
+  await writeCachedDocs(uid, [doc, ...cached.filter((d) => d.id !== doc.id)]);
 }
 
 /** Document delete hua — uski file bhi le jao. */

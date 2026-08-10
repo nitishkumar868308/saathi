@@ -48,12 +48,17 @@ export function NetworkBanner() {
         },
       ]}
     >
+      {/* Icon aur text ka rang patti ke hisaab se — neeche `useStyles` me
+          poori wajah likhi hai. */}
       <Ionicons
         name={offline ? "cloud-offline-outline" : "time-outline"}
         size={15}
-        color={tc.white}
+        color={offline ? tc.onInk : tc.inkCard}
       />
-      <Text style={styles.text} numberOfLines={1}>
+      <Text
+        style={[styles.text, offline ? styles.textOffline : styles.textSlow]}
+        numberOfLines={1}
+      >
         {offline ? n.offline : n.slow}
       </Text>
     </Animated.View>
@@ -74,7 +79,26 @@ const useStyles = makeStyles((c) => ({
     paddingBottom: 7,
     paddingHorizontal: 16,
   },
-  barOffline: { backgroundColor: c.ink },
+  /**
+   * ⚠️ Yahan pehle `backgroundColor: c.ink` tha aur text `c.white` — aur dark
+   * mode me ye patti poori tarah GAYAB ho jaati thi.
+   *
+   * `ink` theme ke saath ULTA hota hai: light me gehra bhoora (#2E2823), dark me
+   * lagbhag safed (#F2EAE0). Text safed hi rehta tha, yaani dark mode me safed
+   * par safed. Aur yahi wo ek patti hai jo tabhi aati hai jab kuch pehle se
+   * galat hai — user ko sirf ek khaali safed patti dikhti thi aur wo samajhta
+   * tha ki app hi atak gayi.
+   *
+   * `inkCard` dono theme me GEHRA rehta hai aur `onInk` dono me UJLA — theek
+   * isi soorat ke liye ye jodi banayi gayi thi (dekho `theme/colors.ts`).
+   */
+  barOffline: { backgroundColor: c.inkCard },
+  /**
+   * Amber dono theme me UJLA hai, isliye uspar safed text kabhi theek tha hi
+   * nahi — light me 1.9:1, dark me 1.6:1. Gehra text yahan 6:1 se upar jaata hai.
+   */
   barSlow: { backgroundColor: c.amber },
-  text: { color: c.white, fontSize: 12.5, fontWeight: "700" },
+  text: { fontSize: 12.5, fontWeight: "700" },
+  textOffline: { color: c.onInk },
+  textSlow: { color: c.inkCard },
 }));

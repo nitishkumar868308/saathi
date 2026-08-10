@@ -186,7 +186,9 @@ export function PermissionModal({
                     <Ionicons
                       name={s.ok ? "checkmark" : ICONS[s.key]}
                       size={17}
-                      color={s.ok ? tc.white : tc.terracotta}
+                      // Ho chuka wala gola SAGE ka hai — dono theme me ujla,
+                      // isliye uspar safed nishaan 2.4:1 par gir jaata tha.
+                      color={s.ok ? tc.onAccent : tc.terracotta}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -219,7 +221,11 @@ export function PermissionModal({
                 pressed && { opacity: 0.88 },
               ]}
             >
-              <Text style={styles.ctaText}>{allOk ? common.done : r.promptLater}</Text>
+              {/* Sab ho gaya to button sage ka ho jaata hai (`ctaDone`) — uspar
+                  safed text nahi chalta, wajah `ctaDone` ke paas likhi hai. */}
+              <Text style={[styles.ctaText, allOk && styles.ctaTextDone]}>
+                {allOk ? common.done : r.promptLater}
+              </Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -330,6 +336,10 @@ const useStyles = makeStyles((c) => ({
     // ka SAFED text (`ctaText`) bilkul gayab.
     backgroundColor: c.inkCard,
   },
+  // ⚠️ Sage dono theme me UJLA hai (dark me to aur bhi). Uspar `ctaText` ka
+  // safed 3.4:1 / 2.4:1 par tha — aur yahi wo button hai jo user ko batata hai
+  // ki uske reminder ab sach me bajenge.
   ctaDone: { backgroundColor: c.sage },
   ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white },
+  ctaTextDone: { color: c.onAccent },
 }));

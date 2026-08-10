@@ -288,7 +288,9 @@ export default function AdminAnalytics() {
                     <span
                       className={`absolute -left-[26px] top-4 flex h-5 w-5 items-center justify-center rounded-full border-2 border-surface ${
                         e.name === "tap" || e.name === "click"
-                          ? "bg-amber-warm/80 text-white"
+                          // Amber dono theme me ujla hai — uspar safed icon
+                          // 1.9:1 par tha. Terracotta gehra hai, wahan safed theek.
+                          ? "bg-amber-warm/80 text-on-accent"
                           : "bg-terracotta/80 text-white"
                       }`}
                     >

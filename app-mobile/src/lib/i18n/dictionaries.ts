@@ -796,10 +796,6 @@ export type Dict = {
     themeDarkSub: string;
     themeSystem: string;
     themeSystemSub: string;
-    offlineDocs: string;
-    offlineDocsClearAsk: string;
-    offlineDocsClear: string;
-    offlineDocsCleared: string;
     privacy: string;
     exportData: string;
     deleteAll: string;
@@ -821,7 +817,23 @@ export type Dict = {
     deleteTitle: string;
     deleteBody: string;
     deleteYes: string;
+    /** Request darj ho gayi. */
     deleted: string;
+    /** Pehle se pending thi — "fail" nahi, wahi tasalli. */
+    deletePending: string;
+    /** Request bheji hi nahi ja saki — dobara koshish karni hai. */
+    deleteFailed: string;
+    /** Row ke daayin chhota nishaan jab request ja chuki ho. */
+    deleteAsked: string;
+    /**
+     * Admin ne account band kar diya — poori app ki jagah yahi screen.
+     *
+     * ⚠️ Ye teen line kisi "error" ki nahi hain. Band account me har table RLS
+     * se ruk jaati hai, yaani user ko har screen khaali dikhti hai aur kahin koi
+     * wajah nahi likhi hoti. Wo sabse buri soorat hai — app tooti hui lagti hai.
+     */
+    closedTitle: string;
+    closedBody: string;
     linkFailed: string;
     exportContact: string;
     settingsFailed: string;
@@ -1628,25 +1640,26 @@ const hinglish: Dict = {
     themeDarkSub: "Raat me aankhon par naram",
     themeSystem: "Phone ke hisaab se",
     themeSystemSub: "Phone dark hote hi app bhi dark",
-    offlineDocs: "Offline documents",
-    offlineDocsClearAsk:
-      "Phone se hatt jayengi, par aapke documents surakshit rahenge — net aane par dobara utar jayengi.",
-    offlineDocsClear: "Khaali karo",
-    offlineDocsCleared: "Offline copy hata di",
     privacy: "Privacy & data",
     exportData: "Mera data export karo",
-    deleteAll: "Sab data delete",
+    deleteAll: "Account delete karwao",
     help: "Help & support",
     about: "About Us",
     logout: "Logout",
     version: "Apka Saathi · v{v} · Made in India",
     langAlertTitle: "Bhasha",
     langAlertBody: "Neeche se apni bhasha chuno — poora app usi me badal jayega.",
-    deleteTitle: "Sab data delete karein?",
+    deleteTitle: "Account delete karwana hai?",
     deleteBody:
-      "Aapke saare documents aur reminders hamesha ke liye hat jaayenge. Account nahi hatega. Ye wapas nahi aayega.",
-    deleteYes: "Haan, delete karo",
-    deleted: "Aapka data delete ho gaya",
+      "Aapki request hamari team tak jaayegi. Jaanch ke baad aapka account aur saara data — documents, reminders, notes — hata diya jayega. Uske baad kuch wapas nahi aata. Kaam poora hone tak aap app use kar sakte ho.",
+    deleteYes: "Haan, request bhejo",
+    deleted: "Request bhej di — team jald dekhegi",
+    deletePending: "Aapki request pehle se darj hai",
+    deleteFailed: "Request nahi ja saki — dobara koshish karo",
+    deleteAsked: "Request bheji hui hai",
+    closedTitle: "Ye account band kar diya gaya hai",
+    closedBody:
+      "Aapki request par is account ko band kar diya gaya hai, isliye ab yahan kuch nahi dikhega. Ye galti se hua ho to support se baat karo — hum ise wapas khol sakte hain.",
     linkFailed: "Link nahi khula",
     exportContact: "Data export ke liye help se contact karo",
     settingsFailed: "Settings nahi khuli",
@@ -2392,25 +2405,26 @@ const hi: Dict = {
     themeDarkSub: "रात में आँखों पर नरम",
     themeSystem: "फ़ोन के हिसाब से",
     themeSystemSub: "फ़ोन डार्क होते ही ऐप भी डार्क",
-    offlineDocs: "ऑफ़लाइन डॉक्युमेंट",
-    offlineDocsClearAsk:
-      "फ़ोन से हट जाएँगी, पर आपके डॉक्युमेंट सुरक्षित रहेंगे — नेट आने पर दोबारा उतर जाएँगी।",
-    offlineDocsClear: "ख़ाली करें",
-    offlineDocsCleared: "ऑफ़लाइन कॉपी हटा दी",
     privacy: "प्राइवेसी & डेटा",
     exportData: "मेरा डेटा export करें",
-    deleteAll: "सब डेटा डिलीट",
+    deleteAll: "अकाउंट डिलीट करवाएँ",
     help: "हेल्प & support",
     about: "हमारे बारे में",
     logout: "लॉगआउट",
     version: "Apka Saathi · v{v} · Made in India",
     langAlertTitle: "भाषा",
     langAlertBody: "नीचे से अपनी भाषा चुनें — पूरा app उसी में बदल जाएगा।",
-    deleteTitle: "सब डेटा डिलीट करें?",
+    deleteTitle: "अकाउंट डिलीट करवाना है?",
     deleteBody:
-      "आपके सारे डॉक्युमेंट और रिमाइंडर हमेशा के लिए हट जाएँगे। अकाउंट नहीं हटेगा। यह वापस नहीं आएगा।",
-    deleteYes: "हाँ, डिलीट करें",
-    deleted: "आपका डेटा डिलीट हो गया",
+      "आपकी request हमारी team तक जाएगी। जाँच के बाद आपका अकाउंट और सारा डेटा — डॉक्युमेंट, रिमाइंडर, नोट्स — हटा दिया जाएगा। उसके बाद कुछ वापस नहीं आता। काम पूरा होने तक आप ऐप चला सकते हैं।",
+    deleteYes: "हाँ, request भेजें",
+    deleted: "Request भेज दी — team जल्द देखेगी",
+    deletePending: "आपकी request पहले से दर्ज है",
+    deleteFailed: "Request नहीं जा सकी — दोबारा कोशिश करें",
+    deleteAsked: "Request भेजी हुई है",
+    closedTitle: "यह अकाउंट बंद कर दिया गया है",
+    closedBody:
+      "आपकी request पर यह अकाउंट बंद कर दिया गया है, इसलिए अब यहाँ कुछ नहीं दिखेगा। यह ग़लती से हुआ हो तो support से बात करें — हम इसे वापस खोल सकते हैं।",
     linkFailed: "लिंक नहीं खुला",
     exportContact: "डेटा एक्सपोर्ट के लिए help से संपर्क करें",
     settingsFailed: "सेटिंग्स नहीं खुलीं",
@@ -3151,25 +3165,26 @@ const en: Dict = {
     themeDarkSub: "Gentler on the eyes at night",
     themeSystem: "Match my phone",
     themeSystemSub: "Goes dark when your phone does",
-    offlineDocs: "Offline documents",
-    offlineDocsClearAsk:
-      "These copies leave your phone, but your documents stay safe — they'll download again when you're online.",
-    offlineDocsClear: "Clear",
-    offlineDocsCleared: "Offline copies removed",
     privacy: "Privacy & data",
     exportData: "Export my data",
-    deleteAll: "Delete all data",
+    deleteAll: "Request account deletion",
     help: "Help & support",
     about: "About Us",
     logout: "Log out",
     version: "Apka Saathi · v{v} · Made in India",
     langAlertTitle: "Language",
     langAlertBody: "Pick your language below — the whole app switches to it.",
-    deleteTitle: "Delete all data?",
+    deleteTitle: "Request account deletion?",
     deleteBody:
-      "All your documents and reminders will be gone forever. Your account stays. This can't be undone.",
-    deleteYes: "Yes, delete",
-    deleted: "Your data has been deleted",
+      "Your request goes to our team. After a check, your account and everything in it — documents, reminders, notes — will be removed. Nothing comes back after that. You can keep using the app until it's done.",
+    deleteYes: "Yes, send the request",
+    deleted: "Request sent — our team will review it soon",
+    deletePending: "Your request is already with us",
+    deleteFailed: "Couldn't send the request — please try again",
+    deleteAsked: "Request sent",
+    closedTitle: "This account has been closed",
+    closedBody:
+      "We closed this account at your request, so there's nothing left to show here. If this happened by mistake, talk to support — we can reopen it.",
     linkFailed: "Couldn't open the link",
     exportContact: "For a data export, please reach out via Help",
     settingsFailed: "Couldn't open settings",

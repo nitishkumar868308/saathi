@@ -17,14 +17,15 @@ import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
 import { UserAvatar } from "@/components/user-avatar";
 import { UpgradeBanner } from "@/components/upgrade-banner";
-import { listDocuments, type Document } from "@/lib/documents";
+import { deleteDocument, listDocuments, type Document } from "@/lib/documents";
 import { setReminderOn, type Reminder } from "@/lib/reminders";
 import { isPendingId, listRemindersWithPending } from "@/lib/reminder-outbox";
 import { hasBeenReferred } from "@/lib/plan";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
-import { cancelReminder } from "@/lib/notifications";
+import { cancelDocumentExpiry, cancelReminder } from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
+import { ConfirmModal } from "@/components/confirm-modal";
 import { useToast } from "@/components/toast";
 import { useUserName, useAuth } from "@/components/auth-provider";
 import { useUserDetails } from "@/lib/user-details";
@@ -56,7 +57,7 @@ export default function Home() {
   const { session } = useAuth();
   const meta = session?.user?.user_metadata;
   const fullName = (meta?.full_name || meta?.name || firstName || "") as string;
-  const { home: h, notes: nt, reminders: r0 } = useT();
+  const { home: h, notes: nt, reminders: r0, documents: dt, common: cm } = useT();
   const { locale } = useLocale();
   const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
@@ -64,6 +65,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refModal, setRefModal] = useState(false);
+  /** Kaunsa document delete hone wala hai — confirm ke intezaar me. */
+  const [pendingDelete, setPendingDelete] = useState<Document | null>(null);
   // Header ka avatar — shared cache se, taaki profile me photo badalte hi yahan
   // bhi turant badal jaye (pehle logout-login tak purani photo dikhti thi).
   const avatarUrl = useUserDetails().details?.avatar_url ?? null;
@@ -206,6 +209,33 @@ export default function Home() {
     },
     [toast, loadBrief],
   );
+
+  /**
+   * Home se document delete — bilkul wahi kaam jo Documents tab karta hai.
+   *
+   * ⚠️ Teen kadam, aur teenon zaroori hain:
+   *   1. `deleteDocument` — DB row, R2 ki asli file, aur offline cache, teenon
+   *   2. `cancelDocumentExpiry` — warna hataye hue document ki expiry wali
+   *      notification mahino tak bajti rehti hai
+   *   3. `emitDataChanged` — Documents tab bhi khula ho sakta hai
+   */
+  async function runDelete(doc: Document) {
+    setPendingDelete(null);
+    setDocs((prev) => prev.filter((x) => x.id !== doc.id));
+    try {
+      await deleteDocument(doc);
+      await cancelDocumentExpiry(doc.id);
+      toast.show(dt.deleted, "success");
+    } catch (e) {
+      reportError(e, { screen: "home", action: "delete_document" });
+      toast.show(`${dt.deleted} ✕`, "error");
+      // Delete nahi hua — list wapas sach par le aao, warna document screen se
+      // gaayab hai par server par zinda hai.
+      void load(true);
+    } finally {
+      emitDataChanged();
+    }
+  }
 
   async function markDone(r: Reminder) {
     /**
@@ -364,7 +394,9 @@ export default function Home() {
                   onPress={() => markDone(r)}
                   style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.85 }]}
                 >
-                  <Ionicons name="checkmark" size={15} color={tc.white} />
+                  {/* `onAccent` — sage par safed nishaan dark theme me 2.4:1
+                      par gir jaata tha. */}
+                  <Ionicons name="checkmark" size={15} color={tc.onAccent} />
                   <Text style={styles.doneText}>{h.markDone}</Text>
                 </Pressable>
               </View>
@@ -451,16 +483,48 @@ export default function Home() {
               <DocCard
                 key={doc.id}
                 doc={doc}
-                onPress={() =>
+                onPress={() => {
+                  // Locked document khulta nahi — wahi kaam jo Documents tab
+                  // karta hai, warna dono jagah do alag vyavhaar dikhte hain.
+                  if (doc.is_locked) {
+                    router.push("/upgrade" as never);
+                    return;
+                  }
                   router.push({
                     pathname: "/document-view",
                     params: {
+                      /**
+                       * ⚠️ `id`, `mime` aur `type` — teenon yahan se CHHOOT gaye
+                       * the, aur teenon ka apna nuksaan tha:
+                       *
+                       *   id   — offline cache ki chaabi hai. Iske bina
+                       *          `resolveDocUri` cache me dekh hi nahi sakta,
+                       *          yaani Home se khola gaya document net na hone
+                       *          par kabhi nahi khulta tha — jabki wahi document
+                       *          Documents tab se bina net ke khul jaata tha.
+                       *   mime — PDF/PNG ko sahi tarah kholne ke liye.
+                       *   type — renewal guide isi se chunta hai.
+                       */
+                      id: doc.id,
                       uri: doc.file_uri ?? "",
                       path: doc.file_path ?? "",
+                      mime: doc.mime_type ?? "",
                       name: doc.name,
+                      type: doc.type,
                     },
-                  } as never)
-                }
+                  } as never);
+                }}
+                /**
+                 * ⚠️ Ye prop yahan tha hi nahi, aur user ne theek pakda: card ka
+                 * trash button DIKHTA tha (DocCard use hamesha banata hai) par
+                 * uska `onPress` `undefined` tha — yaani dabane par bilkul kuch
+                 * nahi hota tha. Aankh ko button dikhta hai, ungli ko kuch nahi
+                 * milta; user ko lagta hai app hi atak gayi.
+                 */
+                onDelete={() => {
+                  if (doc.is_locked) return;
+                  setPendingDelete(doc);
+                }}
               />
             ))}
           </View>
@@ -487,6 +551,20 @@ export default function Home() {
       </ScrollView>
 
       <ReferralCodeModal visible={refModal} onClose={closeRefModal} />
+
+      {/* Delete wapas nahi aata — Documents tab ki tarah yahan bhi poochh
+          ke hi. Dono jagah ek hi sawaal, ek hi shabd. */}
+      <ConfirmModal
+        visible={!!pendingDelete}
+        icon="trash-outline"
+        destructive
+        title={dt.deleteConfirmTitle}
+        message={pendingDelete ? tpl(dt.deleteConfirmBody, { name: pendingDelete.name }) : ""}
+        confirmLabel={cm.delete}
+        cancelLabel={cm.no}
+        onConfirm={() => pendingDelete && runDelete(pendingDelete)}
+        onCancel={() => setPendingDelete(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -600,7 +678,10 @@ const useStyles = makeStyles((c) => ({
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
-  briefUpsellCtaText: { fontSize: 12, fontWeight: "800", color: c.ink },
+  // ⚠️ `c.ink` NAHI — wo dark theme me lagbhag safed ho jaata hai aur amber
+  // chip par "Plus lo" poori tarah gayab ho jaata tha. `onAccent` dono theme
+  // me gehra rehta hai.
+  briefUpsellCtaText: { fontSize: 12, fontWeight: "800", color: c.onAccent },
   todayCard: {
     marginTop: 16,
     borderRadius: 20,
@@ -630,7 +711,9 @@ const useStyles = makeStyles((c) => ({
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  doneText: { fontSize: 12.5, fontWeight: "700", color: c.white },
+  // Sage dono theme me ujla hai — safed text uspar 3.4:1 (light) aur 2.4:1
+  // (dark) par gir jaata tha.
+  doneText: { fontSize: 12.5, fontWeight: "700", color: c.onAccent },
   actions: { flexDirection: "row", gap: 12, marginTop: 16 },
   // `Press3D` ek Pressable hai — chaudai isi par baithti hai, andar wale card
   // par nahi (warna teenon apni-apni chaudai le lete aur pankti tedhi ho jaati).

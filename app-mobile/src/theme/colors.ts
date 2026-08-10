@@ -50,6 +50,28 @@ export const lightColors = {
   /** Us card ke andar ki lakeer. */
   onInkLine: "rgba(247,242,233,0.16)",
 
+  /* ── Ujle accent (amber / sage) par ka rang ─────────────────────────
+   *
+   * ⚠️ Ye token us bug ke liye bana hai jo poore app me phaila hua tha, aur
+   * `onInk` ka theek ULTA hai.
+   *
+   * `amber` aur `sage` DONO theme me UJLE hain (dark me to aur bhi ujle —
+   * #E0A458 → #E8B570, #7C8A6B → #9DAE8A). Un par jo bhi baithta tha wo do me
+   * se ek galti karta tha:
+   *
+   *   • `c.white` — light me hi kamzor (sage par 3.4:1, amber par 1.9:1), aur
+   *     dark me aur gir jaata hai (2.4:1 / 1.6:1). Home ka "Ho gaya" button,
+   *     permission modal ka poora hua CTA, aur reminder-alert ka expiry wala
+   *     34px icon — teenon isi wajah se dhundhle the.
+   *   • `c.ink` — jo theme ke saath ULTA hota hai. Light me theek (6.2:1), par
+   *     dark me wo lagbhag safed ho jaata hai: Home ke brief-upsell ka
+   *     "Plus lo" wala chip amber par POORI TARAH gayab ho jaata tha.
+   *
+   * Isliye ek aisa rang jo dono theme me GEHRA rehta hai. amber par 6.2:1 /
+   * 6.7:1, sage par 4.2:1 / 5.6:1 — chaaron soorat me padha jaata hai.
+   */
+  onAccent: "#241F1A",
+
   /**
    * Khatre ka rang — delete, logout, "ye wapas nahi aayega".
    *
@@ -117,6 +139,9 @@ export const darkColors: Colors = {
   onInk: "#F2EAE0",
   onInkSoft: "rgba(242,234,224,0.72)",
   onInkLine: "rgba(242,234,224,0.16)",
+  // ⚠️ Light theme jaisa hi — amber/sage yahan aur bhi UJLE hain, isliye un par
+  // ka rang ulta karna theek wo bug wapas laa dega jiske liye ye token bana hai.
+  onAccent: "#241F1A",
   // Light wala #B23B3B gehre page par 3.4:1 par gir jaata hai (AA se neeche).
   danger: "#E06B6B",
 };
