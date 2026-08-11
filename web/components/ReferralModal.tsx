@@ -20,7 +20,7 @@ export default function ReferralModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { referral: t } = useT();
+  const { referral: t, a11y } = useT();
   const offers = useOffers();
   const vars = { d: offers.referralDays };
 
@@ -66,7 +66,7 @@ export default function ReferralModal({
           />
           <button
             onClick={onClose}
-            aria-label="Close"
+            aria-label={a11y.close}
             className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white backdrop-blur transition hover:bg-white/25"
           >
             <X size={15} />

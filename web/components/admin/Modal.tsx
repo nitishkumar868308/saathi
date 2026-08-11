@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { useAdminT } from "@/lib/i18n/admin";
 
 type Size = "sm" | "md" | "lg" | "xl";
 
@@ -33,6 +34,7 @@ export default function Modal({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const t = useAdminT();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function Modal({
           </div>
           <button
             onClick={onClose}
-            aria-label="Band karo"
+            aria-label={t.common.close}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line text-ink-soft transition hover:text-terracotta"
           >
             <X size={16} />

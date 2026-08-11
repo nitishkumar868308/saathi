@@ -400,7 +400,22 @@ export async function syncPlayPrices(): Promise<SyncResult> {
     }
   }
 
-  const ok = total > 0;
+  /**
+   * "ok" ka matlab: **saare** product aa gaye — koi ek nahi.
+   *
+   * ⚠️ Pehle yahan `total > 0` tha, aur wo ek chupa hua khatra tha. Sochiye
+   *    `plus_yearly` ka call fail ho jaye: monthly ke 173 desh update ho jaate,
+   *    sync khud ko `ok` bol deta, `synced_at` aaj ka lag jaata — yaani admin
+   *    panel me na laal warning aati, na "purana data" wali. Aur udhar website
+   *    `resolvePrice` dono period maangta hai, isliye wo har desh ko chhod kar
+   *    seedha ₹99 wale default par gir jaati. Poori duniya ko rupaye dikhte,
+   *    aur kisi alarm ki ghanti nahi bajti.
+   *
+   *    Isliye ek product ka fail hona poore sync ka fail hona hai. Jo data aa
+   *    gaya wo phir bhi save rehta hai (upar upsert ho chuka) — bas hum use
+   *    "sab theek hai" nahi kehte.
+   */
+  const ok = products.length > 0 && products.every((p) => p.rows > 0);
   const message = warnings.length ? warnings.join(" | ") : null;
   await writeSyncMeta({ ok, message, rowsCount: total, syncedAt: ok ? stamp : null });
   return { ok, rows: total, products, message, syncedAt: ok ? stamp : null };

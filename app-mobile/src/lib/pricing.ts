@@ -121,13 +121,30 @@ export async function getPlayPrices(code: string): Promise<PlayPrices | null> {
     if (error || !data?.length) return null;
 
     const out: PlayPrices = { monthly: null, yearly: null };
+    const currencies = new Set<string>();
     for (const raw of data as PlayRow[]) {
       const period = periodOf(raw);
       const micros = Number(raw.amount_micros);
       if (!period || out[period] || !Number.isFinite(micros)) continue;
-      out[period] = formatMicros(String(raw.region_currency).toUpperCase(), micros, region);
+      const currency = String(raw.region_currency).toUpperCase();
+      currencies.add(currency);
+      out[period] = formatMicros(currency, micros, region);
     }
-    return out.monthly || out.yearly ? out : null;
+
+    /**
+     * DONO chahiye, aur dono ek hi currency me.
+     *
+     * ⚠️ Pehle yahan `out.monthly || out.yearly` tha — yaani ek bhi mil jaye to
+     *    laut jao. Us halat me screen par "$1.99/month" ke bilkul neeche
+     *    "₹999/year" chipak sakta tha: monthly Play se aata aur yearly apne
+     *    fallback (₹) par gir jaata. Do currency ek saath dikhna sirf bhadda
+     *    nahi — user ka poora hisaab galat kar deta hai.
+     *
+     *    Aadha sach yahan poore fallback se bura hai. Adhoora data mile to
+     *    `null` do; caller dono plan ek hi jagah se dikha dega.
+     */
+    if (!out.monthly || !out.yearly || currencies.size !== 1) return null;
+    return out;
   } catch {
     return null;
   }

@@ -21,6 +21,15 @@ export const LOCALE_META: Record<
 };
 
 type Dict = {
+  /**
+   * Screen-reader ke liye labels — jo aankh se nahi dikhte.
+   *
+   * ⚠️ Ye jaan-boojh ke alag rakhe hain. Aise label sabse aasani se hardcoded
+   *    reh jaate hain (screen par kuch dikhta hi nahi, to review me pakde bhi
+   *    nahi jaate) — aur jo log inhi ke sahare app chalate hain, unke liye ye
+   *    poore page jitne zaroori hain. Bhasha badle to ye bhi badalne chahiye.
+   */
+  a11y: { close: string; changeLanguage: string };
   /** Light / dark / system ka toggle. */
   theme: { label: string; light: string; dark: string; system: string };
   nav: {
@@ -68,7 +77,39 @@ type Dict = {
     desc: { pre: string; strong: string; post: string };
     examplesLabel: string;
     examples: { label: string; sub: string }[];
-    visual: { docTitle: string; docSub: string; remTitle: string; remSub: string };
+    /**
+     * Hero ka phone mockup — floating chips aur andar chalta hua chat demo.
+     *
+     * ⚠️ Ye sab pehle component me HARDCODED Hinglish tha. Bhasha badalne par
+     *    poora page badal jaata tha aur ye ek hissa Hinglish hi pada rehta —
+     *    aur wo hissa page ka sabse bada, sabse pehle dikhne wala visual hai.
+     *    Screenshot me sabse pehle yahi aankh me chubhta tha.
+     */
+    visual: {
+      docTitle: string;
+      docSub: string;
+      remTitle: string;
+      remSub: string;
+      /** Upar-daayen ka chip. */
+      briefChip: string;
+      /** Phone ke andar ka chat demo. */
+      demo: {
+        /** Header me naam ke neeche — "online · yaad rakh raha hai". */
+        status: string;
+        /** Neeche input bar ka placeholder. */
+        inputPlaceholder: string;
+        /** Voice message ka chhota label. */
+        voice: string;
+        /** Bhejai gayi file ka naam — ye TARJUMA nahi hota, filename hai. */
+        docFile: string;
+        docSent: string;
+        docReply: string;
+        voiceMsg: string;
+        voiceReply: string;
+        briefTitle: string;
+        briefSub: string;
+      };
+    };
     trust: string[];
   };
   /**
@@ -314,6 +355,7 @@ type Dict = {
 };
 
 const hinglish: Dict = {
+  a11y: { close: "Band karo", changeLanguage: "Bhasha badlo" },
   theme: { label: "Theme", light: "Light", dark: "Dark", system: "Phone ke hisaab se" },
   nav: {
     earlyAccess: "Early access",
@@ -385,7 +427,23 @@ const hinglish: Dict = {
       { label: "Birthday", sub: "Kisi ki bhoolo mat" },
       { label: "EMI", sub: "Time pe yaad" },
     ],
-    visual: { docTitle: "Car Insurance", docSub: "3 din mein expire", remTitle: "Gym · 7:00 AM", remSub: "Reminder set" },
+    visual: {
+      docTitle: "Car Insurance", docSub: "3 din mein expire",
+      remTitle: "Gym · 7:00 AM", remSub: "Reminder set",
+      briefChip: "Morning brief bheja",
+      demo: {
+        status: "online · yaad rakh raha hai",
+        inputPlaceholder: "Kuch bhi bolo...",
+        voice: "Voice",
+        docFile: "insurance.jpg",
+        docSent: "Car insurance ka photo 📄",
+        docReply: "Mil gaya 👍 Expiry 12 March hai. 1 hafta pehle yaad dila dunga.",
+        voiceMsg: "Kal gym jana hai 7 baje",
+        voiceReply: "Set! Roz 7 baje reminder. 💪",
+        briefTitle: "Good morning! ☀️",
+        briefSub: "Car insurance is hafte expire · Gym 7 baje",
+      },
+    },
     trust: ["100% private", "Voice + text", "Hindi + English", "Android first"],
   },
   seo: {
@@ -889,6 +947,7 @@ const hinglish: Dict = {
 };
 
 const hi: Dict = {
+  a11y: { close: "बंद करें", changeLanguage: "भाषा बदलें" },
   theme: { label: "थीम", light: "लाइट", dark: "डार्क", system: "फ़ोन के हिसाब से" },
   nav: {
     earlyAccess: "अर्ली एक्सेस",
@@ -960,7 +1019,23 @@ const hi: Dict = {
       { label: "जन्मदिन", sub: "किसी का मत भूलिए" },
       { label: "EMI", sub: "समय पर याद" },
     ],
-    visual: { docTitle: "कार इंश्योरेंस", docSub: "3 दिन में एक्सपायर", remTitle: "जिम · 7:00 AM", remSub: "रिमाइंडर सेट" },
+    visual: {
+      docTitle: "कार इंश्योरेंस", docSub: "3 दिन में एक्सपायर",
+      remTitle: "जिम · 7:00 AM", remSub: "रिमाइंडर सेट",
+      briefChip: "मॉर्निंग ब्रीफ़ भेजा",
+      demo: {
+        status: "ऑनलाइन · याद रख रहा है",
+        inputPlaceholder: "कुछ भी बोलिए...",
+        voice: "वॉइस",
+        docFile: "insurance.jpg",
+        docSent: "कार इंश्योरेंस की फ़ोटो 📄",
+        docReply: "मिल गया 👍 एक्सपायरी 12 मार्च है। 1 हफ़्ता पहले याद दिला दूँगा।",
+        voiceMsg: "कल जिम जाना है 7 बजे",
+        voiceReply: "सेट! रोज़ 7 बजे रिमाइंडर। 💪",
+        briefTitle: "गुड मॉर्निंग! ☀️",
+        briefSub: "कार इंश्योरेंस इस हफ़्ते एक्सपायर · जिम 7 बजे",
+      },
+    },
     trust: ["100% प्राइवेट", "वॉइस + टेक्स्ट", "हिंदी + अंग्रेज़ी", "Android पहले"],
   },
   seo: {
@@ -1458,6 +1533,7 @@ const hi: Dict = {
 };
 
 const en: Dict = {
+  a11y: { close: "Close", changeLanguage: "Change language" },
   theme: { label: "Theme", light: "Light", dark: "Dark", system: "Match my device" },
   nav: {
     earlyAccess: "Early access",
@@ -1529,7 +1605,23 @@ const en: Dict = {
       { label: "Birthday", sub: "Never miss one" },
       { label: "EMI", sub: "Right on time" },
     ],
-    visual: { docTitle: "Car Insurance", docSub: "Expires in 3 days", remTitle: "Gym · 7:00 AM", remSub: "Reminder set" },
+    visual: {
+      docTitle: "Car Insurance", docSub: "Expires in 3 days",
+      remTitle: "Gym · 7:00 AM", remSub: "Reminder set",
+      briefChip: "Morning brief sent",
+      demo: {
+        status: "online · remembering for you",
+        inputPlaceholder: "Just say anything...",
+        voice: "Voice",
+        docFile: "insurance.jpg",
+        docSent: "Photo of my car insurance 📄",
+        docReply: "Got it 👍 It expires on 12 March. I'll remind you a week before.",
+        voiceMsg: "I need to go to the gym at 7 tomorrow",
+        voiceReply: "Done! Reminder every day at 7. 💪",
+        briefTitle: "Good morning! ☀️",
+        briefSub: "Car insurance expires this week · Gym at 7",
+      },
+    },
     trust: ["100% private", "Voice + text", "Hindi + English", "Android first"],
   },
   seo: {

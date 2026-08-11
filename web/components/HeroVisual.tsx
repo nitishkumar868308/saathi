@@ -60,9 +60,7 @@ export default function HeroVisual() {
       >
         <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-2 shadow-soft">
           <Bell size={14} className="text-amber-warm" />
-          <span className="text-xs font-semibold text-ink">
-            Morning brief bheja
-          </span>
+          <span className="text-xs font-semibold text-ink">{v.briefChip}</span>
         </div>
       </div>
 

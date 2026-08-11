@@ -60,18 +60,27 @@ type CountryOption = { code: string; name: string };
 const PLAY_CONSOLE_URL = "https://play.google.com/console";
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 
-/** "2 ghante pehle" — poori date se ye jaldi samajh aata hai. */
-function ago(iso: string | null): string | null {
+/**
+ * "2 ghante pehle" — poori date se ye jaldi samajh aata hai.
+ *
+ * Labels dictionary se aate hain. ⚠️ Pehle ye seedhe Hinglish string lautata
+ * tha — screen par dikhta tha par kisi JSX me nahi tha, isliye bhasha badalne
+ * par chup-chaap Hinglish hi pada rehta.
+ */
+function ago(iso: string | null, d: AdminPlayDict): string | null {
   if (!iso) return null;
   const ms = Date.now() - new Date(iso).getTime();
   if (!Number.isFinite(ms) || ms < 0) return null;
+  const fill = (s: string, n: number) => s.replace("{n}", String(n));
   const min = Math.floor(ms / 60000);
-  if (min < 1) return "abhi";
-  if (min < 60) return `${min} min pehle`;
+  if (min < 1) return d.justNow;
+  if (min < 60) return fill(d.minsAgo, min);
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} ghante pehle`;
-  return `${Math.floor(hr / 24)} din pehle`;
+  if (hr < 24) return fill(d.hoursAgo, hr);
+  return fill(d.daysAgo, Math.floor(hr / 24));
 }
+
+type AdminPlayDict = ReturnType<typeof useAdminT>["data"]["pricing"]["play"];
 
 export default function AdminPricing() {
   const t = useAdminT();
@@ -156,7 +165,7 @@ export default function AdminPricing() {
     );
   }
 
-  const syncedAgo = ago(play?.syncedAt ?? null);
+  const syncedAgo = ago(play?.syncedAt ?? null, dp);
   const stale =
     Boolean(play?.syncedAt) && Date.now() - new Date(play!.syncedAt!).getTime() > STALE_MS;
 
@@ -310,12 +319,7 @@ export default function AdminPricing() {
         )}
       </div>
 
-      <p className="text-xs leading-relaxed text-ink-soft">
-        Note: ye sirf <b>display</b> price hai. Charge Google Play user ke
-        account-country se leta hai — VPN/fake-GPS se display badal sakta hai, charge
-        nahi. Daam badalna ho to Play Console me badlo, phir yahan{" "}
-        <b>{dp.syncNow}</b> dabao.
-      </p>
+      <p className="text-xs leading-relaxed text-ink-soft">{dp.note}</p>
     </div>
   );
 }

@@ -806,6 +806,19 @@ export type AdminDict = {
         offBody: string;
         openConsole: string;
         staleWarn: string;
+        /** Neeche wala "ye sirf display price hai" wala note. */
+        note: string;
+        /**
+         * "2 ghante pehle" jaisa relative waqt.
+         *
+         * ⚠️ Ye ek function me bante the aur isliye hardcoded Hinglish reh gaye
+         *    the — JSX me na hone ki wajah se koi scan inhe pakadta bhi nahi.
+         *    `{n}` ki jagah ginti aati hai.
+         */
+        justNow: string;
+        minsAgo: string;
+        hoursAgo: string;
+        daysAgo: string;
       };
     };
   };
@@ -1411,6 +1424,11 @@ const en: AdminDict = {
         offBody: "Until it is set up, the website shows the default ₹99 / ₹999. Setup: docs/play-prices.md",
         openConsole: "Open Play Console",
         staleWarn: "Last successful sync was over 3 days ago — the prices below may be out of date.",
+        note: "Note: this is the display price only. Google Play charges based on the user's account country — a VPN can change what is shown, not what is charged. To change a price, change it in Play Console and then hit Sync now.",
+        justNow: "just now",
+        minsAgo: "{n} min ago",
+        hoursAgo: "{n} hours ago",
+        daysAgo: "{n} days ago",
       },
     },
   },
@@ -2020,6 +2038,11 @@ const hi: AdminDict = {
         offBody: "जब तक यह सेट नहीं होता, वेबसाइट डिफ़ॉल्ट ₹99 / ₹999 दिखाएगी। सेटअप: docs/play-prices.md",
         openConsole: "Play Console खोलें",
         staleWarn: "आख़िरी कामयाब sync 3 दिन से ज़्यादा पुराना है — नीचे के दाम पुराने हो सकते हैं।",
+        note: "नोट: यह सिर्फ़ दिखाने का दाम है। पैसा Google Play यूज़र के अकाउंट वाले देश से काटता है — VPN से दिखने वाला दाम बदल सकता है, कटने वाला नहीं। दाम बदलना हो तो Play Console में बदलिए, फिर यहाँ Sync now दबाइए।",
+        justNow: "अभी",
+        minsAgo: "{n} मिनट पहले",
+        hoursAgo: "{n} घंटे पहले",
+        daysAgo: "{n} दिन पहले",
       },
     },
   },
@@ -2627,6 +2650,11 @@ const hinglish: AdminDict = {
         offBody: "Jab tak ye set nahi hota, website default ₹99 / ₹999 dikhati hai. Setup: docs/play-prices.md",
         openConsole: "Play Console kholo",
         staleWarn: "Aakhri kaamyab sync 3 din se zyada purana hai — neeche ke daam purane ho sakte hain.",
+        note: "Note: ye sirf dikhane ka daam hai. Paisa Google Play user ke account wale desh se kaatta hai — VPN se dikhne wala daam badal sakta hai, katne wala nahi. Daam badalna ho to Play Console me badlo, phir yahan Sync now dabao.",
+        justNow: "abhi",
+        minsAgo: "{n} min pehle",
+        hoursAgo: "{n} ghante pehle",
+        daysAgo: "{n} din pehle",
       },
     },
   },

@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Globe, Check, ChevronDown } from "lucide-react";
-import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import { useLanguage, useT } from "@/lib/i18n/LanguageProvider";
 import { LOCALES, LOCALE_META, type Locale } from "@/lib/i18n/dictionaries";
 
 export default function LanguageSwitcher({ dark = false }: { dark?: boolean }) {
   const { locale, setLocale } = useLanguage();
+  const { a11y } = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -27,7 +28,7 @@ export default function LanguageSwitcher({ dark = false }: { dark?: boolean }) {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Change language"
+        aria-label={a11y.changeLanguage}
         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-2 text-sm font-semibold transition sm:px-3 ${
           dark
             ? "border-white/20 bg-white/10 text-cream hover:bg-white/20"

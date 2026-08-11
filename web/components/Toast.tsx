@@ -8,6 +8,7 @@ import {
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 export type ToastKind = "success" | "error" | "info";
 type ToastItem = { id: number; kind: ToastKind; text: string };
@@ -90,6 +91,7 @@ function ToastCard({
   onClose: () => void;
 }) {
   const s = STYLES[item.kind];
+  const { a11y } = useT();
   return (
     <motion.div
       layout
@@ -110,7 +112,7 @@ function ToastCard({
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={a11y.close}
         className="shrink-0 rounded-full p-0.5 opacity-70 transition hover:bg-cream/20 hover:opacity-100"
       >
         <X size={15} />

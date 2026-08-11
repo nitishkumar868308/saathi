@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   motion,
   useMotionValue,
@@ -11,6 +11,7 @@ import {
 } from "framer-motion";
 import { Mic, FileClock, Check } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
+import { useT } from "@/lib/i18n/LanguageProvider";
 
 type Msg = {
   role: "user" | "saathi";
@@ -19,23 +20,34 @@ type Msg = {
   sub?: string;
 };
 
-const script: Msg[] = [
-  { role: "user", kind: "doc", text: "Car insurance ka photo 📄" },
-  {
-    role: "saathi",
-    text: "Mil gaya 👍 Expiry 12 March hai. 1 hafta pehle yaad dila dunga.",
-  },
-  { role: "user", kind: "voice", text: "Kal gym jana hai 7 baje" },
-  { role: "saathi", text: "Set! Roz 7 baje reminder. 💪" },
-  {
-    role: "saathi",
-    kind: "card",
-    text: "Good morning! ☀️",
-    sub: "Car insurance is hafte expire · Gym 7 baje",
-  },
-];
+/**
+ * Hero ka chalta hua chat demo.
+ *
+ * ⚠️ Ye script pehle module ke top par ek `const` thi, poori Hinglish me
+ *    hardcoded. Natija: bhasha badalne par poora page badal jaata tha aur
+ *    phone ke andar ka text — jo page ka sabse bada visual hai — Hinglish hi
+ *    pada rehta. Ab dictionary se aata hai, isliye teeno bhasha me badalta hai.
+ *
+ * Type ko `Msg[]` hi rakha hai (Bubble usi par chalta hai); sirf text ka
+ * source badla hai.
+ */
+type DemoText = ReturnType<typeof useT>["hero"]["visual"]["demo"];
+
+function buildScript(t: DemoText): Msg[] {
+  return [
+    { role: "user", kind: "doc", text: t.docSent },
+    { role: "saathi", text: t.docReply },
+    { role: "user", kind: "voice", text: t.voiceMsg },
+    { role: "saathi", text: t.voiceReply },
+    { role: "saathi", kind: "card", text: t.briefTitle, sub: t.briefSub },
+  ];
+}
 
 export default function PhoneDemo() {
+  const { hero } = useT();
+  const t = hero.visual.demo;
+  const script = useMemo(() => buildScript(t), [t]);
+
   const reduce = useReducedMotion();
   const [count, setCount] = useState(reduce ? script.length : 1);
 
@@ -46,7 +58,7 @@ export default function PhoneDemo() {
       setCount((c) => (c >= script.length ? 1 : c + 1));
     }, 1700);
     return () => clearInterval(id);
-  }, [reduce]);
+  }, [reduce, script.length]);
 
   // 3D tilt on pointer move (desktop)
   const px = useMotionValue(0);
@@ -96,7 +108,7 @@ export default function PhoneDemo() {
             <SaathiLogo size={42} className="rounded-2xl" />
             <div className="leading-tight">
               <p className="font-display text-base font-semibold">Saathi</p>
-              <p className="text-[11px] text-sage">online · yaad rakh raha hai</p>
+              <p className="text-[11px] text-sage">{t.status}</p>
             </div>
             <span className="ml-auto h-2 w-2 rounded-full bg-sage" />
           </div>
@@ -115,14 +127,14 @@ export default function PhoneDemo() {
                     m.role === "user" ? "flex justify-end" : "flex justify-start"
                   }
                 >
-                  <Bubble msg={m} />
+                  <Bubble msg={m} voiceLabel={t.voice} docFile={t.docFile} />
                 </motion.div>
               ))}
             </AnimatePresence>
 
             {/* input bar */}
             <div className="mt-1 flex items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2.5">
-              <span className="text-[13px] text-ink-soft">Kuch bhi bolo...</span>
+              <span className="text-[13px] text-ink-soft">{t.inputPlaceholder}</span>
               <span className="ml-auto flex h-8 w-8 items-center justify-center rounded-xl bg-terracotta text-white">
                 <Mic size={15} />
               </span>
@@ -134,7 +146,15 @@ export default function PhoneDemo() {
   );
 }
 
-function Bubble({ msg }: { msg: Msg }) {
+function Bubble({
+  msg,
+  voiceLabel,
+  docFile,
+}: {
+  msg: Msg;
+  voiceLabel: string;
+  docFile: string;
+}) {
   if (msg.kind === "card") {
     return (
       <div className="max-w-[88%] rounded-2xl rounded-bl-md bg-ink px-3.5 py-3 text-cream shadow-soft">
@@ -158,12 +178,12 @@ function Bubble({ msg }: { msg: Msg }) {
     >
       {msg.kind === "voice" && (
         <span className="mb-1 flex items-center gap-1.5 text-[11px] opacity-80">
-          <Mic size={12} /> Voice
+          <Mic size={12} /> {voiceLabel}
         </span>
       )}
       {msg.kind === "doc" && (
         <span className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-white/15 px-2 py-1 text-[11px]">
-          <Check size={12} /> insurance.jpg
+          <Check size={12} /> {docFile}
         </span>
       )}
       {msg.text}

@@ -420,7 +420,19 @@
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/set-env.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/live-check.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/dictcheck.mjs\")",
-      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/review.mjs\")"
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/review.mjs\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/verify-prices.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/yearly-check.js\")",
+      "Bash(cp yearly-check.js tail-check.js)",
+      "Bash(node tail-check.js)",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/tail-check.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/i18n-scan.mjs\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/env-audit.mjs\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/live-services.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/wa-sender.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/wa-otp-check.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/db-check.js\")",
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/50077597-6a7d-4f10-b6a9-0a418a431dda/scratchpad/db-check2.js\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

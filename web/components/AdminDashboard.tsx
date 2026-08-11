@@ -414,7 +414,7 @@ function Dashboard({
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-cream/90 px-4 py-3 backdrop-blur-md lg:hidden">
         <button
           onClick={() => setNavOpen(true)}
-          aria-label="Menu"
+          aria-label={t.common.menu}
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-surface text-ink"
         >
           <Menu size={18} />
