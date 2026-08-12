@@ -22,6 +22,7 @@ import { readCachedDocs, resolveDocUri } from "@/lib/doc-cache";
 import { saveDocumentToDevice } from "@/lib/save-to-device";
 import { shareDocument } from "@/lib/share";
 import { iconForType } from "@/theme/status";
+import { ThemeFab } from "@/components/theme-fab";
 import type { Document } from "@/lib/documents";
 
 /**
@@ -223,6 +224,17 @@ export function OfflineScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/*
+        Theme switch — yahan bhi.
+
+        ⚠️ Ye chhoot gaya tha, aur wajah `_layout.tsx` ki tarteeb thi: `ThemeFab`
+        `OfflineGate` ke ANDAR, uske children ke saath baitha hai. Offline hone
+        par gate children ki jagah YE screen dikhata hai — yaani theme ka button
+        bilkul gayab ho jaata tha. Aur wo theek us waqt gayab hota tha jab user
+        ke paas karne ko sirf ye ek screen bachi hoti hai.
+      */}
+      <ThemeFab />
 
       {/* Apna chhota viewer — `/document-view` route is screen ke peeche band
           pada hai, isliye router se kholna yahan kaam nahi karta. */}

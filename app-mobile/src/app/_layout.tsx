@@ -17,13 +17,15 @@ import { LockGate } from "@/components/lock-gate";
 import { OfflineGate } from "@/components/offline-gate";
 import { AccountGate } from "@/components/account-gate";
 import { LockOffer } from "@/components/lock-offer";
+import { WhatsAppSetupModal } from "@/components/whatsapp-setup-modal";
 import { NetworkBanner } from "@/components/network-banner";
 import { useNetworkStatus } from "@/lib/network";
 import { ThemeFab } from "@/components/theme-fab";
 import { NetAlertModal } from "@/components/net-alert-modal";
 import { ScreenLoader } from "@/components/loader";
-import { syncNotifications } from "@/lib/notifications";
+import { flushNotificationActions, syncNotifications } from "@/lib/notifications";
 import { flushOutbox } from "@/lib/reminder-outbox";
+import { flushUploads } from "@/lib/doc-upload-queue";
 import { listenForegroundPush, listenPushOpens, registerPushToken } from "@/lib/push";
 import { setAnalyticsUser, logScreen } from "@/lib/analytics";
 import { usePlanForegroundRefresh } from "@/lib/plan-store";
@@ -105,8 +107,12 @@ export default function RootLayout() {
               <DeviceOwnerWarning />
               {/* Uska ulta: meri ID aur bhi phones par login hai — sign-in ke baad. */}
               <MultiDeviceWarning />
-              {/* "Saathi ko lock kar lo?" — login ke baad ek hi baar. */}
+              {/* "Saathi ko lock kar lo?" — pehla document aane ke baad. */}
               <LockOffer />
+              {/* Plus user ne reminder/document banaya par WhatsApp ka number
+                  verify nahi hai — tab tak wahan koi message ja hi nahi sakta,
+                  aur wo baat kahin likhi hi nahi thi. */}
+              <WhatsAppSetupModal />
               </LockGate>
             </ToastProvider>
           </AuthProvider>
@@ -218,7 +224,24 @@ function RootNavigator() {
     // Unhe server par bhej ke asli id mil jaaye, uske baad hi sync chale —
     // warna sync unhe dekh hi nahi paata (server ki list me hain hi nahi) aur
     // do alag ids ke alarm saath-saath chalte rehte hain.
-    if (uid) void flushOutbox().finally(() => void syncNotifications({ force: true }));
+    if (uid) {
+      /**
+       * ⚠️ Tarteeb: pehle notification ke button wale kaam, phir sync.
+       *
+       * Notification ke "Ho gaya" button se nipta hua reminder headless task me
+       * sirf ek line ban ke pada hota hai. Agar sync usse PEHLE chal jaye to wo
+       * usi reminder ka alarm dobara laga deta hai — user "Ho gaya" daba chuka
+       * hai aur usi kaam ka alarm phir se bajta hai.
+       */
+      void flushNotificationActions()
+        .catch(() => {})
+        .finally(() => {
+          void flushOutbox().finally(() => void syncNotifications({ force: true }));
+        });
+      // Jo document backup hone se reh gaye the — unhe ab bhej do. Alag chain me
+      // isliye ki ek bada upload reminder ke alarm lagne me deri na kare.
+      void flushUploads();
+    }
     setAnalyticsUser(uid ?? null);
   }, [uid]);
 
@@ -264,7 +287,15 @@ function RootNavigator() {
       if (s !== "active") return;
       // Net wapas aa chuka ho sakta hai — kataar me pade reminders ab server par
       // ja sakte hain. Fail ho to kuch nahi bigadta: wo kataar me hi rehte hain.
-      void flushOutbox().finally(() => void syncNotifications());
+      //
+      // Notification ke button wale kaam PEHLE (upar wajah likhi hai) — user ne
+      // lock screen se hi "Ho gaya" daba diya ho sakta hai.
+      void flushNotificationActions()
+        .catch(() => {})
+        .finally(() => {
+          void flushOutbox().finally(() => void syncNotifications());
+        });
+      void flushUploads();
     });
     return () => sub.remove();
   }, [uid]);
@@ -293,6 +324,10 @@ function RootNavigator() {
     if (!uid) return;
     if (wasOffline.current && !offline) {
       void flushOutbox().finally(() => void syncNotifications());
+      // Net wapas aaya — jo document R2 tak nahi pahunche the, ab pahunch sakte
+      // hain. Yahi wo lamha hai jab wo sabse zyada fail hote the (user document
+      // wahin banata hai jahan signal kharab hai).
+      void flushUploads();
     }
     wasOffline.current = offline;
   }, [offline, uid]);
@@ -350,6 +385,9 @@ function RootNavigator() {
       {/* Note likhna ek "abhi ka" kaam hai — modal usse baaki app se alag rakhta
           hai aur band karna ek swipe me ho jaata hai. */}
       <Stack.Screen name="note-edit" options={{ presentation: "modal" }} />
+      {/* Note se reminder — sirf "kab?". Poori add-reminder screen wahan bahut
+          bhaari padti thi (wajah `note-reminder.tsx` ke upar likhi hai). */}
+      <Stack.Screen name="note-reminder" options={{ presentation: "modal" }} />
       <Stack.Screen name="support" />
       <Stack.Screen name="onboarding" />
     </Stack>

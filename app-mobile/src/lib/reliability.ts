@@ -48,6 +48,22 @@ import notifee, {
 const ASKED_KEY = "saathi-reliability-asked";
 const OEM_KEY = "saathi-oem-done";
 const FSI_KEY = "saathi-fsi-done";
+/**
+ * "User is screen tak gaya tha" — par abhi confirm nahi kiya.
+ *
+ * ⚠️ Ye do jhande alag hone ZAROORI hain, aur pehle nahi the. Pehle screen
+ * KHOLTE HI step green ho jaata tha, jabki us screen par ek toggle hota hai jise
+ * dabana abhi baaki tha. Nateeja bilkul wahi shikayat thi jo sabse zyada aati
+ * hai: "maine sab allow kar diya, phir bhi bada popup nahi aata." Modal usse
+ * jhoothi tasalli de raha tha, aur uske baad wo step dobara kabhi dikhta hi
+ * nahi tha — yaani wo galti hamesha ke liye chipak jaati thi.
+ *
+ * In dono ka status Android kisi API se batata hi nahi (na notifee me, na RN
+ * me), isliye poochhne ke alawa koi raasta hai bhi nahi. Par poochhna chahiye —
+ * chup-chaap maan lena nahi.
+ */
+const FSI_ASKED_KEY = "saathi-fsi-asked";
+const OEM_ASKED_KEY = "saathi-oem-asked";
 
 /** Full-screen intent "special app access" Android 14 (API 34) se aaya. */
 const FSI_MIN_API = 34;
@@ -60,6 +76,13 @@ export type ReadinessStep = {
   supported: boolean;
   /** Ho chuka hai? */
   ok: boolean;
+  /**
+   * User settings screen tak ja chuka hai, par confirm abhi baaki hai.
+   *
+   * Sirf `fsi` aur `oem` par — un dono ka status OS batata hi nahi. Modal in par
+   * "Allow" ki jagah "Ho gaya?" dikhata hai.
+   */
+  awaiting?: boolean;
 };
 
 export type Readiness = {
@@ -94,15 +117,18 @@ export async function checkReadiness(): Promise<Readiness> {
     return { steps, allOk: ok, pending: ok ? [] : ["notif"], oemName: null };
   }
 
-  const [settings, batteryOn, power, oemDone, fsiDone] = await Promise.all([
-    notifee.getNotificationSettings().catch(() => null),
-    notifee.isBatteryOptimizationEnabled().catch(() => false),
-    notifee
-      .getPowerManagerInfo()
-      .catch(() => ({}) as { activity?: string | null; manufacturer?: string }),
-    AsyncStorage.getItem(OEM_KEY).catch(() => null),
-    AsyncStorage.getItem(FSI_KEY).catch(() => null),
-  ]);
+  const [settings, batteryOn, power, oemDone, fsiDone, oemAsked, fsiAsked] =
+    await Promise.all([
+      notifee.getNotificationSettings().catch(() => null),
+      notifee.isBatteryOptimizationEnabled().catch(() => false),
+      notifee
+        .getPowerManagerInfo()
+        .catch(() => ({}) as { activity?: string | null; manufacturer?: string }),
+      AsyncStorage.getItem(OEM_KEY).catch(() => null),
+      AsyncStorage.getItem(FSI_KEY).catch(() => null),
+      AsyncStorage.getItem(OEM_ASKED_KEY).catch(() => null),
+      AsyncStorage.getItem(FSI_ASKED_KEY).catch(() => null),
+    ]);
 
   const notifOk =
     settings?.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
@@ -124,13 +150,30 @@ export async function checkReadiness(): Promise<Readiness> {
       supported: alarmSupported,
       ok: !alarmSupported || alarmSetting === AndroidNotificationSetting.ENABLED,
     },
-    // OS iska status nahi batata (koi API nahi) — `oem` ki tarah, ek baar khol
-    // lene par done maante hain. Warna step kabhi green hi na ho.
-    { key: "fsi", supported: fsiSupported, ok: !fsiSupported || fsiDone === "1" },
+    /**
+     * ⚠️ Ab "screen khol li" se green NAHI hota — user ka confirm chahiye.
+     *
+     * Us screen par ek toggle hota hai, aur screen khulne aur toggle dabne me
+     * zameen-aasmaan ka fark hai. Pehle sirf khulne par tick lag jaata tha, aur
+     * uske baad ye step dobara kabhi dikhta hi nahi tha — yaani jo user toggle
+     * dabana bhool gaya, uska bada popup hamesha ke liye band, aur modal use
+     * "sab set hai" bhi keh raha tha.
+     */
+    {
+      key: "fsi",
+      supported: fsiSupported,
+      ok: !fsiSupported || fsiDone === "1",
+      awaiting: fsiSupported && fsiDone !== "1" && fsiAsked === "1",
+    },
     { key: "battery", supported: true, ok: !batteryOn },
-    // OEM screen ka status OS nahi batata (koi API hi nahi). Isliye "ok" tab
-    // maante hain jab user ek baar khol chuka ho — warna step kabhi green na ho.
-    { key: "oem", supported: !!oemActivity, ok: !oemActivity || oemDone === "1" },
+    // Wahi baat OEM ke auto-start switch par — uska status bhi koi API nahi
+    // batati, isliye poochhna hi ek imaandaar raasta hai.
+    {
+      key: "oem",
+      supported: !!oemActivity,
+      ok: !oemActivity || oemDone === "1",
+      awaiting: !!oemActivity && oemDone !== "1" && oemAsked === "1",
+    },
   ];
 
   const pending = steps.filter((s) => s.supported && !s.ok).map((s) => s.key);
@@ -230,7 +273,11 @@ async function requestStepInner(key: StepKey): Promise<void> {
       case "fsi": {
         // "Full screen notifications" — Android 14+ ka special app access.
         // Isi ke bina reminder ka bada popup nahi aata (item 11).
-        await AsyncStorage.setItem(FSI_KEY, "1").catch(() => {});
+        //
+        // ⚠️ Yahan `FSI_KEY` (done) NAHI likhte — sirf "asked". Screen khulne ka
+        // matlab toggle dabna nahi hota, aur pehle yahin dono ko ek maan liya
+        // jaata tha. Confirm user khud `confirmStep()` se deta hai.
+        await AsyncStorage.setItem(FSI_ASKED_KEY, "1").catch(() => {});
         const pkg = Application.applicationId;
         try {
           await IntentLauncher.startActivityAsync(
@@ -248,12 +295,30 @@ async function requestStepInner(key: StepKey): Promise<void> {
         await requestBatteryExemption();
         return;
       case "oem":
-        await AsyncStorage.setItem(OEM_KEY, "1").catch(() => {});
+        // Wahi baat — screen khulna ≠ switch on hona (upar `fsi` par likha hai).
+        await AsyncStorage.setItem(OEM_ASKED_KEY, "1").catch(() => {});
         await notifee.openPowerManagerSettings();
         return;
     }
   } catch {
     /* screen na khule to modal wahi rehta hai — user dobara try kar sakta hai */
+  }
+}
+
+/**
+ * "Haan, maine on kar diya" — sirf un do steps ke liye jinka status OS nahi
+ * batata.
+ *
+ * Ye user ka apna jawab hai, andaza nahi. Galat jawab dena mumkin hai (aur log
+ * denge), par wo pehle wale se phir bhi behtar hai: wahan app KHUD jhooth bol
+ * rahi thi, bina user se poochhe.
+ */
+export async function confirmStep(key: StepKey): Promise<void> {
+  try {
+    if (key === "fsi") await AsyncStorage.setItem(FSI_KEY, "1");
+    else if (key === "oem") await AsyncStorage.setItem(OEM_KEY, "1");
+  } catch {
+    /* storage na chale to step agli baar phir dikhega — koi nuksan nahi */
   }
 }
 

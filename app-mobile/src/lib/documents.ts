@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { canAddDocument, getOffers } from "./plan";
-import { deleteDocumentFile, uploadDocument } from "./storage";
+import { deleteDocumentFile } from "./storage";
+import { flushUploads, queueUpload, requeueMissingUploads } from "./doc-upload-queue";
 import {
   addToCachedDocs,
   primeCachedFile,
@@ -62,6 +63,21 @@ function mimeFromUri(uri: string): string {
 export async function uploadDocumentImage(docId: string, localUri: string): Promise<void> {
   const mime = mimeFromUri(localUri);
   /**
+   * Kataar me PEHLE, upload BAAD me.
+   *
+   * ⚠️ Ye tarteeb jaan-boojh ke hai. Pehle upload ek "chalao aur bhool jao" call
+   * thi (`.catch(() => {})`) — fail hone par document HAMESHA ke liye sirf us
+   * phone par reh jaata tha: koi retry nahi, koi khabar nahi. Admin me wo "Sirf
+   * device" pada rehta tha, jo asal me "hum ise kho chuke hain" ka doosra naam
+   * hai. Aur document banta hi tab hai jab signal sabse kharab hota hai — bank
+   * ke bahar, RTO ke bahar.
+   *
+   * Kataar pehle bharne se ek aur soorat bhi bach jaati hai: upload ke BEECH me
+   * app band ho jaye (Android low-memory par ye aam hai) to bhi wo entry padi
+   * rehti hai aur agli baar chal jaati hai.
+   */
+  await queueUpload(docId, localUri, mime);
+  /**
    * Offline copy PEHLE, upload BAAD me.
    *
    * ⚠️ Tarteeb maayne rakhti hai. Cache aam taur par upload ke baad bharta hai
@@ -74,7 +90,7 @@ export async function uploadDocumentImage(docId: string, localUri: string): Prom
    * na intezaar. Isliye offline ka intezaam pehle, cloud backup uske baad.
    */
   await primeCachedFile(docId, localUri, mime);
-  await uploadDocument(docId, localUri, mime);
+  await flushUploads();
 }
 
 function client() {
@@ -126,6 +142,14 @@ export async function listDocuments(): Promise<Document[]> {
     void writeCachedDocs(uid, docs);
     // Fire-and-forget — list turant dikhni chahiye, files peeche utarti rahein.
     syncDocumentFiles(docs);
+    /**
+     * Jo document cloud par pahuncha hi nahi, use wapas kataar me daal do.
+     *
+     * ⚠️ Iske bina naya upload-queue sirf AAGE ke documents bachata. Jo pehle hi
+     * chhoot chuke hain (admin me "Sirf device" wale) wo hamesha waise hi pade
+     * rehte — aur wahi asli shikayat hai.
+     */
+    void requeueMissingUploads(docs).then(flushUploads);
     return docs;
   } catch (e) {
     const cached = await readCachedDocs(uid);

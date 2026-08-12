@@ -1141,3 +1141,85 @@ export async function sendAdminPasswordEmail(t: {
     kind: "admin_password",
   });
 }
+
+/* ─────────────────────── App lock: PIN bhool gaye ─────────────────────── */
+
+/**
+ * App lock ka PIN reset karne ka code.
+ *
+ * ⚠️ Ye email us user ko jaati hai jo IS WAQT apne hi app se bahar khada hai —
+ * wo lock screen par hai aur PIN yaad nahi aa raha. Isliye yahan har extra
+ * shabd nuksaan karta hai: use sirf code chahiye, aur wo pehli nazar me dikhna
+ * chahiye. Koi button nahi (kahin jaana hi nahi hai), koi lambi bhoomika nahi.
+ *
+ * ⚠️ "Kisi ko mat batao" wali line har OTP me honi chahiye. PIN reset me wo aur
+ * bhi zaroori hai: yahi ek code kisi ke bhi haath me poore app ki chaabi hai.
+ */
+const LOCK_RESET: Record<
+  EmailLocale,
+  { title: string; hello: string; intro: string; expires: string; warn: string; ignore: string; subject: string }
+> = {
+  hinglish: {
+    title: "App lock ka code 🔐",
+    hello: "Namaste",
+    intro: "Naya PIN banane ke liye ye code Saathi me daalo:",
+    expires: "Ye code {m} minute me expire ho jayega.",
+    warn: "Ye code kisi ko mat batao — isse aapka App lock khul jaata hai.",
+    ignore: "Aapne ye nahi manga tha? Tab kuch mat kariye — aapka PIN waisa hi rahega.",
+    subject: "Apka Saathi — App lock ka code",
+  },
+  hi: {
+    title: "ऐप लॉक का कोड 🔐",
+    hello: "नमस्ते",
+    intro: "नया PIN बनाने के लिए यह कोड साथी में डालिए:",
+    expires: "यह कोड {m} मिनट में एक्सपायर हो जाएगा।",
+    warn: "यह कोड किसी को न बताएँ — इससे आपका ऐप लॉक खुल जाता है।",
+    ignore: "आपने यह नहीं माँगा था? तब कुछ मत कीजिए — आपका PIN वैसा ही रहेगा।",
+    subject: "आपका साथी — ऐप लॉक का कोड",
+  },
+  en: {
+    title: "Your app lock code 🔐",
+    hello: "Hi",
+    intro: "Enter this code in Saathi to set a new PIN:",
+    expires: "This code expires in {m} minutes.",
+    warn: "Don't share this code with anyone — it unlocks your app.",
+    ignore: "Didn't ask for this? Then do nothing — your PIN stays as it is.",
+    subject: "Apka Saathi — your app lock code",
+  },
+};
+
+export async function sendAppLockResetEmail(t: {
+  to: string;
+  name?: string | null;
+  code: string;
+  minutes: number;
+  locale?: EmailLocale;
+  userId?: string | null;
+}) {
+  const l = LOCK_RESET[t.locale ?? "hinglish"] ?? LOCK_RESET.hinglish;
+  const greet = t.name ? `${l.hello} ${escapeHtml(t.name)},` : `${l.hello},`;
+
+  const html = renderEmail(
+    l.title,
+    emailParagraph(greet) +
+      emailParagraph(l.intro) +
+      // Code sabse bada aur sabse saaf — monospace + letter-spacing se 6 ank
+      // ek-ek karke padhe jaate hain (0/O aur 1/l ka bhram bhi kam hota hai).
+      `<div style="margin:6px 0 18px;padding:20px;background:${CREAM};border:1px solid ${LINE};border-radius:16px;text-align:center;">
+         <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:700;letter-spacing:9px;color:${INK};">${escapeHtml(t.code)}</div>
+         <div style="margin-top:10px;font-size:13px;color:${SOFT};">${escapeHtml(l.expires.replace("{m}", String(t.minutes)))}</div>
+       </div>` +
+      `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:${INK};font-weight:600;">${escapeHtml(l.warn)}</p>` +
+      `<p style="margin:0;font-size:13.5px;line-height:1.6;color:${SOFT};">${escapeHtml(l.ignore)}</p>`,
+    `${t.code} — ${l.title}`,
+    t.locale ?? "hinglish",
+  );
+
+  return sendMail({
+    to: t.to,
+    subject: l.subject,
+    html,
+    kind: "app_lock_reset",
+    userId: t.userId,
+  });
+}

@@ -209,8 +209,19 @@ function OtpBody({
             </Pressable>
           </View>
 
-          <Text style={styles.title}>{tpl(t.otpTitle, { phone })}</Text>
-          <Text style={styles.sub}>{t.otpSub}</Text>
+          {/*
+            ⚠️ Title tabhi "code bheja hai" kehta hai jab SMS SACH ME chala ho.
+
+            Pehle wo hamesha "{phone} par code bheja hai" likh deta tha — modal
+            khulte hi, bhejne se pehle. Fail hone par (number kisi aur ka hai,
+            hadd poori hai, net nahi) screen ek saath do ulti baatein kehti thi:
+            upar "code bheja hai", neeche laal me "nahi bheja ja saka". User 6
+            ank ka intezaar karta baitha rehta tha jo aane hi nahi the.
+          */}
+          <Text style={styles.title}>
+            {sending ? t.otpSending : error ? t.otpTitleFailed : tpl(t.otpTitle, { phone })}
+          </Text>
+          <Text style={styles.sub}>{error ? tpl(t.otpForPhone, { phone }) : t.otpSub}</Text>
 
           <TextInput
             value={code}

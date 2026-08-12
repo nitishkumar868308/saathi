@@ -188,8 +188,21 @@ export type UserDocument = {
   expiry: string | null;
   file_size: number | null;
   in_storage: boolean;
+  /** R2 ka path — `in_storage` hone par hi. Preview/naya tab isi se banta hai. */
+  file_path?: string | null;
+  mime_type?: string | null;
   created_at: string;
 };
+
+/**
+ * App lock ki haalat — support call ka sabse pehla sawaal.
+ *
+ * ⚠️ Hash/salt yahan jaan-boojh ke nahi hain. Admin ko itna hi jaanna chahiye ki
+ * lock laga hai ya nahi ("main apna PIN bhool gaya" wali call isi se samajh aati
+ * hai); PIN ka hash dekhne ki uski koi zaroorat nahi, aur jo dikhta hai wo kabhi
+ * na kabhi leak hota hai.
+ */
+export type UserAppLock = { on: boolean; biometric: boolean; at: string | null };
 
 export type UserDetail = {
   id: string;
@@ -202,6 +215,7 @@ export type UserDetail = {
   referral_code: string | null;
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
+  app_lock: UserAppLock | null;
   referrals: UserReferral[];
   documents: UserDocument[];
   documents_count: number;

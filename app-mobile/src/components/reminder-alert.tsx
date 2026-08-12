@@ -168,6 +168,17 @@ export function ReminderAlertHost() {
 
   useEffect(() => {
     if (!alert) return;
+    /**
+     * Tray wali notification hata do — sabse pehle.
+     *
+     * ⚠️ Ye sirf saaf-safai nahi hai, ye AWAAZ BAND karta hai. Reminder ab
+     * `loopSound` + `FLAG_INSISTENT` ke saath bajta hai (alarm ki tarah, jab tak
+     * hataya na jaye). Full-screen intent app ko saamne le aata hai aur ye modal
+     * khul jaata hai — par notification tray me zinda rehti hai, yaani alarm
+     * modal ke peeche bajta rehta. User ko poora alert padhne ka mauka hi nahi
+     * milta.
+     */
+    void notifee.cancelNotification(alert.id).catch(() => {});
     setStep("ask");
     setAi(null);
     scale.setValue(0.9);

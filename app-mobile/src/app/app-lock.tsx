@@ -249,7 +249,17 @@ export default function AppLock() {
         visible={askOff}
         title={l.turnOffAsk}
         message={l.turnOffBody}
-        confirmLabel={l.turnOff}
+        /**
+         * ⚠️ Yahan pehle `l.turnOff` tha — "App lock band karo" / "ऐप लॉक बंद
+         * करें". Wo settings ki LIST ka label hai (jahan poori jagah hai), par
+         * modal ke aadhe-chaudai wale button par wo do line me toot ke button ko
+         * hi bigaad deta tha, aur Hindi me to teen line le leta tha.
+         *
+         * Sawaal upar poora likha hai ("App lock band kar dein?"), isliye button
+         * par ek shabd hi kaafi hai — aur ek shabd teenon bhashaon me theek
+         * baithta hai.
+         */
+        confirmLabel={c.yes}
         cancelLabel={c.cancel}
         icon="lock-open-outline"
         destructive

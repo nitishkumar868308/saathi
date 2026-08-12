@@ -136,6 +136,16 @@ export type Dict = {
      * likha hoga aur app kahegi "अनुमति दें" — user dhoondhta hi reh jayega.
      */
     stepAllow: string;
+    /**
+     * "Ho gaya?" — sirf un do steps par (full-screen intent, OEM auto-start)
+     * jinka status Android kisi API se batata hi nahi.
+     *
+     * ⚠️ Pehle wahan kuch poochha hi nahi jaata tha: settings screen KHULTE HI
+     * step green ho jaata tha. Jo user toggle dabana bhool gaya uska bada popup
+     * hamesha ke liye band reh jaata tha — aur app use "sab set hai" kehti thi.
+     */
+    stepConfirmYes: string;
+    stepOpenAgain: string;
     stepDone: string;
     stepNotif: string;
     stepNotifSub: string;
@@ -559,6 +569,14 @@ export type Dict = {
      */
     reminderNeedsTime: string;
     /**
+     * Saathi ne app ki koi setting badal di (theme / bhasha / alert ki awaaz).
+     *
+     * ⚠️ Ye toast zaroori hai. Bhasha badalne par to poori screen badal jaati
+     * hai, aur bina kisi khabar ke wo chaunka deta hai — user ko lagta hai kuch
+     * galat ho gaya.
+     */
+    settingChanged: string;
+    /**
      * Bol ke chhoda — message apne aap ja raha hai, par abhi roka ja sakta hai.
      *
      * ⚠️ Ye do line isliye hain kyunki bola hua message SEEDHA bhej dena
@@ -698,8 +716,28 @@ export type Dict = {
     verifyCta: string;
     verified: string;
     verifyWhy: string;
+    /**
+     * "Ye WhatsApp wala number hona chahiye."
+     *
+     * ⚠️ Ye kahin likha hi nahi tha, aur wo ek asli, chup-chaap fail hone wali
+     * kami thi. Plus me reminder aur document expiry ka message WhatsApp par
+     * jaata hai — usi number par jo yahan verify hua ho. Log apna doosra (bina
+     * WhatsApp wala) number verify kar dete the, screen "Verified ✓" dikhati
+     * thi, aur ek bhi message kabhi nahi pahunchta tha. Kahin koi error bhi nahi
+     * aata tha.
+     */
+    whatsappNote: string;
     /** {phone} */
     otpTitle: string;
+    /**
+     * Code ja hi nahi paaya — title tab yahi kehta hai.
+     *
+     * ⚠️ Iske bina modal fail hone par bhi "code bheja hai" likh deta tha aur
+     * neeche laal me "nahi bheja ja saka" — ek hi screen do ulti baatein.
+     */
+    otpTitleFailed: string;
+    /** {phone} — fail wali soorat me, sirf ye batane ke liye ki baat kis number ki hai. */
+    otpForPhone: string;
     otpSub: string;
     otpPh: string;
     otpSubmit: string;
@@ -912,6 +950,14 @@ export type Dict = {
     bannerBody: string;
     /** Patti ke neeche ka link — tap par poori baat khulti hai. */
     bannerMore: string;
+    /**
+     * Home par pehle din ka chhota toast. {who} = naam ya email.
+     *
+     * ⚠️ Poora modal ab document + reminder ke baad aata hai. Ye line us beech
+     * ki khamoshi bharti hai — theek us soorat me user ke reminder is phone par
+     * aate hi nahi, aur bina kisi khabar ke wo "app kharab hai" samajh leta hai.
+     */
+    toast: string;
   };
 
   /**
@@ -990,6 +1036,58 @@ export type Dict = {
   };
 
   /**
+   * "WhatsApp par message chahiye? Pehle number verify karo." — Plus users.
+   *
+   * ⚠️ Ye shart kahin likhi hi nahi thi, aur wo poori tarah chup-chaap fail
+   * hoti thi: user Plus kharidta, reminder lagata, aur WhatsApp par kabhi kuch
+   * nahi aata — bina kisi error ke. Cron bilkul theek chal raha tha; wo bina
+   * verify kiye number par jaan-boojh ke nahi bhejta (ek digit ki galti reminder
+   * kisi ajnabi ke paas bhej deti hai). Kami sirf batane ki thi.
+   */
+  whatsappSetup: {
+    title: string;
+    body: string;
+    /** Sabse zaroori baat — number WHATSAPP wala hona chahiye. */
+    note: string;
+    cta: string;
+  };
+
+  /**
+   * Note se reminder — ek hi sawaal wali screen.
+   *
+   * ⚠️ Pehle note ka "Reminder set karo" poori Add-reminder screen kholta tha
+   * aur note ka saara text uske text-box me daal deta tha. Wahan se AI use
+   * padhta tha — aur do cheezein hamesha toot-ti thi: note ka poora paragraph
+   * reminder ka title ban jaata (notification me chaar line, jo koi padhta hi
+   * nahi), aur note me waqt hota hi nahi to AI poochhta rehta, jabki user ne
+   * sirf itna kaha tha ki "iska reminder laga do".
+   */
+  noteReminder: {
+    title: string;
+    whenLabel: string;
+    /** Calendar wali pankti ka chhota label. */
+    dateLabel: string;
+    /** Ghadi wali pankti ka chhota label. */
+    timeLabel: string;
+    repeatLabel: string;
+    repeatOnce: string;
+    repeatDaily: string;
+    repeatWeekly: string;
+    /** Chuna hua waqt beet chuka hai. */
+    pastTime: string;
+    /**
+     * Aaj ka beeta hua waqt chunne par reminder kal par sarka diya gaya.
+     *
+     * ⚠️ Ye chetavni nahi, soochna hai — hum user ko roka nahi, uska iraada
+     * (wahi ghanta) rakh kar din badal diya. Chup-chaap badalna sabse bura
+     * hota, isliye toast zaroori hai.
+     */
+    movedToTomorrow: string;
+    saved: string;
+    saveFailed: string;
+  };
+
+  /**
    * App lock — biometric (fingerprint/face) + ek PIN uske peeche.
    *
    * ⚠️ PIN hamesha PEHLE set hota hai, biometric uske UPAR ek shortcut hai.
@@ -1014,10 +1112,33 @@ export type Dict = {
      * combination try kar sakta tha.
      */
     tooManyPin: string;
-    /** Lock screen se nikalne ka imaandaar raasta. */
-    signOutInstead: string;
-    signOutAsk: string;
-    signOutBody: string;
+    /**
+     * PIN bhool gaye — email par 6 ank ka code.
+     *
+     * ⚠️ Pehle yahan sirf "Logout karke dobara login karo" tha. Wo us waqt sach
+     * tha (PIN sirf phone par hota tha), par ab PIN account ka hissa hai —
+     * logout se wo hatta hi nahi. Us badlaav ke saath ye raasta zaroori ho gaya,
+     * warna PIN bhoolne wala apne hi documents se hamesha ke liye bahar.
+     */
+    forgotPin: string;
+    resetSending: string;
+    resetTitle: string;
+    /** {email} — mask kiya hua (ni•••@gmail.com) */
+    resetSentTo: string;
+    resetNewPin: string;
+    resetNewSub: string;
+    resetResend: string;
+    /** {s} */
+    resetResendIn: string;
+    /** Account par email hi nahi hai — support hi raasta hai. */
+    resetErrNoEmail: string;
+    resetErrNotConfigured: string;
+    resetErrTooMany: string;
+    resetErrWrongCode: string;
+    resetErrExpired: string;
+    resetErrLocked: string;
+    resetErrFailed: string;
+    resetErrNoNet: string;
     useBiometric: string;
     biometricPrompt: string;
     /** Set/change karte waqt. */
@@ -1123,12 +1244,14 @@ const hinglish: Dict = {
   reliability: {
     promptTitle: "Reminder theek time pe aaye",
     promptBody:
-      "In cheezon ke bina Android reminder ko der se bhejta hai — kabhi 5-10 minute baad. Ek-ek karke Allow dabao, bas ek baar ka kaam hai.",
+      "Inke bina Android reminder 5-10 minute late bhejta hai. Ek-ek karke Allow dabao — ek baar ka kaam.",
     promptButton: "Setup karo",
     promptLater: "Baad me",
     settingsRow: "Reminders reliable banao",
     settingsRowSub: "Notification, exact alarm aur battery — sab ek jagah",
     stepAllow: "Allow",
+    stepConfirmYes: "On kar diya",
+    stepOpenAgain: "Phir se kholo",
     stepDone: "Ho gaya",
     stepNotif: "Notification allow karo",
     stepNotifSub: "Iske bina reminder dikhega hi nahi",
@@ -1138,7 +1261,7 @@ const hinglish: Dict = {
     stepFsiSub:
       "Iske bina sirf upar patli si notification aayegi — screen ke beech me bada alert nahi",
     fsiSpotlight:
-      "Reminder ka BADA popup poori screen par aane ke liye yahi ek cheez sabse zaroori hai. Android 14 se ye default me BAND aata hai — isliye baaki sab allow karne par bhi bada alert nahi aata.",
+      "Poori screen wala BADA alert isi se aata hai. Android 14 me ye default se BAND rehta hai.",
     stepBattery: "Background me chalne do",
     stepBatterySub: "Battery optimization off — app band ho tab bhi reminder aaye",
     stepOem: "Auto-start on karo",
@@ -1250,11 +1373,11 @@ const hinglish: Dict = {
     renewOpenSite: "Official site kholo",
     renewSoonTitle: "Renew ka tareeka — jald aa raha hai",
     renewSoonBody:
-      "Is document ke liye step-by-step guide abhi taiyar ho rahi hai. Tab tak document par likhi sanstha ki official site dekh lo.",
+      "Guide taiyar ho rahi hai. Tab tak document par likhi sanstha ki official site dekh lo.",
     renewShowSteps: "Renew kaise karein",
     renewHideSteps: "Chhupa do",
     renewVerifyNote:
-      "Ye aam tareeka hai. Apne desh ki official site par ek baar jaanch lena — process aur fees badalti rehti hain.",
+      "Ye aam tareeka hai. Official site par ek baar jaanch lo — process aur fees badalti rehti hain.",
     sharedN: "{n} document share hue",
     selectAll: "Sabhi chuno",
     selectCount: "{n} chune",
@@ -1387,7 +1510,7 @@ const hinglish: Dict = {
     later: "Abhi nahi",
     thanksTitle: "Dhanyavaad! ❤️",
     thanksSub:
-      "Bahut maayne rakhta hai. Ek aakhri baat — Play Store pe ek chhoti rating se aur parivaar Saathi tak pahunchte hain. Bas 10 second. 🙏",
+      "Play Store pe ek chhoti rating se aur parivaar Saathi tak pahunchte hain. Bas 10 second. 🙏",
     rateBtn: "Play Store pe rate karo",
   },
   network: {
@@ -1400,13 +1523,18 @@ const hinglish: Dict = {
     failAi: "Saathi aapki baat padh nahi paaya.",
     failHint: "Ye app ki galti nahi hai — net wapas aate hi ye chal jayega.",
     tryAgain: "Dobara koshish karo",
+    /**
+     * ⚠️ Offline screen ki teenon line chhoti kar di gayi hain.
+     *
+     * Pehle yahan teen-teen line ke paragraph the. Wo poori screen ka sabse bura
+     * waqt hai — user ka kaam ruka hua hai, wo padhne ke mood me hai hi nahi.
+     * Ab sirf wahi jo kaam ka hai: kya hua, aur abhi kya kar sakte ho.
+     */
     offTitle: "Internet nahi hai",
-    offBody:
-      "Net aate hi Saathi poora chalu ho jayega. Tab tak aapke save kiye hue documents yahan hain — dekh sakte ho, download aur share bhi kar sakte ho.",
+    offBody: "Save kiye hue documents abhi bhi khul jayenge.",
     offDocsTitle: "Aapke documents",
-    offEmpty: "Yahan abhi koi document nahi",
-    offEmptyBody:
-      "Jo documents aapne pehle khole the wo apne aap yahan save ho jaate hain. Net aane par ek baar Documents tab khol lo.",
+    offEmpty: "Koi document save nahi hai",
+    offEmptyBody: "Net aane par Documents tab ek baar khol lo — sab yahan aa jayenge.",
     offRetry: "Dobara jaancho",
     offChecking: "Jaanch rahe hain…",
     offView: "Dekho",
@@ -1436,9 +1564,9 @@ const hinglish: Dict = {
   chat: {
     online: "aapka dost · online",
     greeting:
-      "Namaste{name}! Main aapka Saathi. Apne reminders, tasks aur documents ke baare me pooch lo — main madad kar dunga. 🙂",
+      "Namaste{name}! Main aapka Saathi. Reminder, task ya document ke baare me pooch lo. 🙂",
     stubReply:
-      "Aap apne reminder, task ya document se judi cheezein pooch sakte ho. 🙂 Abhi main baaki sab kuch nahi bata sakta, par wo bahut jald aa raha hai — tab tak Documents aur Reminders tabs use karo!",
+      "Filhaal main reminder, task aur document ke sawaal samajhta hoon. 🙂 Baaki bahut jald aa raha hai.",
     inputPlaceholder: "Kuch likho…",
     suggestions: ["Kal 8 baje uthana", "Insurance kab expire hai?", "Aaj kya karna hai?"],
     retrySend: "Dobara bhejo",
@@ -1450,6 +1578,7 @@ const hinglish: Dict = {
     offlineReminderSet: "Net nahi tha, par maine reminder laga diya",
     reminderFailed: "Reminder ban nahi paaya",
     reminderNeedsTime: "Time thoda check kar lo — bas ek tap me set ho jayega",
+    settingChanged: "Setting badal di ✓",
     voiceSending: "Bhej raha hoon…",
     voiceStop: "Roko",
   },
@@ -1466,7 +1595,8 @@ const hinglish: Dict = {
     payBtn: "{price} — Securely pay",
     payNote: "Google Play se secure · UPI, card, netbanking",
     mismatchTitle: "Aapka desh confirm karo",
-    mismatchBody: "Aapka internet {ip} ka lag raha hai, par aapka phone {profile} ka. Kaunse desh ka price dikhaayein?\n\nDhyan rahe: paisa hamesha aapke Google Play account wale desh se hi katta hai.",
+    mismatchBody:
+      "Internet {ip} ka lag raha hai, phone {profile} ka. Kaunse desh ka price dikhayein?\n\nPaisa hamesha aapke Google Play account wale desh se katta hai.",
     mismatchUseIp: "{ip} ka price",
     mismatchUseProfile: "{profile} ka price",
     freeName: "Free",
@@ -1521,7 +1651,7 @@ const hinglish: Dict = {
     title: "Refer & Earn",
     heroTitle: "Dono ko {d} din ka Plus plan FREE",
     heroSub:
-      "Aapka dost aapke code se join kare, apna pehla document daale aur ek reminder set kare — dono ko {d} din ka Saathi Plus plan mil jaayega.",
+      "Dost aapke code se join kare, pehla document daale aur ek reminder set kare — dono ko {d} din Plus.",
     lockedTitle: "Pehle ye poora karo",
     lockedSub: "Uske baad aapka referral code aur share unlock ho jayega.",
     condDocument: "Ek document add karo",
@@ -1558,8 +1688,11 @@ const hinglish: Dict = {
     verifyCta: "Verify karo",
     verified: "Verified",
     verifyWhy:
-      "Number verify karne par hi reminder ka WhatsApp aap tak pahunchega. Ek digit ki galti se wo kisi aur ke paas chala jaata hai.",
+      "Verify hone par hi WhatsApp reminder aap tak pahunchega. Ek digit galat, wo kisi aur ke paas.",
+    whatsappNote: "Wahi number daalo jispar WhatsApp chalta hai — message wahin aayega.",
     otpTitle: "{phone} par code bheja hai",
+    otpTitleFailed: "Code nahi bheja ja saka",
+    otpForPhone: "Number: {phone}",
     otpSub: "SMS me 6 ank ka code aaya hoga. Wahi yahan daal do.",
     otpPh: "6 ank ka code",
     otpSubmit: "Confirm karo",
@@ -1579,7 +1712,7 @@ const hinglish: Dict = {
     errCooldown: "Abhi-abhi code bheja hai. Thoda ruk ke dobara bhejo.",
     errTooMany: "Aaj ki SMS limit poori ho gayi. Support se limit reset karwa lo.",
     otpBlockedNote:
-      "Aapki OTP limit poori ho chuki hai, isliye abhi naya code nahi ja sakta. Support me ticket raise karo — hum limit reset kar denge aur aap turant verify kar paoge.",
+      "OTP limit poori ho gayi, abhi naya code nahi ja sakta. Ticket raise karo — hum reset kar denge.",
     otpBlockedCta: "Support me ticket raise karo",
     otpBlockedSubject: "OTP limit reset karo",
     errBlockedCountry: "Is desh me abhi SMS nahi ja sakta.",
@@ -1660,16 +1793,23 @@ const hinglish: Dict = {
     langAlertTitle: "Bhasha",
     langAlertBody: "Neeche se apni bhasha chuno — poora app usi me badal jayega.",
     deleteTitle: "Account delete karwana hai?",
+    /**
+     * ⚠️ Chhota rakha gaya hai, aur wajah seedhi hai: modal ka lamba paragraph
+     * koi nahi padhta. Pehle yahan chaar line thi (request, jaanch, kya-kya
+     * hatega, tab tak app chalegi) — user uske beech me hi confirm daba deta
+     * tha. Sabse zaroori do baatein hi bachi hain: ye wapas nahi aata, aur tab
+     * tak app chalti rahegi.
+     */
     deleteBody:
-      "Aapki request hamari team tak jaayegi. Jaanch ke baad aapka account aur saara data — documents, reminders, notes — hata diya jayega. Uske baad kuch wapas nahi aata. Kaam poora hone tak aap app use kar sakte ho.",
-    deleteYes: "Haan, request bhejo",
+      "Jaanch ke baad aapka account aur saara data hamesha ke liye hat jayega. Tab tak app chalti rahegi.",
+    deleteYes: "Haan",
     deleted: "Request bhej di — team jald dekhegi",
     deletePending: "Aapki request pehle se darj hai",
     deleteFailed: "Request nahi ja saki — dobara koshish karo",
     deleteAsked: "Request bheji hui hai",
     closedTitle: "Ye account band kar diya gaya hai",
     closedBody:
-      "Aapki request par is account ko band kar diya gaya hai, isliye ab yahan kuch nahi dikhega. Ye galti se hua ho to support se baat karo — hum ise wapas khol sakte hain.",
+      "Aapki request par ye account band kar diya gaya. Galti se hua ho to support se baat karo.",
     linkFailed: "Link nahi khula",
     exportContact: "Data export ke liye help se contact karo",
     settingsFailed: "Settings nahi khuli",
@@ -1703,21 +1843,18 @@ const hinglish: Dict = {
   },
   deviceOwner: {
     title: "Ye phone kisi aur ke naam par set hai",
-    intro:
-      "Saathi me ye phone {name} ({email}) ke liye set hai. Aap apni ID se login kar sakte ho — koi rok nahi. Par ek baat pehle jaan lo, kyunki baad me pata chalne par dono ka nuksaan hota hai.",
-    introNoName:
-      "Saathi me ye phone {email} ke liye set hai. Aap apni ID se login kar sakte ho — koi rok nahi. Par ek baat pehle jaan lo, kyunki baad me pata chalne par dono ka nuksaan hota hai.",
+    intro: "Ye phone {name} ({email}) ke liye set hai. Login kar sakte ho — pehle itna jaan lo.",
+    introNoName: "Ye phone {email} ke liye set hai. Login kar sakte ho — pehle itna jaan lo.",
     notifTitle: "Notification ek waqt me ek hi ID ki",
     notifBody:
-      "Phone ka pata (token) ek samay me ek hi account se juda rehta hai. Aap login karoge to unke reminder ki notification is phone par aani band ho jayegi — aur aap logout karoge to aapki. Dono ek saath kabhi nahi chal sakti.",
+      "Aap login karoge to unke reminder is phone par aana band. Dono ek saath nahi chal sakti.",
     aiTitle: "AI sirf usi ka data dekhta hai jo abhi login hai",
     aiBody:
-      "Chat, document scan aur reminder samajhne wala Saathi aapke apne documents aur reminders par chalta hai. Is phone par jo pehle se rakha hai wo aapko nahi dikhega, aur aapka unhe nahi.",
+      "Saathi sirf usi ke documents aur reminder padhta hai jo login hai. Unka aapko nahi dikhega.",
     rewardTitle: "Referral ka inaam ek phone par ek hi baar",
     rewardBody:
-      "Ek device se refer ka reward sirf ek baar milta hai. Is phone par wo pehle hi liya ja chuka ho sakta hai — us soorat me aapko wo nahi milega, chahe code sahi ho.",
-    advice:
-      "Sabse achha yahi hai: apne phone par apni ID se login karo. Tabhi notification, AI aur baaki sab poori tarah aapke liye chalega.",
+      "Ek phone par inaam ek hi baar. Yahan pehle liya ja chuka ho to sahi code par bhi nahi milega.",
+    advice: "Behtar yahi — apne phone par apni ID. Tabhi sab poori tarah aapke liye chalega.",
     ok: "Samajh gaya, phir bhi chalu rakho",
     logout: "Logout karo",
     bannerTitle: "Ye phone pehle se set hai",
@@ -1728,24 +1865,22 @@ const hinglish: Dict = {
     bannerBody:
       "{who} ke liye. Doosri ID se login karoge to notification aur AI unke liye band ho jayenge.",
     bannerMore: "Poori baat padho",
+    toast: "Ye phone {who} ke naam par set hai — aapke reminder yahan nahi aayenge.",
   },
   multiDevice: {
     title: "Aapki ID aur phones par bhi login hai",
-    intro:
-      "Aapka account is phone ke alawa {count} aur phones par login hai. Koi rok nahi hai — par ek baat jaan lena zaroori hai, warna aage chal ke lagega ki app kharab hai.",
-    introOne:
-      "Aapka account is phone ke alawa ek aur phone par bhi login hai. Koi rok nahi hai — par ek baat jaan lena zaroori hai, warna aage chal ke lagega ki app kharab hai.",
+    intro: "Is phone ke alawa aapki ID {count} aur phones par login hai. Bas itna jaan lo.",
+    introOne: "Is phone ke alawa aapki ID ek aur phone par bhi login hai. Bas itna jaan lo.",
     alarmTitle: "Reminder ka alarm har phone me alag lagta hai",
     alarmBody:
-      "Alarm phone ke andar set hota hai, server par nahi. Aapne yahan reminder ka time badla, to doosre phone par purana alarm tab tak wahi rahega jab tak wahan app khol nahi lete. Isi wajah se ek hi reminder do alag waqt par baj sakta hai.",
+      "Alarm phone ke andar lagta hai, server par nahi. Time yahan badla to doosre phone par purana hi bajega.",
     notifTitle: "Ek hi message har phone par jaayega",
     notifBody:
-      "Reminder aur Saathi ke message aapke har logged-in phone par pahunchte hain. Do phone hain to do baar aayega — ye galti nahi hai, bas dono phone aapke naam par darj hain.",
+      "Har logged-in phone par message jaata hai. Do phone hain to do baar aayega — ye galti nahi.",
     privacyTitle: "Aapke documents har us phone par khule hain",
     privacyBody:
-      "Jo phone login hai, uspar aapke saare documents aur reminders dikhte hain. Koi phone aapke paas nahi hai (ghar ka purana phone, bech diya hua phone) to use abhi hata dena behtar hai.",
-    advice:
-      "Jo phone ab aap use nahi karte, unhe yahin se logout kar do. Yahi phone chalta rahega — aapko dobara login nahi karna padega.",
+      "Jo phone login hai, uspar aapke saare documents khule hain. Phone aapke paas nahi to abhi hata do.",
+    advice: "Jo phone use nahi karte, unhe yahin se logout kar do. Yahi phone chalta rahega.",
     ok: "Theek hai, rehne do",
     logoutOthers: "Baaki sab phones se logout karo",
     logoutOthersDone: "Ho gaya — ab sirf yahi phone login hai.",
@@ -1755,7 +1890,7 @@ const hinglish: Dict = {
     title: "Notes",
     empty: "Abhi koi note nahi",
     emptyHint:
-      "Bazaar ka saamaan, koi idea, gaadi ka number — jo baat yaad rakhni hai par jiska koi time nahi, wo yahan likh lo.",
+      "Bazaar ka saamaan, koi idea, gaadi ka number — jo yaad rakhna hai par jiska time nahi.",
     add: "Naya note",
     titlePh: "Title (chaho to)",
     bodyPh: "Jo likhna hai likho…",
@@ -1776,6 +1911,26 @@ const hinglish: Dict = {
     reminderOn: "Reminder laga hai",
     reminderOff: "Reminder band hai",
   },
+  whatsappSetup: {
+    title: "WhatsApp par bhi yaad dila dun?",
+    body: "Plus me reminder aur expiry ka message WhatsApp par bhi jaata hai. Number ek baar verify karo.",
+    note: "Wahi number daalo jispar WhatsApp chalta hai.",
+    cta: "Number verify karo",
+  },
+  noteReminder: {
+    title: "Kab yaad dilaun?",
+    whenLabel: "Kab",
+    dateLabel: "Taarikh",
+    timeLabel: "Waqt",
+    repeatLabel: "Dohrao",
+    repeatOnce: "Ek baar",
+    repeatDaily: "Roz",
+    repeatWeekly: "Har hafte",
+    pastTime: "Ye waqt beet chuka hai",
+    movedToTomorrow: "Aaj ka ye waqt nikal gaya — kal ke liye laga diya",
+    saved: "Reminder lag gaya ✓",
+    saveFailed: "Reminder set nahi ho paya",
+  },
   lock: {
     title: "App lock",
     subtitle: "Fingerprint/face ya PIN ke bina Saathi na khule",
@@ -1784,9 +1939,22 @@ const hinglish: Dict = {
     enterPin: "PIN daalo",
     wrongPin: "PIN galat hai",
     tooManyPin: "Bahut baar galat PIN. {s} second baad dobara koshish karo.",
-    signOutInstead: "PIN bhool gaye? Logout karke dobara login karo",
-    signOutAsk: "Logout kar dein?",
-    signOutBody: "App lock hat jayega. Aapka saara data safe hai — usi email/Google se dobara login karte hi sab wapas aa jayega.",
+    forgotPin: "PIN bhool gaye? Email se badlo",
+    resetSending: "Code bhej rahe hain…",
+    resetTitle: "Email par code aaya hai",
+    resetSentTo: "{email} par 6 ank ka code bheja hai",
+    resetNewPin: "Naya PIN banao",
+    resetNewSub: "4 ank ka naya PIN daalo.",
+    resetResend: "Dobara bhejo",
+    resetResendIn: "Dobara bhejo ({s}s)",
+    resetErrNoEmail: "Is account par email nahi hai. Support se baat karo.",
+    resetErrNotConfigured: "Abhi email nahi ja pa rahi. Thodi der baad koshish karo.",
+    resetErrTooMany: "Bahut baar code manga. Ek ghante baad koshish karo.",
+    resetErrWrongCode: "Code galat hai",
+    resetErrExpired: "Code expire ho gaya. Naya mangwao.",
+    resetErrLocked: "Is code par bahut koshish ho gayi. Naya mangwao.",
+    resetErrFailed: "Nahi ho paya. Dobara koshish karo.",
+    resetErrNoNet: "Internet nahi hai",
     useBiometric: "Fingerprint/face se kholo",
     biometricPrompt: "Saathi kholne ke liye",
     setTitle: "Naya PIN banao",
@@ -1806,7 +1974,7 @@ const hinglish: Dict = {
     saveFailed: "Nahi ho paya. Dobara koshish karo.",
     offerTitle: "Saathi ko lock kar lo?",
     offerBody:
-      "Aapke documents is phone me rakhe hain. Ek PIN laga do — phone kisi aur ke haath lage to bhi wo unhe nahi khol payega. Fingerprint/face bhi laga sakte ho.",
+      "Documents is phone me hain. Ek PIN laga do — phone kisi aur ke haath lage to bhi na khule.",
     offerYes: "Haan, lock lagao",
     offerNo: "Abhi nahi",
   },
@@ -1890,12 +2058,14 @@ const hi: Dict = {
   reliability: {
     promptTitle: "रिमाइंडर ठीक समय पर आए",
     promptBody:
-      "इनके बिना Android रिमाइंडर देर से भेजता है — कभी 5-10 मिनट बाद। एक-एक करके Allow दबाएँ, बस एक बार का काम है।",
+      "इनके बिना Android रिमाइंडर 5-10 मिनट देर से भेजता है। एक-एक करके Allow दबाएँ — एक बार का काम।",
     promptButton: "सेटअप करें",
     promptLater: "बाद में",
     settingsRow: "रिमाइंडर भरोसेमंद बनाएँ",
     settingsRowSub: "नोटिफ़िकेशन, exact alarm और बैटरी — सब एक जगह",
     stepAllow: "Allow",
+    stepConfirmYes: "On कर दिया",
+    stepOpenAgain: "फिर से खोलें",
     stepDone: "हो गया",
     stepNotif: "नोटिफ़िकेशन allow करें",
     stepNotifSub: "इसके बिना रिमाइंडर दिखेगा ही नहीं",
@@ -1905,7 +2075,7 @@ const hi: Dict = {
     stepFsiSub:
       "इसके बिना सिर्फ़ ऊपर पतली सी नोटिफ़िकेशन आएगी — स्क्रीन के बीच में बड़ा अलर्ट नहीं",
     fsiSpotlight:
-      "रिमाइंडर का बड़ा पॉपअप पूरी स्क्रीन पर आने के लिए यही एक चीज़ सबसे ज़रूरी है। Android 14 से यह डिफ़ॉल्ट में बंद आता है — इसलिए बाकी सब allow करने पर भी बड़ा अलर्ट नहीं आता।",
+      "पूरी स्क्रीन वाला बड़ा अलर्ट इसी से आता है। Android 14 में यह डिफ़ॉल्ट से बंद रहता है।",
     stepBattery: "बैकग्राउंड में चलने दें",
     stepBatterySub: "बैटरी ऑप्टिमाइज़ेशन ऑफ़ — ऐप बंद हो तब भी रिमाइंडर आए",
     stepOem: "ऑटो-स्टार्ट ऑन करें",
@@ -2016,11 +2186,11 @@ const hi: Dict = {
     renewOpenSite: "आधिकारिक साइट खोलें",
     renewSoonTitle: "रिन्यू का तरीका — जल्द आ रहा है",
     renewSoonBody:
-      "इस डॉक्युमेंट के लिए स्टेप-बाय-स्टेप गाइड अभी तैयार हो रही है। तब तक डॉक्युमेंट पर लिखी संस्था की आधिकारिक साइट देख लीजिए।",
+      "गाइड तैयार हो रही है। तब तक डॉक्युमेंट पर लिखी संस्था की आधिकारिक साइट देख लीजिए।",
     renewShowSteps: "रिन्यू कैसे करें",
     renewHideSteps: "छुपा दें",
     renewVerifyNote:
-      "यह आम तरीक़ा है। अपने देश की आधिकारिक साइट पर एक बार जाँच लें — प्रक्रिया और फ़ीस बदलती रहती है।",
+      "यह आम तरीक़ा है। आधिकारिक साइट पर एक बार जाँच लें — प्रक्रिया और फ़ीस बदलती रहती है।",
     sharedN: "{n} डॉक्युमेंट शेयर हुए",
     selectAll: "सभी चुनें",
     selectCount: "{n} चुने",
@@ -2153,7 +2323,7 @@ const hi: Dict = {
     later: "अभी नहीं",
     thanksTitle: "धन्यवाद! ❤️",
     thanksSub:
-      "बहुत मायने रखता है। एक आख़िरी बात — Play Store पर एक छोटी रेटिंग से और परिवार साथी तक पहुँचते हैं। बस 10 सेकंड। 🙏",
+      "Play Store पर एक छोटी रेटिंग से और परिवार साथी तक पहुँचते हैं। बस 10 सेकंड। 🙏",
     rateBtn: "Play Store पर रेट करें",
   },
   network: {
@@ -2167,12 +2337,10 @@ const hi: Dict = {
     failHint: "यह ऐप की ग़लती नहीं है — नेट वापस आते ही यह चल जाएगा।",
     tryAgain: "दोबारा कोशिश करें",
     offTitle: "इंटरनेट नहीं है",
-    offBody:
-      "नेट आते ही साथी पूरा चालू हो जाएगा। तब तक आपके सेव किए हुए डॉक्युमेंट यहाँ हैं — देख सकते हैं, डाउनलोड और शेयर भी कर सकते हैं।",
+    offBody: "सेव किए हुए डॉक्युमेंट अभी भी खुल जाएँगे।",
     offDocsTitle: "आपके डॉक्युमेंट",
-    offEmpty: "यहाँ अभी कोई डॉक्युमेंट नहीं",
-    offEmptyBody:
-      "जो डॉक्युमेंट आपने पहले खोले थे वे अपने आप यहाँ सेव हो जाते हैं। नेट आने पर एक बार Documents टैब खोल लीजिए।",
+    offEmpty: "कोई डॉक्युमेंट सेव नहीं है",
+    offEmptyBody: "नेट आने पर Documents टैब एक बार खोल लीजिए — सब यहाँ आ जाएँगे।",
     offRetry: "दोबारा जाँचें",
     offChecking: "जाँच रहे हैं…",
     offView: "देखें",
@@ -2202,9 +2370,9 @@ const hi: Dict = {
   chat: {
     online: "आपका दोस्त · ऑनलाइन",
     greeting:
-      "नमस्ते{name}! मैं आपका साथी। अपने reminders, tasks और documents के बारे में पूछ लें — मैं मदद कर दूँगा। 🙂",
+      "नमस्ते{name}! मैं आपका साथी। रिमाइंडर, task या document के बारे में पूछ लें। 🙂",
     stubReply:
-      "आप अपने reminder, task या document से जुड़ी चीज़ें पूछ सकते हैं। 🙂 अभी मैं बाकी सब कुछ नहीं बता सकता, पर वो बहुत जल्द आ रहा है — तब तक Documents और Reminders टैब इस्तेमाल करें!",
+      "फ़िलहाल मैं reminder, task और document के सवाल समझता हूँ। 🙂 बाकी बहुत जल्द आ रहा है।",
     inputPlaceholder: "कुछ लिखें…",
     suggestions: ["कल 8 बजे उठाना", "इंश्योरेंस कब एक्सपायर है?", "आज क्या करना है?"],
     retrySend: "दोबारा भेजें",
@@ -2216,6 +2384,7 @@ const hi: Dict = {
     offlineReminderSet: "नेट नहीं था, फिर भी मैंने रिमाइंडर लगा दिया",
     reminderFailed: "रिमाइंडर बन नहीं पाया",
     reminderNeedsTime: "समय एक बार देख लीजिए — बस एक टैप में सेट हो जाएगा",
+    settingChanged: "सेटिंग बदल दी ✓",
     voiceSending: "भेज रहा हूँ…",
     voiceStop: "रोकें",
   },
@@ -2232,7 +2401,8 @@ const hi: Dict = {
     payBtn: "{price} — सुरक्षित pay करें",
     payNote: "Google Play से सुरक्षित · UPI, card, netbanking",
     mismatchTitle: "अपना देश कन्फ़र्म करें",
-    mismatchBody: "आपका इंटरनेट {ip} का लग रहा है, पर आपका फ़ोन {profile} का। किस देश का प्राइस दिखाएँ?\n\nध्यान रहे: पैसा हमेशा आपके Google Play अकाउंट वाले देश से ही कटता है।",
+    mismatchBody:
+      "इंटरनेट {ip} का लग रहा है, फ़ोन {profile} का। किस देश का प्राइस दिखाएँ?\n\nपैसा हमेशा आपके Google Play अकाउंट वाले देश से कटता है।",
     mismatchUseIp: "{ip} का प्राइस",
     mismatchUseProfile: "{profile} का प्राइस",
     freeName: "फ्री",
@@ -2287,7 +2457,7 @@ const hi: Dict = {
     title: "रेफ़र करें और पाएँ",
     heroTitle: "दोनों को {d} दिन का प्लस प्लान FREE",
     heroSub:
-      "आपका दोस्त आपके कोड से जॉइन करे, अपना पहला डॉक्युमेंट डाले और एक reminder सेट करे — दोनों को {d} दिन का साथी प्लस प्लान मिल जाएगा।",
+      "दोस्त आपके कोड से जॉइन करे, पहला डॉक्युमेंट डाले और एक reminder सेट करे — दोनों को {d} दिन प्लस।",
     lockedTitle: "पहले ये पूरा करें",
     lockedSub: "उसके बाद आपका रेफ़रल कोड और शेयर अनलॉक हो जाएगा।",
     condDocument: "एक डॉक्युमेंट जोड़ें",
@@ -2324,8 +2494,11 @@ const hi: Dict = {
     verifyCta: "वेरिफ़ाई करें",
     verified: "वेरिफ़ाइड",
     verifyWhy:
-      "नंबर वेरिफ़ाई होने पर ही रिमाइंडर का WhatsApp आप तक पहुँचेगा। एक अंक की ग़लती से वह किसी और के पास चला जाता है।",
+      "वेरिफ़ाई होने पर ही WhatsApp रिमाइंडर आप तक पहुँचेगा। एक अंक ग़लत, वह किसी और के पास।",
+    whatsappNote: "वही नंबर डालिए जिस पर WhatsApp चलता है — मैसेज वहीं आएगा।",
     otpTitle: "{phone} पर कोड भेजा है",
+    otpTitleFailed: "कोड नहीं भेजा जा सका",
+    otpForPhone: "नंबर: {phone}",
     otpSub: "SMS में 6 अंक का कोड आया होगा। वही यहाँ डाल दीजिए।",
     otpPh: "6 अंक का कोड",
     otpSubmit: "कन्फ़र्म करें",
@@ -2345,7 +2518,7 @@ const hi: Dict = {
     errCooldown: "अभी-अभी कोड भेजा है। थोड़ा रुककर दोबारा भेजिए।",
     errTooMany: "आज की SMS लिमिट पूरी हो गई। सपोर्ट से लिमिट रीसेट करवा लीजिए।",
     otpBlockedNote:
-      "आपकी OTP लिमिट पूरी हो चुकी है, इसलिए अभी नया कोड नहीं जा सकता। सपोर्ट में टिकट राइज़ कीजिए — हम लिमिट रीसेट कर देंगे और आप तुरंत वेरिफ़ाई कर पाएँगे।",
+      "OTP लिमिट पूरी हो गई, अभी नया कोड नहीं जा सकता। टिकट राइज़ कीजिए — हम रीसेट कर देंगे।",
     otpBlockedCta: "सपोर्ट में टिकट राइज़ करें",
     otpBlockedSubject: "OTP लिमिट रीसेट करें",
     errBlockedCountry: "इस देश में अभी SMS नहीं जा सकता।",
@@ -2427,15 +2600,15 @@ const hi: Dict = {
     langAlertBody: "नीचे से अपनी भाषा चुनें — पूरा app उसी में बदल जाएगा।",
     deleteTitle: "अकाउंट डिलीट करवाना है?",
     deleteBody:
-      "आपकी request हमारी team तक जाएगी। जाँच के बाद आपका अकाउंट और सारा डेटा — डॉक्युमेंट, रिमाइंडर, नोट्स — हटा दिया जाएगा। उसके बाद कुछ वापस नहीं आता। काम पूरा होने तक आप ऐप चला सकते हैं।",
-    deleteYes: "हाँ, request भेजें",
+      "जाँच के बाद आपका अकाउंट और सारा डेटा हमेशा के लिए हट जाएगा। तब तक ऐप चलती रहेगी।",
+    deleteYes: "हाँ",
     deleted: "Request भेज दी — team जल्द देखेगी",
     deletePending: "आपकी request पहले से दर्ज है",
     deleteFailed: "Request नहीं जा सकी — दोबारा कोशिश करें",
     deleteAsked: "Request भेजी हुई है",
     closedTitle: "यह अकाउंट बंद कर दिया गया है",
     closedBody:
-      "आपकी request पर यह अकाउंट बंद कर दिया गया है, इसलिए अब यहाँ कुछ नहीं दिखेगा। यह ग़लती से हुआ हो तो support से बात करें — हम इसे वापस खोल सकते हैं।",
+      "आपकी request पर यह अकाउंट बंद कर दिया गया। ग़लती से हुआ हो तो support से बात करें।",
     linkFailed: "लिंक नहीं खुला",
     exportContact: "डेटा एक्सपोर्ट के लिए help से संपर्क करें",
     settingsFailed: "सेटिंग्स नहीं खुलीं",
@@ -2469,45 +2642,40 @@ const hi: Dict = {
   },
   deviceOwner: {
     title: "यह फ़ोन किसी और के नाम पर सेट है",
-    intro:
-      "साथी में यह फ़ोन {name} ({email}) के लिए सेट है। आप अपनी ID से लॉगिन कर सकते हैं — कोई रोक नहीं। पर एक बात पहले जान लीजिए, क्योंकि बाद में पता चलने पर नुक़सान दोनों का होता है।",
-    introNoName:
-      "साथी में यह फ़ोन {email} के लिए सेट है। आप अपनी ID से लॉगिन कर सकते हैं — कोई रोक नहीं। पर एक बात पहले जान लीजिए, क्योंकि बाद में पता चलने पर नुक़सान दोनों का होता है।",
+    intro: "यह फ़ोन {name} ({email}) के लिए सेट है। लॉगिन कर सकते हैं — पहले इतना जान लीजिए।",
+    introNoName: "यह फ़ोन {email} के लिए सेट है। लॉगिन कर सकते हैं — पहले इतना जान लीजिए।",
     notifTitle: "नोटिफ़िकेशन एक समय में एक ही ID की",
     notifBody:
-      "फ़ोन का पता (टोकन) एक समय में एक ही अकाउंट से जुड़ा रहता है। आप लॉगिन करेंगे तो उनके रिमाइंडर की नोटिफ़िकेशन इस फ़ोन पर आनी बंद हो जाएगी — और आप लॉगआउट करेंगे तो आपकी। दोनों एक साथ कभी नहीं चल सकतीं।",
+      "आप लॉगिन करेंगे तो उनके रिमाइंडर इस फ़ोन पर आना बंद। दोनों एक साथ नहीं चल सकतीं।",
     aiTitle: "AI सिर्फ़ उसी का डेटा देखता है जो अभी लॉगिन है",
     aiBody:
-      "चैट, डॉक्यूमेंट स्कैन और रिमाइंडर समझने वाला साथी आपके अपने डॉक्यूमेंट और रिमाइंडर पर चलता है। इस फ़ोन में जो पहले से रखा है वह आपको नहीं दिखेगा, और आपका उन्हें नहीं।",
+      "साथी सिर्फ़ उसी के डॉक्यूमेंट और रिमाइंडर पढ़ता है जो लॉगिन है। उनका आपको नहीं दिखेगा।",
     rewardTitle: "रेफ़रल का इनाम एक फ़ोन पर एक ही बार",
     rewardBody:
-      "एक डिवाइस से रेफ़र का इनाम सिर्फ़ एक बार मिलता है। इस फ़ोन पर वह पहले ही लिया जा चुका हो सकता है — तब आपको वह नहीं मिलेगा, चाहे कोड सही हो।",
-    advice:
-      "सबसे अच्छा यही है: अपने फ़ोन पर अपनी ID से लॉगिन कीजिए। तभी नोटिफ़िकेशन, AI और बाक़ी सब पूरी तरह आपके लिए चलेगा।",
+      "एक फ़ोन पर इनाम एक ही बार। यहाँ पहले लिया जा चुका हो तो सही कोड पर भी नहीं मिलेगा।",
+    advice: "बेहतर यही — अपने फ़ोन पर अपनी ID। तभी सब पूरी तरह आपके लिए चलेगा।",
     ok: "समझ गया, फिर भी चालू रखें",
     logout: "लॉगआउट करें",
     bannerTitle: "यह फ़ोन पहले से सेट है",
     bannerBody:
       "{who} के लिए। दूसरी ID से लॉगिन करेंगे तो नोटिफ़िकेशन और AI उनके लिए बंद हो जाएँगे।",
     bannerMore: "पूरी बात पढ़िए",
+    toast: "यह फ़ोन {who} के नाम पर सेट है — आपके रिमाइंडर यहाँ नहीं आएँगे।",
   },
   multiDevice: {
     title: "आपकी ID और फ़ोनों पर भी लॉगिन है",
-    intro:
-      "आपका अकाउंट इस फ़ोन के अलावा {count} और फ़ोनों पर लॉगिन है। कोई रोक नहीं है — पर एक बात जान लेना ज़रूरी है, वरना आगे चलकर लगेगा कि ऐप ख़राब है।",
-    introOne:
-      "आपका अकाउंट इस फ़ोन के अलावा एक और फ़ोन पर भी लॉगिन है। कोई रोक नहीं है — पर एक बात जान लेना ज़रूरी है, वरना आगे चलकर लगेगा कि ऐप ख़राब है।",
+    intro: "इस फ़ोन के अलावा आपकी ID {count} और फ़ोनों पर लॉगिन है। बस इतना जान लीजिए।",
+    introOne: "इस फ़ोन के अलावा आपकी ID एक और फ़ोन पर भी लॉगिन है। बस इतना जान लीजिए।",
     alarmTitle: "रिमाइंडर का अलार्म हर फ़ोन में अलग लगता है",
     alarmBody:
-      "अलार्म फ़ोन के अंदर सेट होता है, सर्वर पर नहीं। आपने यहाँ रिमाइंडर का समय बदला, तो दूसरे फ़ोन पर पुराना अलार्म तब तक वैसा ही रहेगा जब तक वहाँ ऐप खोल न लें। इसी वजह से एक ही रिमाइंडर दो अलग समय पर बज सकता है।",
+      "अलार्म फ़ोन के अंदर लगता है, सर्वर पर नहीं। समय यहाँ बदला तो दूसरे फ़ोन पर पुराना ही बजेगा।",
     notifTitle: "एक ही मैसेज हर फ़ोन पर जाएगा",
     notifBody:
-      "रिमाइंडर और साथी के मैसेज आपके हर लॉगिन फ़ोन पर पहुँचते हैं। दो फ़ोन हैं तो दो बार आएगा — यह ग़लती नहीं है, बस दोनों फ़ोन आपके नाम पर दर्ज हैं।",
+      "हर लॉगिन फ़ोन पर मैसेज जाता है। दो फ़ोन हैं तो दो बार आएगा — यह ग़लती नहीं।",
     privacyTitle: "आपके डॉक्यूमेंट हर उस फ़ोन पर खुले हैं",
     privacyBody:
-      "जो फ़ोन लॉगिन है, उस पर आपके सारे डॉक्यूमेंट और रिमाइंडर दिखते हैं। कोई फ़ोन आपके पास नहीं है (घर का पुराना फ़ोन, बेचा हुआ फ़ोन) तो उसे अभी हटा देना बेहतर है।",
-    advice:
-      "जो फ़ोन अब आप इस्तेमाल नहीं करते, उन्हें यहीं से लॉगआउट कर दीजिए। यही फ़ोन चलता रहेगा — आपको दोबारा लॉगिन नहीं करना पड़ेगा।",
+      "जो फ़ोन लॉगिन है, उस पर आपके सारे डॉक्यूमेंट खुले हैं। फ़ोन आपके पास नहीं तो अभी हटा दीजिए।",
+    advice: "जो फ़ोन इस्तेमाल नहीं करते, उन्हें यहीं से लॉगआउट कर दीजिए। यही फ़ोन चलता रहेगा।",
     ok: "ठीक है, रहने दीजिए",
     logoutOthers: "बाक़ी सब फ़ोनों से लॉगआउट करें",
     logoutOthersDone: "हो गया — अब सिर्फ़ यही फ़ोन लॉगिन है।",
@@ -2517,7 +2685,7 @@ const hi: Dict = {
     title: "नोट्स",
     empty: "अभी कोई नोट नहीं",
     emptyHint:
-      "बाज़ार का सामान, कोई आइडिया, गाड़ी का नंबर — जो बात याद रखनी है पर जिसका कोई समय नहीं, वह यहाँ लिख लीजिए।",
+      "बाज़ार का सामान, कोई आइडिया, गाड़ी का नंबर — जो याद रखना है पर जिसका समय नहीं।",
     add: "नया नोट",
     titlePh: "टाइटल (चाहें तो)",
     bodyPh: "जो लिखना है लिखिए…",
@@ -2538,6 +2706,26 @@ const hi: Dict = {
     reminderOn: "रिमाइंडर लगा है",
     reminderOff: "रिमाइंडर बंद है",
   },
+  whatsappSetup: {
+    title: "WhatsApp पर भी याद दिला दूँ?",
+    body: "प्लस में रिमाइंडर और एक्सपायरी का मैसेज WhatsApp पर भी जाता है। नंबर एक बार वेरिफ़ाई करें।",
+    note: "वही नंबर डालिए जिस पर WhatsApp चलता है।",
+    cta: "नंबर वेरिफ़ाई करें",
+  },
+  noteReminder: {
+    title: "कब याद दिलाऊँ?",
+    whenLabel: "कब",
+    dateLabel: "तारीख़",
+    timeLabel: "समय",
+    repeatLabel: "दोहराएँ",
+    repeatOnce: "एक बार",
+    repeatDaily: "रोज़",
+    repeatWeekly: "हर हफ़्ते",
+    pastTime: "यह समय बीत चुका है",
+    movedToTomorrow: "आज का यह समय निकल गया — कल के लिए लगा दिया",
+    saved: "रिमाइंडर लग गया ✓",
+    saveFailed: "रिमाइंडर सेट नहीं हो पाया",
+  },
   lock: {
     title: "ऐप लॉक",
     subtitle: "फ़िंगरप्रिंट/फ़ेस या PIN के बिना साथी न खुले",
@@ -2546,9 +2734,22 @@ const hi: Dict = {
     enterPin: "PIN डालिए",
     wrongPin: "PIN ग़लत है",
     tooManyPin: "बहुत बार ग़लत PIN। {s} सेकंड बाद दोबारा कोशिश कीजिए।",
-    signOutInstead: "PIN भूल गए? लॉगआउट करके दोबारा लॉगिन कीजिए",
-    signOutAsk: "लॉगआउट कर दें?",
-    signOutBody: "ऐप लॉक हट जाएगा। आपका सारा डेटा सुरक्षित है — उसी ईमेल/Google से दोबारा लॉगिन करते ही सब वापस आ जाएगा।",
+    forgotPin: "PIN भूल गए? ईमेल से बदलिए",
+    resetSending: "कोड भेज रहे हैं…",
+    resetTitle: "ईमेल पर कोड आया है",
+    resetSentTo: "{email} पर 6 अंक का कोड भेजा है",
+    resetNewPin: "नया PIN बनाइए",
+    resetNewSub: "4 अंक का नया PIN डालिए।",
+    resetResend: "दोबारा भेजें",
+    resetResendIn: "दोबारा भेजें ({s}s)",
+    resetErrNoEmail: "इस अकाउंट पर ईमेल नहीं है। सपोर्ट से बात कीजिए।",
+    resetErrNotConfigured: "अभी ईमेल नहीं जा पा रही। थोड़ी देर बाद कोशिश कीजिए।",
+    resetErrTooMany: "बहुत बार कोड माँगा। एक घंटे बाद कोशिश कीजिए।",
+    resetErrWrongCode: "कोड ग़लत है",
+    resetErrExpired: "कोड एक्सपायर हो गया। नया मँगवाइए।",
+    resetErrLocked: "इस कोड पर बहुत कोशिश हो गई। नया मँगवाइए।",
+    resetErrFailed: "नहीं हो पाया। दोबारा कोशिश कीजिए।",
+    resetErrNoNet: "इंटरनेट नहीं है",
     useBiometric: "फ़िंगरप्रिंट/फ़ेस से खोलें",
     biometricPrompt: "साथी खोलने के लिए",
     setTitle: "नया PIN बनाइए",
@@ -2568,7 +2769,7 @@ const hi: Dict = {
     saveFailed: "नहीं हो पाया। दोबारा कोशिश कीजिए।",
     offerTitle: "साथी को लॉक कर लें?",
     offerBody:
-      "आपके डॉक्यूमेंट इसी फ़ोन में रखे हैं। एक PIN लगा दीजिए — फ़ोन किसी और के हाथ लगे तो भी वह उन्हें नहीं खोल पाएगा। फ़िंगरप्रिंट/फ़ेस भी लगा सकते हैं।",
+      "डॉक्यूमेंट इसी फ़ोन में हैं। एक PIN लगा दीजिए — फ़ोन किसी और के हाथ लगे तो भी न खुले।",
     offerYes: "हाँ, लॉक लगाइए",
     offerNo: "अभी नहीं",
   },
@@ -2652,12 +2853,14 @@ const en: Dict = {
   reliability: {
     promptTitle: "Get reminders exactly on time",
     promptBody:
-      "Without these, Android delivers reminders late — sometimes 5-10 minutes off. Tap Allow on each one. It's a one-time setup.",
+      "Without these, Android delivers reminders 5-10 minutes late. Tap Allow on each — a one-time setup.",
     promptButton: "Set up",
     promptLater: "Later",
     settingsRow: "Make reminders reliable",
     settingsRowSub: "Notifications, exact alarms and battery — all in one place",
     stepAllow: "Allow",
+    stepConfirmYes: "I turned it on",
+    stepOpenAgain: "Open again",
     stepDone: "Done",
     stepNotif: "Allow notifications",
     stepNotifSub: "Without this, reminders never show up",
@@ -2667,7 +2870,7 @@ const en: Dict = {
     stepFsiSub:
       "Without this you only get a thin notification at the top — no big alert in the middle of the screen",
     fsiSpotlight:
-      "This is the one setting that makes the reminder show as a BIG full-screen popup. Android 14 turns it off by default — which is why the big alert never appears even when everything else is allowed.",
+      "This is what makes the alert fill the screen. Android 14 turns it OFF by default.",
     stepBattery: "Allow background activity",
     stepBatterySub: "Battery optimization off — reminders fire even when the app is closed",
     stepOem: "Turn on auto-start",
@@ -2777,11 +2980,11 @@ const en: Dict = {
     renewOpenSite: "Open official site",
     renewSoonTitle: "How to renew — coming soon",
     renewSoonBody:
-      "A step-by-step guide for this document is being prepared. Until then, check the official site of the authority named on your document.",
+      "A step-by-step guide is on the way. Until then, check the issuing authority's official site.",
     renewShowSteps: "How to renew",
     renewHideSteps: "Hide",
     renewVerifyNote:
-      "This is the general process. Check your country's official site once — steps and fees change over time.",
+      "This is the general process. Check the official site once — steps and fees change.",
     sharedN: "{n} document(s) shared",
     selectAll: "Select all",
     selectCount: "{n} selected",
@@ -2914,7 +3117,7 @@ const en: Dict = {
     later: "Not now",
     thanksTitle: "Thank you! ❤️",
     thanksSub:
-      "It means a lot. One last thing — a quick rating on the Play Store helps other families find Saathi. Takes 10 seconds. 🙏",
+      "A quick rating on the Play Store helps other families find Saathi. Takes 10 seconds. 🙏",
     rateBtn: "Rate on Play Store",
   },
   network: {
@@ -2928,12 +3131,10 @@ const en: Dict = {
     failHint: "This isn't the app's fault — it'll work as soon as the network is back.",
     tryAgain: "Try again",
     offTitle: "No internet",
-    offBody:
-      "Saathi comes back fully as soon as you're online. Until then, your saved documents are right here — view, download and share them.",
+    offBody: "Your saved documents still open.",
     offDocsTitle: "Your documents",
-    offEmpty: "No documents here yet",
-    offEmptyBody:
-      "Documents you've opened before are saved here automatically. Open the Documents tab once when you're back online.",
+    offEmpty: "No documents saved yet",
+    offEmptyBody: "Open the Documents tab once you're online — they'll all show up here.",
     offRetry: "Check again",
     offChecking: "Checking…",
     offView: "View",
@@ -2963,9 +3164,9 @@ const en: Dict = {
   chat: {
     online: "your friend · online",
     greeting:
-      "Hello{name}! I'm your Saathi. Ask me about your reminders, tasks and documents — I'll help. 🙂",
+      "Hello{name}! I'm your Saathi. Ask me about a reminder, task or document. 🙂",
     stubReply:
-      "You can ask me about your reminders, tasks or documents. 🙂 I can't answer everything else just yet, but that's coming very soon — until then, use the Documents and Reminders tabs!",
+      "For now I understand questions about your reminders, tasks and documents. 🙂 More is coming soon.",
     inputPlaceholder: "Type something…",
     suggestions: ["Wake me at 8am", "When does my insurance expire?", "What's on today?"],
     retrySend: "Send again",
@@ -2977,6 +3178,7 @@ const en: Dict = {
     offlineReminderSet: "No internet, but I've set the reminder",
     reminderFailed: "Couldn't create the reminder",
     reminderNeedsTime: "Just check the time — one tap and it's set",
+    settingChanged: "Setting changed ✓",
     voiceSending: "Sending…",
     voiceStop: "Stop",
   },
@@ -2993,7 +3195,8 @@ const en: Dict = {
     payBtn: "{price} — Pay securely",
     payNote: "Secure via Google Play · UPI, card, netbanking",
     mismatchTitle: "Confirm your country",
-    mismatchBody: "Your internet looks like {ip}, but your phone looks like {profile}. Which country's price should we show?\n\nNote: you're always charged in your Google Play account's country.",
+    mismatchBody:
+      "Your internet looks like {ip}, your phone like {profile}. Which country's price?\n\nYou're always charged in your Google Play account's country.",
     mismatchUseIp: "{ip} price",
     mismatchUseProfile: "{profile} price",
     freeName: "Free",
@@ -3048,7 +3251,7 @@ const en: Dict = {
     title: "Refer & Earn",
     heroTitle: "You both get {d} days of the Plus plan FREE",
     heroSub:
-      "Your friend joins with your code, adds their first document and sets one reminder — you both get {d} days of the Saathi Plus plan.",
+      "Your friend joins with your code, adds a document and sets one reminder — you both get {d} days of Plus.",
     lockedTitle: "First, finish these",
     lockedSub: "Then your referral code and sharing unlock.",
     condDocument: "Add one document",
@@ -3085,8 +3288,11 @@ const en: Dict = {
     verifyCta: "Verify",
     verified: "Verified",
     verifyWhy:
-      "WhatsApp reminders only reach you once the number is verified. One wrong digit and they go to a stranger instead.",
+      "WhatsApp reminders only reach you once the number is verified. One wrong digit sends them elsewhere.",
+    whatsappNote: "Use the number your WhatsApp is on — that's where messages go.",
     otpTitle: "Code sent to {phone}",
+    otpTitleFailed: "Couldn't send the code",
+    otpForPhone: "Number: {phone}",
     otpSub: "A 6-digit code should arrive by SMS. Type it here.",
     otpPh: "6-digit code",
     otpSubmit: "Confirm",
@@ -3106,7 +3312,7 @@ const en: Dict = {
     errCooldown: "A code just went out. Wait a moment and send again.",
     errTooMany: "You've hit today's SMS limit. Ask support to reset it.",
     otpBlockedNote:
-      "You've hit your OTP limit, so a new code can't go out right now. Raise a support ticket — we'll reset the limit and you can verify straight away.",
+      "You've hit the OTP limit, so no new code can go out. Raise a ticket — we'll reset it.",
     otpBlockedCta: "Raise a support ticket",
     otpBlockedSubject: "Reset my OTP limit",
     errBlockedCountry: "We can't send SMS to this country yet.",
@@ -3188,22 +3394,22 @@ const en: Dict = {
     langAlertBody: "Pick your language below — the whole app switches to it.",
     deleteTitle: "Request account deletion?",
     deleteBody:
-      "Your request goes to our team. After a check, your account and everything in it — documents, reminders, notes — will be removed. Nothing comes back after that. You can keep using the app until it's done.",
-    deleteYes: "Yes, send the request",
+      "After a review, your account and all its data are gone for good. You can use the app until then.",
+    deleteYes: "Yes",
     deleted: "Request sent — our team will review it soon",
     deletePending: "Your request is already with us",
     deleteFailed: "Couldn't send the request — please try again",
     deleteAsked: "Request sent",
     closedTitle: "This account has been closed",
     closedBody:
-      "We closed this account at your request, so there's nothing left to show here. If this happened by mistake, talk to support — we can reopen it.",
+      "We closed this account at your request. If that was a mistake, talk to support.",
     linkFailed: "Couldn't open the link",
     exportContact: "For a data export, please reach out via Help",
     settingsFailed: "Couldn't open settings",
   },
   support: {
     title: "Support",
-    sub: "Something not working, or just a question? Write here — every request gets its own number and the reply comes back to this same place.",
+    sub: "Not working, or just a question? Write here — each request gets a number, and the reply lands here.",
     newBtn: "New request",
     empty: "No tickets yet",
     emptyHint: "Ask anything — a problem, a suggestion, or just a question. We'll reply.",
@@ -3230,45 +3436,40 @@ const en: Dict = {
   },
   deviceOwner: {
     title: "This phone is set up for someone else",
-    intro:
-      "In Saathi, this phone is set up for {name} ({email}). You can still sign in with your own ID — nothing is blocked. But please read this first, because finding out later costs both of you.",
-    introNoName:
-      "In Saathi, this phone is set up for {email}. You can still sign in with your own ID — nothing is blocked. But please read this first, because finding out later costs both of you.",
+    intro: "This phone is set up for {name} ({email}). You can still sign in — just read this first.",
+    introNoName: "This phone is set up for {email}. You can still sign in — just read this first.",
     notifTitle: "Notifications belong to one ID at a time",
     notifBody:
-      "A phone's delivery address (its token) can belong to only one account at a time. Sign in here and their reminder notifications stop arriving on this phone — sign out and yours stop. The two can never run together.",
+      "Sign in here and their reminders stop arriving on this phone. The two can't run together.",
     aiTitle: "The AI only sees whoever is signed in",
     aiBody:
-      "Chat, document scanning and reminder understanding all work on your own documents and reminders. Whatever is already stored on this phone won't be visible to you, and yours won't be visible to them.",
+      "Saathi only reads the signed-in person's documents and reminders. Theirs stay hidden from you.",
     rewardTitle: "One referral reward per phone",
     rewardBody:
-      "A device can earn the referral reward only once. It may already have been claimed on this phone — in that case you won't get it, however valid your code is.",
-    advice:
-      "The best thing is simple: sign in with your own ID on your own phone. That's the only way notifications, the AI and everything else work fully for you.",
+      "One reward per phone. If it's already been claimed here, even a valid code won't pay out.",
+    advice: "Best is simple: your own ID on your own phone. Then everything works fully for you.",
     ok: "I understand, continue anyway",
     logout: "Sign out",
     bannerTitle: "This phone is already set up",
     bannerBody:
       "For {who}. Signing in with a different ID turns off their notifications and AI.",
     bannerMore: "Read what changes",
+    toast: "This phone is set up for {who} — your reminders won't arrive here.",
   },
   multiDevice: {
     title: "Your ID is signed in on other phones too",
-    intro:
-      "Besides this phone, your account is signed in on {count} others. Nothing is blocked — but it's worth knowing this, otherwise the app will start looking broken.",
-    introOne:
-      "Besides this phone, your account is signed in on one other phone. Nothing is blocked — but it's worth knowing this, otherwise the app will start looking broken.",
+    intro: "Besides this phone, your ID is signed in on {count} others. Just worth knowing.",
+    introOne: "Besides this phone, your ID is signed in on one other phone. Just worth knowing.",
     alarmTitle: "Reminder alarms are set on each phone separately",
     alarmBody:
-      "Alarms live inside the phone, not on the server. Change a reminder's time here and the other phone keeps the old alarm until you open the app there. That's why one reminder can ring at two different times.",
+      "Alarms live on the phone, not the server. Change the time here and the other phone rings the old one.",
     notifTitle: "The same message goes to every phone",
     notifBody:
-      "Reminders and messages from Saathi reach every phone you're signed in on. Two phones means it arrives twice — that isn't a fault, both phones are registered to you.",
+      "Every signed-in phone gets the message. Two phones means it arrives twice — not a fault.",
     privacyTitle: "Your documents are open on every one of those phones",
     privacyBody:
-      "Any signed-in phone shows all your documents and reminders. If a phone isn't with you any more — an old family handset, one you sold — it's better to remove it now.",
-    advice:
-      "Sign out the phones you no longer use, right here. This phone stays signed in — you won't have to log in again.",
+      "Any signed-in phone shows all your documents. If a phone isn't with you, remove it now.",
+    advice: "Sign out the phones you no longer use, right here. This phone stays signed in.",
     ok: "That's fine, leave it",
     logoutOthers: "Sign out all other phones",
     logoutOthersDone: "Done — only this phone is signed in now.",
@@ -3278,7 +3479,7 @@ const en: Dict = {
     title: "Notes",
     empty: "No notes yet",
     emptyHint:
-      "A shopping list, an idea, a car number — anything worth keeping that doesn't need a time. Write it here.",
+      "A shopping list, an idea, a car number — worth keeping, but with no time attached.",
     add: "New note",
     titlePh: "Title (optional)",
     bodyPh: "Write whatever you need…",
@@ -3299,6 +3500,26 @@ const en: Dict = {
     reminderOn: "Reminder is set",
     reminderOff: "Reminder is off",
   },
+  whatsappSetup: {
+    title: "Want these on WhatsApp too?",
+    body: "With Plus, reminders and expiry alerts also go to WhatsApp. Just verify your number once.",
+    note: "Use the number your WhatsApp is on.",
+    cta: "Verify my number",
+  },
+  noteReminder: {
+    title: "When should I remind you?",
+    whenLabel: "When",
+    dateLabel: "Date",
+    timeLabel: "Time",
+    repeatLabel: "Repeat",
+    repeatOnce: "Once",
+    repeatDaily: "Daily",
+    repeatWeekly: "Weekly",
+    pastTime: "That time has already passed",
+    movedToTomorrow: "That time has passed today — set for tomorrow",
+    saved: "Reminder set ✓",
+    saveFailed: "Couldn't set the reminder",
+  },
   lock: {
     title: "App lock",
     subtitle: "Saathi won't open without your fingerprint, face or PIN",
@@ -3307,9 +3528,22 @@ const en: Dict = {
     enterPin: "Enter PIN",
     wrongPin: "That PIN isn't right",
     tooManyPin: "Too many wrong tries. Try again in {s} seconds.",
-    signOutInstead: "Forgot your PIN? Sign out and log in again",
-    signOutAsk: "Sign out?",
-    signOutBody: "The app lock will be removed. All your data is safe — log in again with the same email/Google and everything comes back.",
+    forgotPin: "Forgot your PIN? Change it by email",
+    resetSending: "Sending code…",
+    resetTitle: "Check your email",
+    resetSentTo: "We sent a 6-digit code to {email}",
+    resetNewPin: "Create a new PIN",
+    resetNewSub: "Enter a new 4-digit PIN.",
+    resetResend: "Send again",
+    resetResendIn: "Send again ({s}s)",
+    resetErrNoEmail: "This account has no email. Please contact support.",
+    resetErrNotConfigured: "Email isn't going out right now. Try again shortly.",
+    resetErrTooMany: "Too many codes requested. Try again in an hour.",
+    resetErrWrongCode: "That code isn't right",
+    resetErrExpired: "That code expired. Ask for a new one.",
+    resetErrLocked: "Too many tries on that code. Ask for a new one.",
+    resetErrFailed: "Couldn't do it. Please try again.",
+    resetErrNoNet: "No internet",
     useBiometric: "Use fingerprint / face",
     biometricPrompt: "Unlock Saathi",
     setTitle: "Create a PIN",
@@ -3329,7 +3563,7 @@ const en: Dict = {
     saveFailed: "Couldn't do it. Please try again.",
     offerTitle: "Lock Saathi?",
     offerBody:
-      "Your documents live on this phone. Set a PIN and nobody else can open them, even holding your phone. You can add fingerprint or face too.",
+      "Your documents live on this phone. Set a PIN so nobody else can open them, even holding it.",
     offerYes: "Yes, lock it",
     offerNo: "Not now",
   },

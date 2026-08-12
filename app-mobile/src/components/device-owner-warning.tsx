@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -19,9 +19,24 @@ import { tpl } from "@/lib/i18n/dictionaries";
 import { useAuth } from "@/components/auth-provider";
 import { deviceOwner, getDeviceId, type DeviceOwner } from "@/lib/device";
 import { signOut } from "@/lib/auth";
+import { hasFirstDocument, hasFirstReminder, onMilestone } from "@/lib/reviews";
 
 /**
- * "Ye phone kisi aur ke naam par set hai" — login ke baad ek baar.
+ * "Ye phone kisi aur ke naam par set hai" — document AUR reminder, dono ke baad.
+ *
+ * ⚠️ Ye pehle LOGIN ke turant baad khulta tha, aur wahi is chetavni ki sabse
+ * badi kamzori thi. Us pal do aur modal bhi khul rahe the (referral code aur
+ * "PIN laga lo"), aur teenon ka jhund dekh kar user teenon ko bina padhe band
+ * kar deta tha. Nateeja screenshot me saaf tha: reminder set tha, notification
+ * kabhi nahi aayi, aur user ko poori baat ka pata hi nahi chala — jabki wo baat
+ * yahin likhi hui thi.
+ *
+ * Aur pehle din ye baat samajh me bhi nahi aati: jab tak apna koi reminder hai
+ * hi nahi, "aapke reminder is phone par nahi aayenge" ek anjaan chetavni hai.
+ * Reminder ban jaane ke BAAD wahi line seedhi samajh aati hai.
+ *
+ * Tab tak user ko poori tarah andhere me bhi nahi rakha jaata — Home par pehle
+ * hi din ek chhota toast ye baat keh deta hai (`(tabs)/index.tsx`).
  *
  * ⚠️ Ye rok NAHI hai. Login ho chuka hai aur chalta rahega; ye sirf wo baat
  * saaf-saaf keh deta hai jo pehle kahin likhi hi nahi thi.
@@ -60,31 +75,43 @@ export function DeviceOwnerWarning() {
   const insets = useSafeAreaInsets();
   const maxCardHeight = Math.max(320, height - insets.top - insets.bottom - 48);
 
-  useEffect(() => {
+  const check = useCallback(async () => {
     if (!uid) {
       setOwner(null);
       return;
     }
+    // Document AUR reminder, dono ke baad hi (upar wajah likhi hai).
+    const [doc, rem] = await Promise.all([hasFirstDocument(), hasFirstReminder()]);
+    if (!doc || !rem) return;
+
+    const o = await deviceOwner();
+    // Maalik hai hi nahi, ya maalik yahi banda hai — kuch dikhane ki baat hi
+    // nahi. (Naya phone hamesha isi raaste se nikalta hai.)
+    if (!o || o.isMe) return;
+
+    // Ek baar dikha chuke? Key me device aur user dono — kyunki ek hi phone par
+    // teesra banda aaye to usse phir batana chahiye.
+    const deviceId = await getDeviceId();
+    const key = `${SEEN_PREFIX}${deviceId}:${uid}`;
+    const seen = await AsyncStorage.getItem(key).catch(() => null);
+    if (seen === "1") return;
+
+    setOwner(o);
+  }, [uid]);
+
+  useEffect(() => {
     let alive = true;
-    (async () => {
-      const o = await deviceOwner();
-      // Maalik hai hi nahi, ya maalik yahi banda hai — kuch dikhane ki baat hi
-      // nahi. (Naya phone hamesha isi raaste se nikalta hai.)
-      if (!o || o.isMe || !alive) return;
-
-      // Ek baar dikha chuke? Key me device aur user dono — kyunki ek hi phone par
-      // teesra banda aaye to usse phir batana chahiye.
-      const deviceId = await getDeviceId();
-      const key = `${SEEN_PREFIX}${deviceId}:${uid}`;
-      const seen = await AsyncStorage.getItem(key).catch(() => null);
-      if (seen === "1" || !alive) return;
-
-      setOwner(o);
+    void (async () => {
+      await check();
+      if (!alive) return;
     })();
     return () => {
       alive = false;
     };
-  }, [uid]);
+  }, [check]);
+
+  // Reminder/document abhi-abhi bana — padav poora hote hi dobara dekho.
+  useEffect(() => onMilestone(() => void check()), [check]);
 
   useEffect(() => {
     if (!owner) return;

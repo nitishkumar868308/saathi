@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
-import { makeStyles, useColors } from "@/theme/theme";
+import { makeStyles, useColors, useThemeMode } from "@/theme/theme";
+import { setAlertMode } from "@/lib/alert-mode";
 import { TypingDots as Dots } from "@/components/typing-dots";
 import SaathiLogo from "@/components/saathi-logo";
 import { VoiceButton } from "@/components/voice-button";
@@ -201,7 +202,10 @@ export default function Chat() {
   const t = useT();
   const ch = t.chat;
   const c = t.common;
-  const { locale } = useLocale();
+  // Saathi ab app ki apni settings badal sakta hai (theme / bhasha / awaaz).
+  // Poori wajah `runAction` ke andar likhi hai.
+  const { locale, setLocale } = useLocale();
+  const { setMode: setThemeMode } = useThemeMode();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   /** Aakhri turn jo fail hua — "Dobara bhejo" isi ko chalata hai. */
@@ -497,8 +501,57 @@ export default function Chat() {
 
   /** Saathi ka action client par chalao — limits + notifications reuse hote hain. */
   async function runAction(action: SaathiAction) {
-    if (action.type === "navigate" && action.to === "add_document") {
-      router.push("/add-document");
+    /**
+     * Kahin le jao.
+     *
+     * ⚠️ Pehle sirf `add_document` chalta tha; baaki har jagah ke liye Saathi
+     * ek lamba jawab likh deta tha ki khud kaise jaana hai. Bujurg user ke liye
+     * wo jawab bekaar hai — use raasta yaad nahi rakhna, use wahan PAHUNCHNA
+     * hai.
+     */
+    if (action.type === "navigate") {
+      const ROUTES: Record<string, string> = {
+        add_document: "/add-document",
+        add_reminder: "/add-reminder",
+        documents: "/documents",
+        reminders: "/reminders",
+        notes: "/notes",
+        profile: "/profile-details",
+        settings: "/settings",
+        app_lock: "/app-lock",
+        support: "/support",
+        upgrade: "/upgrade",
+      };
+      const path = ROUTES[action.to];
+      if (path) router.push(path as never);
+      return;
+    }
+
+    /**
+     * App ki apni settings — Saathi ab sach me badal deta hai.
+     *
+     * ⚠️ Pehle wo mana kar deta tha ("mere paas aapke phone ki settings ka
+     * access nahi hai"), aur wo jawab APP ki apni settings ke liye sach hi nahi
+     * tha — theme, bhasha aur alert ki awaaz, teenon app ke apne haath me hain.
+     * User ne screenshot me theek yahi pakda tha.
+     *
+     * Har badlaav ke baad ek toast — warna user ko pata hi nahi chalta ki kaam
+     * hua ya nahi (aur bhasha badalne par to poori screen hi badal jaati hai,
+     * jise bina kisi khabar ke dekhna chaunka deta hai).
+     */
+    if (action.type === "set_theme") {
+      setThemeMode(action.value);
+      toast.show(ch.settingChanged, "success");
+      return;
+    }
+    if (action.type === "set_language") {
+      await setLocale(action.value);
+      toast.show(ch.settingChanged, "success");
+      return;
+    }
+    if (action.type === "set_alert_mode") {
+      await setAlertMode(action.value);
+      toast.show(ch.settingChanged, "success");
       return;
     }
     if (action.type === "create_reminder") {

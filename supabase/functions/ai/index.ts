@@ -344,6 +344,32 @@ function repeatFields(a: any): { repeat_every_days: number | null; repeat_until:
   return { repeat_every_days: every, repeat_until: until };
 }
 
+/**
+ * Jo action app sach me chala sakti hai — allow-list, block-list nahi.
+ *
+ * ⚠️ Allow-list hona ZAROORI hai. Model kabhi bhi apni marzi ka `to` ya `value`
+ * likh sakta hai ("to":"delete_all", "value":"blue"), aur wo seedha app tak
+ * pahunch jaata. App unhe chup-chaap gira degi (wahan bhi map hai), par tab
+ * user ko "haan kar diya" wala reply dikhta hai aur kuch hota nahi — jo sabse
+ * uljhan wali soorat hai. Yahin rok dena behtar hai: action null jaayega, aur
+ * reply bhi usi hisaab se banega.
+ */
+const NAV_TARGETS = new Set([
+  "add_document",
+  "add_reminder",
+  "documents",
+  "reminders",
+  "notes",
+  "profile",
+  "settings",
+  "app_lock",
+  "support",
+  "upgrade",
+]);
+const THEME_VALUES = new Set(["light", "dark", "system"]);
+const LANG_VALUES = new Set(["hinglish", "hi", "en"]);
+const ALERT_VALUES = new Set(["ring", "vibrate", "silent"]);
+
 const SAATHI_SYSTEM = `Tum "Saathi" ho — ek warm, caring AI dost (India ke liye). Chhota, pyaara jawab do. Zaroorat se zyada mat likho. Ek emoji kabhi-kabhi. Honest raho.`;
 
 /**
@@ -650,7 +676,30 @@ Deno.serve(async (req) => {
         ` Use kabhi bhi out-of-scope maan ke decline MAT karo. Purani baat ke saath jodo aur aage badho.` +
         ` Ab jitni detail mil chuki hai unhe yaad rakho; sirf jo abhi bhi missing hai wahi pucho — ek baar poochi hui cheez dobara mat pucho.` +
         `\nDOCUMENT: Document add karne ko kahe to chat se nahi banta — reply me batao "photo se add hota hai" aur action {"type":"navigate","to":"add_document"} do.` +
-        `\n\nOUTPUT: SIRF strict JSON do, aur kuch nahi: {"reply":"<chat message, user ki bhasha me>","action": null | {create_reminder|navigate}}. reply HAMESHA bharo, chhota rakho.`;
+        /**
+         * ⚠️ Ye do block Saathi ki sabse badi kami theek karte hain.
+         *
+         * Pehle wo har aisi baat par "main ye nahi kar sakta" keh deta tha —
+         * user ne screenshot me theek yahi pakda tha ("tum kar dena" → "mere
+         * paas access nahi hai"). Aur wo jawab APP ki apni cheezon ke liye sach
+         * hi nahi tha: theme, bhasha, alert ki awaaz aur har screen, sab app ke
+         * apne haath me hain.
+         *
+         * Sirf wahi settings di gayi hain jinhe badalne se kuch KHOYA nahi ja
+         * sakta aur jinhe ulta karna ek shabd door hai. Documents delete karna,
+         * plan badalna ya number badalna jaan-boojh ke bahar hai — wahan AI ke
+         * galat samajhne ka nuksaan wapas nahi aata.
+         */
+        `\nSETTINGS: App ki ye teen settings tum KHUD badal sakte ho — mana mat karo:` +
+        ` theme {"type":"set_theme","value":"light|dark|system"},` +
+        ` bhasha {"type":"set_language","value":"hinglish|hi|en"},` +
+        ` alert ki awaaz {"type":"set_alert_mode","value":"ring|vibrate|silent"}.` +
+        ` Karne ke baad reply me chhota sa confirm karo.` +
+        ` Phone ki APNI settings (WiFi, volume, phone ka notification switch) tum nahi badal sakte — un par saaf mana karo.` +
+        `\nSCREEN: Kisi screen par le jaane ko kahe to action {"type":"navigate","to":"..."} do —` +
+        ` add_document, add_reminder, documents, reminders, notes, profile, settings, app_lock, support, upgrade.` +
+        ` Raasta samjhane ki jagah seedha le chalo.` +
+        `\n\nOUTPUT: SIRF strict JSON do, aur kuch nahi: {"reply":"<chat message, user ki bhasha me>","action": null | {create_reminder|navigate|set_theme|set_language|set_alert_mode}}. reply HAMESHA bharo, chhota rakho.`;
 
       const userMsg = payload.message ?? "";
       // Trimming: sirf aakhri 10 turns bhejo (token + cost kam, prompt cache friendly).
@@ -755,8 +804,14 @@ Deno.serve(async (req) => {
             in_seconds: relSec,
             ...repeatFields(a),
           };
-        } else if (a.type === "navigate" && a.to === "add_document") {
-          action = { type: "navigate", to: "add_document" };
+        } else if (a.type === "navigate" && NAV_TARGETS.has(String(a.to))) {
+          action = { type: "navigate", to: String(a.to) };
+        } else if (a.type === "set_theme" && THEME_VALUES.has(String(a.value))) {
+          action = { type: "set_theme", value: String(a.value) };
+        } else if (a.type === "set_language" && LANG_VALUES.has(String(a.value))) {
+          action = { type: "set_language", value: String(a.value) };
+        } else if (a.type === "set_alert_mode" && ALERT_VALUES.has(String(a.value))) {
+          action = { type: "set_alert_mode", value: String(a.value) };
         }
       }
 
@@ -936,10 +991,37 @@ REPEAT (bahut zaroori):
         return json({ brief: null, error: "plus required" }, 403);
       }
       const nameNote = payload.name ? ` User ka naam "${payload.name}" hai — naam se greet karo.` : "";
+      /**
+       * ⚠️ Brief ko "abhi kitne baje hain" pata hona ZAROORI hai.
+       *
+       * Pehle yahan sirf `payload.data` jaata tha (aaj ki taarikh, reminders,
+       * documents) aur prompt "morning brief" maangta tha. Yaani AI ke paas waqt
+       * ka koi zariya hi nahi tha, aur wo hamesha subah wali baat likhta tha.
+       * User ne wahi pakda: 6 baje ka gym wala reminder nipat chuka hai, par 1
+       * baje app kholne par card ab bhi "chalo jaldi ready ho jao" keh raha hai.
+       *
+       * Ab do cheezein jaati hain — local waqt aur din ka hissa — aur prompt
+       * saaf kehta hai ki beet chuke kaam ko aage ka kaam mat batao.
+       */
+      const now = typeof payload.now === "string" ? payload.now : "";
+      const part = typeof payload.part === "string" ? payload.part : "";
+      const timeNote = now
+        ? ` Abhi ka local waqt: ${now}${part ? ` (${part})` : ""}.` +
+          ` Greeting isi waqt ke hisaab se do (subah/dopahar/shaam/raat).` +
+          ` Jo reminder ka waqt ABHI SE PEHLE ka hai use "aage karna hai" mat kaho —` +
+          ` ya to use chhod do ya "ho gaya hoga" ki tarah halke se chhoo lo.` +
+          ` Sirf aane wale kaam par zor do; koi na bacha ho to din ke us hisse ke` +
+          ` hisaab se ek chhoti si tasalli wali line likho.`
+        : "";
       const reply = await gemini({
         model: MODEL,
-        system: `${SAATHI_SYSTEM}${langNote(payload.locale)}${nameNote} User ke aaj ke data se ek chhota warm morning brief likho (2-3 line). Sirf brief text do.`,
-        contents: [{ role: "user", parts: [{ text: JSON.stringify(payload.data ?? {}) }] }],
+        system: `${SAATHI_SYSTEM}${langNote(payload.locale)}${nameNote}${timeNote} User ke aaj ke data se ek chhota warm brief likho (2-3 line). Sirf brief text do.`,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: JSON.stringify({ ...(payload.data ?? {}), now, part }) }],
+          },
+        ],
         // Wahi baat jo chat/reminder me thi: model pehle soch-vichaar likhta hai
         // aur wo bhi isi budget me ginta hai. 300 par jawab aksar khaali aata.
         maxTokens: 1024,

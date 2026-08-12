@@ -62,24 +62,72 @@ export async function markFirstOpen(): Promise<void> {
  * Pehla document ban gaya — yaad rakh lo.
  * Sirf pehli baar likhta hai; baar-baar likhne ka koi matlab nahi.
  */
-export async function markFirstDocument(): Promise<void> {
+export async function markFirstDocument(opts: MarkOpts = {}): Promise<void> {
   try {
     if (!(await AsyncStorage.getItem(HAS_DOC)))
       await AsyncStorage.setItem(HAS_DOC, String(Date.now()));
-    emitMilestone();
+    if (!opts.silent) emitMilestone();
   } catch {
     /* ignore */
   }
 }
 
 /** Pehla reminder ban gaya — yaad rakh lo. */
-export async function markFirstReminder(): Promise<void> {
+export async function markFirstReminder(opts: MarkOpts = {}): Promise<void> {
   try {
     if (!(await AsyncStorage.getItem(HAS_REMINDER)))
       await AsyncStorage.setItem(HAS_REMINDER, String(Date.now()));
-    emitMilestone();
+    if (!opts.silent) emitMilestone();
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * `silent` = jhanda sirf MILAO, kisi ko khabar mat karo.
+ *
+ * ⚠️ Ye Home ke liye hai, aur ye farak zaroori hai. Home har load par asli data
+ * se in jhandon ko mila leta hai (purane user ka naya install — wahan ye kabhi
+ * bharte hi nahi the). Par wo "cheez BANI hai" nahi, "cheez PEHLE SE hai" hai.
+ *
+ * Bina is farak ke har Home load ek "abhi-abhi banaya" event ban jaata, aur
+ * usse chalne wale modal (jaise WhatsApp wala) app kholte hi khul jaate — theek
+ * wahi bheed jise abhi-abhi khatm kiya gaya hai.
+ */
+type MarkOpts = { silent?: boolean };
+
+/**
+ * Padav ab sirf review popup ke liye nahi hain.
+ *
+ * ⚠️ Login ke baad TEEN modal ek saath khul jaate the — referral code, "PIN laga
+ * lo", aur "ye phone kisi aur ka hai". Teenon apni jagah theek the aur ek saath
+ * milkar bilkul bekaar: user ne teenon ko bina padhe band kiya, aur teesri wali
+ * (jo asal me sabse zaroori thi — us phone par uske reminder aayenge hi nahi)
+ * bhi usi jhund me nikal gayi. Screenshot me reminder set tha aur notification
+ * kabhi nahi aayi; user ko kabhi pata hi nahi chala kyun.
+ *
+ * Ab har modal ka apna waqt hai, aur wo waqt inhi do padav se tay hota hai:
+ *
+ *   • Referral        — pehle hi din (kuch samajhne ki zaroorat nahi).
+ *   • "PIN laga lo"   — pehla DOCUMENT aane ke baad. Tab tak lock ka koi matlab
+ *                       hi nahi hota: chhupane ko kuch hai hi nahi.
+ *   • "Ye phone kisi aur ka hai" — document AUR reminder, dono ke baad. Uski
+ *                       poori baat hi reminder/notification ke baare me hai;
+ *                       reminder bane bina wo ek anjaan chetavni hai.
+ */
+export async function hasFirstDocument(): Promise<boolean> {
+  try {
+    return !!(await AsyncStorage.getItem(HAS_DOC));
+  } catch {
+    return false;
+  }
+}
+
+export async function hasFirstReminder(): Promise<boolean> {
+  try {
+    return !!(await AsyncStorage.getItem(HAS_REMINDER));
+  } catch {
+    return false;
   }
 }
 

@@ -21,6 +21,7 @@ import {
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { OtpModal } from "@/components/otp-modal";
+import { checkPhoneAvailable } from "@/lib/phone-verify";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/components/auth-provider";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -41,7 +42,7 @@ import {
 export default function ProfileDetails() {
   const tc = useColors();
   const styles = useStyles();
-  const { profileDetails: t } = useT();
+  const { profileDetails: t, common: c } = useT();
   const genders = [
     { key: "male", label: t.male },
     { key: "female", label: t.female },
@@ -90,6 +91,22 @@ export default function ProfileDetails() {
    * jo har baar fail hota. Ab note screen par tika rehta hai.
    */
   const [otpBlocked, setOtpBlocked] = useState(false);
+  /**
+   * "Verify karo" dabne ke baad ki jaanch — modal khulne se PEHLE.
+   *
+   * ⚠️ Pehle ye jaanch hoti hi nahi thi: modal turant khul jaata tha aur uske
+   * ANDAR SMS bhejne ki koshish hoti thi. Number kisi aur account me verified ho
+   * to user ko ek saath do ulti baatein dikhti thi — upar "+91… par code bheja
+   * hai" aur neeche laal me "ye number kisi aur ka hai". Wo 6 ank ka intezaar
+   * karta baitha rehta tha jo kabhi aane hi nahi the.
+   *
+   * Aur ek chhupa hua kharcha bhi tha: `send-otp` tak pahunchne ka matlab hai us
+   * number par OTP ki cooldown aur din/ghante wali ginti kharch ho jaana — ek
+   * aise number par jispar SMS kabhi jaana hi nahi tha. Do-teen aisi koshishon
+   * ke baad user apna ASLI number bhi verify nahi kar paata tha.
+   */
+  const [checkingPhone, setCheckingPhone] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -236,6 +253,30 @@ export default function ProfileDetails() {
     !!countryId &&
     !!stateId &&
     !!cityId;
+
+  /**
+   * "Verify karo" — modal khulne se PEHLE number ki jaanch.
+   *
+   * ⚠️ Poori wajah `checkingPhone` ke declaration par likhi hai. Chhota sa
+   * saar: pehle modal turant khul jaata tha aur SMS ki koshish uske ANDAR hoti
+   * thi, isliye ek hi screen "code bheja hai" aur "ye number kisi aur ka hai"
+   * dono ek saath keh deti thi — aur us number par OTP ki hadd bhi bekaar me
+   * kharch ho jaati thi.
+   */
+  async function startVerify() {
+    if (checkingPhone) return;
+    setVerifyError(null);
+    setCheckingPhone(true);
+    const err = await checkPhoneAvailable(normalized);
+    setCheckingPhone(false);
+    if (err) {
+      // Yahi wo do line hain jo pehle modal ke andar, SMS "bhejne" ke baad
+      // dikhti thi.
+      setVerifyError(err === "phone_taken" ? t.errTaken : t.errFailed);
+      return;
+    }
+    setOtpOpen(true);
+  }
 
   async function onSave() {
     if (saving) return;
@@ -417,12 +458,32 @@ export default function ProfileDetails() {
               ) : (
                 <View style={styles.verifyBox}>
                   <Text style={styles.verifyWhy}>{t.verifyWhy}</Text>
+                  {/*
+                    ⚠️ WhatsApp wali baat yahan saaf likhi hai, aur ye ek asli
+                    kami thi. Plus me reminder aur document expiry ka message
+                    WhatsApp par jaata hai — usi number par jo yahan verify hua
+                    ho. Par kahin likha hi nahi tha ki ye number WHATSAPP wala
+                    hona chahiye. Log apna doosra (bina WhatsApp wala) number
+                    verify kar dete the, sab kuch theek dikhta tha, aur ek bhi
+                    message kabhi nahi pahunchta tha — bina kisi error ke.
+                  */}
+                  <View style={styles.waNote}>
+                    <Ionicons name="logo-whatsapp" size={14} color={tc.sage} />
+                    <Text style={styles.waNoteText}>{t.whatsappNote}</Text>
+                  </View>
+                  {!!verifyError && <Text style={styles.err}>{verifyError}</Text>}
                   <Pressable
-                    onPress={() => setOtpOpen(true)}
-                    style={({ pressed }) => [styles.verifyBtn, pressed && { opacity: 0.85 }]}
+                    onPress={() => void startVerify()}
+                    disabled={checkingPhone}
+                    style={({ pressed }) => [
+                      styles.verifyBtn,
+                      (pressed || checkingPhone) && { opacity: 0.85 },
+                    ]}
                   >
                     <Ionicons name="shield-checkmark" size={15} color={tc.white} />
-                    <Text style={styles.verifyBtnText}>{t.verifyCta}</Text>
+                    <Text style={styles.verifyBtnText}>
+                      {checkingPhone ? c.loading : t.verifyCta}
+                    </Text>
                   </Pressable>
                 </View>
               ))}
@@ -578,6 +639,19 @@ const useStyles = makeStyles((c) => ({
     padding: 13,
   },
   verifyWhy: { fontSize: 12.5, lineHeight: 19, color: c.inkSoft },
+  // "Ye WhatsApp wala number hona chahiye" — sage me, taaki ye chetavni na
+  // lage. Ye rok nahi hai, ek zaroori jaankari hai.
+  waNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    marginTop: 9,
+    borderRadius: 12,
+    backgroundColor: "rgba(124,138,107,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  waNoteText: { flex: 1, fontSize: 12, lineHeight: 17, fontWeight: "600", color: c.ink },
   verifyBtn: {
     marginTop: 11,
     alignSelf: "flex-start",

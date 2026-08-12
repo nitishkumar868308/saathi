@@ -8,13 +8,23 @@ import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
 import { getLockState } from "@/lib/app-lock";
+import { hasFirstDocument, onMilestone } from "@/lib/reviews";
 
 /**
- * "Saathi ko lock kar lo?" — login ke baad, ek hi baar.
+ * "Saathi ko lock kar lo?" — pehla document aane ke BAAD, ek hi baar.
  *
  * ⚠️ Ye poochna zaroori hai, warna app lock ka koi matlab nahi rehta: jo cheez
  * Settings ke andar teen tap door padi ho use koi nahi dhoondhta, aur documents
  * bina kisi rok ke us har phone par khule rehte hain jispar app install hai.
+ *
+ * ⚠️ Par ye login ke TURANT baad nahi poochha jaata — aur wo badlaav zaroori
+ * tha. Pehle ye login ke saath hi khulta tha, theek usi pal jab referral wala
+ * aur "ye phone kisi aur ka hai" wala bhi khul rahe the. Teen modal ek saath =
+ * teenon bina padhe band. Aur is sawaal ka pehle din koi matlab bhi nahi hota:
+ * chhupane ko abhi kuch hai hi nahi.
+ *
+ * Pehla document aate hi ye sawaal apne aap sabse kaam ka ho jaata hai — ab
+ * phone me sach me kuch aisa hai jo kisi aur ko nahi dikhna chahiye.
  *
  * Ek baar hi poochte hain (har user ke apne key par). Baar-baar poochna is
  * sawaal ko ek bekaar popup me badal deta hai jise log bina padhe band karne
@@ -36,6 +46,8 @@ export function LockOffer() {
 
   const check = useCallback(async () => {
     if (!uid) return;
+    // Pehla document aaye bina ye sawaal bekaar hai (upar wajah likhi hai).
+    if (!(await hasFirstDocument())) return;
     // Lock pehle se laga hua hai — poochne ki baat hi nahi.
     const st = await getLockState();
     if (st.enabled) return;
@@ -47,6 +59,15 @@ export function LockOffer() {
   useEffect(() => {
     void check();
   }, [check]);
+
+  /**
+   * Document abhi-abhi bana — turant poochho, agli launch ka intezaar mat karo.
+   *
+   * ⚠️ Iske bina ye modal sirf app dobara khulne par aata, aur wo lamha nikal
+   * jaata jab user ne abhi apna pehla document daala hi hai — theek wahi pal jab
+   * "ise lock kar lo?" sabse zyada samajh me aata hai.
+   */
+  useEffect(() => onMilestone(() => void check()), [check]);
 
   useEffect(() => {
     if (!show) return;

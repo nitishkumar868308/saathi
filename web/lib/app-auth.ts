@@ -17,6 +17,21 @@ const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
  * Kuch bhi gadbad (token nahi, expire, Supabase down) → `null`. Caller 401 de.
  */
 export async function appUserId(request: Request): Promise<string | null> {
+  return (await appUser(request))?.id ?? null;
+}
+
+/**
+ * Wahi jaanch, par email/naam ke saath.
+ *
+ * `appUserId` isi ke upar khada hai. Alag function isliye hai ki zyadatar
+ * routes ko sirf id chahiye, aur unhe email tak pahunch dena bekaar hai — jitna
+ * kam data ghoomta hai, utna kam kahin galti se log/response me pahunchta hai.
+ * Jinhe email SACH ME chahiye (jaise PIN reset ka code bhejna), sirf wahi ye
+ * bulate hain.
+ */
+export type AppUser = { id: string; email: string | null; name: string | null };
+
+export async function appUser(request: Request): Promise<AppUser | null> {
   const header = request.headers.get("Authorization");
   if (!header?.startsWith("Bearer ") || !SUPABASE_URL || !ANON) return null;
 
@@ -26,8 +41,17 @@ export async function appUserId(request: Request): Promise<string | null> {
       cache: "no-store",
     });
     if (!res.ok) return null;
-    const user = (await res.json()) as { id?: string };
-    return user.id ?? null;
+    const user = (await res.json()) as {
+      id?: string;
+      email?: string;
+      user_metadata?: { full_name?: string; name?: string };
+    };
+    if (!user.id) return null;
+    return {
+      id: user.id,
+      email: user.email ?? null,
+      name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+    };
   } catch {
     return null;
   }

@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -28,6 +20,7 @@ import {
   noteTitle,
 } from "@/lib/notes";
 import { emitDataChanged } from "@/lib/data-events";
+import { useKeyboardHeight } from "@/lib/use-keyboard";
 
 /**
  * Ek note likho / badlo.
@@ -52,6 +45,8 @@ export default function NoteEdit() {
   const toast = useToast();
   const { notes: n, common: c, voice: v } = useT();
   const { locale } = useLocale();
+  /** Keyboard ki oonchai — footer isse upar rehta hai (upar wajah likhi hai). */
+  const kb = useKeyboardHeight();
   const bcp = locale === "hi" ? "hi-IN" : "en-IN";
 
   /** Reminder kab hai — "12 Aug, 6:00 pm". */
@@ -211,10 +206,23 @@ export default function NoteEdit() {
       // note par pehle id chahiye, warna reminder banega par kis note se juda
       // hai wo kabhi pata nahi chalega.
       const id = savedId.current;
+      /**
+       * ⚠️ Ab `/add-reminder` nahi — `/note-reminder`.
+       *
+       * Purani screen note ka poora text ek text-box me daal deti thi aur AI se
+       * usme title/waqt dhoondhne ko kehti thi. Do cheezein wahi toot-ti thi:
+       * note ka poora paragraph reminder ka title ban jaata (notification me
+       * chaar line, jo koi padhta hi nahi), aur note me waqt hota hi nahi to AI
+       * poochhta rehta — jabki user ne to sirf itna kaha tha ki "iska reminder
+       * laga do".
+       *
+       * Nayi screen sirf EK sawaal poochhti hai: kab? Kaam ka text note se
+       * waise ka waisa jaata hai.
+       */
       router.push({
-        pathname: "/add-reminder",
+        pathname: "/note-reminder",
         params: id ? { text, noteId: id } : { text },
-      });
+      } as never);
     });
   }
 
@@ -301,10 +309,18 @@ export default function NoteEdit() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/*
+        ⚠️ `KeyboardAvoidingView` yahan se hata diya gaya hai — wo Android par
+        kuch karta hi nahi tha, aur wahi user ki shikayat thi: note likhte hi
+        neeche ke dono button (mic aur "Reminder set karo") keyboard ke peeche
+        chale jaate the aur unka hona hi pata nahi chalta tha.
+
+        Wajah edge-to-edge hai (Android 15 se zabardasti). Us haalat me window
+        resize hoti hi nahi, aur KAV ka poora Android raasta usi resize par tika
+        tha. Ab keyboard ki oonchai khud naapte hain (`useKeyboardHeight`) aur
+        footer ko utna upar utha dete hain — dono platform par ek hi vyavhaar.
+      */}
+      <View style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
@@ -347,6 +363,8 @@ export default function NoteEdit() {
          * ⚠️ Space ke saath jodte hain, seedha chipka ke nahi — warna do baar
          * bol ke jodne par "dawai lenibills bharna" ban jaata hai.
          */}
+        {/* Footer — mic aur reminder, dono keyboard ke UPAR rehte hain. */}
+        <View style={{ paddingBottom: kb }}>
         <View style={styles.voiceRow}>
           <VoiceButton onText={(t) => setBody((prev) => (prev.trim() ? `${prev.trim()} ${t}` : t))} />
           <Text style={styles.voiceHint} numberOfLines={2}>
@@ -383,7 +401,8 @@ export default function NoteEdit() {
             <Ionicons name="chevron-forward" size={16} color={tc.terracotta} />
           </Pressable>
         )}
-      </KeyboardAvoidingView>
+        </View>
+      </View>
 
       <ConfirmModal
         visible={askDelete}

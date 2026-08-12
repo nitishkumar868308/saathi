@@ -56,18 +56,35 @@ export function ConfirmModal({
             </View>
             <Text style={styles.title}>{title}</Text>
             {!!message && <Text style={styles.message}>{message}</Text>}
+            {/*
+              ⚠️ Dono button par `numberOfLines={1}` + `adjustsFontSizeToFit`.
+
+              Ye ek suraksha jaal hai, sundarta ki baat nahi. Label teen bhashaon
+              me aata hai aur Hindi/Hinglish aksar English se lamba hota hai —
+              "App lock band karo" jaisa label aadhi chaudai wale button par do
+              (Hindi me teen) line me toot jaata tha, aur button ki oonchai tay
+              hai: text seedha uske bahar nikal jaata tha.
+
+              Ab lamba label chhota ho ke ek line me baith jaata hai. Asli ilaaj
+              phir bhi chhota label hi hai (call site par), par ek naya string
+              jodne wale ko ye galti dobara nahi kar sakti.
+            */}
             <View style={styles.btnRow}>
               <Pressable
                 onPress={onCancel}
                 style={({ pressed }) => [styles.btnAlt, pressed && { opacity: 0.7 }]}
               >
-                <Text style={styles.btnAltText}>{cancelLabel}</Text>
+                <Text style={styles.btnAltText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {cancelLabel}
+                </Text>
               </Pressable>
               <Pressable
                 onPress={onConfirm}
                 style={({ pressed }) => [styles.btn, { backgroundColor: accent }, pressed && { opacity: 0.85 }]}
               >
-                <Text style={styles.btnText}>{confirmLabel}</Text>
+                <Text style={styles.btnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {confirmLabel}
+                </Text>
               </Pressable>
             </View>
           </Pressable>

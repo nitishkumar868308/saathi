@@ -21,6 +21,7 @@ import { useToast } from "@/components/toast";
 import { getDeviceId, otherDevices } from "@/lib/device";
 import { signOutOtherDevices } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { hasFirstDocument, hasFirstReminder } from "@/lib/reviews";
 
 /**
  * "Aapki ID aur bhi phones par login hai" — login ke baad.
@@ -81,6 +82,17 @@ export function MultiDeviceWarning() {
   const check = useCallback(
     async (force: boolean) => {
       if (!uid) return;
+      /**
+       * ⚠️ Ye bhi document + reminder ke baad hi.
+       *
+       * Iski poori baat alarm aur notification ke baare me hai ("ek reminder do
+       * alag waqt par baj sakta hai"). Jab tak user ka koi reminder hai hi nahi,
+       * wo baat samajh me aa hi nahi sakti — aur login ke pal me ye teesra modal
+       * ban ke baaki do ko bhi bekaar kar deti thi.
+       */
+      const [doc, rem] = await Promise.all([hasFirstDocument(), hasFirstReminder()]);
+      if (!doc || !rem) return;
+
       const res = await otherDevices();
       // `null` = RPC hi nahi chali (purana DB / net nahi). Chetavni na dikhna
       // galat chetavni dikhane se behtar hai.

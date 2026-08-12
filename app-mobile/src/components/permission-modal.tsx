@@ -19,6 +19,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { syncNotifications } from "@/lib/notifications";
 import {
   checkReadiness,
+  confirmStep,
   requestStep,
   markReliabilityPromptShown,
   type Readiness,
@@ -127,6 +128,12 @@ export function PermissionModal({
     if (key === "notif" || key === "alarm") void syncNotifications({ force: true });
   }
 
+  /** "Haan, on kar diya" — sirf un steps par jinka status OS nahi batata. */
+  async function confirm(key: StepKey) {
+    await confirmStep(key);
+    await refresh();
+  }
+
   const steps = (state?.steps ?? []).filter((s) => s.supported);
   const allOk = !!state?.allOk;
 
@@ -197,6 +204,30 @@ export function PermissionModal({
                   </View>
                   {s.ok ? (
                     <Text style={styles.stepOk}>{r.stepDone}</Text>
+                  ) : s.awaiting ? (
+                    /*
+                      User settings screen tak ja chuka hai, par uske toggle ka
+                      status Android kisi API se batata hi nahi (full-screen
+                      intent aur OEM auto-start, dono).
+
+                      ⚠️ Pehle yahan kuch tha hi nahi — screen KHULTE HI step
+                      green ho jaata tha. Jo user toggle dabana bhool gaya, uska
+                      bada popup hamesha ke liye band reh jaata tha, aur modal
+                      use "sab set hai" bhi keh deta tha. Yahi "sab allow kar
+                      diya, phir bhi popup nahi aata" wali sabse aam shikayat ki
+                      jad thi. Ab jawab user deta hai, app andaza nahi lagati.
+                    */
+                    <View style={styles.confirmRow}>
+                      <Pressable
+                        onPress={() => confirm(s.key)}
+                        style={({ pressed }) => [styles.allowBtn, pressed && { opacity: 0.7 }]}
+                      >
+                        <Text style={styles.allowText}>{r.stepConfirmYes}</Text>
+                      </Pressable>
+                      <Pressable onPress={() => allow(s.key)} hitSlop={6}>
+                        <Text style={styles.retryText}>{r.stepOpenAgain}</Text>
+                      </Pressable>
+                    </View>
                   ) : (
                     <Pressable
                       onPress={() => allow(s.key)}
@@ -326,6 +357,10 @@ const useStyles = makeStyles((c) => ({
     paddingVertical: 8,
   },
   allowText: { fontSize: 12.5, fontWeight: "800", color: c.white },
+  // "Ho gaya?" ke saath "phir se kholo" — dono chhote, ek ke neeche doosra,
+  // taaki row ki chaudai teen bhashaon me na toote.
+  confirmRow: { alignItems: "flex-end", gap: 5 },
+  retryText: { fontSize: 11.5, fontWeight: "600", color: c.inkSoft, textDecorationLine: "underline" },
   cta: {
     marginTop: 12,
     height: 50,

@@ -34,8 +34,10 @@ import { tpl } from "@/lib/i18n/dictionaries";
 import { useOffers } from "@/lib/use-offers";
 import { emitDataChanged, useDataChanged } from "@/lib/data-events";
 import { usePlan } from "@/lib/use-plan";
-import { dailyBrief } from "@/lib/ai";
+import { dailyBrief, dayPart } from "@/lib/ai";
 import { Reveal3D, Press3D } from "@/components/reveal-3d";
+import { deviceOwner, getDeviceId } from "@/lib/device";
+import { markFirstDocument, markFirstReminder } from "@/lib/reviews";
 
 function isToday(iso: string | null): boolean {
   if (!iso) return false;
@@ -57,7 +59,7 @@ export default function Home() {
   const { session } = useAuth();
   const meta = session?.user?.user_metadata;
   const fullName = (meta?.full_name || meta?.name || firstName || "") as string;
-  const { home: h, notes: nt, reminders: r0, documents: dt, common: cm } = useT();
+  const { home: h, notes: nt, reminders: r0, documents: dt, common: cm, deviceOwner: dw } = useT();
   const { locale } = useLocale();
   const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
@@ -99,6 +101,43 @@ export default function Home() {
   }, []);
 
   /**
+   * "Ye phone kisi aur ke naam par hai" — pehle din sirf ek toast.
+   *
+   * ⚠️ Poora modal ab document + reminder ke baad aata hai (wahan wo baat samajh
+   * me aati hai), par tab tak user ko poori tarah andhere me rakhna galat hoga:
+   * theek isi soorat me uske reminder is phone par aate hi nahi, aur usne wahi
+   * shikayat ki thi — "reminder set kiya, notification aayi hi nahi, pata hi
+   * nahi chala kyun".
+   *
+   * Toast rok nahi hai aur kuch poochta bhi nahi — bas ek line jo us khamoshi ko
+   * khatam kar deti hai. Ek hi baar, har (device, user) jodi par.
+   */
+  const uid = session?.user?.id;
+  useEffect(() => {
+    if (!uid) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const o = await deviceOwner();
+        if (!o || o.isMe || !alive) return;
+        const key = `saathi-device-owner-toast:${await getDeviceId()}:${uid}`;
+        if (await AsyncStorage.getItem(key)) return;
+        if (!alive) return;
+        toast.show(tpl(dw.toast, { who: o.name || o.email || "" }), "info");
+        await AsyncStorage.setItem(key, "1");
+      } catch {
+        /* toast na dikhe to kuch nahi bigadta — modal baad me aata hi hai */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // `toast`/`dw` har render par naye ban sakte hain; ye effect sirf user
+    // badalne par chalna chahiye.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid]);
+
+  /**
    * Saathi ka apna morning brief (Plus).
    *
    * ⚠️ Ye card kab se ek fixed template line dikha raha tha, jabki "Subah ka
@@ -129,13 +168,27 @@ export default function Home() {
    * hai aur "kabhi-kabhi ek pal ke liye purana text jhalak jaata hai" wali
    * soorat ban hi nahi sakti.
    */
-  const [brief, setBriefState] = useState<{ text: string; locale: string } | null>(null);
+  const [brief, setBriefState] = useState<{
+    text: string;
+    locale: string;
+    part: string;
+  } | null>(null);
   const setBrief = useCallback(
-    (text: string, forLocale: string) => setBriefState({ text, locale: forLocale }),
+    (text: string, forLocale: string, forPart: string) =>
+      setBriefState({ text, locale: forLocale, part: forPart }),
     [],
   );
-  /** Abhi ki bhasha ka brief — doosri bhasha ka ho to hai hi nahi. */
-  const briefText = brief && brief.locale === locale ? brief.text : null;
+  /**
+   * Abhi ki bhasha AUR abhi ke waqt ka brief — warna hai hi nahi.
+   *
+   * ⚠️ `part` ki shart bhasha wali shart jitni hi zaroori hai. Bina uske subah
+   * ka brief screen par tab tak chipka rehta hai jab tak naya AI se aa na jaye —
+   * aur net na ho to poore din. User ne yahi dekha tha: 1 baje card ab bhi
+   * subah wali baat keh raha tha.
+   */
+  const nowPart = dayPart();
+  const briefText =
+    brief && brief.locale === locale && brief.part === nowPart ? brief.text : null;
 
   const loadBrief = useCallback(
     async (documents: Document[], reminders: Reminder[]) => {
@@ -152,12 +205,22 @@ export default function Home() {
        * Hinglish text wapas padh leta tha. Home ka sabse upar wala card poore
        * din galat bhasha me chipka rehta tha, aur baaki screen badal chuki
        * hoti thi. Ab har bhasha ka apna cache hai.
+       *
+       * ⚠️ Aur key me DIN KA HISSA bhi hona zaroori hai (`part`).
+       *
+       * Pehle key sirf `uid:day:locale` thi, yaani subah 6 baje bana brief raat
+       * 11 baje tak wahi rehta tha. User ne theek yahi pakda: 6 baje wala gym
+       * reminder nipat chuka tha, par 1 baje card ab bhi "chalo jaldi ready ho
+       * jao" keh raha tha. Ab din me chaar khidkiyan hain (subah/dopahar/shaam/
+       * raat) aur har khidki me brief ek baar naya banta hai — na har baar (jo
+       * mehnga aur ajeeb dono hai), na din me sirf ek baar.
        */
-      const key = `saathi-brief:${uid}:${day}:${locale}`;
+      const part = dayPart();
+      const key = `saathi-brief:${uid}:${day}:${part}:${locale}`;
       try {
         const cached = await AsyncStorage.getItem(key);
         if (cached) {
-          setBrief(cached, locale);
+          setBrief(cached, locale, part);
           return;
         }
       } catch {
@@ -180,7 +243,7 @@ export default function Home() {
         locale,
       );
       if (!text) return; // net/AI fail — neeche wali template line hi chalegi
-      setBrief(text, locale);
+      setBrief(text, locale, part);
       // Purane dinon ki keys apne aap bekaar ho jaati hain (date key me hai).
       AsyncStorage.setItem(key, text).catch(() => {});
     },
@@ -198,6 +261,24 @@ export default function Home() {
         );
         setDocs(d);
         setToday(r.filter((x) => x.is_on && !x.is_paused && isToday(x.remind_at)));
+        /**
+         * Padav ko ASLI data se mila lo.
+         *
+         * ⚠️ `markFirstDocument`/`markFirstReminder` sirf tab likhte hain jab
+         * cheez ISI install par banti hai. Purana user jo app dobara install
+         * karta hai — ya doosre phone par login karta hai — uske paas 20
+         * document aur 10 reminder hote hue bhi dono jhande khaali rehte the.
+         * Ab modal inhi jhandon se tay hote hain, isliye us user ke liye "PIN
+         * laga lo" aur "ye phone kisi aur ka hai" kabhi dikhte hi nahi.
+         *
+         * Home waise bhi dono list padh raha hai — yahan mila lena muft hai.
+         */
+        //
+        // `silent` — ye "abhi-abhi banaya" nahi, "pehle se hai" hai. Bina iske
+        // har Home load ek creation event ban jaata aur uspar chalne wale modal
+        // app kholte hi khul jaate.
+        if (d.length > 0) void markFirstDocument({ silent: true });
+        if (r.length > 0) void markFirstReminder({ silent: true });
         void loadBrief(d, r);
       } catch (e) {
         reportError(e, { screen: "home", action: "load" });

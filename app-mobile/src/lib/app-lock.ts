@@ -2,6 +2,8 @@ import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import * as Crypto from "expo-crypto";
 
+import { supabase } from "./supabase";
+
 /**
  * App lock — biometric (fingerprint / face) + ek PIN jo uske peeche khada rehta hai.
  *
@@ -12,20 +14,47 @@ import * as Crypto from "expo-crypto";
  * documents se bahar khada reh jaata hai. Isliye PIN pehle set hota hai,
  * biometric uske UPAR ek shortcut ki tarah lagta hai.
  *
- * ⚠️ Sab kuch SIRF is phone par rehta hai. PIN kabhi server par nahi jaata,
- * aur PIN khud kahin save bhi nahi hota — sirf uska hash (salt ke saath). Iska
- * matlab hai ki phone kho jaye ya app uninstall ho to lock apne aap khatam:
- * user apni Supabase ID se dobara login kar leta hai. Ye kamzori nahi, seedha
- * faisla hai — lock ka kaam is PHONE ko rokna hai, account ko nahi.
+ * ── Lock ab ACCOUNT ke saath chalta hai, sirf phone ke saath nahi ─────────
+ *
+ * ⚠️ Pehle sab kuch SIRF is phone par rehta tha, aur wo ek soch thi: "lock ka
+ * kaam is PHONE ko rokna hai, account ko nahi". Wo soch lock ko dikhawa bana
+ * deti thi, kyunki teen aam raaste use poori tarah bypass kar dete the:
+ *
+ *   • App uninstall karke dobara install — SecureStore saaf, lock gayab.
+ *   • Logout karke wapas login — wahi baat.
+ *   • Doosre phone par usi ID se login — wahan lock kabhi tha hi nahi.
+ *
+ * Teenon me user ke saare documents bina PIN ke khul jaate the. Ab lock ka hash
+ * server par bhi rehta hai (`supabase/app-lock.sql`), isliye jis user ne lock
+ * chalu kiya hai uske account me login karte hi PIN maanga jaata hai — chahe
+ * phone naya ho ya app abhi-abhi install hui ho.
+ *
+ * ⚠️ PIN khud phir bhi kabhi kahin save nahi hota — na phone par, na server
+ * par. Sirf uska hash (salt ke saath). Server ke paas se PIN nikaala nahi ja
+ * sakta, sirf milaaya ja sakta hai.
+ *
+ * ⚠️ Milaan hamesha LOCAL hota hai (hash+salt login ke baad phone par cache ho
+ * jaate hain). Ye zaroori hai: flight mode me ya lift ke andar phone uthate hi
+ * lock khul hi na paaye — us se bura kuch nahi. Server sirf ye batata hai ki
+ * lock HAI ya nahi; kholta hamesha phone hi hai.
  *
  * Salt kyun: bina salt ke "1234" ka SHA-256 duniya me har jagah ek jaisa hota
  * hai. Kisi ne phone ka storage padh liya to 4-ank ka PIN ek lookup me khul
- * jaata. Har install ka apna salt isse bekaar kar deta hai.
+ * jaata. Har user ka apna salt isse bekaar kar deta hai.
  */
 
 const PIN_KEY = "saathi-lock-pin";
 const SALT_KEY = "saathi-lock-salt";
 const BIO_KEY = "saathi-lock-bio";
+/**
+ * Server par abhi tak nahi pahunchi hui badlaav.
+ *
+ * ⚠️ Iske bina ek chupa hua chhed reh jaata: user net ke bina PIN badalta hai,
+ * server par purana hash pada rehta hai, aur agli baar sync usi purane hash ko
+ * wapas local par likh deta — yaani user ka naya PIN chup-chaap gayab. Ye
+ * jhanda sync ko batata hai ki abhi local sach hai, server nahi.
+ */
+const DIRTY_KEY = "saathi-lock-dirty";
 /**
  * App background me jaane ke baad itni der tak dobara nahi poochte.
  *
@@ -123,24 +152,170 @@ export function isValidPin(pin: string): boolean {
   return new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin);
 }
 
-/** PIN set/badlo. Lock isi se chalu hota hai. */
+/** PIN set/badlo. Lock isi se chalu hota hai — is phone par AUR account par. */
 export async function setPin(pin: string): Promise<void> {
   if (!isValidPin(pin)) throw new Error("PIN sahi nahi hai");
   const salt = randomHex();
+  const hash = await hashPin(pin, salt);
   // Salt PEHLE — agar beech me kuch ruk jaye to purana hash naye salt ke saath
   // padha jaata aur user apne hi sahi PIN se bahar reh jaata.
   await set(SALT_KEY, salt);
-  await set(PIN_KEY, await hashPin(pin, salt));
+  await set(PIN_KEY, hash);
+  // Net na ho to bhi PIN turant chalu ho jaata hai; server ko baad me bata denge.
+  await set(DIRTY_KEY, "1");
+  await pushLock(hash, salt);
 }
 
 /** Lock poori tarah band — PIN, salt aur biometric ki setting, teeno. */
 export async function disableLock(): Promise<void> {
   await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY)]);
+  await set(DIRTY_KEY, "1");
   resetGrace();
+  await pushClear();
 }
 
 export async function setBiometricOn(on: boolean): Promise<void> {
   await set(BIO_KEY, on ? "1" : "0");
+  // Best-effort — biometric ki setting phone ki hai, par doosre phone par bhi
+  // wahi pasand chale to behtar hai. Fail ho to kuch nahi bigadta.
+  try {
+    await supabase?.rpc("set_app_lock_biometric", { p_on: on });
+  } catch {
+    /* server baad me sync ho jaayega */
+  }
+}
+
+/* ------------------------- server ke saath sync ------------------------- */
+
+/**
+ * Local hash+salt server par bhej do.
+ *
+ * Fail hone par `DIRTY_KEY` laga rehta hai, aur agla `syncAppLock()` ise dobara
+ * bhejta hai. Isliye yahan koi error nahi uchhalte: PIN phone par lag CHUKA hai,
+ * aur user ko "PIN set nahi hua" kehna jhooth hoga.
+ */
+async function pushLock(hash: string, salt: string): Promise<void> {
+  try {
+    const { error } = (await supabase?.rpc("set_app_lock", {
+      p_hash: hash,
+      p_salt: salt,
+      p_biometric: (await get(BIO_KEY)) === "1",
+    })) ?? { error: new Error("no client") };
+    if (!error) await del(DIRTY_KEY);
+  } catch {
+    /* dirty laga rehne do */
+  }
+}
+
+async function pushClear(): Promise<void> {
+  try {
+    const { error } = (await supabase?.rpc("clear_app_lock")) ?? {
+      error: new Error("no client"),
+    };
+    if (!error) await del(DIRTY_KEY);
+  } catch {
+    /* dirty laga rehne do */
+  }
+}
+
+type ServerLock = { enabled: boolean; hash: string | null; salt: string | null };
+
+/**
+ * Account ka lock is phone par le aao.
+ *
+ * Login ke baad (aur app khulne par) chalta hai. Teen soorat:
+ *
+ *   • Server par lock hai   → hash+salt phone par likh do. Yahi wo line hai
+ *     jiske bina naya phone / naya install lock ke bina khul jaata tha.
+ *   • Server par lock nahi hai, aur phone par bhi koi bina bheja badlaav nahi
+ *     → phone se bhi hata do. (User ne doosre phone par lock band kiya hoga.)
+ *   • Phone par bina bheja badlaav pada hai (`DIRTY_KEY`) → local hi sach hai;
+ *     use server par bhej do, server se kuch mat lo.
+ *
+ * ⚠️ Net na ho to KUCH MAT BADLO. Ye sabse zaroori shart hai: fail hue call ko
+ * "server par lock nahi hai" maan lena lock ko flight mode me poori tarah hata
+ * deta — yaani lock bypass karne ka sabse aasan raasta ban jaata.
+ */
+export async function syncAppLock(): Promise<void> {
+  if (!supabase) return;
+
+  // Pehle apna bina bheja badlaav — warna server ka purana jawab use dabа dega.
+  if ((await get(DIRTY_KEY)) === "1") {
+    const [hash, salt] = await Promise.all([get(PIN_KEY), get(SALT_KEY)]);
+    if (hash && salt) await pushLock(hash, salt);
+    else await pushClear();
+    return;
+  }
+
+  let row: ServerLock | null = null;
+  try {
+    const { data, error } = await supabase.rpc("get_app_lock");
+    if (error) return; // net/RPC fail — upar wali wajah, kuch mat badlo
+    const first = Array.isArray(data) ? data[0] : data;
+    row = (first as ServerLock | undefined) ?? { enabled: false, hash: null, salt: null };
+  } catch {
+    return;
+  }
+
+  if (row.enabled && row.hash && row.salt) {
+    const [localHash, localSalt] = await Promise.all([get(PIN_KEY), get(SALT_KEY)]);
+    if (localHash !== row.hash || localSalt !== row.salt) {
+      await set(SALT_KEY, row.salt);
+      await set(PIN_KEY, row.hash);
+      /**
+       * ⚠️ Naya hash aaya = PIN kisi aur phone par badla gaya hai. Us haalat me
+       * "abhi-abhi khola tha" wali chhoot rakhna galat hai — purane PIN se khuli
+       * hui app khuli hi reh jaati.
+       */
+      resetGrace();
+    }
+    return;
+  }
+
+  // Server keh raha hai ki lock hai hi nahi — phone se bhi hata do.
+  if (await get(PIN_KEY)) {
+    await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY)]);
+  }
+}
+
+/**
+ * Logout — is phone se lock ka nishaan hata do.
+ *
+ * ⚠️ Server par kuch nahi chhoota. Wahi poora point hai: dobara login karte hi
+ * `syncAppLock()` lock wapas le aata hai, isliye "logout karke lock hata lo"
+ * wala purana raasta ab band hai.
+ *
+ * Aur local hatana zaroori hai kyunki agla user is phone par koi AUR ho sakta
+ * hai — use pehle wale ka PIN maangna sabse bekaar soorat hai.
+ */
+export async function forgetLocalLock(): Promise<void> {
+  await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY), del(DIRTY_KEY)]);
+  resetGrace();
+}
+
+/**
+ * PIN reset (email OTP) ke baad naya PIN phone par bitha do.
+ *
+ * Server par wo pehle hi likha ja chuka hai (web ka route), isliye yahan sirf
+ * local copy — aur `DIRTY_KEY` bilkul nahi, warna agla sync isi ko wapas server
+ * par bhej ke ek bekaar chakkar chalata rahega.
+ */
+export async function adoptResetPin(hash: string, salt: string): Promise<void> {
+  await set(SALT_KEY, salt);
+  await set(PIN_KEY, hash);
+  await del(DIRTY_KEY);
+  // Ginti bhi saaf — user ne abhi apni pehchaan email se saabit ki hai, use
+  // purani galat koshishon ki saza dena bekaar hai.
+  wrongTries = 0;
+  lockoutRound = 0;
+  lockedUntil = 0;
+}
+
+/** Naya PIN ka hash + salt — reset ke liye (PIN khud kabhi nahi bhejte). */
+export async function makePinHash(pin: string): Promise<{ hash: string; salt: string }> {
+  if (!isValidPin(pin)) throw new Error("PIN sahi nahi hai");
+  const salt = randomHex();
+  return { hash: await hashPin(pin, salt), salt };
 }
 
 /* ------------------------------ unlock ------------------------------- */

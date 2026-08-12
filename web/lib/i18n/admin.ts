@@ -471,6 +471,30 @@ export type AdminDict = {
       earnedFromReferral: string;
       planEnds: string;
       detailFailed: string;
+      /**
+       * "Reminder delivery" block — support ka sabse aam sawaal.
+       *
+       * ⚠️ Ye block isliye hai ki "mujhe WhatsApp par reminder nahi aaya" ka
+       * jawab pehle kahin se milta hi nahi tha. Wajah aksar seedhi hoti hai
+       * (Plus nahi, ya number verify nahi hua) par use dhoondhne me har baar
+       * teen-chaar jagah dekhni padti thi.
+       */
+      delivery: string;
+      deliveryLang: string;
+      willSend: string;
+      wontSend: string;
+      /** Koi rok nahi — agla sawaal cron ka hai, isliye wo isi line me. */
+      deliveryOk: string;
+      deliveryUnknown: string;
+      /** Template us bhasha me nahi hai — pahunchega, par Hinglish me. */
+      waWrongLang: string;
+      blockerNotPlus: string;
+      blockerNoEmail: string;
+      blockerNoPhone: string;
+      blockerPhoneUnverified: string;
+      blockerSmtpOff: string;
+      blockerTwilioOff: string;
+      blockerWaTemplate: string;
     };
     usage: {
       today: string;
@@ -1183,6 +1207,18 @@ const en: AdminDict = {
       cameFromCode: "Came from code", noReferrer: "Nobody referred them",
       earnedFromReferral: "Earned from referrals", planEnds: "Plan ends",
       detailFailed: "Could not load details",
+      delivery: "Reminder delivery", deliveryLang: "Message language",
+      willSend: "Will send", wontSend: "Won't send",
+      deliveryOk: "Nothing is blocking delivery — check that the cron is running.",
+      deliveryUnknown: "Couldn't check delivery.",
+      waWrongLang: "No template in this language — WhatsApp will arrive in Hinglish.",
+      blockerNotPlus: "Not on Plus — email and WhatsApp are Plus-only.",
+      blockerNoEmail: "No email on the profile.",
+      blockerNoPhone: "No phone number added.",
+      blockerPhoneUnverified: "Phone added but never verified — nothing is sent to it.",
+      blockerSmtpOff: "SMTP isn't configured on the server.",
+      blockerTwilioOff: "Twilio isn't configured on the server.",
+      blockerWaTemplate: "No approved WhatsApp template — Meta rejects the message.",
     },
     usage: {
       today: "Today", yesterday: "Yesterday", all: "All",
@@ -1794,6 +1830,18 @@ const hi: AdminDict = {
       cameFromCode: "किस कोड से आया", noReferrer: "किसी ने रेफर नहीं किया",
       earnedFromReferral: "रेफरल से कमाए", planEnds: "प्लान खत्म",
       detailFailed: "डिटेल लोड नहीं हुई",
+      delivery: "रिमाइंडर डिलीवरी", deliveryLang: "मैसेज की भाषा",
+      willSend: "जाएगा", wontSend: "नहीं जाएगा",
+      deliveryOk: "कोई रोक नहीं — अब देखें कि cron चल रहा है या नहीं।",
+      deliveryUnknown: "डिलीवरी जाँची नहीं जा सकी।",
+      waWrongLang: "इस भाषा का टेम्पलेट नहीं — WhatsApp Hinglish में पहुँचेगा।",
+      blockerNotPlus: "प्लस नहीं है — ईमेल और WhatsApp सिर्फ़ प्लस में।",
+      blockerNoEmail: "प्रोफ़ाइल में ईमेल नहीं है।",
+      blockerNoPhone: "नंबर डाला ही नहीं गया।",
+      blockerPhoneUnverified: "नंबर है पर वेरिफ़ाई नहीं हुआ — उस पर कुछ नहीं जाता।",
+      blockerSmtpOff: "सर्वर पर SMTP सेट नहीं है।",
+      blockerTwilioOff: "सर्वर पर Twilio सेट नहीं है।",
+      blockerWaTemplate: "कोई approved WhatsApp टेम्पलेट नहीं — Meta मैसेज reject करता है।",
     },
     usage: {
       today: "आज", yesterday: "कल", all: "सब",
@@ -2407,6 +2455,18 @@ const hinglish: AdminDict = {
       cameFromCode: "Kis code se aaya", noReferrer: "Kisi ne refer nahi kiya",
       earnedFromReferral: "Referral se kamaaye", planEnds: "Plan khatam",
       detailFailed: "Detail load nahi hui",
+      delivery: "Reminder delivery", deliveryLang: "Message ki bhasha",
+      willSend: "Jayega", wontSend: "Nahi jayega",
+      deliveryOk: "Koi rok nahi — ab dekho ki cron chal raha hai ya nahi.",
+      deliveryUnknown: "Delivery jaanchi nahi ja saki.",
+      waWrongLang: "Is bhasha ka template nahi — WhatsApp Hinglish me pahunchega.",
+      blockerNotPlus: "Plus nahi hai — email aur WhatsApp sirf Plus me.",
+      blockerNoEmail: "Profile me email nahi hai.",
+      blockerNoPhone: "Number daala hi nahi gaya.",
+      blockerPhoneUnverified: "Number hai par verify nahi hua — uspar kuch nahi jaata.",
+      blockerSmtpOff: "Server par SMTP set nahi hai.",
+      blockerTwilioOff: "Server par Twilio set nahi hai.",
+      blockerWaTemplate: "Koi approved WhatsApp template nahi — Meta message reject karta hai.",
     },
     usage: {
       today: "Aaj", yesterday: "Kal", all: "Sab",

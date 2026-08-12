@@ -65,7 +65,46 @@ export type SaathiAction =
       /** Aakhri din (YYYY-MM-DD) — "90 din tak". null = koi limit nahi. */
       repeat_until?: string | null;
     }
-  | { type: "navigate"; to: "add_document" };
+  /**
+   * Kahin le jao — screen kholna.
+   *
+   * ⚠️ Pehle yahan sirf `add_document` tha, aur wahi is poori file ki sabse badi
+   * kami thi. User chat me kuch bhi kehta ("profile kholo", "notes dikhao",
+   * "settings me le chalo") aur Saathi ek lamba jawab likh deta ki khud kaise
+   * jaana hai — jabki wo ek tap door tha. Bujurg user ke liye wo jawab bekaar
+   * hai: use raasta yaad nahi rakhna, use wahan PAHUNCHNA hai.
+   */
+  | {
+      type: "navigate";
+      to:
+        | "add_document"
+        | "add_reminder"
+        | "documents"
+        | "reminders"
+        | "notes"
+        | "profile"
+        | "settings"
+        | "app_lock"
+        | "support"
+        | "upgrade";
+    }
+  /**
+   * App ki setting badlo — theme, bhasha, alert ki awaaz.
+   *
+   * ⚠️ Ye teenon jaan-boojh ke chuni gayi hain: teenon poori tarah IS PHONE ki
+   * hain aur inhe badalne se kuch khoya nahi ja sakta (ulta karna ek shabd door
+   * hai). Documents delete karna, plan badalna ya number badalna yahan
+   * JAAN-BOOJH KE nahi hai — un sab ka ulta karna aasan nahi hai, aur AI ke
+   * galat samajhne ka nuksaan wahan wapas nahi aata.
+   *
+   * User ne theek pakda tha: "profile me jo setting hai wo change karne ka
+   * bolta hoon to wo nahi karta". Saathi keh deta tha "main aapke phone ki
+   * settings nahi badal sakta" — jo APP ki apni settings ke liye sach hi nahi
+   * tha.
+   */
+  | { type: "set_theme"; value: "light" | "dark" | "system" }
+  | { type: "set_language"; value: "hinglish" | "hi" | "en" }
+  | { type: "set_alert_mode"; value: "ring" | "vibrate" | "silent" };
 
 /**
  * AI ka jawab kyun nahi aaya.
@@ -447,12 +486,40 @@ export async function documentFollowUp(
 }
 
 /**
- * Subah ka daily brief — Saathi apne shabdon me, aaj ke data se (Plus feature).
+ * Din ka hissa — brief ko "abhi" ka pata isi se chalta hai.
+ *
+ * ⚠️ Ye bantwara sirf greeting ke liye nahi hai. Home ka cache bhi isi par
+ * bandha hai, isliye din me char baar brief apne aap taaza ho jaata hai.
+ */
+export type DayPart = "morning" | "afternoon" | "evening" | "night";
+
+export function dayPart(d = new Date()): DayPart {
+  const h = d.getHours();
+  if (h < 12) return "morning";
+  if (h < 17) return "afternoon";
+  if (h < 21) return "evening";
+  return "night";
+}
+
+/**
+ * Aaj ka brief — Saathi apne shabdon me, aaj ke data se (Plus feature).
  *
  * ⚠️ Ye server par kab se bana pada tha (`task: "brief"`) par app ne use kabhi
  * bulaya hi nahi. Home ka card ek fixed template line dikhata tha ("aapke {n}
  * documents ko dhyan chahiye") — free aur Plus dono ko bilkul ek jaisi. Yaani
  * "Subah ka daily brief" bech to rahe the, milta kisi ko nahi tha.
+ *
+ * ── Aur ye "MORNING brief" nahi hai ────────────────────────────────────────
+ *
+ * ⚠️ Pehle yahan waqt bheja hi nahi jaata tha — sirf `today` (taarikh). Server
+ * ka prompt bhi "morning brief" maangta tha. Nateeja bilkul wahi tha jo user ne
+ * pakda: subah 6 baje ka reminder nipat chuka hai, par 1 baje app kholne par
+ * card ab bhi "chalo gym jao" keh raha hai. AI ke paas ye jaanne ka koi tareeka
+ * hi nahi tha ki abhi kitne baje hain — na wo greeting badal sakta tha, na ye
+ * bata sakta tha ki kaunsa kaam beet chuka hai.
+ *
+ * Ab local waqt aur din ka hissa dono jaate hain. Aur Home ka cache bhi din ke
+ * hisse par bandha hai, warna subah bana hua brief poore din chipka rehta.
  *
  * Fail ho to null — home apni purani template line dikha deta hai. Brief ek
  * upar wali cheez hai; uske liye screen kabhi khaali nahi rehni chahiye.
@@ -469,7 +536,16 @@ export async function dailyBrief(
   if (!supabase) return null;
   try {
     const d = await callAi<{ brief?: string } | null>(
-      { task: "brief", data, name, locale },
+      {
+        task: "brief",
+        data,
+        name,
+        locale,
+        // ⚠️ LOCAL waqt (bina Z). UTC bhejne par bharat me shaam ka brief
+        // "dopahar" ban jaata hai — 5:30 ka farak theek is jagah kaat-ta hai.
+        now: localNowIso(),
+        part: dayPart(),
+      },
       TASK_TIMEOUT_MS,
     );
     const brief = d?.brief?.trim();

@@ -60,6 +60,27 @@ export function twilioConfigured(): boolean {
 }
 
 /**
+ * Kis bhasha ka template asli me maujood hai — admin ko dikhane ke liye.
+ *
+ * `exact`    = us bhasha ka apna template hai.
+ * `fallback` = us bhasha ka nahi hai, Hinglish wala jayega (pahunchega, par
+ *              galat bhasha me — yahi wo halat hai jo chup-chaap nikal jaati hai).
+ * `none`     = koi template hi nahi. Production me Meta free-form text REJECT
+ *              karta hai, yaani us raaste par message bilkul nahi jaata.
+ */
+export type WaTemplateState = "exact" | "fallback" | "none";
+
+export function waTemplateState(
+  kind: "reminder" | "document",
+  locale: WaLocale,
+): WaTemplateState {
+  const row = TEMPLATES[kind];
+  if (row[locale]) return "exact";
+  if (row.hinglish) return "fallback";
+  return "none";
+}
+
+/**
  * WhatsApp message bhejo. `to` = E.164 (jaise +919876543210).
  *
  * ⚠️ WhatsApp ka niyam: business khud se (24h window ke bahar) SIRF approved

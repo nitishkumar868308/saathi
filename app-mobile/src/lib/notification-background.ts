@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import notifee, { EventType, type Notification } from "@notifee/react-native";
 
-import { alertUser } from "./alert-mode";
+import { alertUser, stopAlert } from "./alert-mode";
 
 /**
  * Notifee ka background/headless event handler — app ke BAAHAR wala hissa.
@@ -37,8 +37,33 @@ import { alertUser } from "./alert-mode";
 /** App band/background me aayi notification — resume par modal dikhane ke liye. */
 const PENDING_ALERT_KEY = "saathi-pending-alert";
 
+/**
+ * Notification ke button se kiye gaye kaam — app khulne par server tak jaayenge.
+ *
+ * ⚠️ Ye kataar isliye zaroori hai ki ye handler ek **headless task** me chalta
+ * hai. Wahan Supabase ka client banana matlab poora auth/session/network stack
+ * boot karna — sasta phone us der me alarm ka pehla lamha hi kha jaata hai, aur
+ * task khatam hote hi Android process gira deta hai (yaani aadhi bheji hui
+ * request beech me hi mar jaati hai).
+ *
+ * Isliye yahan sirf ek chhoti si line likhi jaati hai; asli kaam app khulne par
+ * hota hai (`flushNotificationActions`).
+ */
+const PENDING_ACTIONS_KEY = "saathi-notif-actions";
+
 /** Itni purani notification ka modal ab dikhana bhadda lagta hai. */
 const PENDING_ALERT_MAX_AGE_MS = 30 * 60_000;
+
+/** Notification ke do button — id dono taraf ek jaisi honi chahiye. */
+export const ACTION_DONE = "reminder-done";
+export const ACTION_LATER = "reminder-later";
+
+export type PendingAction = {
+  /** Notification id — repeat wale reminder me `<uuid>#3` bhi ho sakta hai. */
+  id: string;
+  action: "done" | "later";
+  at: number;
+};
 
 /**
  * Awaaz kis notification par ho — reminder/expiry par, baaki par nahi.
@@ -52,10 +77,60 @@ function shouldSpeak(n: Notification): boolean {
   return kind === "reminder" || kind === "expiry";
 }
 
+/** Button ka kaam kataar me daal do — app khulte hi server tak jayega. */
+async function queueAction(id: string, action: "done" | "later"): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ACTIONS_KEY);
+    const list = raw ? (JSON.parse(raw) as PendingAction[]) : [];
+    const rest = Array.isArray(list) ? list.filter((x) => x.id !== id) : [];
+    rest.push({ id, action, at: Date.now() });
+    await AsyncStorage.setItem(PENDING_ACTIONS_KEY, JSON.stringify(rest));
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Kataar khaali karke lauta do — app start par ek hi baar chalta hai. */
+export async function takeNotificationActions(): Promise<PendingAction[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ACTIONS_KEY);
+    if (!raw) return [];
+    await AsyncStorage.removeItem(PENDING_ACTIONS_KEY);
+    const list = JSON.parse(raw) as PendingAction[];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
 if (Platform.OS !== "web") {
   notifee.onBackgroundEvent(async ({ type, detail }) => {
-    if (type !== EventType.DELIVERED && type !== EventType.PRESS) return;
     const n = detail.notification;
+
+    /**
+     * ── Notification ke button (app khole bina) ──────────────────────────
+     *
+     * ⚠️ Yahan `cancelNotification` sirf saaf-safai nahi hai — wo AWAAZ BAND
+     * karta hai. Reminder ab `loopSound` + `FLAG_INSISTENT` ke saath bajta hai,
+     * yaani awaaz tab tak chalti rehti hai jab tak notification hat na jaye.
+     * Bina is line ke button dabane par alarm bajta hi rehta.
+     */
+    if (type === EventType.ACTION_PRESS) {
+      const pressId = detail.pressAction?.id;
+      if (pressId === ACTION_DONE || pressId === ACTION_LATER) {
+        stopAlert();
+        if (n?.id) {
+          await queueAction(n.id, pressId === ACTION_DONE ? "done" : "later");
+          await notifee.cancelNotification(n.id).catch(() => {});
+        }
+      }
+      return;
+    }
+
+    // Notification par tap — awaaz rok do, app ab khul rahi hai.
+    if (type === EventType.PRESS || type === EventType.DISMISSED) stopAlert();
+
+    if (type !== EventType.DELIVERED && type !== EventType.PRESS) return;
     if (!n?.id) return;
 
     /**

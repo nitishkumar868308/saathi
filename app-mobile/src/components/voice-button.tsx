@@ -194,6 +194,39 @@ const ownerReset = new Map<number, () => void>();
 const INSTANT_DEATH_MS = 1500;
 
 /**
+ * ── "Bolne ka mauka hi nahi milta" ──────────────────────────────────────
+ *
+ * ⚠️ Ye is file ka sabse asli sudhaar hai, aur pehle ye tha hi nahi.
+ *
+ * Android ka recognizer apni marzi se faisla karta hai ki "ab bas". Jab tak
+ * awaaz shuru na ho, wo aksar 2-5 second me hi `ERROR_SPEECH_TIMEOUT` ya
+ * `ERROR_NO_MATCH` de deta hai — aur ye timeout kisi intent extra se badla nahi
+ * ja sakta (Google ka recognizer un extras ko poori tarah anadekha karta hai).
+ *
+ * Iska seedha nateeja user ki shikayat thi: mic dabao, saans lo, bolna shuru
+ * karne hi wale ho — aur tab tak toast aa chuka hota tha "awaaz saaf nahi aayi".
+ * Bujurg haath aur naya user dono ko 2 second me bolna shuru karna hi padta tha,
+ * jo asli baat-cheet me hota hi nahi.
+ *
+ * `escalated()` bhi yahan kaam nahi aata: wo sirf DED SE PEHLE (1.5s) marne wale
+ * session ko pakadta hai, kyunki uska maqsad alag hai — galat options/recognizer
+ * pehchaanna, chuppi nahi.
+ *
+ * Ilaaj seedha hai: agar user ka IRAADA abhi bhi bolne ka hai (ungli lagi hui
+ * hai, ya tap-mode chalu hai) aur abhi tak kuch suna hi nahi gaya, to chup-chaap
+ * recognizer dobara chala do. User ko kuch dikhta hi nahi — uske liye mic bas
+ * sunta rehta hai, jitni der wo chahe.
+ *
+ * Do chhat, aur dono zaroori hain:
+ *   • `RESTART_MAX` — jis phone par recognizer sach me toota hua hai wahan ye
+ *     hamesha ke liye nahi ghoomta rahega.
+ *   • `LISTEN_MAX_MS` — mic khuli chhod dena battery aur privacy dono ke liye
+ *     bura hai. Ek minute me har asli baat khatam ho jaati hai.
+ */
+const RESTART_MAX = 5;
+const LISTEN_MAX_MS = 60_000;
+
+/**
  * ── "Voice bilkul kaam nahi karta" — asli do wajah ──────────────────────
  *
  * Dono `expo-speech-recognition` ke NATIVE code me hain, aur dono par app ka
@@ -420,6 +453,17 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
 
   /** Ye session kab shuru hua — "turant mar gaya" pehchaanne ke liye. */
   const startedAt = useRef(0);
+  /**
+   * User ne pehli baar mic kab dabaya (restart ke aar-paar bhi wahi rehta hai).
+   *
+   * ⚠️ `startedAt` se alag hona ZAROORI hai. `startedAt` har restart par naya ho
+   * jaata hai, isliye usse "kitni der se sun rahe hain" naapa hi nahi ja sakta —
+   * aur bina us naap ke `LISTEN_MAX_MS` wali chhat lagti hi nahi, yaani mic
+   * hamesha ke liye khuli reh sakti hai.
+   */
+  const listeningSince = useRef(0);
+  /** Chuppi par kitni baar chup-chaap dobara chala chuke hain. */
+  const restarts = useRef(0);
   /** Abhi kaunsi koshish chal rahi hai (tuned / plain / google). */
   const attemptRef = useRef<Attempt>("tuned");
   /**
@@ -537,11 +581,51 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     return true;
   }
 
+  /**
+   * User abhi bhi bolna chahta hai aur recognizer ne bina kuch sune chhod diya —
+   * chup-chaap dobara chalu kar do.
+   *
+   * `true` lauta to caller ko kuch nahi karna: na toast, na release. Poori soch
+   * `RESTART_MAX` ke upar likhi hai.
+   */
+  function keepListening(): boolean {
+    // Kuch mil gaya — ab dobara sunne ka koi matlab nahi.
+    if (gotResult.current || lastInterim.current) return false;
+    // User ne haath hi hata liya (hold chhoda / tap se band kiya).
+    if (intent.current === "none") return false;
+    if (restarts.current >= RESTART_MAX) return false;
+    if (listeningSince.current && Date.now() - listeningSince.current > LISTEN_MAX_MS) {
+      return false;
+    }
+
+    restarts.current += 1;
+    /**
+     * ⚠️ Purane session ko murda chihnit karna zaroori hai — bilkul wahi wajah
+     * jo `escalated()` me likhi hai. Native side ek fail par DO event bhejta hai
+     * (`error` phir `end`); bina is jhande ke doosra event nayi koshish ko hi
+     * maar deta.
+     */
+    deadSession.current = true;
+    setTimeout(() => {
+      if (!isMine() || intent.current === "none") {
+        deadSession.current = false;
+        release();
+        return;
+      }
+      // Wahi koshish (attempt) dobara — yahan galti options ki nahi, sirf
+      // recognizer ke sabra ki hai.
+      void startListening({ attempt: attemptRef.current, keepAlive: true });
+    }, 150);
+    return true;
+  }
+
   useSpeechRecognitionEvent("end", () => {
     if (!live()) return;
     // Final kabhi aaya hi nahi par interim mil chuka hai — wahi sach hai.
     if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current);
     if (!gotResult.current && escalated("end")) return;
+    // User abhi bhi bolna chahta hai — mic band mat karo (upar wajah likhi hai).
+    if (!gotResult.current && keepListening()) return;
     // Ab bhi kuch nahi — tabhi kuch kehna hai. Mil gaya to chup rehna behtar.
     if (!gotResult.current) hintForSilence();
     release();
@@ -574,6 +658,18 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
        */
       const fatal = e?.error === "not-allowed" || e?.error === "aborted";
       if (!fatal && escalated(e?.error ?? "unknown")) return;
+      /**
+       * ⚠️ "Kuch sunayi nahi diya" par toast NAHI — dobara sunna.
+       *
+       * `no-speech` / `speech-timeout` ka matlab sirf itna hai ki recognizer ne
+       * apne hisaab se sabra khatam kar diya (Android par wo 2-5 second me hi
+       * kar deta hai, aur wo waqt badla nahi ja sakta). Us par user ko "awaaz
+       * saaf nahi aayi" dikhana do tarah se galat tha: baat awaaz ki thi hi
+       * nahi, aur user abhi bolna shuru hi kar raha tha. Wahi "bolne ka mauka
+       * hi nahi milta" wali shikayat thi.
+       */
+      const silence = e?.error === "no-speech" || e?.error === "speech-timeout";
+      if (!fatal && silence && keepListening()) return;
       toast.show(errorLine(e?.error), "info");
     }
     release();
@@ -688,6 +784,10 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     if (isMine()) activeOwner = null;
     intent.current = "none";
     starting.current = false;
+    // Sunwaai poori tarah khatam — agli baar ginti 0 se (warna ek purani lambi
+    // koshish agli baar ke restarts kha jaati).
+    restarts.current = 0;
+    listeningSince.current = 0;
     // Agli baar taazi shuruaat — warna ek murda-chihnit session ka jhanda agle
     // press par bhi laga rehta aur uske saare event chup-chaap gir jaate.
     deadSession.current = false;
@@ -753,7 +853,19 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
    * `attempt` na do to phone par jo koshish pehle chal chuki hai wahi (aur
    * pehli baar `tuned`). Poori soch `ATTEMPTS` ke upar likhi hai.
    */
-  async function startListening({ attempt }: { attempt?: Attempt } = {}) {
+  async function startListening({
+    attempt,
+    /**
+     * Ye ek chalti hui sunwaai ka agla hissa hai (chuppi ke baad dobara), nayi
+     * shuruaat nahi.
+     *
+     * ⚠️ Ye jhanda isliye chahiye ki `beginUi()` sab kuch reset kar deta hai —
+     * `restarts` aur `listeningSince` samet. Bina iske dono ginti har restart
+     * par 0 ho jaati aur DONO chhat (RESTART_MAX, LISTEN_MAX_MS) kabhi lagti hi
+     * nahi: mic hamesha ke liye khuli reh sakti thi.
+     */
+    keepAlive,
+  }: { attempt?: Attempt; keepAlive?: boolean } = {}) {
     // Pehla `start()` abhi raaste me hai — doosra bhejna sirf
     // ERROR_RECOGNIZER_BUSY laayega aur pehle wale ka transcript gira dega.
     if (starting.current) return;
@@ -859,6 +971,10 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
       activeOwner = meRef.current;
       beginUi();
       startedAt.current = Date.now();
+      if (!keepAlive) {
+        listeningSince.current = Date.now();
+        restarts.current = 0;
+      }
       attemptRef.current = mode;
       // Purane, murda session ka pehra ab hata do — yahan se aage ke event is
       // nayi koshish ke hain.

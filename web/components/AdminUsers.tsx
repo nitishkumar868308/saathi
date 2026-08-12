@@ -17,6 +17,38 @@ import Pagination, { usePagination } from "@/components/admin/Pagination";
 import CopyButton from "@/components/CopyButton";
 import Loader from "@/components/Loader";
 import { useAdminT } from "@/lib/i18n/admin";
+/**
+ * ⚠️ Sirf TYPE import. `delivery-check` server-only hai (service-role key wali
+ * fetch us ke andar hai), par `import type` compile par poora mit jaata hai —
+ * bundle me us module ka koi nishaan nahi jaata. Isse jaanch ka aakaar ek hi
+ * jagah rehta hai: server naya field jode aur UI purana dikhaye, ye ho hi nahi
+ * sakta.
+ */
+import type { DeliveryBlocker, DeliveryCheck } from "@/lib/delivery-check";
+
+/** Bhasha ka naam — teenon ka apna, translate karne ki cheez nahi. */
+const LANG_LABEL: Record<DeliveryCheck["language"], string> = {
+  hinglish: "Hinglish",
+  hi: "हिंदी",
+  en: "English",
+};
+
+/**
+ * Wajah -> dictionary key.
+ *
+ * ⚠️ `Record<DeliveryBlocker, ...>` jaan-boojh ke: server par nayi wajah judne
+ * par TypeScript yahin rok deta hai. Warna nayi wajah chup-chaap khaali line
+ * ban kar dikhti — aur khaali line ka matlab admin "koi rok nahi" samajh leta.
+ */
+const BLOCKER_KEY = {
+  not_plus: "blockerNotPlus",
+  no_email: "blockerNoEmail",
+  no_phone: "blockerNoPhone",
+  phone_unverified: "blockerPhoneUnverified",
+  smtp_off: "blockerSmtpOff",
+  twilio_off: "blockerTwilioOff",
+  wa_template_missing: "blockerWaTemplate",
+} as const satisfies Record<DeliveryBlocker, string>;
 
 type AdminUser = {
   id: string;
@@ -51,6 +83,18 @@ type UserDetail = {
   referral_code: string | null;
   referral_days_earned: number;
   referred_by: { email: string | null; code: string | null } | null;
+  /**
+   * App lock (PIN) ki haalat.
+   *
+   * ⚠️ Sirf HAALAT — hash/salt kabhi nahi. Support par sabse aam sawaal "main
+   * apna PIN bhool gaya" hai, aur uske liye itna hi jaanna kaafi hai ki lock
+   * laga hai ya nahi. PIN ka hash dekhne ki koi zaroorat nahi, aur jo cheez
+   * dikhti hai wo kabhi na kabhi leak hoti hai.
+   *
+   * `null` = us user ki `user_details` row hi nahi bani (profile kabhi chhui hi
+   * nahi) — yaani lock bhi nahi hai.
+   */
+  app_lock: { on: boolean; biometric: boolean; at: string | null } | null;
   referrals: UserReferral[];
   documents: UserDocument[];
   documents_count: number;
@@ -426,6 +470,7 @@ function Detail({ id }: { id: string }) {
   const d = t.data.users;
   const sh = t.data.shared;
   const [detail, setDetail] = useState<UserDetail | null>(null);
+  const [delivery, setDelivery] = useState<DeliveryCheck | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -433,9 +478,14 @@ function Detail({ id }: { id: string }) {
     (async () => {
       try {
         const res = await fetch(`/api/admin/users/${id}`, { cache: "no-store" });
-        const body = (await res.json()) as { detail?: UserDetail; error?: string };
+        const body = (await res.json()) as {
+          detail?: UserDetail;
+          delivery?: DeliveryCheck | null;
+          error?: string;
+        };
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
         if (alive) setDetail(body.detail ?? null);
+        if (alive) setDelivery(body.delivery ?? null);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : d.detailFailed);
       }
@@ -480,6 +530,64 @@ function Detail({ id }: { id: string }) {
               : fmtDate(detail.plan_expires_at)
           }
         />
+        {/*
+          App lock — support call ka pehla sawaal.
+
+          ⚠️ Ye jaanna zaroori hai ki lock ACCOUNT par laga hai, phone par nahi.
+          Isi wajah se user ko naye phone par bhi PIN maanga jaata hai, aur bina
+          ye row dekhe support ise "app toot gayi" samajh leta tha.
+        */}
+        <DetailRow
+          label="App lock"
+          value={
+            !detail.app_lock?.on
+              ? t.common.no
+              : `${t.common.yes}${detail.app_lock.biometric ? " + biometric" : ""} · ${fmtDate(
+                  detail.app_lock.at,
+                )}`
+          }
+        />
+
+        {/*
+          Reminder delivery — "mujhe WhatsApp par reminder nahi aaya" ka jawab.
+
+          ⚠️ Ye ginti nahi, WAJAH dikhata hai. Cron sirf total lautata hai
+          ("whatsapp: 3, skippedFreePlan: 12"), jisme kisi ek user ka kyun ruka
+          ye kabhi nahi hota — aur support ko wahi ek baat chahiye hoti hai.
+        */}
+        <h4 className="pt-3 text-xs font-bold uppercase tracking-wider text-ink-soft">
+          {d.delivery}
+        </h4>
+        {!delivery ? (
+          <p className="text-sm text-ink-soft">{d.deliveryUnknown}</p>
+        ) : (
+          <>
+            <DetailRow label={d.deliveryLang} value={LANG_LABEL[delivery.language]} />
+            <DetailRow
+              label="WhatsApp"
+              value={delivery.whatsapp.willSend ? d.willSend : d.wontSend}
+            />
+            <DetailRow label="Email" value={delivery.email.willSend ? d.willSend : d.wontSend} />
+            {delivery.blockers.length === 0 ? (
+              <p className="text-xs text-ink-soft">{d.deliveryOk}</p>
+            ) : (
+              <ul className="space-y-1">
+                {delivery.blockers.map((b) => (
+                  <li key={b} className="text-xs font-semibold text-terracotta-dark">
+                    {d[BLOCKER_KEY[b]]}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/*
+              Template ki bhasha — rok nahi, isliye `blockers` me nahi. Par
+              chup-chaap galat bhasha me pahunchna bhi ek shikayat banta hai.
+            */}
+            {delivery.whatsapp.willSend && delivery.whatsapp.template === "fallback" && (
+              <p className="text-xs text-ink-soft">{d.waWrongLang}</p>
+            )}
+          </>
+        )}
       </div>
 
       {/* Right: kisko refer kiya */}

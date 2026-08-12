@@ -12,7 +12,7 @@ import {
   ExternalLink,
   FolderOpen,
 } from "lucide-react";
-import Loader, { SkeletonRows } from "@/components/Loader";
+import { SkeletonRows } from "@/components/Loader";
 import Modal from "@/components/admin/Modal";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
@@ -355,39 +355,29 @@ export default function AdminDocuments() {
 function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) {
   const t = useAdminT();
   const dd = t.data.documents;
-  const [url, setUrl] = useState<string | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const [state, setState] = useState<"idle" | "error">("idle");
   const [msg, setMsg] = useState("");
 
+  /**
+   * File ka URL — ab seedha apna proxy route.
+   *
+   * ⚠️ Pehle yahan ek `fetch` chalta tha jo R2 ka short-lived signed URL laata
+   * tha, aur wahi URL preview aur "Naye tab me", dono me lagta tha. Wo teen
+   * tareeke se chup-chaap fail hota tha (poori wajah `api/admin/documents/file`
+   * me likhi hai) aur har baar screen par sirf khaali jagah bachti thi.
+   *
+   * Ab URL banane me na network lagta hai na waqt — yaani "preview load ho raha
+   * hai" wali haalat hi khatam. Fail hone ka ek hi tareeka bacha hai: file sach
+   * me na mile, aur wo `<img onError>` / iframe se pakda jaata hai.
+   */
+  const url =
+    doc?.inStorage && doc.filePath
+      ? `/api/admin/documents/file?path=${encodeURIComponent(doc.filePath)}`
+      : null;
+
   useEffect(() => {
-    setUrl(null);
+    setState("idle");
     setMsg("");
-    if (!doc || !doc.inStorage || !doc.filePath) {
-      setState("idle");
-      return;
-    }
-    let alive = true;
-    setState("loading");
-    fetch(`/api/admin/documents/signed-url?path=${encodeURIComponent(doc.filePath)}`, {
-      cache: "no-store",
-    })
-      .then(async (r) => {
-        const b = (await r.json()) as { url?: string; error?: string };
-        if (!r.ok) throw new Error(b.error ?? `HTTP ${r.status}`);
-        if (alive) {
-          setUrl(b.url ?? null);
-          setState("idle");
-        }
-      })
-      .catch((e) => {
-        if (alive) {
-          setState("error");
-          setMsg(e instanceof Error ? e.message : "load fail");
-        }
-      });
-    return () => {
-      alive = false;
-    };
   }, [doc]);
 
   if (!doc) return null;
@@ -408,15 +398,27 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
             {doc.filePath ?? "storage me nahi"}
           </code>
           {url && (
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-terracotta px-4 text-sm font-semibold text-white transition hover:bg-terracotta-dark"
-            >
-              <ExternalLink size={14} />
-              Naye tab me
-            </a>
+            <div className="flex shrink-0 items-center gap-2">
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-terracotta px-4 text-sm font-semibold text-white transition hover:bg-terracotta-dark"
+              >
+                <ExternalLink size={14} />
+                Naye tab me
+              </a>
+              {/* Download alag button — `Content-Disposition: inline` ki wajah se
+                  upar wala link ab file DIKHATA hai, utarta nahi. Dono kaam
+                  chahiye, isliye dono button. */}
+              <a
+                href={`${url}&download=1`}
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink-soft transition hover:text-terracotta"
+              >
+                <Download size={14} />
+                Download
+              </a>
+            </div>
           )}
         </div>
       }
@@ -438,39 +440,43 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
           </div>
         )}
 
-        {!doc.inStorage || !doc.filePath ? (
+        {!url ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-cream-deep/20 py-12 text-center">
             <Download size={22} className="text-ink-soft" />
             <p className="text-sm text-ink-soft">
-              Ye document sirf user ke device pe hai — storage me upload nahi hua, isliye preview nahi.
+              Ye document abhi sirf user ke device pe hai — storage me upload nahi hua, isliye
+              preview nahi. App agli baar khulne par khud upload karne ki koshish karegi.
             </p>
-          </div>
-        ) : state === "loading" ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-ink-soft">
-            <Loader size={40} />
-            <span className="text-sm">{dd.loadingPreview}</span>
           </div>
         ) : state === "error" ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-terracotta/30 bg-terracotta/10 py-12 text-center">
             <AlertTriangle size={20} className="text-terracotta-dark" />
             <p className="text-sm text-terracotta-dark">{msg || dd.previewFailed}</p>
           </div>
-        ) : url ? (
-          isPdf ? (
-            <iframe
-              src={url}
-              title={doc.name}
-              className="h-[60vh] w-full rounded-2xl border border-line bg-white"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={url}
-              alt={doc.name}
-              className="mx-auto max-h-[60vh] w-auto rounded-2xl border border-line object-contain"
-            />
-          )
-        ) : null}
+        ) : isPdf ? (
+          <iframe
+            src={url}
+            title={doc.name}
+            className="h-[60vh] w-full rounded-2xl border border-line bg-white"
+          />
+        ) : (
+          /**
+           * ⚠️ `onError` zaroori hai. Pehle file na khulne par `<img>` chup-chaap
+           * kuch bhi render nahi karta tha — admin ko ek khaali modal dikhta tha
+           * aur ye samajhne ka koi tareeka hi nahi tha ki file gayab hai, R2 band
+           * hai, ya session hi expire ho gaya.
+           */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={url}
+            alt={doc.name}
+            onError={() => {
+              setState("error");
+              setMsg(dd.previewFailed);
+            }}
+            className="mx-auto max-h-[60vh] w-auto rounded-2xl border border-line object-contain"
+          />
+        )}
       </div>
     </Modal>
   );

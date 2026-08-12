@@ -1,6 +1,7 @@
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { supabase } from "./supabase";
+import { forgetLocalLock } from "./app-lock";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -66,6 +67,21 @@ export async function setNewPassword(password: string): Promise<void> {
 }
 
 export async function signOut() {
+  /**
+   * ⚠️ Lock ka local nishaan PEHLE hatao, session ke BAAD nahi.
+   *
+   * Do wajah, aur dono asli hain:
+   *
+   *   • Is phone par agla user koi AUR ho sakta hai. Uske saamne pehle wale ka
+   *     PIN maangna sabse bekaar soorat hai — wo PIN use pata hi nahi hoga.
+   *   • Server par lock waise ka waisa pada rehta hai. Yahi poora point hai:
+   *     "logout karke lock hata lo" wala purana raasta ab band hai, kyunki
+   *     dobara login karte hi `syncAppLock()` lock wapas le aata hai.
+   *
+   * `catch` isliye ki SecureStore ki kisi dikkat par logout khud na ruk jaye —
+   * atka hua logout is se kahin zyada bura hai.
+   */
+  await forgetLocalLock().catch(() => {});
   await client().auth.signOut();
 }
 

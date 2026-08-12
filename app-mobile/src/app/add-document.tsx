@@ -175,8 +175,19 @@ export default function AddDocument() {
         file_uri: savedUri,
       });
 
-      // Cloud backup — document image Cloudflare R2 me (private). Best-effort:
-      // fail ho to local copy to hai hi. Admin/size/cross-device iske liye.
+      /**
+       * Cloud backup — document image Cloudflare R2 me (private).
+       *
+       * ⚠️ Ye ab "chalao aur bhool jao" nahi hai. `uploadDocumentImage` pehle
+       * file ko kataar me daalta hai aur uske BAAD upload ki koshish karta hai —
+       * yaani net na ho (ya beech me toot jaye) to bhi wo kataar me padi rehti
+       * hai aur app khulne/net aane par apne aap chali jaati hai.
+       *
+       * Pehle yahan seedha upload tha aur uska `.catch(() => {})` fail ko
+       * chup-chaap nigal jaata tha: document HAMESHA ke liye sirf us phone par
+       * reh jaata tha. Phone kho jaye to backup ka poora waada wahin toot-ta tha,
+       * aur kisi ko pata bhi nahi chalta tha.
+       */
       if (savedUri) {
         uploadDocumentImage(doc.id, savedUri).catch(() => {});
       }
