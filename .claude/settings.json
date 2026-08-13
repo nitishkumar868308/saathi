@@ -461,7 +461,8 @@
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/adddict.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/fixdict.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/genpepper.js\")",
-      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/pepper-verify.js\")"
+      "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/pepper-verify.js\")",
+      "Bash(node -e \"for \\(const s of ['2027-02-29','2027-02-30','2027-13-01','2027-04-31','2026-02-29']\\) { const d=new Date\\(s\\); console.log\\(s, '->', isNaN\\(d.getTime\\(\\)\\)?'INVALID':d.toISOString\\(\\)\\); }\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",
