@@ -14,7 +14,6 @@
  */
 import { Platform } from "react-native";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Purchases: any = null;
 try {
   // Expo Go me ye throw kar sakta hai — catch me handle.

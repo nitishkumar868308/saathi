@@ -56,6 +56,18 @@ export type PendingUpload = {
   tries: number;
   /** Pehli baar kab kataar me aaya. */
   at: number;
+  /**
+   * Renew ka version — R2 par file ka naam isi se banta hai.
+   *
+   * ⚠️ Ye kataar me RAKHNA zaroori hai, sirf call ke waqt bhejna kaafi nahi.
+   * Renew net ke bina bhi hota hai (wahi to poora point hai), aur us haalat me
+   * asli upload ghanton baad chalta hai. Version yahan na pada ho to wo upload
+   * purane naam (`<docId>.<ext>`) par chala jaata — yaani theek wahi purani
+   * photo mit jaati jise bachane ke liye ye poora intezaam hai.
+   *
+   * `undefined` = pehla version (naya document) — purana raasta, jaisa tha.
+   */
+  version?: number;
 };
 
 async function read(): Promise<PendingUpload[]> {
@@ -84,10 +96,15 @@ async function write(list: PendingUpload[]): Promise<void> {
  * Ek hi document do baar kataar me nahi aata: doosri entry pehli ko badal deti
  * hai (user ne photo dobara li ho sakti hai, aur nayi hi sach hai).
  */
-export async function queueUpload(docId: string, uri: string, mime: string): Promise<void> {
+export async function queueUpload(
+  docId: string,
+  uri: string,
+  mime: string,
+  version?: number,
+): Promise<void> {
   const list = await read();
   const rest = list.filter((x) => x.docId !== docId);
-  rest.push({ docId, uri, mime, tries: 0, at: Date.now() });
+  rest.push({ docId, uri, mime, tries: 0, at: Date.now(), version });
   await write(rest);
 }
 
@@ -136,7 +153,7 @@ export async function flushUploads(): Promise<void> {
       if (!exists) continue; // chhod do — file hi nahi bachi
 
       try {
-        await uploadDocument(item.docId, item.uri, item.mime);
+        await uploadDocument(item.docId, item.uri, item.mime, item.version);
         // Kaamyab — kataar se bahar (server khud `file_path`/`file_size` bhar
         // chuka hai, yahan DB ko chhoone ki zaroorat nahi).
       } catch (e) {

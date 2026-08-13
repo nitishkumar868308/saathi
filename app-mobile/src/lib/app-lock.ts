@@ -39,8 +39,35 @@ import { supabase } from "./supabase";
  * lock HAI ya nahi; kholta hamesha phone hi hai.
  *
  * Salt kyun: bina salt ke "1234" ka SHA-256 duniya me har jagah ek jaisa hota
- * hai. Kisi ne phone ka storage padh liya to 4-ank ka PIN ek lookup me khul
- * jaata. Har user ka apna salt isse bekaar kar deta hai.
+ * hai, yaani ek hi banी-banayi list se lakhon phone ek saath khul jaate. Har
+ * user ka apna salt us list ko bekaar kar deta hai.
+ *
+ * ── Ye lock kya NAHI rok sakta (saaf-saaf) ────────────────────────────────
+ *
+ * ⚠️ Yahan pehle likha tha ki salt aur "5 koshish" wali rok mil kar PIN ko
+ * brute-force se bacha leti hain. **Wo galat tha, aur us par bharosa karna
+ * khatarnak hai** — isliye asli baat likhi ja rahi hai:
+ *
+ *   • PIN 4 ank ka hai — sirf 10,000 sambhavnaayein. Hash ek hi SHA-256 hai.
+ *     Jisne phone ka storage padh liya (root, ADB backup, ya chura kar khola
+ *     hua phone) wo un 10,000 ko apne computer par SECOND ke andar chala kar
+ *     PIN nikaal sakta hai. Salt ise dheema nahi karta — salt ka kaam sirf
+ *     banी-banayi list rokna hai, ginti rokna nahi.
+ *   • Neeche wali "5 koshish" wali rok SIRF app ke andar chalti hai. Jo hamla
+ *     app ke bahar (apne computer par) hota hai, wo use chhoota bhi nahi.
+ *   • Aur ye lock waise bhi UI ka lock hai: jiske paas account ka session hai
+ *     wo REST API se seedha documents padh sakta hai, PIN ke aar-paar se.
+ *
+ * To phir ye lock kis kaam ka: **wahi kaam jiske liye user ne lagaya tha** —
+ * phone kisi ke haath me de dena (bacha, dukaandar, rishtedaar) aur uska app
+ * khol ke documents dekh lena. Wo hamla app ke ANDAR se hota hai, aur usi ke
+ * liye neeche wali badhti hui rok banayi gayi hai (jo ab app band karne se bhi
+ * nahi mitti).
+ *
+ * ⚠️ Asli behtari ek hi hai: PIN ko lamba karna (6 ank = 100 guna, 8 = 10,000
+ * guna). Wo `PIN_LENGTH` badalne se hoga, aur uske saath purane 4-ank wale PIN
+ * ke liye ek raasta rakhna padega — isliye wo alag faisla hai, chupke se badal
+ * dene wali cheez nahi.
  */
 
 const PIN_KEY = "saathi-lock-pin";
@@ -131,6 +158,10 @@ export async function biometricAvailable(): Promise<boolean> {
 }
 
 export async function getLockState(): Promise<LockState> {
+  // Lock screen mount hote hi yahi chalta hai — galat koshishon ki ginti bhi
+  // yahin storage se aa jaati hai, taaki `pinAttemptsLeft()` (jo sync hai)
+  // pehle sawaal par hi sach bata sake.
+  await hydrateGuard();
   const [pin, bio, avail] = await Promise.all([
     get(PIN_KEY),
     get(BIO_KEY),
@@ -170,6 +201,9 @@ export async function setPin(pin: string): Promise<void> {
 export async function disableLock(): Promise<void> {
   await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY)]);
   await set(DIRTY_KEY, "1");
+  // Purana intezaar bhi saaf — warna lock band karke naya PIN lagane wala user
+  // apne hi naye PIN par "abhi 8 minute ruko" dekhta.
+  await clearGuard();
   resetGrace();
   await pushClear();
 }
@@ -290,6 +324,9 @@ export async function syncAppLock(): Promise<void> {
  */
 export async function forgetLocalLock(): Promise<void> {
   await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY), del(DIRTY_KEY)]);
+  // Galat koshishon ki ginti bhi — agla user is phone par koi AUR ho sakta hai,
+  // aur use pehle wale ke intezaar me baithana bilkul bekaar hai.
+  await clearGuard();
   resetGrace();
 }
 
@@ -305,10 +342,9 @@ export async function adoptResetPin(hash: string, salt: string): Promise<void> {
   await set(PIN_KEY, hash);
   await del(DIRTY_KEY);
   // Ginti bhi saaf — user ne abhi apni pehchaan email se saabit ki hai, use
-  // purani galat koshishon ki saza dena bekaar hai.
-  wrongTries = 0;
-  lockoutRound = 0;
-  lockedUntil = 0;
+  // purani galat koshishon ki saza dena bekaar hai. (Storage se bhi hatti hai,
+  // warna app band karke kholne par purana intezaar wapas aa jaata.)
+  await clearGuard();
 }
 
 /** Naya PIN ka hash + salt — reset ke liye (PIN khud kabhi nahi bhejte). */
@@ -331,23 +367,78 @@ export async function makePinHash(pin: string): Promise<{ hash: string; salt: st
  *
  * Ab har 5 galat koshish ke baad intezaar badhta jaata hai. Ye asli user ko
  * mushkil se chhoota hai (wo aksar pehli ya doosri baar me sahi daalta hai) par
- * brute-force ko poori tarah bekaar kar deta hai: 10,000 koshishon me ghanton
- * nahi, dinon lag jaate hain.
+ * haath me aaye hue phone par 10,000 tap karne wale ko poori tarah rok deta hai.
  *
- * Memory me hai, storage me nahi — soch samajh ke. Storage me rakhne par ek
- * hamlavar app ka data clear karke ginti reset kar sakta tha (aur app data
- * clear karne se PIN bhi chala jaata, yaani wo raasta waise bhi lock hata deta
- * hai). Memory me hone ka matlab hai ki app poori tarah band karke ginti reset
- * ho sakti hai — par uske liye har 5 koshish par app restart karni padegi, jo
- * apne aap me ek badi rok hai.
+ * ── Ginti ab STORAGE me hai, sirf memory me nahi ──────────────────────────
+ *
+ * ⚠️ Pehle ye teenon sirf memory me the, aur us faisle ke saath ek daleel likhi
+ * thi: "app data clear karne se PIN bhi chala jaata hai, isliye wo raasta waise
+ * bhi lock hata deta hai." **Wo daleel ab sach nahi hai** — jab se lock account
+ * ke saath chalta hai (`syncAppLock`), app data clear karne par agli login par
+ * PIN server se WAPAS aa jaata hai. Yaani us raaste se lock hatta hi nahi.
+ *
+ * Par memory wali ginti se ek asli chhed khula reh jaata tha, aur wo bilkul
+ * aasan tha: 5 galat koshish → 30 second ka intezaar → app ko recents se hata
+ * do → dobara kholo → ginti phir 0. Koi root nahi, koi computer nahi, sirf
+ * swipe. Us tarah 10,000 koshishein rok se guzre bina ki ja sakti thi, aur wo
+ * theek WAHI hamla hai jiske liye ye rok banayi gayi thi.
+ *
+ * Ab ginti SecureStore me rehti hai, isliye app band karne se kuch nahi badalta.
+ * Sahi PIN, logout, ya email se PIN reset — teeno use saaf kar dete hain.
  */
 const MAX_TRIES = 5;
 /** Har 5 galat koshish ke baad: 30s, 60s, 2m, 4m… (aakhir me 15 min par ruk). */
 const LOCKOUT_STEPS_MS = [30_000, 60_000, 120_000, 240_000, 480_000, 900_000];
 
+/** Galat koshishon ka hisaab — SecureStore me isi shakl me padta hai. */
+const GUARD_KEY = "saathi-lock-guard";
+
 let wrongTries = 0;
 let lockoutRound = 0;
 let lockedUntil = 0;
+/** Storage se ek baar padh liya? (`pinAttemptsLeft` sync hai, isliye mirror.) */
+let guardLoaded = false;
+
+/**
+ * Storage se ginti memory me le aao — ek hi baar.
+ *
+ * `getLockState()` se bulaya jaata hai, jo lock screen mount hote hi chalta hai.
+ * Isliye pehla `checkPin()` aane se pehle ginti hamesha taiyaar hoti hai.
+ */
+async function hydrateGuard(): Promise<void> {
+  if (guardLoaded) return;
+  guardLoaded = true;
+  const raw = await get(GUARD_KEY);
+  if (!raw) return;
+  try {
+    const g = JSON.parse(raw) as { tries?: number; round?: number; until?: number };
+    wrongTries = Number(g.tries) || 0;
+    lockoutRound = Number(g.round) || 0;
+    lockedUntil = Number(g.until) || 0;
+  } catch {
+    /* toota hua likha hua — 0 se shuru, isse bura kuch nahi hota */
+  }
+}
+
+async function saveGuard(): Promise<void> {
+  try {
+    await set(
+      GUARD_KEY,
+      JSON.stringify({ tries: wrongTries, round: lockoutRound, until: lockedUntil }),
+    );
+  } catch {
+    /* best-effort — memory wali ginti phir bhi chalti rahegi */
+  }
+}
+
+/** Ginti poori tarah saaf — sahi PIN, logout, ya email se reset ke baad. */
+async function clearGuard(): Promise<void> {
+  wrongTries = 0;
+  lockoutRound = 0;
+  lockedUntil = 0;
+  guardLoaded = true;
+  await del(GUARD_KEY);
+}
 
 /** Abhi PIN daala ja sakta hai? Nahi to kitne second baad. */
 export function pinAttemptsLeft(): { blocked: boolean; waitSeconds: number; left: number } {
@@ -363,6 +454,10 @@ export function pinAttemptsLeft(): { blocked: boolean; waitSeconds: number; left
 }
 
 export async function checkPin(pin: string): Promise<boolean> {
+  // App abhi-abhi khuli ho to ginti storage se le aao — warna app band karke
+  // kholna hi rok ke aar-paar nikalne ka raasta ban jaata hai.
+  await hydrateGuard();
+
   // Intezaar chal raha hai — koshish ginte bhi nahi, warna hamlavar lagatar
   // bhej ke ginti aage badhata rehta aur asli user aur lamba phansta.
   if (pinAttemptsLeft().blocked) return false;
@@ -372,9 +467,7 @@ export async function checkPin(pin: string): Promise<boolean> {
   const ok = (await hashPin(pin, salt)) === saved;
 
   if (ok) {
-    wrongTries = 0;
-    lockoutRound = 0;
-    lockedUntil = 0;
+    await clearGuard();
     return true;
   }
 
@@ -385,6 +478,7 @@ export async function checkPin(pin: string): Promise<boolean> {
     lockoutRound += 1;
     wrongTries = 0;
   }
+  await saveGuard();
   return false;
 }
 

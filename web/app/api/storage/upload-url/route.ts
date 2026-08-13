@@ -3,7 +3,9 @@ import { appUserId } from "@/lib/app-auth";
 import { presignUpload, r2Key, R2NotConfigured, r2Configured } from "@/lib/r2";
 import {
   documentBelongsTo,
+  documentFileName,
   extFor,
+  parseVersion,
   rulesFor,
   storageDbConfigured,
   type UploadKind,
@@ -17,6 +19,12 @@ export const dynamic = "force-dynamic";
  *
  *   POST { kind: "avatar" }                      -> avatars/<uid>/avatar.jpg
  *   POST { kind: "document", docId, contentType } -> documents/<uid>/<docId>.<ext>
+ *   POST { …, version: 2 }                        -> documents/<uid>/<docId>-v2.<ext>
+ *
+ * `version` renew ke liye hai: uske bina nayi photo purani ke UPAR chadh jaati
+ * thi aur purana document hamesha ke liye mit jaata tha. Poori wajah
+ * `supabase/document-versions.sql` ke upar likhi hai. Field na aaye to purana
+ * raasta chalta hai — isliye purani app aur purane document bilkul nahi hilte.
  *
  * ⚠️ `uid` HAMESHA token se aata hai, kabhi body se. Body me uid maan lena
  * matlab koi bhi kisi ke bhi folder me file rakh sakta hai — aur R2 me RLS
@@ -36,11 +44,19 @@ export async function POST(request: Request) {
   let kind: UploadKind = "document";
   let docId = "";
   let contentType = "";
+  /**
+   * Kaunsa version chadh raha hai — renew par app `snapshot_document_version()`
+   * ka lautaya hua number + 1 bhejti hai. Na aaye to purana raasta
+   * (`<docId>.<ext>`), taaki purani app aur har purana document waise ka waisa
+   * chalta rahe.
+   */
+  let version: number | undefined;
   try {
     const body = await request.json();
     kind = body?.kind === "avatar" ? "avatar" : "document";
     docId = String(body?.docId ?? "").trim();
     contentType = String(body?.contentType ?? "").split(";")[0].trim().toLowerCase();
+    version = parseVersion(body?.version);
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
@@ -70,8 +86,9 @@ export async function POST(request: Request) {
     if (!(await documentBelongsTo(docId, uid))) {
       return NextResponse.json({ error: "document nahi mila" }, { status: 404 });
     }
-    key = r2Key.document(uid, docId, ext);
-    path = `${uid}/${docId}.${ext}`;
+    // Naam ek hi jagah se banta hai — `commit` bhi bilkul yahi bulata hai.
+    path = `${uid}/${documentFileName(docId, ext, version)}`;
+    key = r2Key.documentPath(path);
   }
 
   try {

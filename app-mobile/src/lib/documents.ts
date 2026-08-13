@@ -15,6 +15,7 @@ import {
   syncDocumentFiles,
   writeCachedDocs,
 } from "./doc-cache";
+import { snapshotVersion, versionFilePaths } from "./doc-versions";
 
 /**
  * Free-plan document limit cross hone par throw hota hai.
@@ -65,7 +66,11 @@ function mimeFromUri(uri: string): string {
  * `file_path` / `file_size` / `mime_type` ab server khud bharta hai (upload ke
  * baad R2 se asli size poochh kar) — isliye yahan koi DB update nahi hai.
  */
-export async function uploadDocumentImage(docId: string, localUri: string): Promise<void> {
+export async function uploadDocumentImage(
+  docId: string,
+  localUri: string,
+  version?: number,
+): Promise<void> {
   const mime = mimeFromUri(localUri);
   /**
    * Kataar me PEHLE, upload BAAD me.
@@ -81,7 +86,7 @@ export async function uploadDocumentImage(docId: string, localUri: string): Prom
    * app band ho jaye (Android low-memory par ye aam hai) to bhi wo entry padi
    * rehti hai aur agli baar chal jaati hai.
    */
-  await queueUpload(docId, localUri, mime);
+  await queueUpload(docId, localUri, mime, version);
   /**
    * Offline copy PEHLE, upload BAAD me.
    *
@@ -246,6 +251,31 @@ export async function updateDocument(
 ): Promise<Document> {
   const sb = client();
 
+  /**
+   * Purana haal PEHLE history me — kuch badalne se PEHLE.
+   *
+   * ⚠️ Tarteeb yahan sab kuch hai. Snapshot `documents` ki row padh kar banta
+   * hai, isliye wo update ke BAAD chalaya jaye to wo "purana" nahi, naya haal
+   * hi copy karega — history bhar jaati par usme rakha kuch bhi purana nahi
+   * hota.
+   *
+   * Lauta hua `n` do baatein kehta hai: purana haal `version = n` par mehfooz
+   * ho gaya, aur nayi file ka naam `n + 1` se banna chahiye taaki wo purani ke
+   * upar na chadhe.
+   *
+   * `0` = history bani hi nahi (SQL abhi deploy nahi hui, ya net nahi tha). Us
+   * par rukte NAHI — renew ek zaroori kaam hai aur history uske upar wali cheez
+   * hai. 0 par sab kuch bilkul purane tareeke se chalta hai.
+   *
+   * ⚠️ `changing` ki shart zaroori hai. User Renew screen khol kar bina kuch
+   * badle "Save" daba sakta hai (aur ye bilkul aam hai — log ye pakka karne ke
+   * liye kholte hain ki date sahi hai). Bina is shart ke har aisi tap ek naya
+   * version bana deti, aur "Purane versions" ek hi date ki das ek jaisi entry se
+   * bhar jaata — jo history ko poori tarah bekaar kar deta hai.
+   */
+  const changing = !!patch.file_uri || patch.expiry !== doc.expiry;
+  const snapshot = changing ? await snapshotVersion(doc.id) : 0;
+
   const row: { expiry: string | null; file_uri?: string } = { expiry: patch.expiry };
   if (patch.file_uri) row.file_uri = patch.file_uri;
 
@@ -268,15 +298,56 @@ export async function updateDocument(
    * cloud file hatani hai, aur wo tabhi surakshit hai jab nayi chadh chuki ho.
    */
   if (patch.file_uri) {
-    await uploadDocumentImage(doc.id, patch.file_uri).catch(() => {});
+    /**
+     * ⚠️ PURANI cached copy pehle hatao — warna nayi photo kabhi dikhti hi nahi.
+     *
+     * Ye is poore renew ka sabse chupa hua bug tha. `primeCachedFile()` jaan-
+     * boojh ke turant laut jaata hai jab `doccache/<id>.<ext>` pehle se padi ho
+     * (add ke raaste par wo sahi hai — wahan wo file abhi-abhi usi ne rakhi
+     * thi). Par renew me wahi rasta PURANI photo se bhara hua hota hai, aur
+     * `resolveDocUri()` sabse pehle cache hi padhta hai.
+     *
+     * Nateeja: nayi photo DB me chali jaati, R2 par bhi chadh jaati, par app me
+     * har jagah — list, document-view, share, download — purani hi dikhti
+     * rehti. User ke liye ye "app ne photo badli hi nahi" hai, aur wo dobara-
+     * dobara koshish karta rehta hai.
+     *
+     * Ext badalne par (jpg → png) ye line ek doosra kaam bhi karti hai: purani
+     * file ka rasta naye se alag hota, isliye wo cache me hamesha ke liye padi
+     * reh jaati thi — kabhi padhi nahi jaati, bas jagah ghere rehti.
+     */
+    await removeCachedFile(doc);
+    /**
+     * Nayi photo NAYE naam par — `<uid>/<docId>-v<n>.<ext>`.
+     *
+     * Yahi ek baat purani photo ko bachati hai. Purana naam
+     * (`<uid>/<docId>.<ext>`) chhoota hi nahi jaata, isliye purani file R2 par
+     * jyon ki tyon padi rehti hai aur history use wahin se padh leti hai.
+     */
+    await uploadDocumentImage(
+      doc.id,
+      patch.file_uri,
+      snapshot > 0 ? snapshot + 1 : undefined,
+    ).catch(() => {});
 
     /**
-     * Purani cloud file hatao — sirf tab jab uska rasta NAYE se alag ho.
+     * ⚠️ Purani cloud file ab JAAN-BOOJH KE nahi hatti — wo ab history hai.
      *
-     * R2 par rasta `<uid>/<docId>.<ext>` hai, yaani wahi extension hone par nayi
-     * file purani ke UPAR chadh jaati hai aur hatane ko kuch bachta hi nahi. Par
-     * JPG ki jagah PNG aa jaye to purani file wahin padi reh jaati — user ke liye
-     * delete, bill me zinda, aur kisi purane signed URL se abhi bhi khulne layak.
+     * Yahan pehle purani file delete hoti thi (jab ext badal jata ho), aur wo us
+     * waqt bilkul sahi tha: purana kuch bacha hi nahi tha, to R2 par padi file
+     * sirf ek kharcha thi. Ab wahi file "Purane versions" me user ko dikhti hai,
+     * isliye use hatana seedha wo feature todna hoga.
+     *
+     * Orphan ka darr bhi ab nahi hai: `document_versions` har purani file ka
+     * rasta yaad rakhta hai, aur document delete hone par `deleteDocument()`
+     * unhe ek-ek karke hataati hai.
+     *
+     * ── Par jab history bani hi na ho (snapshot = 0) ──────────────────────
+     *
+     * Tab purana raasta hi sahi hai. Us soorat me nayi file PURANE naam par
+     * chadhti hai, yaani wo purani ko waise bhi daba deti hai — sirf ext badalne
+     * par purani file kahin darj hue bina reh jaati. Wahi ek soorat hai jisme
+     * delete karna zaroori hai.
      *
      * ⚠️ `isUploadPending` ki shart zaroori hai. Kataar me abhi bhi entry hai ka
      * matlab hai upload chadha hi nahi (net nahi tha). Us haal me purani file
@@ -284,13 +355,41 @@ export async function updateDocument(
      * nuksan se kahin sasti hai.
      */
     const oldPath = doc.file_path;
-    if (oldPath && !(await isUploadPending(doc.id))) {
+    if (snapshot === 0 && oldPath && !(await isUploadPending(doc.id))) {
       const newExt = mimeFromUri(patch.file_uri).split("/")[1];
       const oldExt = oldPath.split(".").pop()?.toLowerCase();
       // `jpeg` (mime me) aur `jpg` (rasta me) — dono ek hi cheez hain.
       const same = oldExt === newExt || (oldExt === "jpg" && newExt === "jpeg");
       if (!same) await deleteDocumentFile(oldPath).catch(() => {});
     }
+  }
+
+  /**
+   * Nayi photo ke baad row DOBARA padho.
+   *
+   * ⚠️ `updated` upar `.update().select()` se aaya hai — yaani upload se PEHLE
+   * ka haal. `file_path`, `file_size` aur `mime_type` app nahi bharti; wo server
+   * upload poora hone ke BAAD bharta hai (`uploadDocumentImage` par likha hai).
+   * Isliye `updated` me abhi bhi PURANI file ka rasta pada hota hai — jo ab
+   * history ka hissa hai, is document ka current nahi.
+   *
+   * Wahi galat row offline cache me likh dena sabse bura tha: app current
+   * document ke naam par purane version ki file dikhati rehti, yaani renew ke
+   * baad bhi purani hi photo — theek wahi bug jise upar `removeCachedFile()`
+   * theek karta hai, bas doosre raaste se wapas aaya hua.
+   *
+   * Fail ho to `updated` hi theek hai — us haalat me `file_uri` (isi phone ki
+   * nayi file) mil jaata hai, aur agli `listDocuments()` par row apne aap sudhar
+   * jaati hai.
+   */
+  let latest = updated;
+  if (patch.file_uri) {
+    const { data: fresh } = await sb
+      .from("documents")
+      .select()
+      .eq("id", doc.id)
+      .maybeSingle();
+    if (fresh) latest = fresh as Document;
   }
 
   /**
@@ -306,12 +405,12 @@ export async function updateDocument(
     if (cached) {
       await writeCachedDocs(
         uid,
-        cached.map((x) => (x.id === updated.id ? updated : x)),
+        cached.map((x) => (x.id === latest.id ? latest : x)),
       );
     }
   }
 
-  return updated;
+  return latest;
 }
 
 /**
@@ -323,6 +422,21 @@ export async function updateDocument(
  * hi nahi.
  */
 export async function deleteDocument(doc: Document): Promise<void> {
+  /**
+   * ⚠️ Purane versions ke raste ROW HATNE SE PEHLE poochho.
+   *
+   * `document_versions` par `on delete cascade` laga hai, yaani `documents` ki
+   * row hatte hi wo saari row bhi chali jaati hain — aur unke saath un purani
+   * files ke rasta bhi, jo R2 par abhi bhi padi hain. Ek baar wo pata kho gaya
+   * to wo files hamesha ke liye bucket me pad jaati: user ke liye "delete",
+   * bill me zinda, aur kisi purane signed URL se khulne layak. Yahi baat neeche
+   * current file par pehle se likhi hai; history ne bas usi ko naya roop diya.
+   *
+   * Fail ho to khaali list — delete phir bhi hona chahiye. Ek reh gayi file
+   * "document delete hi nahi hua" se kahin sasti hai.
+   */
+  const oldPaths = await versionFilePaths(doc.id);
+
   const { error } = await client().from("documents").delete().eq("id", doc.id);
   if (error) throw error;
 
@@ -331,6 +445,16 @@ export async function deleteDocument(doc: Document): Promise<void> {
   // thi — bucket me file padi rehti thi: user ke liye "delete", bill me zinda,
   // aur kisi purane signed URL se abhi bhi khulne layak.
   if (doc.file_path) await deleteDocumentFile(doc.file_path);
+  /**
+   * Har purane version ki file bhi.
+   *
+   * `doc.file_path` ko chhod dete hain — wo abhi upar hataayi ja chuki hai, aur
+   * bina photo wale renew me do version ek hi file par ishara karte hain
+   * (`my_document_version_paths` khud bhi `distinct` deta hai).
+   */
+  for (const p of oldPaths) {
+    if (p !== doc.file_path) await deleteDocumentFile(p);
+  }
   // Metadata cache bhi turant sudhaaro — warna offline jaate hi delete kiya
   // hua document wapas list me aa jaata.
   const uid = await currentUid();

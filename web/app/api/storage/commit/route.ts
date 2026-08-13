@@ -4,7 +4,9 @@ import { r2Configured, r2Key, R2NotConfigured } from "@/lib/r2";
 import {
   commitUpload,
   documentBelongsTo,
+  documentFileName,
   extFor,
+  parseVersion,
   saveDocumentFile,
   storageDbConfigured,
   type UploadKind,
@@ -36,11 +38,21 @@ export async function POST(request: Request) {
   let kind: UploadKind = "document";
   let docId = "";
   let contentType = "";
+  /**
+   * ⚠️ Wahi `version` jo `upload-url` ko gaya tha — hubahu wahi.
+   *
+   * Dono jagah naam `documentFileName()` se banta hai, isliye alag hone ka koi
+   * raasta nahi bachta. Agar yahan ye field chhoot jaaye to commit purane naam
+   * (`<docId>.<ext>`) par HEAD maarta, file wahan hoti nahi, aur user ko "file
+   * R2 pe mili nahi" milta — jabki upload sach me kaamyab hua tha.
+   */
+  let version: number | undefined;
   try {
     const body = await request.json();
     kind = body?.kind === "avatar" ? "avatar" : "document";
     docId = String(body?.docId ?? "").trim();
     contentType = String(body?.contentType ?? "").split(";")[0].trim().toLowerCase();
+    version = parseVersion(body?.version);
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
@@ -63,8 +75,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "document nahi mila" }, { status: 404 });
   }
 
-  const path = `${uid}/${docId}.${ext}`;
-  const res = await commitUpload(r2Key.document(uid, docId, ext), "document");
+  const path = `${uid}/${documentFileName(docId, ext, version)}`;
+  const res = await commitUpload(r2Key.documentPath(path), "document");
   if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
 
   const saved = await saveDocumentFile(docId, uid, path, res.size, contentType);

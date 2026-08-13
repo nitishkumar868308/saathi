@@ -181,10 +181,30 @@ if (Platform.OS !== "web") {
             // hi nahi (wahan sirf "done" kaam karta hai), aur daal dene par app
             // khulne par `flushNotificationActions` DOBARA snooze laga deta —
             // yaani alarm 5 minute aur aage sarak jaata, har baar app kholne par.
+            //
+            /**
+             * ⚠️ Yahan `cancelNotification()` NAHI — sirf DIKH RAHI parchi hatao.
+             *
+             * `cancelNotification()` do kaam karta hai: dikh rahi parchi hatata
+             * hai AUR us id par laga trigger bhi uda deta hai. Doosra kaam yahan
+             * seedha nuksan karta tha, kyunki `snoozeNotification()` naya alarm
+             * `snooze:<uuid>` id par lagata hai — aur DOOSRI baar "abhi nahi"
+             * dabane par jo parchi saamne hoti hai wo KHUD `snooze:<uuid>` hi
+             * hoti hai. Dono id hubahu ek, isliye abhi-abhi laga hua alarm usi
+             * lamhe mit jaata tha.
+             *
+             * Nateeja bilkul chup tha: pehli baar "abhi nahi" theek chalta,
+             * doosri baar reminder hamesha ke liye khatam — na koi error, na
+             * koi nishaan.
+             *
+             * Awaaz phir bhi rukti hai: `loopSound`/`FLAG_INSISTENT` wali awaaz
+             * DIKH RAHI notification se bandhi hai, aur wahi hata rahe hain.
+             */
+            await notifee.cancelDisplayedNotification(n.id).catch(() => {});
           } else {
             await queueAction(n.id, "done");
+            await notifee.cancelNotification(n.id).catch(() => {});
           }
-          await notifee.cancelNotification(n.id).catch(() => {});
         }
       }
       return;

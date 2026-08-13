@@ -367,6 +367,28 @@ export type Dict = {
     renewUpdate: string;
     /** Jis document par expiry hai hi nahi — wahan wahi screen, alag naam se. */
     addExpiry: string;
+    /**
+     * Renew se PEHLE wale document — photo + us waqt ki expiry.
+     *
+     * ⚠️ Ye hissa isliye hai kyunki purana document renew ke baad bekaar nahi ho
+     * jaata: purana passport visa ke record ke liye maanga jaata hai, purani
+     * policy claim ke waqt chahiye hoti hai, aur purana DL transfer/challan me
+     * kaam aata hai. Pehle renew purani photo ko mita deta tha, isliye ye sab
+     * kahin bachta hi nahi tha.
+     */
+    versionsTitle: string;
+    /** "{n} purane version" — ginti ke saath. */
+    versionsCount: string;
+    /** Ek purane version ka label — "Version {n}". */
+    versionLabel: string;
+    /** Us version ki expiry ke aage — "Expiry: 12 Jan 2025". */
+    versionExpiry: string;
+    /** Jis purane version par expiry thi hi nahi. */
+    versionNoExpiry: string;
+    /** "{date} tak chala" — ye version kab tak current tha. */
+    versionUntil: string;
+    /** Purani photo khul nahi payi (net nahi, ya file hi nahi bachi). */
+    versionNoFile: string;
   };
   /**
    * Document renew — expiry (aur chaho to nayi photo) badalne wali screen.
@@ -1586,6 +1608,13 @@ const hinglish: Dict = {
     deleteConfirmBody: "\"{name}\" hata denge?",
     renewUpdate: "Renew ho gaya? Nayi expiry daalo",
     addExpiry: "Expiry date add karo",
+    versionsTitle: "Purane versions",
+    versionsCount: "{n} purane version",
+    versionLabel: "Version {n}",
+    versionExpiry: "Expiry: {date}",
+    versionNoExpiry: "Expiry nahi thi",
+    versionUntil: "{date} tak chala",
+    versionNoFile: "Purani photo abhi nahi khul payi",
   },
   renewDoc: {
     title: "Expiry update karo",
@@ -2488,6 +2517,13 @@ const hi: Dict = {
     deleteConfirmBody: "\"{name}\" हटा दें?",
     renewUpdate: "रिन्यू हो गया? नई एक्सपायरी डालें",
     addExpiry: "एक्सपायरी डेट जोड़ें",
+    versionsTitle: "पुराने वर्जन",
+    versionsCount: "{n} पुराने वर्जन",
+    versionLabel: "वर्जन {n}",
+    versionExpiry: "एक्सपायरी: {date}",
+    versionNoExpiry: "एक्सपायरी नहीं थी",
+    versionUntil: "{date} तक चला",
+    versionNoFile: "पुरानी फ़ोटो अभी खुल नहीं पाई",
   },
   renewDoc: {
     title: "एक्सपायरी अपडेट करें",
@@ -3371,6 +3407,13 @@ const en: Dict = {
     deleteConfirmBody: "Remove \"{name}\"?",
     renewUpdate: "Renewed? Add the new expiry",
     addExpiry: "Add an expiry date",
+    versionsTitle: "Older versions",
+    versionsCount: "{n} older versions",
+    versionLabel: "Version {n}",
+    versionExpiry: "Expiry: {date}",
+    versionNoExpiry: "No expiry date",
+    versionUntil: "Used until {date}",
+    versionNoFile: "Couldn't open the old photo",
   },
   renewDoc: {
     title: "Update expiry",

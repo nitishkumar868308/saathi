@@ -476,12 +476,34 @@
       "Bash(cd \"d:/my-app/app-mobile\" && grep -rn \"launchMode\" node_modules/expo-modules-autolinking/../../node_modules/@expo/config-plugins/build/android/*.js 2>/dev/null | head -3; echo \"=== expo template MainActivity ===\"; find node_modules/@expo -name \"AndroidManifest.xml\" -path \"*template*\" 2>/dev/null | head -3; grep -rn \"singleTask\\\\|launchMode\" node_modules/expo/template/android/app/src/main/AndroidManifest.xml 2>/dev/null | head)",
       "Read(//d/my-app/app-mobile/node_modules/@expo/config-plugins/build/android/**)",
       "Bash(cd \"d:/my-app/app-mobile\" && grep -rn \"targetSdkVersion\" android/build.gradle; echo \"--- expo default sdk versions ---\"; grep -rn \"targetSdkVersion\\\\|compileSdkVersion\" node_modules/expo-modules-core/android/build.gradle 2>/dev/null | head -3; grep -rn \"targetSdkVersion\" node_modules/expo/scripts/../package.json 2>/dev/null | head -2; sed -n '1,40p' android/build.gradle)",
-      "Read(//d/my-app/app-mobile/node_modules/expo/**)"
+      "Read(//d/my-app/app-mobile/node_modules/expo/**)",
+      "Bash(sed 's/.*\\\\.//')",
+      "Bash(xargs wc -l)",
+      "Bash(git status *)",
+      "PowerShell(git diff HEAD~1 -- app-mobile/src | Out-File -Encoding utf8 \"C:\\\\Users\\\\PRATIE~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--my-app\\\\d3e757a8-2612-4cf7-9dc4-609e90ac5cfe\\\\scratchpad\\\\diff.txt\"; \\(Get-Content \"C:\\\\Users\\\\PRATIE~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--my-app\\\\d3e757a8-2612-4cf7-9dc4-609e90ac5cfe\\\\scratchpad\\\\diff.txt\" | Measure-Object -Line\\).Lines)",
+      "Bash(grep -rn \"cancelNotification\" app-mobile/node_modules/@notifee/react-native/dist/types/Module.d.ts 2>/dev/null | head -20; echo \"---\"; sed -n '/cancelNotification\\(/,/^\\\\s*\\\\*\\\\//p' app-mobile/node_modules/@notifee/react-native/dist/types/Module.d.ts 2>/dev/null | head -40)",
+      "Bash(node -e \"const p=require\\('./app-mobile/package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")",
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const r=JSON.parse\\(s.slice\\(s.indexOf\\('['\\)\\)\\);const c={};const f={};r.forEach\\(x=>x.messages.forEach\\(m=>{c[m.ruleId]=\\(c[m.ruleId]||0\\)+1;if\\(m.severity===2\\)f[x.filePath.split\\('src'\\)[1]]=\\(f[x.filePath.split\\('src'\\)[1]]||0\\)+1}\\)\\);console.log\\('BY RULE:'\\);Object.entries\\(c\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).forEach\\(\\([k,v]\\)=>console.log\\(' ',v,k\\)\\);console.log\\('\\\\nBY FILE \\(errors\\):'\\);Object.entries\\(f\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).slice\\(0,15\\).forEach\\(\\([k,v]\\)=>console.log\\(' ',v,k\\)\\)}\\)\")",
+      "Bash(node -e \"const r=require\\('/tmp/lint.json'\\);const c={},f={};r.forEach\\(x=>x.messages.forEach\\(m=>{const k=m.ruleId||'\\(parse\\)';c[k]=\\(c[k]||0\\)+1;if\\(m.severity===2\\){const p=x.filePath.replace\\(/.*src/,'src'\\);f[p]=\\(f[p]||0\\)+1}}\\)\\);console.log\\('BY RULE:'\\);Object.entries\\(c\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).forEach\\(\\([k,v]\\)=>console.log\\(' ',v,k\\)\\);console.log\\('\\\\nTOP FILES:'\\);Object.entries\\(f\\).sort\\(\\(a,b\\)=>b[1]-a[1]\\).slice\\(0,15\\).forEach\\(\\([k,v]\\)=>console.log\\(' ',v,k\\)\\)\")",
+      "Bash(node -e \"console.log\\(require\\('./app-mobile/node_modules/@notifee/react-native/package.json'\\).version\\)\")",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "Bash(echo \"=== web tsc exit: $? ===\")",
+      "Bash(git --no-pager diff .claude/settings.json)",
+      "Bash(git --no-pager diff --no-color -U2 app-mobile/src/lib/documents.ts)",
+      "Bash(git --no-pager diff --no-color -U1 app-mobile/src/lib/notification-background.ts app-mobile/src/lib/notifications.ts app-mobile/src/components/reminder-alert.tsx)",
+      "Bash(grep -vE \"^\\\\+\\\\s*\\\\*|^\\\\+\\\\s*/\\\\*\\\\*|^\\\\+\\\\s*//\")",
+      "Bash(git --no-pager diff --no-color -U0 app-mobile/src/lib/app-lock.ts app-mobile/src/lib/device.ts app-mobile/src/app/login.tsx app-mobile/src/app/\\\\\\(tabs\\\\\\)/reminders.tsx app-mobile/src/components/lock-screen.tsx)",
+      "Bash(grep -vE \"^\\\\+\\\\s*\\\\*|^\\\\+\\\\s*/\\\\*\\\\*|^\\\\+\\\\s*//|^\\\\-\\\\-\\\\-|^\\\\+\\\\+\\\\+\")",
+      "Bash(grep -vE \"^\\\\+\\\\s*$\")",
+      "Bash(echo \"MOBILE tsc: $?\")",
+      "Bash(echo \"WEB tsc: $?\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",
       "D:\\my-app\\web",
-      "\\tmp"
+      "\\tmp",
+      "D:\\my-app\\app-mobile\\node_modules\\@notifee\\react-native\\dist\\types"
     ]
   }
 }

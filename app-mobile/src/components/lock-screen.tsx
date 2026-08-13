@@ -169,6 +169,17 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
       const st = await getLockState();
       if (!alive) return;
       setBioOn(st.biometricOn);
+      /**
+       * Pichhli baar ka intezaar abhi chal raha ho to wo TURANT dikhna chahiye.
+       *
+       * ⚠️ Galat koshishon ki ginti ab app band hone par bhi bachi rehti hai
+       * (`app-lock.ts` par poori wajah likhi hai). Bina in do line ke wo rok
+       * chupi rehti: user app kholta, PIN daalta, aur bina koi wajah dekhe
+       * "galat PIN" jaisa suna-suna kuch paata — jabki asal me use sirf rukna
+       * tha. Ulti ginti dikha dena hi wo ek cheez hai jo use rukna samjhati hai.
+       */
+      const guard = pinAttemptsLeft();
+      if (guard.blocked) setWait(guard.waitSeconds);
       if (!st.biometricOn) {
         focusPin();
         return;

@@ -122,22 +122,35 @@ export async function uploadAvatar(
 /**
  * Document ki file. Server khud `documents` row me path/size/type bhar deta hai.
  * DB me jaane wala path (`<uid>/<docId>.<ext>`) lautata hai.
+ *
+ * `version` sirf RENEW par jaata hai (2 se shuru). Uske bina nayi photo purani
+ * ke UPAR chadh jaati hai — jo naye document ke liye bilkul theek hai, par renew
+ * par purani photo hamesha ke liye mita deta hai. Poori wajah
+ * `supabase/document-versions.sql` ke upar likhi hai.
+ *
+ * ⚠️ Dono call me EK HI `version` jaana chahiye. `upload-url` us naam par
+ * presigned URL banata hai aur `commit` usi naam par file dhoondhta hai; alag
+ * hone par upload chadh jaata hai par commit "file R2 pe mili nahi" keh deta
+ * hai. Isliye wo yahan ek hi jagah se dono me jaata hai.
  */
 export async function uploadDocument(
   docId: string,
   uri: string,
   contentType: string,
+  version?: number,
 ): Promise<{ path: string; size: number }> {
   const { url } = await api<{ url: string; path: string }>("upload-url", {
     kind: "document",
     docId,
     contentType,
+    version,
   });
   await putFile(url, uri, contentType);
   return api<{ path: string; size: number }>("commit", {
     kind: "document",
     docId,
     contentType,
+    version,
   });
 }
 

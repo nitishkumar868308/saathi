@@ -15,6 +15,7 @@ import {
   CHANNEL_ID,
   QUIET_CHANNEL_ID,
   SNOOZE_MS,
+  SNOOZE_PREFIX,
   baseReminderId,
   buildAlarmNotification,
   cancelNotification as cancel,
@@ -224,6 +225,16 @@ function endOfDay(day: string): number | null {
 /** Reminder ke SAARE alarm hatao — poori repeat khidki samet. */
 export async function cancelReminder(id: string): Promise<void> {
   for (let i = 0; i < REPEAT_WINDOW; i++) await cancel(occId(id, i));
+  /**
+   * ⚠️ Snooze ka alarm ALAG id par baithta hai (`snooze:<uuid>`), isliye upar
+   * wali ginti (`<uuid>`, `<uuid>#1`…) use kabhi chhooti hi nahi thi.
+   *
+   * Nateeja wahi tha jo sabse bura lagta hai: user ne "abhi nahi" dabaya, phir
+   * reminder poora kar diya / delete kar diya / pause kar diya — aur 5 minute
+   * baad wo phir bhi baj gaya. Us waqt tak reminder app me hai hi nahi, isliye
+   * user ke paas use rokne ka koi raasta bhi nahi bachta.
+   */
+  await cancel(`${SNOOZE_PREFIX}${id}`);
 }
 
 /**
@@ -398,7 +409,13 @@ export async function scheduleDocumentExpiry(
 }
 
 export async function cancelDocumentExpiry(docId: string): Promise<void> {
-  for (const lead of EXPIRY_LEAD_DAYS) await cancel(docNotifId(docId, lead));
+  for (const lead of EXPIRY_LEAD_DAYS) {
+    await cancel(docNotifId(docId, lead));
+    // Wahi baat jo `cancelReminder()` par likhi hai — expiry ka alert bhi
+    // "abhi nahi" se snooze hota hai, aur wo alag id par baithta hai. Bina
+    // iske renew/delete kiya hua document 5 minute baad phir chetavni deta.
+    await cancel(`${SNOOZE_PREFIX}${docNotifId(docId, lead)}`);
+  }
 }
 
 /* ------------------- alarm chup, par parchi tray me zinda ------------------- */

@@ -131,18 +131,44 @@ export function ReminderAlertHost() {
         const nid = notif?.id;
         if ((pressId === ACTION_DONE || pressId === ACTION_LATER) && nid) {
           stopAlert();
-          if (pressId === ACTION_LATER) {
-            // Snooze seedha yahin — bilkul waise hi jaise app band hone par
-            // headless handler karta hai. Dono ek hi `snoozeNotification()` par
-            // jaate hain, isliye "5 min baad" ka matlab dono jagah ek hi hai.
-            void snoozeNotification(notif).catch(() => {});
-          } else {
-            void queueNotificationAction(nid, "done");
-            // Wahi kataar jo app start par chalti hai — turant chala do, warna
-            // "Ho gaya" ka asar agli baar app kholne tak dikhta hi nahi.
-            void flushNotificationActions().catch(() => {});
-          }
-          void notifee.cancelNotification(nid).catch(() => {});
+          /**
+           * ⚠️ Poora silsila ek hi async chain me — teeno kaam ek doosre par
+           * tike hain aur inhe saath-saath chhod dena do alag bug banata tha
+           * (dono neeche likhe hain).
+           */
+          void (async () => {
+            if (pressId === ACTION_LATER) {
+              // Snooze seedha yahin — bilkul waise hi jaise app band hone par
+              // headless handler karta hai. Dono ek hi `snoozeNotification()` par
+              // jaate hain, isliye "5 min baad" ka matlab dono jagah ek hi hai.
+              await snoozeNotification(notif).catch(() => {});
+              /**
+               * ⚠️ `cancelNotification()` NAHI — sirf DIKH RAHI parchi hatao.
+               *
+               * Bilkul wahi baat jo `notification-background.ts` par likhi hai:
+               * doosri baar "abhi nahi" dabane par saamne wali parchi khud
+               * `snooze:<uuid>` hoti hai, aur naya alarm bhi usi id par lagta
+               * hai — `cancelNotification()` use turant uda deta tha.
+               */
+              await notifee.cancelDisplayedNotification(nid).catch(() => {});
+            } else {
+              /**
+               * ⚠️ `await` yahan ZAROORI hai (pehle `void` tha).
+               *
+               * `queueNotificationAction` kataar par read-then-write karta hai
+               * aur `flushNotificationActions` usi key par read-then-CLEAR. Bina
+               * await ke dono ek saath chalte the, aur "Ho gaya" aksar ya to
+               * flush se pehle likha hi nahi jaata tha, ya likhne ke baad usi
+               * clear me mit jaata tha. User ke liye ye "Ho gaya dabaya, phir bhi
+               * reminder wahin pada hai" jaisa dikhta tha.
+               */
+              await queueNotificationAction(nid, "done").catch(() => {});
+              // Wahi kataar jo app start par chalti hai — turant chala do, warna
+              // "Ho gaya" ka asar agli baar app kholne tak dikhta hi nahi.
+              await flushNotificationActions().catch(() => {});
+              await notifee.cancelNotification(nid).catch(() => {});
+            }
+          })();
           // Modal isi reminder ka khula pada ho to use bhi hata do.
           if (handledId.current === nid) dismiss();
         }

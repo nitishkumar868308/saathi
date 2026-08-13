@@ -62,8 +62,23 @@ function isToday(iso: string | null): boolean {
  *
  * `remind_at` khaali ho to `false`: bina waqt wala reminder beeta hua nahi hai,
  * wo bas abhi tay nahi hua. Wo "Aane wale" me hi rehta hai.
+ *
+ * ⚠️ Band aur paused reminder kabhi "chhoot gaye" nahi hote.
+ *
+ * Pehle yahan sirf waqt dekha jaata tha, aur uska nateeja ulta tha: user ne jo
+ * reminder KHUD switch se band kiya hai (ya jo Plus khatam hone par apne aap
+ * pause hua hai) wo bhi beetne ke baad "Chhoot gaye" me sabse UPAR aa baithta
+ * tha — us khaane ke saath jo kehta hai "inka waqt nikal chuka hai". Band karne
+ * ka matlab hi ye tha ki ab uski yaad nahi chahiye; usko sabse pehle dikhana us
+ * faisle ko ulta deta hai, aur list us kachre se bhar jaati hai jise user pehle
+ * hi na keh chuka hai.
+ *
+ * Aise reminder "Aane wale" me chale jaate hain, jahan card khud apna haal saaf
+ * dikhata hai — Switch band, aur paused par "Plus" wali patti.
  */
-function isMissed(iso: string | null): boolean {
+function isMissed(r: Pick<Reminder, "remind_at" | "is_on" | "is_paused">): boolean {
+  if (!r.is_on || r.is_paused) return false;
+  const iso = r.remind_at;
   if (!iso || isToday(iso)) return false;
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -235,9 +250,9 @@ export default function Reminders() {
    * abhi bhi chalu hai aur user ne use nipatana hai. List se gayab kar dena use
    * dobara kabhi na dikhne dena hota.
    */
-  const missed = items.filter((r) => isMissed(r.remind_at));
+  const missed = items.filter((r) => isMissed(r));
   const today = items.filter((r) => isToday(r.remind_at));
-  const upcoming = items.filter((r) => !isToday(r.remind_at) && !isMissed(r.remind_at));
+  const upcoming = items.filter((r) => !isToday(r.remind_at) && !isMissed(r));
 
   // 7 se zyada hote hi pagination — har list me (item 21).
   const mp = usePaged(missed, PAGE_SIZE);

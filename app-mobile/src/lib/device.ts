@@ -53,18 +53,37 @@ const KEY = "saathi-device-id";
  */
 const HW_SALT = "apka-saathi-device-v1";
 
-/** RFC-4122 v4 jaisa UUID, bina kisi native crypto ke. */
+/**
+ * RFC-4122 v4 UUID — asli crypto RNG se.
+ *
+ * ⚠️ Yahan pehle `Math.random()` tha, aur wo is ek jagah par galat chunav tha.
+ * `Math.random()` surakhsha ke liye bana hi nahi hai: Hermes me wo ek saadha
+ * sa PRNG hai jise ek hi seed se chalaya jaata hai, aur uski nikli hui ginti
+ * dekh kar aage ki ginti batayi ja sakti hai.
+ *
+ * Aur ye koi aam id nahi hai — poora anti-fraud isi par khada hai:
+ * `device_seen`, `device_owner`, `apply_referral_code`,
+ * `check_referral_qualification` aur `forget_my_device_tokens`, sab isi ko
+ * chaabi ki tarah lete hain. `device_owner()` to `anon` ko bhi mil jaata hai
+ * (login screen ki patti ke liye), yaani ek andaaza lagayi ja sakne wali id ka
+ * matlab hai kisi aur ke phone ka masked naam aur email bahar aa jaana.
+ *
+ * `expo-crypto` is file me pehle se maujood tha (hardware-id ka hash usi se
+ * banta hai) — yaani ye galti muft me theek ho jaati thi.
+ *
+ * ⚠️ Purani id jaan-boojh ke NAHI badalte: wo SecureStore me padi hai aur
+ * `getDeviceId()` use waise hi lauta deta hai. Badal dene par har purana phone
+ * server ko naya dikhta, aur referral ka `device_already_rewarded` wala nishaan
+ * ek hi jhatke me bekaar ho jaata — yaani jis chhed ko ye id band karti hai,
+ * wahi khul jaata. Ye sirf NAYI id par lagta hai.
+ */
 function uuid(): string {
-  const hex = "0123456789abcdef";
-  let out = "";
-  for (let i = 0; i < 36; i++) {
-    if (i === 8 || i === 13 || i === 18 || i === 23) out += "-";
-    else if (i === 14) out += "4";
-    // Variant nibble: 8, 9, a ya b.
-    else if (i === 19) out += hex[8 + ((Math.random() * 4) | 0)];
-    else out += hex[(Math.random() * 16) | 0];
-  }
-  return out;
+  const b = Crypto.getRandomBytes(16);
+  // Version 4 (random) aur RFC-4122 variant ke do nishaan.
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 let memoId: string | null = null;

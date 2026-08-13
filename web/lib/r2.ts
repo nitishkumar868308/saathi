@@ -306,9 +306,16 @@ export async function getObject(key: string): Promise<Response | null> {
  */
 export const r2Key = {
   avatar: (uid: string) => `avatars/${uid}/avatar.jpg`,
-  document: (uid: string, docId: string, ext: string) =>
-    `documents/${uid}/${docId}.${ext}`,
-  /** DB me pada `<uid>/<file>` → poora key. */
+  /**
+   * ⚠️ Yahan pehle `document(uid, docId, ext)` tha, jo hamesha
+   * `documents/<uid>/<docId>.<ext>` banata tha — yaani har document ki EK hi
+   * jagah. Renew par nayi photo theek usi jagah chadh jaati thi aur purani
+   * hamesha ke liye mit jaati thi.
+   *
+   * Ab naam `documentFileName()` tay karta hai (version ke saath), aur yahan se
+   * sirf `<uid>/<file>` ko poore key me badla jaata hai. Ek hi raasta hone se
+   * upload aur commit ka key kabhi alag nahi ho sakta.
+   */
   documentPath: (filePath: string) => `documents/${filePath.replace(/^\/+/, "")}`,
 };
 

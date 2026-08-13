@@ -68,6 +68,49 @@ const MIN_PASSWORD = 6;
  */
 const MAX_PASSWORD = 72;
 
+/**
+ * Password ki asli lambai — BYTE me, character me nahi.
+ *
+ * ⚠️ Ye farak yahan sirf ilmi baat nahi hai. bcrypt 72 **byte** par kaat-ta hai,
+ * par `pw.length` **character** ginta hai, aur UTF-8 me dono ek jaise sirf
+ * angrezi me hote hain:
+ *
+ *   • "abcd"     → 4 character, 4 byte
+ *   • "पासवर्ड"   → 7 character, 21 byte  (har akshar 3 byte)
+ *   • "🔑"        → 2 character, 4 byte
+ *
+ * Yaani 30 akshar ka Hindi password 90 byte ka hota hai — bcrypt uske aakhri 18
+ * byte chup-chaap phenk deta hai, aur wo rok jo iske liye hi likhi gayi thi
+ * (`password.length > MAX_PASSWORD`) kabhi chalti hi nahi thi. Wahi baat
+ * `maxLength={MAX_PASSWORD}` par bhi lagti thi: wo 72 AKSHAR par rokta tha,
+ * yaani 216 byte tak aaram se jaane deta tha.
+ *
+ * Aur ye app Hindi/Hinglish bolne walon ke liye hi bani hai, isliye ye soorat
+ * virli nahi — aam hai.
+ *
+ * ⚠️ Yahan `new Blob([pw]).size` JAAN-BOOJH KE nahi hai, jabki wo sabse chhota
+ * likhne ka tareeka hota. Do wajah:
+ *
+ *   • React Native ka `Blob` sirf JS ka object nahi hai — wo `NativeBlobModule`
+ *     ko bula kar data NATIVE memory me registry ke andar rakh deta hai. Yaani
+ *     user ka poora password, saaf shakl me, ek aur jagah pad jaata — sirf uski
+ *     lambai naapne ke liye. Password ki har extra copy ek bekaar khatra hai.
+ *   • Wo native module par tikta hai (`invariant(NativeBlobModule)`), aur ek
+ *     saadhi si ginti ko kisi native cheez par tikana bilkul zaroori nahi.
+ *
+ * `for...of` string ko CODE POINT se ghumta hai (`for (i...)` ki tarah UTF-16
+ * unit se nahi), isliye emoji jaise surrogate pair bhi ek hi baar, poore 4 byte
+ * gine jaate hain.
+ */
+function passwordBytes(pw: string): number {
+  let n = 0;
+  for (const ch of pw) {
+    const c = ch.codePointAt(0) ?? 0;
+    n += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+  }
+  return n;
+}
+
 /** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
 function referralFromUrl(url: string | null): string | null {
   if (!url) return null;
@@ -100,11 +143,32 @@ function passwordScore(pw: string): 0 | 1 | 2 {
     (/[A-Z]/.test(pw) ? 1 : 0) +
     (/[0-9]/.test(pw) ? 1 : 0) +
     (/[^A-Za-z0-9]/.test(pw) ? 1 : 0);
-  // Lambai apne aap me sabse badi takat hai — 14+ ka passphrase har "Abc@1" se
-  // behtar hai, chahe usme ek hi tarah ke character hon.
-  if (pw.length >= 14 && kinds >= 2) return 2;
+  /**
+   * Lambai apne aap me sabse badi takat hai — 14+ ka passphrase har "Abc@1" se
+   * behtar hai, chahe usme ek hi tarah ke character hon.
+   *
+   * ⚠️ Ye line theek yahi kehti thi, par code iske ULTA chalta tha: shart
+   * `pw.length >= 14 && kinds >= 2` thi, yaani "ek hi tarah ke character hon"
+   * wali soorat me hi wo shart fail ho jaati. Neeche ki dono line bhi `kinds`
+   * maangti hain, isliye `chaipatti sardiyon me` jaisa 20 akshar ka passphrase
+   * — jo is app ke user ke liye sabse acha password HAI — seedha 0 par gir kar
+   * "Kamzor" dikhta tha.
+   *
+   * Aur wo sirf ek label nahi tha: user ko "Kamzor" dikha kar hum use theek us
+   * "Password@123" ki taraf dhakel rahe the jise ye poora function jaan-boojh ke
+   * rokna chahta hai (upar wali wajah dekho).
+   */
+  if (pw.length >= 14) return 2;
   if (kinds >= 3 && pw.length >= 10) return 2;
   if (kinds >= 2 && pw.length >= 8) return 1;
+  /**
+   * Lamba, par ek hi tarah ke character.
+   *
+   * Bina is line ke 13 akshar ka passphrase "Kamzor" (0) hota aur 14 akshar ka
+   * seedha "Majboot" (2) — ek akshar par do darje ki chhalang, jo user ko sirf
+   * uljhati hai. Ab beech ka rasta bhi hai.
+   */
+  if (pw.length >= 10) return 1;
   return 0;
 }
 
@@ -170,7 +234,8 @@ export default function Login() {
     if (password.length < MIN_PASSWORD) {
       return toast.show(l.shortPassword, "info");
     }
-    if (password.length > MAX_PASSWORD) {
+    // Byte me — bcrypt bhi byte hi ginta hai (upar `passwordBytes` par wajah).
+    if (passwordBytes(password) > MAX_PASSWORD) {
       return toast.show(l.longPassword, "info");
     }
     try {
@@ -357,7 +422,16 @@ export default function Login() {
                */
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               textContentType={mode === "signup" ? "newPassword" : "password"}
-              // Hadd bcrypt ki hai (upar `MAX_PASSWORD` par poori wajah likhi hai).
+              /**
+               * ⚠️ Ye sirf ek motі chhat hai, asli rok NAHI.
+               *
+               * `maxLength` AKSHAR ginta hai aur bcrypt BYTE — Hindi me ek akshar
+               * teen byte ka hota hai, isliye ye 72 aksharon me 216 byte tak jaane
+               * de sakta hai. Asli jaanch `submit()` me `passwordBytes()` se hoti
+               * hai, jahan user ko saaf message bhi milta hai. Ise yahan se ghata
+               * dena galat hoga: tab 72 akshar ka angrezi password — jo bilkul
+               * theek hai — bina kuch kahe kat jaata.
+               */
               maxLength={MAX_PASSWORD}
               style={[styles.input, styles.passInput]}
             />

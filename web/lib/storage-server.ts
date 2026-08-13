@@ -47,6 +47,49 @@ export function extFor(contentType: string): string | null {
   return EXT[contentType] ?? null;
 }
 
+/* ------------------------------ Version wale naam ------------------------------ */
+
+/**
+ * Document ki file ka naam — version ke saath.
+ *
+ * ⚠️ Ye ek hi jagah hona ZAROORI hai. `upload-url` presigned URL is naam par
+ * banata hai aur `commit` usi naam par HEAD maar kar DB bharta hai. Dono ka
+ * hisaab alag hua to upload chadh jaayega aur commit "file R2 pe mili nahi"
+ * keh kar fail hoga — ek aisa fail jise pakadna bahut mushkil hai.
+ *
+ * Version 1 (ya bina version) jaan-boojh ke PURANA raasta hai —
+ * `<docId>.<ext>`, bilkul waisa jaisa aaj har document ka hai. Isliye is poore
+ * badlaav se ek bhi purana document nahi hilta: unka path waisa ka waisa rehta
+ * hai, aur unki file wahin padi rehti hai.
+ *
+ * Version 2 se aage `<docId>-v<n>.<ext>` — aur yahi wo cheez hai jo renew par
+ * purani photo ko bachati hai. Nayi file ka naam alag hai, isliye wo purani ke
+ * upar chadh hi nahi sakti.
+ *
+ * ⚠️ `-` aur ank dono `isOwnDocumentPath()` ke `[A-Za-z0-9._-]` me pehle se
+ * allowed hain, isliye purani versions padhna aur delete karna bina kisi aur
+ * badlaav ke chalta hai.
+ */
+export function documentFileName(docId: string, ext: string, version?: number): string {
+  return version && version > 1 ? `${docId}-v${version}.${ext}` : `${docId}.${ext}`;
+}
+
+/**
+ * Body se aaya `version` — sirf 1 se 9999 tak ka poora ank.
+ *
+ * ⚠️ Ye jaanch dheeli nahi chhodi ja sakti: ye ginti seedha R2 key ke NAAM me
+ * jaati hai. Sirf ank hone se `..`, `/` aur baaki har chaalaki apne aap ruk
+ * jaati hai — bilkul waise hi jaise extension client se nahi liya jaata.
+ *
+ * Galat/khaali ho to `undefined` (yaani purana `<docId>.<ext>` wala raasta),
+ * kyunki purani app is field ko bhejti hi nahi hai aur usse kuch tootna nahi
+ * chahiye.
+ */
+export function parseVersion(raw: unknown): number | undefined {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 9999 ? n : undefined;
+}
+
 /* ------------------------------ Supabase REST ------------------------------ */
 
 function sbHeaders(extra?: Record<string, string>) {

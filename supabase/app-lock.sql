@@ -40,11 +40,22 @@ alter table public.user_details
  * Isliye app login ke baad hash+salt ek baar le ke SecureStore me rakh leti hai
  * aur milaan hamesha local karti hai.
  *
- * Isme koi nayi kamzori nahi hai: ye sirf USI user ko milta hai jiska session
- * pehle se hai, aur jiske paas session hai wo lock band bhi kar sakta hai. Jo
- * cheez rukni thi — "bina PIN jaane documents dekh lena" — wo ab bhi rukti hai,
- * kyunki 4 ank ka hash salt ke saath brute-force karna hi padega aur app usme
- * apni hi rok (5 koshish ke baad badhta intezaar) lagati hai.
+ * ⚠️ Par ye maan lena galat hoga ki hash bahar jaana "bilkul bhi kamzori nahi"
+ * hai. Sach ye hai:
+ *
+ *   • Jiske paas session hai wo waise bhi lock band kar sakta hai AUR REST API
+ *     se seedha documents padh sakta hai — isliye uske saamne hash chhupane se
+ *     kuch bachta hi nahi. Ye hissa theek hai.
+ *   • Par 4 ank ka PIN sirf 10,000 sambhavnaayein hai aur hash ek hi SHA-256.
+ *     Jise ye hash+salt mil gaya wo apne computer par SECOND ke andar PIN nikaal
+ *     lega. Salt ise dheema NAHI karta (uska kaam sirf ban-banayi list rokna
+ *     hai), aur app ki "5 koshish" wali rok app ke bahar chalti hi nahi.
+ *   • Nuksan isliye asli hai ki log yahan wahi PIN daalte hain jo bank/phone ka
+ *     hota hai.
+ *
+ * Isliye ye hash ko `service_role` jaisa sambhalna chahiye, aur asli behtari ek
+ * hi hai: PIN ko lamba karna (6 ank = 100 guna). Poori baat
+ * `app-mobile/src/lib/app-lock.ts` ke upar likhi hai.
  */
 create or replace function public.get_app_lock()
 returns table (enabled boolean, hash text, salt text, biometric boolean)
