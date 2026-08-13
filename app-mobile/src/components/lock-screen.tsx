@@ -570,16 +570,27 @@ const useStyles = makeStyles((c) => ({
   // Input dikhta nahi par tappable rehna chahiye — warna keyboard band hone ke
   // baad wapas laane ka koi raasta hi nahi bachta.
   hiddenInput: { position: "absolute", opacity: 0, height: 48, width: "100%" },
+  /**
+   * ⚠️ 15px se 21px.
+   *
+   * Shikayat seedhi thi: "OOOO circle thoda bada hona chahiye, lock page par
+   * dabana mushkil hai". Tap ka nishana pehle hi theek kar diya gaya tha
+   * (`hitSlop` + `onPress` jo sach me keyboard laata hai), par asli baat wo thi
+   * hi nahi — baat DIKHNE ki thi. 15px par ye batana hi mushkil ho jaata hai ki
+   * kitne ank pad chuke hain, aur ye app un logon ke liye bani hai jinki nazar
+   * kamzor hai.
+   */
   dot: {
-    height: 15,
-    width: 15,
-    borderRadius: 8,
+    height: 21,
+    width: 21,
+    borderRadius: 11,
     borderWidth: 1.5,
     borderColor: c.line,
     backgroundColor: c.surface,
   },
   // 6 ank ke code me 4 wale naap se pankti chhoti screen par bahar nikal jaati.
-  dotSmall: { height: 13, width: 13, borderRadius: 7 },
+  /** 6-ank wala reset code — utne dots ek line me aane chahiye, isliye thode chhote. */
+  dotSmall: { height: 17, width: 17, borderRadius: 9 },
   dotOn: { backgroundColor: c.terracotta, borderColor: c.terracotta },
   err: {
     marginTop: 14,

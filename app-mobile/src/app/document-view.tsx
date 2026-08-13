@@ -26,13 +26,20 @@ export default function DocumentView() {
   const { documents: d } = useT();
   const { locale } = useLocale();
   const toast = useToast();
-  const { id, uri, path, mime, name, type } = useLocalSearchParams<{
+  const { id, uri, path, mime, name, type, expiry } = useLocalSearchParams<{
     id?: string;
     uri?: string;
     path?: string;
     mime?: string;
     name?: string;
     type?: string;
+    /**
+     * ⚠️ `expiry` yahan sirf ye tay karne ke liye hai ki renew wale button par
+     * kya likha jaaye — "nayi expiry daalo" ya "expiry add karo". Asli document
+     * `document-renew` khud DB/cache se padhta hai, isliye ye param purana ho
+     * jaye to bhi kuch galat save nahi ho sakta.
+     */
+    expiry?: string;
   }>();
   /**
    * ⚠️ `useWindowDimensions` — `Dimensions.get()` nahi.
@@ -177,6 +184,44 @@ export default function DocumentView() {
             <Ionicons name="document-outline" size={40} color={tc.inkSoft} />
             <Text style={styles.emptyText}>{d.noFileSaved}</Text>
           </View>
+        )}
+
+        {/**
+         * Renew — expiry (aur chaho to photo) badalne ka raasta.
+         *
+         * ⚠️ Ye pehle THA HI NAHI, aur uski kami is app ke sabse aam kaam par
+         * padti thi: document renew ho gaya, nayi date daalni hai — aur ek hi
+         * raasta tha, "pehle delete karo, phir poori photo dobara kheencho, phir
+         * dobara scan karo". Delete karte hi cloud ki file bhi jaati thi, yaani
+         * photo sach me dobara kheenchni padti thi.
+         *
+         * Naam "Edit" JAAN-BOOJH KE nahi hai. Wo screen naam/type badalne deti
+         * hi nahi (wajah `document-renew.tsx` ke upar poori likhi hai), aur
+         * button ka naam bhi wahi kehna chahiye jo wo sach me karta hai.
+         *
+         * Bina expiry wale document par bhi dikhta hai — wahan "Expiry date add
+         * karo" ban jaata hai. AI ka scan aksar expiry miss kar deta hai, aur
+         * uske baad wahi purana lamba raasta bachta tha.
+         *
+         * `id` na ho to nahi dikhta: uske bina renew screen document dhoondh hi
+         * nahi sakti, aur ek aisa button dikhana jo kuch na kare sabse bura hai.
+         */}
+        {!!id && (
+          <Pressable
+            onPress={() =>
+              // `as never` — bilkul waise hi jaise is file ke baaki push. Expo ka
+              // typed-routes list build ke waqt banti hai, aur nayi screen usme
+              // agle generate tak nahi hoti.
+              router.push({ pathname: "/document-renew", params: { id } } as never)
+            }
+            style={({ pressed }) => [styles.renewBtn, pressed && { opacity: 0.9 }]}
+          >
+            <Ionicons name="refresh-circle" size={20} color={tc.terracotta} />
+            <Text style={styles.renewBtnText}>
+              {expiry ? d.renewUpdate : d.addExpiry}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={tc.terracotta} />
+          </Pressable>
         )}
 
         {/**
@@ -387,6 +432,27 @@ const useStyles = makeStyles((c) => ({
   body: { alignItems: "center", padding: 16, paddingBottom: 8, gap: 16 },
   empty: { alignItems: "center", gap: 12, paddingVertical: 40 },
   emptyText: { fontSize: 15, color: c.inkSoft, textAlign: "center" },
+
+  /**
+   * Renew ka button — bhara hua nahi, kinare wala.
+   *
+   * Neeche Download/Share pehle se bhare hue button hain. Teesra bhara hua
+   * button teenon ko ek jaisa bana deta aur user ko chunna mushkil ho jaata;
+   * ye alag dikhta hai par kam zaroori nahi lagta.
+   */
+  renewBtn: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: c.terracotta,
+    backgroundColor: "rgba(194,90,55,0.07)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  renewBtnText: { flex: 1, fontSize: 15, fontWeight: "700", color: c.terracotta },
 
   renewCard: {
     width: "100%",

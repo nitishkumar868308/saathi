@@ -592,6 +592,8 @@ export default function Home() {
                       mime: doc.mime_type ?? "",
                       name: doc.name,
                       type: doc.type,
+                      // Renew wale button ka naam isi se tay hota hai.
+                      expiry: doc.expiry ?? "",
                     },
                   } as never);
                 }}

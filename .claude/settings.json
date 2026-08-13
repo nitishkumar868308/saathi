@@ -462,7 +462,21 @@
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/fixdict.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/genpepper.js\")",
       "Bash(node \"C:/Users/PRATIE~1/AppData/Local/Temp/claude/d--my-app/d328bd34-eb5a-4113-8ec7-01737a4d8116/scratchpad/pepper-verify.js\")",
-      "Bash(node -e \"for \\(const s of ['2027-02-29','2027-02-30','2027-13-01','2027-04-31','2026-02-29']\\) { const d=new Date\\(s\\); console.log\\(s, '->', isNaN\\(d.getTime\\(\\)\\)?'INVALID':d.toISOString\\(\\)\\); }\")"
+      "Bash(node -e \"for \\(const s of ['2027-02-29','2027-02-30','2027-13-01','2027-04-31','2026-02-29']\\) { const d=new Date\\(s\\); console.log\\(s, '->', isNaN\\(d.getTime\\(\\)\\)?'INVALID':d.toISOString\\(\\)\\); }\")",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/@supabase/supabase-js/package.json'\\).version, require\\('./node_modules/@supabase/auth-js/package.json'\\).version\\)\")",
+      "Bash(node -e \"console.log\\('2027-02-29 ->', new Date\\('2027-02-29'\\).toString\\(\\)\\); console.log\\('2026-02-29 ->', new Date\\('2026-02-29'\\).toString\\(\\)\\); console.log\\('2027-13-01 ->', new Date\\('2027-13-01'\\).toString\\(\\)\\); console.log\\('2027-04-31 ->', new Date\\('2027-04-31'\\).toString\\(\\)\\);\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(grep -rn \"file_path\\\\|\\\\`\\\\${uid}/\\\\|ext\" d:/my-app/web/app/api/storage/*/route.ts)",
+      "Bash(grep -n \"naam \\\\`jpg\\\\`\" src/lib/documents.ts)",
+      "Bash(grep -n \"jpeg\\\\` \\(mime\\)\" src/lib/documents.ts)",
+      "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\(Object.keys\\(p.dependencies\\).filter\\(k=>/local|intl|date/i.test\\(k\\)\\)\\)\")",
+      "Bash(grep -oE \"app-mobile\\\\\\\\\\\\\\\\src\\\\\\\\\\\\\\\\[^ ]+:[0-9]+:[0-9]+\")",
+      "Bash(grep -E \"^D:\\\\\\\\\\\\\\\\my-app.*\\\\.\\(ts|tsx\\)$\")",
+      "Bash(sed -i 's/^import { useCallback, useEffect, useState } from \"react\";$/import { useEffect, useState } from \"react\";/' src/app/document-renew.tsx)",
+      "Bash(cd \"d:/my-app/app-mobile\" && grep -rn \"launchMode\" node_modules/expo-modules-autolinking/../../node_modules/@expo/config-plugins/build/android/*.js 2>/dev/null | head -3; echo \"=== expo template MainActivity ===\"; find node_modules/@expo -name \"AndroidManifest.xml\" -path \"*template*\" 2>/dev/null | head -3; grep -rn \"singleTask\\\\|launchMode\" node_modules/expo/template/android/app/src/main/AndroidManifest.xml 2>/dev/null | head)",
+      "Read(//d/my-app/app-mobile/node_modules/@expo/config-plugins/build/android/**)",
+      "Bash(cd \"d:/my-app/app-mobile\" && grep -rn \"targetSdkVersion\" android/build.gradle; echo \"--- expo default sdk versions ---\"; grep -rn \"targetSdkVersion\\\\|compileSdkVersion\" node_modules/expo-modules-core/android/build.gradle 2>/dev/null | head -3; grep -rn \"targetSdkVersion\" node_modules/expo/scripts/../package.json 2>/dev/null | head -2; sed -n '1,40p' android/build.gradle)",
+      "Read(//d/my-app/app-mobile/node_modules/expo/**)"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

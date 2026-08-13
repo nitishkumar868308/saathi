@@ -343,10 +343,33 @@ async function callAi<T>(
  * karta tha: AI ka nikala hua time aane se pehle hi beet chuka hota tha, aur
  * chat use "beeta hua time" maan ke Add-reminder screen par phenk deti thi.
  */
-function localNowIso(): string {
-  const d = new Date();
+/**
+ * Date → naive LOCAL ISO (`2026-08-13T20:00:00`), bina `Z` aur bina offset.
+ *
+ * ⚠️ Ye `export` hai, aur uski wajah ek asli bug hai jise user ne theek pakda:
+ * **"chat se pichhle reminder ka time poocho to wo galat time batata hai."**
+ *
+ * Prompt me "abhi ka time" to yahin se (local) jaata tha — wo hissa sahi tha.
+ * Par uske saath jo `context` jaata hai usme reminders ka `when` seedha DB ka
+ * `remind_at` hota tha, yaani **UTC** (`2026-08-13T14:30:00.000Z`). Model ke
+ * saamne ek hi prompt me do alag timezone rakh dena, aur ummeed karna ki wo
+ * khud jod-ghata lega — wo kabhi nahi hota. Wo `Z` wali ginti seedha padh ke
+ * bol deta tha, aur India me har jawab **theek 5:30 ghante peeche** hota tha.
+ *
+ * Isliye ab context me jaane wala har waqt isi shakl me jaata hai. Ek hi
+ * timezone, jise samajhne ke liye model ko kuch karna hi nahi padta.
+ *
+ * `Z` jaan-boojh ke nahi lagate: server ka prompt in dono ko "user ke apne waqt"
+ * ki tarah padhta hai, aur usi shakl me `remind_at` wapas maangta hai.
+ */
+export function localIso(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** Abhi ka waqt, naive local ISO me. */
+export function localNowIso(): string {
+  return localIso(new Date());
 }
 
 /** Saathi se jawab lo. Network/config fail ho to bhi kuch na kuch lautata hai. */
@@ -423,7 +446,16 @@ export async function parseReminderAI(
   if (!text.trim()) return { ok: false, failure: "server" };
   try {
     const data = await callAi<(Partial<ReminderAI> & { error?: string }) | null>(
-      { task: "reminder", text, locale, now: new Date().toISOString() },
+      /**
+       * ⚠️ `now` LOCAL me — `toISOString()` (UTC) me nahi.
+       *
+       * Server ka prompt saaf likhta hai "Abhi ka time (ISO, user ke timezone
+       * me)", par yahan se UTC ja raha tha. India me iska matlab tha ki AI ko
+       * hamesha 5:30 ghante purana waqt milta tha — aur uska sabse bura roop
+       * raat me dikhta: 11 baje bola gaya "kal subah 8 baje" AI ke liye abhi
+       * 5:30 shaam tha, yaani "kal" ka matlab hi ek din khisak jaata.
+       */
+      { task: "reminder", text, locale, now: localNowIso() },
       TASK_TIMEOUT_MS,
     );
     // Server ne jawab to diya, par usme samajh nahi thi — ye AI ki apni baat
@@ -475,7 +507,9 @@ export async function documentFollowUp(
   if (!supabase || !doc?.name) return null;
   try {
     const data = await callAi<DocFollowUp | null>(
-      { task: "docfollow", document: doc, locale, now: new Date().toISOString().slice(0, 10) },
+      // Aaj ki taarikh LOCAL din se — UTC se lene par raat 12 se 5:30 ke beech
+      // "aaj" kal ki date ban jaata tha.
+      { task: "docfollow", document: doc, locale, now: localNowIso().slice(0, 10) },
       TASK_TIMEOUT_MS,
     );
     if (!data?.ask) return null;

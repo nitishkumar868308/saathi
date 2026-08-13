@@ -75,3 +75,44 @@ $$;
 revoke all on function public.my_other_devices(text, int) from public, anon;
 -- Sirf logged-in user — aur wo bhi sirf apne hi phone dekh sakta hai (auth.uid()).
 grant execute on function public.my_other_devices(text, int) to authenticated;
+
+
+/**
+ * "Baaki sab phones se logout" — devices table par bhi lagu karo.
+ *
+ * ⚠️ Ye function pehle THA HI NAHI, aur uski kami se ek button poori tarah
+ * jhooth bol raha tha. App ka `signOutOtherDevices()` sirf Supabase ke refresh
+ * TOKEN revoke karta hai — us se `devices` table ko koi farak nahi padta. Aur
+ * upar wala `my_other_devices()` ginti wahin se leta hai.
+ *
+ * Natija theek wahi tha jo user ne pakda: "Sign out all other phones" dabao,
+ * "ho gaya" wala toast bhi aaye, aur agli baar login karte hi wahi chetavni
+ * phir se — "aapki ID aur bhi phones par login hai". Row 30 din tak padi rehti
+ * thi, isliye chetavni 30 din tak lauttti rehti thi.
+ *
+ * Ab `last_user_id` hata dete hain: wo phone ab kisi ke naam par nahi rehta,
+ * ginti se nikal jaata hai, aur uspar is user ka koi push bhi nahi jaata.
+ *
+ * ⚠️ Row DELETE nahi karte. `devices` me hardware/analytics ki jaankari bhi
+ * hai, aur usi id par wo phone kal dobara login kar sakta hai — tab wo apne
+ * aap wapas apne naam par aa jaata hai.
+ */
+create or replace function public.release_my_other_devices(p_id text default null)
+returns int language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if auth.uid() is null then return 0; end if;
+
+  update public.devices
+     set last_user_id = null
+   where last_user_id = auth.uid()
+     -- Abhi wala phone chalu rehna chahiye — yahi to "baaki sab" ka matlab hai.
+     and (p_id is null or id <> p_id);
+
+  get diagnostics n = row_count;
+  return coalesce(n, 0);
+end;
+$$;
+
+revoke all on function public.release_my_other_devices(text) from public, anon;
+grant execute on function public.release_my_other_devices(text) to authenticated;

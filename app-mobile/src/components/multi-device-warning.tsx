@@ -18,7 +18,7 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
-import { getDeviceId, otherDevices } from "@/lib/device";
+import { getDeviceId, otherDevices, releaseOtherDevices } from "@/lib/device";
 import { signOutOtherDevices } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { hasFirstDocument, hasFirstReminder } from "@/lib/reviews";
@@ -165,6 +165,18 @@ export function MultiDeviceWarning() {
     setBusy(true);
     try {
       await signOutOtherDevices();
+      /**
+       * ⚠️ Ye doosri line ke bina button poori tarah jhooth bolta tha.
+       *
+       * `signOutOtherDevices()` sirf Supabase ke refresh TOKEN revoke karta hai.
+       * Par upar wali ginti `my_other_devices()` se aati hai, jo `devices` table
+       * padhta hai — aur us table ko token revoke hone se koi farak nahi padta.
+       * Row 30 din tak padi rehti thi (`last_seen_at` wali window), isliye user
+       * ko har login par wahi chetavni dobara milti thi, chahe usne button kitni
+       * baar dabaya ho. Bilkul wahi shikayat: "har baar poochta hai, jabki
+       * pichhli baar hi sign out all kar chuka tha".
+       */
+      await releaseOtherDevices();
       // Ab koi doosra phone bacha hi nahi — ack 0 par, taaki agli baar ginti
       // badalte hi (naya login) modal phir aa jaaye.
       await remember(0);

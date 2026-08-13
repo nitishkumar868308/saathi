@@ -1,7 +1,12 @@
 import { supabase } from "./supabase";
 import { canAddDocument, getOffers } from "./plan";
 import { deleteDocumentFile } from "./storage";
-import { flushUploads, queueUpload, requeueMissingUploads } from "./doc-upload-queue";
+import {
+  flushUploads,
+  isUploadPending,
+  queueUpload,
+  requeueMissingUploads,
+} from "./doc-upload-queue";
 import {
   addToCachedDocs,
   primeCachedFile,
@@ -202,6 +207,111 @@ export async function addDocument(input: {
   if (uid) await addToCachedDocs(uid, doc);
 
   return doc;
+}
+
+/**
+ * Document RENEW — sirf expiry (aur chaho to nayi photo).
+ *
+ * ── Naam aur type yahan JAAN-BOOJH KE nahi hain ──────────────────────────
+ *
+ * ⚠️ Ye is function ki sabse zaroori baat hai, aur ye `patch` ke TYPE me hi
+ * likhi hai — comment me nahi, taaki bhoolna namumkin ho.
+ *
+ * Aam "edit" ka matlab hota "sab kuch badal sakte ho", aur wahi is app me sabse
+ * bada khatra tha: user Passport add kare aur baad me use Driving Licence bana
+ * de. Us ek row par tab kya sach hai, ye kisi ko pata nahi chalta — photo kisi
+ * aur document ki, naam kisi aur ka, aur renewal guide (jo `type` se chunta hai)
+ * bilkul galat. AI ka scan bhi usi type par tika hai. Aisi galti ka koi error
+ * nahi aata; wo bas chup-chaap galat ho jaati hai.
+ *
+ * Isliye yahan "edit" nahi, **RENEW** hai — wahi ek kaam jiske liye user sach me
+ * lauta hai: "document renew ho gaya, nayi date daal do". Document ki PEHCHAAN
+ * waisi ki waisi rehti hai; sirf uski taarikh (aur chaho to nayi photo) badalti
+ * hai. Naam ya type sach me galat ho to document delete karke naya banana hi
+ * sahi raasta hai — kyunki wo tab ek ALAG document hai.
+ *
+ * ⚠️ Notification yahan se NAHI lagti. Wo bulane wale ka kaam hai
+ * (`scheduleDocumentExpiry`), bilkul waise hi jaise `addDocument` me hai —
+ * warna ye lib file notifee (native module) par tik jaati aur headless task me
+ * import hone layak nahi rehti.
+ */
+export async function updateDocument(
+  doc: Document,
+  patch: {
+    /** Nayi expiry. `null` = expiry hata do (Aadhaar/PAN jaisa). */
+    expiry: string | null;
+    /** Nayi photo ka local rasta. `undefined` = photo waisi hi rehne do. */
+    file_uri?: string;
+  },
+): Promise<Document> {
+  const sb = client();
+
+  const row: { expiry: string | null; file_uri?: string } = { expiry: patch.expiry };
+  if (patch.file_uri) row.file_uri = patch.file_uri;
+
+  const { data, error } = await sb
+    .from("documents")
+    .update(row)
+    .eq("id", doc.id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  const updated = data as Document;
+
+  /**
+   * Nayi photo — wahi poora raasta jo `add-document` par hai.
+   *
+   * Kataar pehle bharti hai, phir offline copy, phir upload. Net na ho to bhi
+   * nayi photo turant is phone par dikhti hai aur cloud par baad me chali jaati
+   * hai. Yahan `await` isliye hai (add-document ke ulta) ki uske baad hume purani
+   * cloud file hatani hai, aur wo tabhi surakshit hai jab nayi chadh chuki ho.
+   */
+  if (patch.file_uri) {
+    await uploadDocumentImage(doc.id, patch.file_uri).catch(() => {});
+
+    /**
+     * Purani cloud file hatao — sirf tab jab uska rasta NAYE se alag ho.
+     *
+     * R2 par rasta `<uid>/<docId>.<ext>` hai, yaani wahi extension hone par nayi
+     * file purani ke UPAR chadh jaati hai aur hatane ko kuch bachta hi nahi. Par
+     * JPG ki jagah PNG aa jaye to purani file wahin padi reh jaati — user ke liye
+     * delete, bill me zinda, aur kisi purane signed URL se abhi bhi khulne layak.
+     *
+     * ⚠️ `isUploadPending` ki shart zaroori hai. Kataar me abhi bhi entry hai ka
+     * matlab hai upload chadha hi nahi (net nahi tha). Us haal me purani file
+     * hata dena document ki EK MAATR cloud copy hatana hai — orphan file us
+     * nuksan se kahin sasti hai.
+     */
+    const oldPath = doc.file_path;
+    if (oldPath && !(await isUploadPending(doc.id))) {
+      const newExt = mimeFromUri(patch.file_uri).split("/")[1];
+      const oldExt = oldPath.split(".").pop()?.toLowerCase();
+      // `jpeg` (mime me) aur `jpg` (rasta me) — dono ek hi cheez hain.
+      const same = oldExt === newExt || (oldExt === "jpg" && newExt === "jpeg");
+      if (!same) await deleteDocumentFile(oldPath).catch(() => {});
+    }
+  }
+
+  /**
+   * Offline list bhi turant sudhaaro.
+   *
+   * ⚠️ Iske bina net jaate hi user ko purani expiry wapas dikhti — usne abhi-abhi
+   * renew kiya hota aur app usi purani date par "expired" ka laal tag dikha rahi
+   * hoti. Wo "app ne save hi nahi kiya" jaisa dikhta hai.
+   */
+  const uid = await currentUid();
+  if (uid) {
+    const cached = await readCachedDocs(uid);
+    if (cached) {
+      await writeCachedDocs(
+        uid,
+        cached.map((x) => (x.id === updated.id ? updated : x)),
+      );
+    }
+  }
+
+  return updated;
 }
 
 /**

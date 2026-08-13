@@ -226,6 +226,10 @@ export default function Documents() {
                         name: doc.name,
                         // Renewal guide isi se chunta hai.
                         type: doc.type,
+                        // Renew wale button par kya likha jaaye — "nayi expiry
+                        // daalo" ya "expiry add karo". Asli document renew screen
+                        // khud padhti hai, isliye ye purana ho to bhi nuksan nahi.
+                        expiry: doc.expiry ?? "",
                       },
                     } as never);
                   }}

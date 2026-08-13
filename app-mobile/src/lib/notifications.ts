@@ -1,16 +1,31 @@
-import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import notifee, {
-  AlarmType,
-  AndroidImportance,
-  AndroidVisibility,
-  AndroidCategory,
-  AndroidFlags,
-  AuthorizationStatus,
-  TriggerType,
-  type TimestampTrigger,
-} from "@notifee/react-native";
+import notifee, { AndroidImportance, AuthorizationStatus } from "@notifee/react-native";
 
+/**
+ * ⚠️ Alarm ka poora dhaancha ab `notify-core.ts` me hai, yahan nahi.
+ *
+ * Wajah: wahi dhaancha background/headless task ko bhi chahiye (snooze ke liye,
+ * jo app band hone par bhi lagna chahiye), aur wo task ye bhaari file import
+ * nahi kar sakta — ismein supabase, reminders aur documents ka poora stack aa
+ * jaata hai. `notify-core` me sirf notifee hai.
+ */
+import {
+  ACTION_DONE,
+  ACTION_LATER,
+  CHANNEL_ID,
+  QUIET_CHANNEL_ID,
+  SNOOZE_MS,
+  baseReminderId,
+  buildAlarmNotification,
+  cancelNotification as cancel,
+  ensureChannel,
+  ensureQuietChannel,
+  scheduleNotificationAt,
+  snoozeNotification,
+  type AlarmKind,
+} from "./notify-core";
+
+import { EXPIRY_LEAD_DAYS, expiryNotifyPlan } from "../utils/expiry";
 import { completeReminder, listReminders } from "./reminders";
 import { ensureDeviceState } from "./device-approval";
 import { emitDataChanged } from "./data-events";
@@ -19,14 +34,12 @@ import { reportError } from "./report-error";
 import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionaries";
 // Background/headless handler ab `index.js` se sabse pehle lagta hai. Yahan se
 // sirf takePendingAlert aage bheja jaata hai (purane import na tootein).
-import {
-  ACTION_DONE,
-  ACTION_LATER,
-  takeNotificationActions,
-  takePendingAlert,
-} from "./notification-background";
+import { takeNotificationActions, takePendingAlert } from "./notification-background";
 
 export { takePendingAlert };
+// Snooze/repeat wale id se asli reminder id — modal aur tray, dono isi ko use
+// karte hain (wajah `notify-core.ts` me likhi hai).
+export { baseReminderId, SNOOZE_MS };
 
 /**
  * Notifications — ab @notifee/react-native se.
@@ -54,86 +67,6 @@ async function notifDict() {
   return dictionaries[loc].notif;
 }
 
-/**
- * Reminder ka channel.
- *
- * ⚠️ Naam me `v2` hai, aur ye jaan-boojh ke hai — ise badalna hi EK MAATR tareeka
- * hai channel ki settings badalne ka. Android me ek baar bana hua channel
- * **kabhi nahi** badalta: `createChannel()` dobara chalao to importance, sound,
- * vibration, bypassDnd — sab chup-chaap anadekha ho jaata hai (user ke haath me
- * chhod diya jaata hai, jo theek bhi hai).
- *
- * Iska seedha matlab ye tha ki purane `reminders-fs` channel wale har phone par
- * neeche ke saare sudhaar (alarm-jaisi awaaz, DND se chhoot, tez vibration)
- * bekaar the — code me maujood, phone par kabhi lagu nahi. Naya id un sabko
- * ek naye channel me le aata hai.
- *
- * ⚠️ Aage kabhi channel ki settings badlo to id bhi badalna (v3, v4…), warna
- * badlaav sirf naye install par dikhega aur purane user ko kabhi nahi milega —
- * aur ye wahi galti hai jo pakadna sabse mushkil hoti hai.
- */
-const CHANNEL_ID = "reminders-alarm-v2";
-
-/**
- * Alarm kitni der bajta rahe (ms).
- *
- * ⚠️ Ye zaroori hai kyunki neeche `loopSound` + `FLAG_INSISTENT` lage hue hain —
- * yaani awaaz apne aap band NAHI hoti, wo tab tak bajti hai jab tak notification
- * hat na jaye. Ye bilkul aisa hi hai jaisa asli alarm app karte hain, par uske
- * saath ek chhat honi hi chahiye: user phone ghar par chhod ke nikal gaya to
- * bina chhat ke wo ghanton bajta rehta.
- *
- * 60 second ek asli alarm jitna hi hai — ignore karna mushkil, aur bhaari bhi
- * nahi.
- */
-const ALARM_TIMEOUT_MS = 60_000;
-
-/**
- * Document expiry ka teen-qadam ladder: 7 din pehle, 1 din pehle, aur us din.
- *
- * ⚠️ Ye web ke cron (`web/app/api/cron/document-expiry/route.ts`) ke saath
- * BILKUL milna chahiye — wahan email + WhatsApp isi ladder par jaate hain.
- * Ek jagah badla aur doosri jagah nahi, to user ko notification aaj aayegi aur
- * email kisi aur din — sabse bura tajurba.
- *
- * Pehle [14, 3, 0] tha. 7/1/0 isliye behtar hai: 14 din pehle wali baat log bhool
- * jaate hain, aur 1 din pehle wali chetavni sach me kaam karati hai.
- */
-export const EXPIRY_LEAD_DAYS = [7, 1, 0] as const;
-const NOTIFY_HOUR = 9;
-
-/**
- * Reminder ka channel — alarm jaisa, notification jaisa nahi.
- *
- * ⚠️ `bypassDnd` yahan sabse zaroori nayi cheez hai. Bahut se log raat me Do Not
- * Disturb chalu rakhte hain (ya OEM apne aap "bedtime mode" laga deta hai), aur
- * usme aam notification ki awaaz poori tarah dab jaati hai. Reminder ke liye
- * user ne KHUD kaha tha ki "us waqt bata dena" — us par chup reh jaana wahi ek
- * kaam na karna hai jiske liye app hai. Alarm apps isi wajah se DND bypass karte
- * hain, aur reminder alarm hi hai.
- *
- * ⚠️ Channel ki ye settings sirf PEHLI baar lagti hain (upar `CHANNEL_ID` par
- * poori baat likhi hai). Isme kuch bhi badlo to id bhi badalni hogi.
- */
-async function ensureChannel(): Promise<void> {
-  if (Platform.OS !== "android") return;
-  await notifee.createChannel({
-    id: CHANNEL_ID,
-    name: "Reminders & alarms",
-    description: "Aapke reminder aur document expiry ke alert",
-    importance: AndroidImportance.HIGH,
-    sound: "default",
-    vibration: true,
-    // Lamba, alarm-jaisa pattern — chhoti si thap jeb me mehsoos hi nahi hoti.
-    vibrationPattern: [300, 600, 300, 600],
-    // Lock screen par poora text dikhe — chhupa hua reminder bekaar hai.
-    visibility: AndroidVisibility.PUBLIC,
-    // Raat/DND me bhi bajna chahiye (upar wajah likhi hai).
-    bypassDnd: true,
-    lights: true,
-  });
-}
-
 export async function ensureNotifPermission(): Promise<boolean> {
   await ensureChannel();
   const settings = await notifee.requestPermission();
@@ -150,175 +83,45 @@ export async function hasNotifPermission(): Promise<boolean> {
 
 /**
  * Ek notification schedule karo (timestamp trigger).
- * Android: fullScreenAction = lock screen par poora alert. Same `id` dobara dene
- * se purani schedule replace ho jaati hai (duplicate nahi).
+ *
+ * Poora dhaancha aur exact→inexact wala fallback ab `notify-core.ts` me hai —
+ * wahi headless task bhi use karta hai (snooze ke liye). Yahan sirf wo hissa
+ * bacha hai jo is file ka apna hai: bhasha ke labels aur error reporting.
+ *
+ * Same `id` dobara dene se purani schedule replace ho jaati hai (duplicate nahi).
  */
 async function schedule(
   id: string,
   title: string,
   body: string,
   when: Date,
-  kind: "reminder" | "expiry" | "test" = "reminder",
+  kind: AlarmKind = "reminder",
 ): Promise<boolean> {
   if (when.getTime() <= Date.now()) return false;
 
   const n = await notifDict();
-
-  /**
-   * ── Alarm jaisa vyavhaar, app khuli ho ya na ho ─────────────────────────
-   *
-   * ⚠️ Ye is file ka sabse zaroori hissa hai. Shikayat seedhi thi: "app band ho
-   * ya phone locked ho to sound aur task aana chahiye — Rapido/Astrotalk me aata
-   * hai, hamare me kyun nahi." Pehle yahan sirf `fullScreenAction` par bharosa
-   * tha, aur wo Android 14 (API 34) se ek **special app access** ban chuka hai
-   * jo alarm/calling apps ke alawa sab ke liye DEFAULT SE BAND hai. User ne
-   * sab kuch allow kar rakha ho, tab bhi bada popup nahi aata — aur uske saath
-   * hi poora alert chup ho jaata tha.
-   *
-   * Isliye ab poora bhaar `fullScreenAction` par nahi hai. Wo abhi bhi lagta hai
-   * (jahan permission hai wahan sabse achha anubhav wahi deta hai), par uske
-   * bina bhi reminder ab ek ASLI alarm ki tarah bajta hai:
-   *
-   *   • `loopSound` + `FLAG_INSISTENT` — awaaz ek baar "ting" karke chup nahi
-   *     hoti; wo bajti rehti hai jab tak user use hata na de. Yahi wo ek cheez
-   *     hai jo aam notification aur alarm ke beech ka poora fark banati hai.
-   *   • `ongoing` — swipe se galti se hat na jaye. Hatane ka saaf raasta neeche
-   *     ke do button hain.
-   *   • `lightUpScreen` — screen jaag jaati hai, isliye jebe me pada phone bhi
-   *     dikh jaata hai (full-screen intent na chal paaye tab bhi).
-   *   • `timeoutAfter` — aur uski chhat: 60 second baad alarm khud chup ho jaata
-   *     hai. Bina iske phone ghar par chhod ke nikal jaane par wo ghanton bajta.
-   *
-   *   • Do action button ("Ho gaya" / "Baad me") — app kholе bina hi kaam
-   *     nipat jaata hai. Pehle nipatane ka EK HI raasta tha: app kholo, modal ka
-   *     intezaar karo, phir dabao. Lock screen par khade user ke liye wo teen
-   *     kadam bahut hain.
-   *
-   * `category: ALARM` + HIGH importance dono zaroori hain: inhi se Android is
-   * notification ko alarm maanta hai (heads-up, DND bypass, aur full-screen
-   * intent ki patrata).
-   */
-  const isReminder = kind === "reminder";
-  /**
-   * Test alarm ko asli reminder jaisa hi bajna chahiye — warna wo kuch saabit
-   * hi nahi karta. Isliye awaaz, full-screen aur screen jagana sab wahi.
-   *
-   * Do cheezein jaan-boojh ke ALAG hain:
-   *   • `ongoing` nahi — asli reminder ke do button hote hain jinse wo hat-ta
-   *     hai; test me wo button nahi hain, to ongoing use hataana namumkin bana
-   *     deta.
-   *   • action button nahi — "Ho gaya" server par ek aisi id bhejta jo hai hi
-   *     nahi.
-   */
-  const isAlarmLike = kind === "reminder" || kind === "test";
-
-  const notification = {
-    id,
-    title,
-    body,
-    data: { kind, body, title, id },
-    android: {
-      channelId: CHANNEL_ID,
-      importance: AndroidImportance.HIGH,
-      category: AndroidCategory.ALARM,
-      // Lock screen par alarm-jaisa poora popup — jahan permission mili ho.
-      fullScreenAction: { id: "default" },
-      pressAction: { id: "default" },
-      // Screen jaga do. Ye full-screen intent se alag hai aur uske bina bhi
-      // chalta hai — jeb me pada phone bhi tab dikh jaata hai.
-      lightUpScreen: true,
-      /**
-       * Awaaz bajti rahe.
-       *
-       * ⚠️ `loopSound` akele kaafi nahi hai kuch OEM par; `FLAG_INSISTENT`
-       * Android ko seedha kehta hai ki awaaz tab tak dohraate raho jab tak
-       * notification hat na jaye. Dono saath me har phone par chalte hain.
-       */
-      loopSound: isAlarmLike,
-      flags: isAlarmLike ? [AndroidFlags.FLAG_INSISTENT] : undefined,
-      // Swipe se galti se hat na jaye — hatane ka raasta neeche ke button hain.
-      ongoing: isReminder,
-      autoCancel: !isReminder,
-      // Alarm ki chhat — 60 second baad khud chup (upar wajah likhi hai).
-      timeoutAfter: isAlarmLike ? ALARM_TIMEOUT_MS : undefined,
-      /**
-       * App khole bina hi nipat jaye.
-       *
-       * ⚠️ Ye pehle tha hi nahi, aur uski kami sabse zyada lock screen par
-       * chubhti thi: alarm bajta tha aur use band karne ka ek hi raasta tha —
-       * phone kholo, app kholo, modal ka intezaar karo, phir dabao.
-       */
-      actions: isReminder
-        ? [
-            { title: n.alertDone, pressAction: { id: ACTION_DONE } },
-            { title: n.alertLater, pressAction: { id: ACTION_LATER } },
-          ]
-        : undefined,
+  return scheduleNotificationAt(
+    buildAlarmNotification({
+      id,
+      title,
+      body,
+      kind,
+      labels: { done: n.alertDone, later: n.alertLater },
+    }),
+    when,
+    {
+      // Exact alarm ki permission nahi mili — alarm laga to hai, par ~10 min ki
+      // window me. Ye chup-chaap nahi hona chahiye; permission modal isi wajah
+      // se user se exact-alarm maangta hai.
+      onFallback: (e) =>
+        reportError(
+          e,
+          { screen: "notifications", action: "schedule_exact", id, kind, fallback: "inexact" },
+          "warn",
+        ),
+      onFail: (e) => reportError(e, { screen: "notifications", action: "schedule", id, kind }),
     },
-    ios: {
-      sound: "default",
-      // `critical` ke liye Apple ki alag manzoori chahiye; `timeSensitive` wo
-      // sabse ooncha darja hai jo har app ko milta hai — Focus/DND ke aar-paar
-      // se nikal jaata hai.
-      interruptionLevel: "timeSensitive" as const,
-    },
-  };
-
-  const trigger = (type: AlarmType): TimestampTrigger => ({
-    type: TriggerType.TIMESTAMP,
-    timestamp: when.getTime(),
-    // ⚠️ Pehle yahan sirf `{ allowWhileIdle: true }` tha. Wo notifee ka
-    // deprecated flag hai aur alarm ko SET_AND_ALLOW_WHILE_IDLE banata hai —
-    // yaani **inexact**. Android aise alarms ko ~10 min ki window me doosre
-    // alarms ke saath batch karta hai, isliye 8:36 wala reminder 8:38 pe 8:39
-    // wale ke saath ek jhund me aata tha. SET_EXACT_AND_ALLOW_WHILE_IDLE se
-    // alarm doze me bhi theek us minute par bajta hai.
-    alarmManager: { type },
-  });
-
-  try {
-    await ensureChannel();
-    await notifee.createTriggerNotification(
-      notification,
-      trigger(AlarmType.SET_EXACT_AND_ALLOW_WHILE_IDLE),
-    );
-    return true;
-  } catch (exactErr) {
-    /**
-     * ⚠️ Exact alarm ki permission (SCHEDULE_EXACT_ALARM) na ho to notifee
-     * yahan THROW karta hai — aur purana code use chup-chaap nigal ke `false`
-     * lauta deta tha. Natija: reminder ka alarm lagta hi nahi tha, kahin koi
-     * error bhi nahi dikhta tha, aur user ko lagta tha app hi toot gayi.
-     *
-     * Der se aana, na aane se behtar hai. Isliye ab inexact alarm par gir
-     * jaate hain (~10 min ki window me bajega) aur permission modal user se
-     * exact-alarm maang hi raha hai.
-     */
-    try {
-      await notifee.createTriggerNotification(
-        notification,
-        trigger(AlarmType.SET_AND_ALLOW_WHILE_IDLE),
-      );
-      reportError(
-        exactErr,
-        { screen: "notifications", action: "schedule_exact", id, kind, fallback: "inexact" },
-        "warn",
-      );
-      return true;
-    } catch (e) {
-      reportError(e, { screen: "notifications", action: "schedule", id, kind });
-      return false;
-    }
-  }
-}
-
-async function cancel(id: string): Promise<void> {
-  try {
-    await notifee.cancelTriggerNotification(id);
-    await notifee.cancelNotification(id);
-  } catch {
-    /* already gone */
-  }
+  );
 }
 
 /* ----------------------------- reminders ----------------------------- */
@@ -435,16 +238,66 @@ export async function cancelReminder(id: string): Promise<void> {
  * hi "abhi kuch mat karo" hai. Uska poora kaam alarm ki awaaz band karna tha,
  * aur wo notification hatte hi ho chuka.
  */
+/**
+ * Reminder ko 5 minute aage sarka do — "abhi nahi" ka asli matlab.
+ *
+ * ⚠️ Ye APP KE ANDAR wala raasta hai (full-screen modal ka "5 min baad" button).
+ * App band hone par wahi kaam `notification-background.ts` seedha karta hai —
+ * dono ek hi `snoozeNotification()` par jaate hain, isliye vyavhaar ek hi rehta
+ * hai chahe app khuli ho ya nahi.
+ *
+ * ⚠️ Ye poora raasta pehle THA HI NAHI. "Abhi nahi" ka button MAUJOOD tha par
+ * kuch karta hi nahi tha: notification hat jaati thi, kataar me "later" pada
+ * rehta tha, aur `flushNotificationActions` use `if (a.action !== "done")
+ * continue;` se chup-chaap gira deta tha. Reminder poori tarah gayab — na tray
+ * me, na dobara.
+ */
+export async function snoozeReminder(notifId: string, title: string): Promise<boolean> {
+  const n = await notifDict();
+  return snoozeNotification({
+    id: notifId,
+    title: n.reminderTitle,
+    body: title,
+    data: { kind: "reminder", id: notifId, title: n.reminderTitle, body: title },
+    android: {
+      channelId: CHANNEL_ID,
+      actions: [
+        { title: n.alertDone, pressAction: { id: ACTION_DONE } },
+        { title: n.alertLater, pressAction: { id: ACTION_LATER } },
+      ],
+    },
+  });
+}
+
 export async function flushNotificationActions(): Promise<void> {
   const list = await takeNotificationActions();
   if (list.length === 0) return;
 
   let changed = false;
   for (const a of list) {
+    // Repeat wale reminder me notification id `<uuid>#3` jaisi hoti hai, aur
+    // snooze me `snooze:<uuid>` — server ko hamesha asli id chahiye.
+    const id = baseReminderId(a.id);
+
+    /**
+     * "Abhi nahi" — 5 minute baad dobara.
+     *
+     * Title server se nahi, kataar se bhi nahi — `listReminders()` se aata hai,
+     * kyunki notification me sirf uska text hota hai aur wo bhasha badalne par
+     * purana reh sakta hai. Na mile (net nahi / reminder delete ho chuka) to
+     * chup-chaap chhod dete hain: ek khaali title wala alarm bajana bekaar hai.
+     */
+    if (a.action === "later") {
+      try {
+        const row = (await listReminders().catch(() => [])).find((x) => x.id === id);
+        if (row?.title) await snoozeReminder(a.id, row.title);
+      } catch {
+        /* best-effort — snooze na lag paaye to reminder waise bhi list me hai */
+      }
+      continue;
+    }
+
     if (a.action !== "done") continue;
-    // Repeat wale reminder me notification id `<uuid>#3` jaisi hoti hai —
-    // server ko hamesha bina suffix wali asli id chahiye.
-    const id = a.id.split("#")[0];
     try {
       const next = await completeReminder(id);
       if (next) {
@@ -513,14 +366,18 @@ export async function scheduleTestAlarm(): Promise<boolean> {
 
 const docNotifId = (docId: string, lead: number) => `doc:${docId}:${lead}`;
 
-function expiryDate(expiry: string, minusDays: number): Date | null {
-  const [y, m, d] = expiry.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  const dt = new Date(y, m - 1, d, NOTIFY_HOUR, 0, 0, 0);
-  dt.setDate(dt.getDate() - minusDays);
-  return dt;
-}
-
+/**
+ * Document ki expiry ke teen alarm — 7 din pehle, 1 din pehle, aur us din.
+ *
+ * ⚠️ Kaunsa qadam kab padta hai, ye hisaab ab `expiryNotifyPlan()` karta hai —
+ * wahi function jo `add-document` screen user ko dikhati hai ("hum aapko kab-kab
+ * yaad dilayenge"). Do jagah do hisaab hone par screen kuch waada karti aur phone
+ * kuch aur karta; ab dono ek hi jagah se aate hain.
+ *
+ * `willFire: false` wale qadam skip ho jaate hain — beeta hua waqt par `schedule()`
+ * waise bhi kuch nahi lagata, par yahan chhaan lene se ek bekaar native call bhi
+ * bach jaati hai.
+ */
 export async function scheduleDocumentExpiry(
   docId: string,
   name: string,
@@ -530,17 +387,92 @@ export async function scheduleDocumentExpiry(
   if (!expiry) return;
 
   const n = await notifDict();
-  for (const lead of EXPIRY_LEAD_DAYS) {
-    const when = expiryDate(expiry, lead);
-    if (!when) continue;
+  for (const step of expiryNotifyPlan(expiry)) {
+    if (!step.willFire) continue;
     const body =
-      lead === 0 ? tpl(n.expiryToday, { name }) : tpl(n.expiryInDays, { name, n: lead });
-    await schedule(docNotifId(docId, lead), n.expiryTitle, body, when, "expiry");
+      step.lead === 0
+        ? tpl(n.expiryToday, { name })
+        : tpl(n.expiryInDays, { name, n: step.lead });
+    await schedule(docNotifId(docId, step.lead), n.expiryTitle, body, step.at, "expiry");
   }
 }
 
 export async function cancelDocumentExpiry(docId: string): Promise<void> {
   for (const lead of EXPIRY_LEAD_DAYS) await cancel(docNotifId(docId, lead));
+}
+
+/* ------------------- alarm chup, par parchi tray me zinda ------------------- */
+
+/**
+ * Alarm ki AWAAZ band karo — par notification tray se GAYAB mat karo.
+ *
+ * ⚠️ Ye poora function ek asli bug ki wajah se hai, aur wo bug seedha "dono
+ * cheezein aani chahiye" wali baat par baithta hai. **Tray ki notification aur
+ * full-screen alert do alag cheezein hain, aur dono ka apna kaam hai:**
+ *
+ *   • Full-screen alert us LAMHE ke liye hai — "abhi ye kaam hai".
+ *   • Tray ki notification us lamhe ke BAAD ke liye hai — jeb me pada phone,
+ *     meeting me chup kiya hua alert, ya wo modal jo galti se hat gaya.
+ *
+ * Pehle yahan seedha `cancelNotification()` chalta tha (modal khulte hi), aur
+ * uska maqsad theek tha: reminder `loopSound` + `FLAG_INSISTENT` ke saath bajta
+ * hai, yaani awaaz modal ke PEECHE bajti rehti thi aur user ko padhne ka mauka
+ * hi nahi milta tha.
+ *
+ * Par uski keemat ye thi ki notification bhi uske saath hi mar jaati thi. Modal
+ * ko bina kuch kiye hata do — aur reminder poori tarah gayab. Tray me kuch nahi,
+ * lauta ke dekhne ko kuch nahi. User ke liye wo "app ne yaad hi nahi dilaya"
+ * hai, jabki app ne dilaya tha aur phir khud hi mita diya.
+ *
+ * Ab do kaam alag-alag hote hain: chillane wali notification hatti hai (awaaz
+ * wahin ruk jaati hai), aur usi id par ek CHUP parchi turant wapas baith jaati
+ * hai — wahi title, wahi baat, aur wahi "Ho gaya / Baad me" button. Yaani awaaz
+ * gayi, khabar rahi.
+ *
+ * Fail ho jaye to bhi purani notification hat chuki hoti hai — awaaz to band ho
+ * hi jaati hai. Isliye yahan throw nahi karte; alarm band karna sabse zaroori
+ * hissa hai aur wo pehle ho chuka hota hai.
+ */
+export async function quietenNotification(a: {
+  id: string;
+  title: string;
+  body: string;
+  kind: "reminder" | "expiry";
+}): Promise<void> {
+  // Pehle awaaz — ye kabhi nahi ruk-na chahiye.
+  await cancel(a.id);
+
+  try {
+    const n = await notifDict();
+    await ensureQuietChannel();
+    await notifee.displayNotification({
+      id: a.id,
+      title: a.title,
+      body: a.body,
+      // ⚠️ `quiet` zaroori hai: iske bina ye dobara DELIVERED hone par headless
+      // handler ise ek NAYA reminder samajh ke phir se bol deta.
+      data: { kind: a.kind, body: a.body, title: a.title, id: a.id, quiet: "1" },
+      android: {
+        channelId: QUIET_CHANNEL_ID,
+        importance: AndroidImportance.LOW,
+        pressAction: { id: "default" },
+        // Ab ye chillati nahi, isliye swipe se hatana bilkul theek hai.
+        autoCancel: true,
+        showTimestamp: true,
+        // Button yahan bhi — app khole bina nipatne ka rasta band nahi hona
+        // chahiye sirf isliye ki awaaz chup ho gayi.
+        actions:
+          a.kind === "reminder"
+            ? [
+                { title: n.alertDone, pressAction: { id: ACTION_DONE } },
+                { title: n.alertLater, pressAction: { id: ACTION_LATER } },
+              ]
+            : undefined,
+      },
+    });
+  } catch (e) {
+    reportError(e, { screen: "notifications", action: "quieten", id: a.id }, "warn");
+  }
 }
 
 /* -------------------------------- sync -------------------------------- */

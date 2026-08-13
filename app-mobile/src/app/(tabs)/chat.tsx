@@ -21,7 +21,15 @@ import { useUserName, useAuth } from "@/components/auth-provider";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
-import { askSaathi, ChatTurn, ChatContext, type AiFailure, type SaathiAction } from "@/lib/ai";
+import {
+  askSaathi,
+  ChatTurn,
+  ChatContext,
+  localIso,
+  localNowIso,
+  type AiFailure,
+  type SaathiAction,
+} from "@/lib/ai";
 import { ReminderLimitError } from "@/lib/reminders";
 import { listRemindersWithPending, saveReminder } from "@/lib/reminder-outbox";
 import { listDocuments, type Document } from "@/lib/documents";
@@ -311,7 +319,8 @@ export default function Chat() {
    * hai; bhejte waqt sirf ek hi call jaati hai — AI ki.
    */
   const ctxRef = useRef<{ context: ChatContext; docs: Document[] }>({
-    context: { today: new Date().toISOString(), reminders: [], documents: [] },
+    // Shuruaati khaali context — waqt yahan bhi LOCAL (neeche wajah likhi hai).
+    context: { today: localNowIso(), reminders: [], documents: [] },
     docs: [],
   });
 
@@ -323,11 +332,27 @@ export default function Chat() {
     ctxRef.current = {
       docs,
       context: {
-        today: new Date().toISOString(),
+        /**
+         * ⚠️ Sab kuch LOCAL waqt me — `toISOString()` (UTC) me bilkul nahi.
+         *
+         * Yahi wo galti thi jiski wajah se "chat pichhle reminder ka galat time
+         * batati hai". Prompt me "abhi ka time" to pehle se local jaata tha, par
+         * ye context UTC me jaata tha — ek hi prompt me do timezone. Model us
+         * `Z` wali ginti ko seedha padh ke bol deta tha, aur India me har jawab
+         * theek 5:30 ghante peeche hota tha.
+         *
+         * `remind_at` DB me UTC hai (aur wahi sahi hai), isliye badlaav yahan
+         * hota hai — bhejne ke lamhe par.
+         */
+        today: localNowIso(),
         reminders: rem
           .filter((r) => r.is_on && !r.is_paused)
           .slice(0, 30)
-          .map((r) => ({ title: r.title, when: r.remind_at, on: r.is_on })),
+          .map((r) => ({
+            title: r.title,
+            when: r.remind_at ? localIso(new Date(r.remind_at)) : null,
+            on: r.is_on,
+          })),
         documents: docs.slice(0, 30).map((dd) => ({
           name: dd.name,
           type: dd.type,

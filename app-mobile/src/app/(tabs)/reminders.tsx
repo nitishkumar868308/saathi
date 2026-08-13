@@ -52,6 +52,24 @@ function isToday(iso: string | null): boolean {
   );
 }
 
+/**
+ * Is reminder ka waqt beet chuka hai (aur aaj ka bhi nahi hai)?
+ *
+ * ⚠️ Ye check pehle KAHIN THA HI NAHI, aur wahi shikayat ki jad thi: "Aug 5 ke
+ * reminder 'Aane wale' me dikh rahe hain". Bucket sirf DO the — `isToday` aur
+ * "baaki sab" — isliye har beeta hua reminder definition se hi "aane wala" ban
+ * jaata tha. App user ko saaf-saaf galat baat dikha rahi thi.
+ *
+ * `remind_at` khaali ho to `false`: bina waqt wala reminder beeta hua nahi hai,
+ * wo bas abhi tay nahi hua. Wo "Aane wale" me hi rehta hai.
+ */
+function isMissed(iso: string | null): boolean {
+  if (!iso || isToday(iso)) return false;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return new Date(iso).getTime() < start.getTime();
+}
+
 export default function Reminders() {
   const tc = useColors();
   const styles = useStyles();
@@ -206,10 +224,23 @@ export default function Reminders() {
   //
   // Home tab pehle se hi `remind_at` se hisaab lagata hai (`isToday`). Ab dono
   // screen ek hi sach dikhate hain.
+  /**
+   * Teen khaane, do nahi.
+   *
+   * ⚠️ Pehle sirf `today` aur `upcoming` the, aur `upcoming` ki poori shart
+   * `!isToday(...)` thi — yaani 5 August ka beeta hua reminder bhi "Aane wale"
+   * me baith jaata tha (upar `isMissed` par poori wajah likhi hai).
+   *
+   * "Chhoot gaye" apna alag khaana isliye deta hai, chhupata nahi: wo reminder
+   * abhi bhi chalu hai aur user ne use nipatana hai. List se gayab kar dena use
+   * dobara kabhi na dikhne dena hota.
+   */
+  const missed = items.filter((r) => isMissed(r.remind_at));
   const today = items.filter((r) => isToday(r.remind_at));
-  const upcoming = items.filter((r) => !isToday(r.remind_at));
+  const upcoming = items.filter((r) => !isToday(r.remind_at) && !isMissed(r.remind_at));
 
-  // 7 se zyada hote hi pagination — dono list me (item 21).
+  // 7 se zyada hote hi pagination — har list me (item 21).
+  const mp = usePaged(missed, PAGE_SIZE);
   const tp = usePaged(today, PAGE_SIZE);
   const up = usePaged(upcoming, PAGE_SIZE);
 
@@ -254,6 +285,15 @@ export default function Reminders() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Chhoot gaye — sabse upar, kyunki yahi wo hain jinpe kuch karna
+              baaki hai. Khaali ho to `Section` khud kuch nahi dikhata. */}
+          {missed.length > 0 && (
+            <>
+              <Section title={r0.missed} items={mp.pageItems} {...rowProps} />
+              <Text style={styles.missedHint}>{r0.missedHint}</Text>
+              <Pagination page={mp.page} pageCount={mp.pageCount} onPage={mp.setPage} />
+            </>
+          )}
           <Section title={r0.today} items={tp.pageItems} {...rowProps} />
           <Pagination page={tp.page} pageCount={tp.pageCount} onPage={tp.setPage} />
           <Section title={r0.upcoming} items={up.pageItems} {...rowProps} />
@@ -540,6 +580,14 @@ const useStyles = makeStyles((c) => ({
   headerWrap: { paddingHorizontal: 20, paddingTop: 16, ...CONTENT },
   title: { fontSize: 26, fontWeight: "700", color: c.ink },
   sub: { marginTop: 4, fontSize: 14, color: c.inkSoft },
+  /** "Inka waqt beet chuka hai" — heading ke neeche, halka. */
+  missedHint: {
+    marginTop: -4,
+    marginBottom: 8,
+    paddingHorizontal: 20,
+    fontSize: 12.5,
+    color: c.inkSoft,
+  },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 32 },
   emptyIcon: {
     height: 64,

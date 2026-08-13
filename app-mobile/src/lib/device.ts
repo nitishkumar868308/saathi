@@ -274,6 +274,30 @@ export async function otherDevices(): Promise<{ count: number; devices: OtherDev
   }
 }
 
+/**
+ * "Baaki sab phones se logout" — `devices` table par bhi lagu karo.
+ *
+ * ⚠️ Iske bina wo button poori tarah jhooth bolta tha. `signOutOtherDevices()`
+ * sirf Supabase ke refresh TOKEN revoke karta hai; ginti `my_other_devices()`
+ * se aati hai jo `devices` table padhta hai — aur us table ko token revoke hone
+ * se koi farak nahi padta.
+ *
+ * Natija wahi tha jo user ne pakda: button dabao, "ho gaya" toast bhi aaye, aur
+ * agli login par phir se wahi chetavni. Row 30 din tak padi rehti thi, isliye
+ * chetavni 30 din tak lauttti rehti thi.
+ *
+ * Fail ho to chup — asli logout (token revoke) ho hi chuka hota hai, aur uspar
+ * ye rukna nahi chahiye.
+ */
+export async function releaseOtherDevices(): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase.rpc("release_my_other_devices", { p_id: await getDeviceId() });
+  } catch {
+    /* best-effort — agli baar sync ho jaayega */
+  }
+}
+
 export async function deviceOwner(): Promise<DeviceOwner | null> {
   if (!supabase) return null;
   try {

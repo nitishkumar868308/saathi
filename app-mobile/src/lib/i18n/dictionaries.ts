@@ -70,7 +70,17 @@ export type Dict = {
     alertOk: string;
     alertDid: string;
     alertDone: string;
+    /**
+     * "Abhi nahi" ab ek ASLI kaam karta hai — 5 minute baad dobara bajta hai.
+     *
+     * ⚠️ Pehle ye button sirf dikhta tha. `flushNotificationActions()` me
+     * `if (a.action !== "done") continue;` likha tha, yaani "later" chup-chaap
+     * gir jaata tha: notification hat jaati thi aur reminder poori tarah gayab.
+     * Isliye naam bhi ab wahi kehta hai jo hota hai.
+     */
     alertLater: string;
+    /** Snooze lag gaya — toast. */
+    alertSnoozed: string;
     /**
      * Document expiry follow-up ki default lines (item 18).
      * Net ho to Saathi apne shabd bhejta hai; ye tab chalti hain jab AI na aaye.
@@ -201,6 +211,22 @@ export type Dict = {
     nameRequired: string;
     badEmail: string;
     shortPassword: string;
+    /**
+     * Password 72 se lamba nahi ho sakta.
+     *
+     * ⚠️ Ye rok dikhawa nahi hai. Supabase bcrypt use karta hai, aur bcrypt 72
+     * BYTE ke baad sab kuch CHUP-CHAAP kaat deta hai. Yaani 80 character ka
+     * password banane wala baad me apne pehle 72 character se bhi login kar
+     * pata tha — aur use kabhi pata hi nahi chalta ki uske aakhri 8 character
+     * kabhi gine hi nahi gaye.
+     */
+    longPassword: string;
+    /** Password ki takat — teen darje. */
+    pwWeak: string;
+    pwOk: string;
+    pwStrong: string;
+    /** Kaise majboot karein — bar ke neeche wali salah. */
+    pwHint: string;
     confirmSent: string;
     welcomeNew: string;
     welcomeBackToast: string;
@@ -330,6 +356,65 @@ export type Dict = {
     deleteConfirmTitle: string;
     /** {name} */
     deleteConfirmBody: string;
+    /**
+     * Document par "renew ho gaya, nayi date daal do" wala button.
+     *
+     * ⚠️ Iska naam "Edit" JAAN-BOOJH KE nahi hai. "Edit" ka matlab hota hai "sab
+     * kuch badal sakte ho", aur wahi sabse bada khatra tha: Passport add karke
+     * use Driving Licence bana dena. Ye button sirf EK kaam karta hai — expiry
+     * (aur chaho to photo) badalna — aur uska naam bhi wahi kehna chahiye.
+     */
+    renewUpdate: string;
+    /** Jis document par expiry hai hi nahi — wahan wahi screen, alag naam se. */
+    addExpiry: string;
+  };
+  /**
+   * Document renew — expiry (aur chaho to nayi photo) badalne wali screen.
+   *
+   * Naam aur type yahan kabhi nahi badalte; wo `lib/documents.ts` ke
+   * `updateDocument()` me type-level par hi rok diye gaye hain. Wajah wahan
+   * poori likhi hai.
+   */
+  renewDoc: {
+    title: string;
+    sub: string;
+    /** Naam/type wale locked card ka footer — kyun badal nahi sakte. */
+    lockedNote: string;
+    photoLabel: string;
+    photoKeep: string;
+    photoNew: string;
+    photoUndo: string;
+    newPhoto: string;
+    /** Nayi photo se sirf expiry padhi jaati hai — naam/type nahi. */
+    scanExpiryOnly: string;
+    /**
+     * "Pehle ye tha, ab ye hai" — purana aur naya, saath-saath.
+     *
+     * ⚠️ Ye card is screen ka sabse zaroori hissa hai. Renew me user ek CHEEZ
+     * badal raha hai (date, aur kabhi photo) — par bina saamne dekhe use kabhi
+     * pakka nahi hota ki wo sach me badli ya nahi, aur na hi ye ki purana kya
+     * tha. Expiry wale aur bina-expiry wale, dono documents par dikhta hai.
+     */
+    compareTitle: string;
+    beforeLabel: string;
+    afterLabel: string;
+    /** Nayi photo nahi li — wahi purani chalti rahegi. */
+    samePhoto: string;
+    /** Is document par expiry thi hi nahi (Aadhaar/PAN jaisa). */
+    noExpiryShort: string;
+    /** Document ki koi photo hai hi nahi. */
+    noPhoto: string;
+    expiryLabel: string;
+    /** Expiry poori tarah hata dene ka rasta (galti se lag gayi ho). */
+    clearExpiry: string;
+    save: string;
+    saved: string;
+    savedNoNotif: string;
+    savedExpired: string;
+    savedNoExpiry: string;
+    saveFailed: string;
+    nothingChanged: string;
+    notFound: string;
   };
   addDocument: {
     title: string;
@@ -353,10 +438,48 @@ export type Dict = {
     limitReached: string;
     nameRequired: string;
     badDate: string;
+    /**
+     * Shakl theek hai par wo din hai hi nahi (jaise 29 Feb 2027).
+     *
+     * ⚠️ Ye `badDate` se ALAG hona zaroori hai. Pehle dono par "Date format:
+     * YYYY-MM-DD" dikhta tha — jo is soorat me ulta galat raasta dikhata hai,
+     * kyunki format to bilkul sahi likha gaya tha.
+     *
+     * {m} = mahine ka naam, {y} = saal, {d} = us mahine me kitne din hote hain.
+     */
+    badDateDay: string;
     /** Expiry beet chuki — field ke neeche wali chetavni. */
     expiryPast: string;
     /** Save ho gaya, par expiry beeti hui thi — koi reminder nahi laga. */
     addedExpired: string;
+    /**
+     * Expiry khaali chhodi hai — card ka sar-naam.
+     *
+     * ⚠️ Ye ROK nahi hai aur kabhi nahi honi chahiye: Aadhaar aur PAN ki koi
+     * expiry hoti hi nahi, aur unhe rok dena poore feature ka matlab hi khatam
+     * kar deta. Ye sirf saaf-saaf batata hai ki khaali chhodne par kya NAHI
+     * hoga, taaki user jaan-boojh ke faisla kare.
+     */
+    noExpiryTitle: string;
+    noExpiryBody: string;
+    /** Save ho gaya par expiry nahi thi — is document par koi khabar nahi aayegi. */
+    addedNoExpiry: string;
+    /** Expiry bhari hai — "hum aapko kab-kab yaad dilayenge" wala sar-naam. */
+    notifyPlanTitle: string;
+    /** "{n} din pehle" */
+    notifyPlanLead: string;
+    /** Expiry wale din khud. */
+    notifyPlanOnDay: string;
+    /**
+     * Ye qadam beet chuka hai — is par kuch nahi aayega.
+     *
+     * ⚠️ Beete hue qadam ko chhupa dena aasan tha, par wo jhooth banta: 3 din
+     * baad expire hone wale document par "7 din pehle" kabhi nahi aa sakta, aur
+     * use list se gayab kar dene par user maan leta hai ki teenon lag gaye.
+     */
+    notifyPlanPassed: string;
+    /** Khabar din ke kis waqt aayegi — "subah 9 baje". */
+    notifyPlanAtTime: string;
     saveFailed: string;
     cameraPermission: string;
     ocrExpiryFound: string;
@@ -377,6 +500,16 @@ export type Dict = {
     emptyBody: string;
     today: string;
     upcoming: string;
+    /**
+     * Beet chuke reminder — apna alag khaana.
+     *
+     * ⚠️ Ye pehle THA HI NAHI, aur uski kami seedhi dikhti thi: bucket sirf
+     * do the ("aaj" aur "baaki sab"), isliye 5 August ka beeta hua reminder
+     * "Aane wale" me baith jaata tha. User ke liye wo app ka saaf-saaf jhooth
+     * tha.
+     */
+    missed: string;
+    missedHint: string;
     longPressHint: string;
     pausedTag: string;
     deleteConfirmTitle: string;
@@ -1273,7 +1406,8 @@ const hinglish: Dict = {
     alertOk: "Theek hai, samajh gaya",
     alertDid: "Kya aapne yeh kar liya?",
     alertDone: "Haan, ho gaya",
-    alertLater: "Abhi nahi",
+    alertLater: "5 min baad",
+    alertSnoozed: "Theek hai — 5 minute baad phir yaad dila dunga ⏰",
     docAsk: "Ye kaam ho gaya kya?",
     docDone: "Badhiya! 🎉 Ab is document ke reminder band kar diye.",
     docLater: "Koi baat nahi — main phir yaad dila dunga. 🙂",
@@ -1359,6 +1493,11 @@ const hinglish: Dict = {
     nameRequired: "Apna naam daalo",
     badEmail: "Sahi email daalo",
     shortPassword: "Password kam se kam 6 characters",
+    longPassword: "Password 72 character se zyada nahi ho sakta",
+    pwWeak: "Kamzor",
+    pwOk: "Theek hai",
+    pwStrong: "Majboot",
+    pwHint: "Chhote-bade letter, ek number aur ek symbol milane se password kaafi majboot ho jaata hai",
     confirmSent: "Email pe confirmation link bheja — check karo",
     welcomeNew: "Welcome to Apka Saathi! 🎉",
     welcomeBackToast: "Wapas aa gaye! 🙂",
@@ -1445,6 +1584,37 @@ const hinglish: Dict = {
     deleted: "Document delete ho gaya",
     deleteConfirmTitle: "Delete karein?",
     deleteConfirmBody: "\"{name}\" hata denge?",
+    renewUpdate: "Renew ho gaya? Nayi expiry daalo",
+    addExpiry: "Expiry date add karo",
+  },
+  renewDoc: {
+    title: "Expiry update karo",
+    sub: "Document renew ho gaya ho to bas nayi date daal do — baaki sab waisa hi rahega.",
+    lockedNote:
+      "Naam aur type nahi badalte — ye wahi document rehna chahiye. Sach me koi doosra document hai to use alag se add karo.",
+    photoLabel: "Photo",
+    photoKeep: "Purani photo waisi hi rahegi",
+    photoNew: "Nayi photo lagegi",
+    photoUndo: "Hatao",
+    newPhoto: "Nayi photo",
+    scanExpiryOnly:
+      "Nayi photo lete hi Saathi use khud padh lega aur nayi expiry bhar dega. Na mile to koi baat nahi — bina expiry ke bhi save ho jayega. Naam aur type waise hi rahenge.",
+    compareTitle: "Pehle aur ab",
+    beforeLabel: "Pehle",
+    afterLabel: "Renew ke baad",
+    samePhoto: "wahi photo",
+    noExpiryShort: "Expiry nahi",
+    noPhoto: "Photo nahi",
+    expiryLabel: "Nayi expiry date",
+    clearExpiry: "Expiry hata do",
+    save: "Save karo",
+    saved: "Expiry update ho gayi 🎉",
+    savedNoNotif: "Expiry update ho gayi — notification permission do to yaad dila dunga",
+    savedExpired: "Expiry update ho gayi — par ye date bhi beet chuki hai, reminder nahi lagega",
+    savedNoExpiry: "Expiry hata di — ab is document par koi reminder nahi aayega",
+    saveFailed: "Save nahi ho paya",
+    nothingChanged: "Kuch badla hi nahi",
+    notFound: "Ye document mila nahi",
   },
   addDocument: {
     title: "Document add karo",
@@ -1461,15 +1631,25 @@ const hinglish: Dict = {
     name: "Naam",
     namePlaceholder: "Photo scan karo, ya naam khud daalo",
     expiry: "Expiry date",
-    expiryPlaceholder: "YYYY-MM-DD",
+    expiryPlaceholder: "Tap karke date chuno",
     save: "Save karo",
     added: "Document add ho gaya 🎉",
     addedNoNotif: "Document add ho gaya — notification permission do to expiry yaad dila dunga",
     limitReached: "Free me itne hi documents — unlimited ke liye Saathi Plus dekhein",
     nameRequired: "Naam daalo (ya photo scan karo)",
     badDate: "Date format: YYYY-MM-DD",
+    badDateDay: "Ye taarikh hai hi nahi — {m} {y} me sirf {d} din hote hain",
     expiryPast: "Ye date beet chuki hai — is document ka koi reminder nahi lagega",
     addedExpired: "Document add ho gaya — par expiry beet chuki hai, reminder nahi lagega",
+    noExpiryTitle: "Expiry nahi di",
+    noExpiryBody:
+      "Aadhaar ya PAN jaise documents ki expiry hoti hi nahi — unke liye ye bilkul theek hai. Bas itna jaan lo ki is document par Saathi kabhi yaad nahi dilayega. Expiry ho to upar likh do, baaki aise hi save kar do.",
+    addedNoExpiry: "Document add ho gaya — expiry nahi di, isliye koi reminder nahi aayega",
+    notifyPlanTitle: "Saathi kab yaad dilayega",
+    notifyPlanLead: "{n} din pehle",
+    notifyPlanOnDay: "Expiry wale din",
+    notifyPlanPassed: "ye din beet chuka hai",
+    notifyPlanAtTime: "subah 9 baje",
     saveFailed: "Save nahi ho paya",
     cameraPermission: "Camera permission chahiye",
     ocrExpiryFound: "expiry mil gayi",
@@ -1487,6 +1667,8 @@ const hinglish: Dict = {
     emptyBody: "Neeche + dabake naya reminder banao — bol ke ya type karke.",
     today: "Aaj",
     upcoming: "Aane wale",
+    missed: "Chhoot gaye",
+    missedHint: "Inka waqt beet chuka hai",
     longPressHint: "Delete karne ke liye card ko dabaye rakho",
     pausedTag: "Plus khatam hone pe paused — dekhne ke liye tap karein",
     deleteConfirmTitle: "Delete karein?",
@@ -2127,7 +2309,8 @@ const hi: Dict = {
     alertOk: "ठीक है, समझ गया",
     alertDid: "क्या आपने यह कर लिया?",
     alertDone: "हाँ, हो गया",
-    alertLater: "अभी नहीं",
+    alertLater: "5 मिनट बाद",
+    alertSnoozed: "ठीक है — 5 मिनट बाद फिर याद दिला दूँगा ⏰",
     docAsk: "यह काम हो गया क्या?",
     docDone: "बढ़िया! 🎉 अब इस डॉक्युमेंट के रिमाइंडर बंद कर दिए।",
     docLater: "कोई बात नहीं — मैं फिर याद दिला दूँगा। 🙂",
@@ -2213,6 +2396,11 @@ const hi: Dict = {
     nameRequired: "अपना नाम डालें",
     badEmail: "सही ईमेल डालें",
     shortPassword: "पासवर्ड कम से कम 6 अक्षर का हो",
+    longPassword: "पासवर्ड 72 कैरेक्टर से ज़्यादा नहीं हो सकता",
+    pwWeak: "कमज़ोर",
+    pwOk: "ठीक है",
+    pwStrong: "मज़बूत",
+    pwHint: "छोटे-बड़े लेटर, एक नंबर और एक सिंबल मिलाने से पासवर्ड काफ़ी मज़बूत हो जाता है",
     confirmSent: "ईमेल पर confirmation link भेजा — चेक करें",
     welcomeNew: "आपके साथी में स्वागत है! 🎉",
     welcomeBackToast: "वापस आ गए! 🙂",
@@ -2298,6 +2486,37 @@ const hi: Dict = {
     deleted: "डॉक्युमेंट डिलीट हो गया",
     deleteConfirmTitle: "डिलीट करें?",
     deleteConfirmBody: "\"{name}\" हटा दें?",
+    renewUpdate: "रिन्यू हो गया? नई एक्सपायरी डालें",
+    addExpiry: "एक्सपायरी डेट जोड़ें",
+  },
+  renewDoc: {
+    title: "एक्सपायरी अपडेट करें",
+    sub: "डॉक्युमेंट रिन्यू हो गया हो तो बस नई डेट डाल दें — बाक़ी सब वैसा ही रहेगा।",
+    lockedNote:
+      "नाम और टाइप नहीं बदलते — यह वही डॉक्युमेंट रहना चाहिए। सच में कोई दूसरा डॉक्युमेंट है तो उसे अलग से जोड़ें।",
+    photoLabel: "फ़ोटो",
+    photoKeep: "पुरानी फ़ोटो वैसी ही रहेगी",
+    photoNew: "नई फ़ोटो लगेगी",
+    photoUndo: "हटाएँ",
+    newPhoto: "नई फ़ोटो",
+    scanExpiryOnly:
+      "नई फ़ोटो लेते ही साथी उसे खुद पढ़ लेगा और नई एक्सपायरी भर देगा। न मिले तो कोई बात नहीं — बिना एक्सपायरी के भी सेव हो जाएगा। नाम और टाइप वैसे ही रहेंगे।",
+    compareTitle: "पहले और अब",
+    beforeLabel: "पहले",
+    afterLabel: "रिन्यू के बाद",
+    samePhoto: "वही फ़ोटो",
+    noExpiryShort: "एक्सपायरी नहीं",
+    noPhoto: "फ़ोटो नहीं",
+    expiryLabel: "नई एक्सपायरी डेट",
+    clearExpiry: "एक्सपायरी हटा दें",
+    save: "सेव करें",
+    saved: "एक्सपायरी अपडेट हो गई 🎉",
+    savedNoNotif: "एक्सपायरी अपडेट हो गई — notification permission दें तो याद दिला दूँगा",
+    savedExpired: "एक्सपायरी अपडेट हो गई — पर यह डेट भी बीत चुकी है, रिमाइंडर नहीं लगेगा",
+    savedNoExpiry: "एक्सपायरी हटा दी — अब इस डॉक्युमेंट पर कोई रिमाइंडर नहीं आएगा",
+    saveFailed: "सेव नहीं हो पाया",
+    nothingChanged: "कुछ बदला ही नहीं",
+    notFound: "यह डॉक्युमेंट मिला नहीं",
   },
   addDocument: {
     title: "डॉक्युमेंट जोड़ें",
@@ -2314,15 +2533,25 @@ const hi: Dict = {
     name: "नाम",
     namePlaceholder: "फ़ोटो स्कैन करें, या नाम खुद डालें",
     expiry: "एक्सपायरी डेट",
-    expiryPlaceholder: "YYYY-MM-DD",
+    expiryPlaceholder: "टैप करके डेट चुनें",
     save: "सेव करें",
     added: "डॉक्युमेंट जुड़ गया 🎉",
     addedNoNotif: "डॉक्युमेंट जुड़ गया — notification permission दें तो एक्सपायरी याद दिला दूँगा",
     limitReached: "फ्री में इतने ही डॉक्युमेंट — अनलिमिटेड के लिए साथी प्लस देखें",
     nameRequired: "नाम डालें (या फ़ोटो स्कैन करें)",
     badDate: "डेट फ़ॉर्मैट: YYYY-MM-DD",
+    badDateDay: "यह तारीख़ है ही नहीं — {m} {y} में सिर्फ़ {d} दिन होते हैं",
     expiryPast: "यह डेट बीत चुकी है — इस डॉक्यूमेंट का कोई रिमाइंडर नहीं लगेगा",
     addedExpired: "डॉक्यूमेंट जुड़ गया — पर एक्सपायरी बीत चुकी है, रिमाइंडर नहीं लगेगा",
+    noExpiryTitle: "एक्सपायरी नहीं दी",
+    noExpiryBody:
+      "आधार या PAN जैसे डॉक्यूमेंट की एक्सपायरी होती ही नहीं — उनके लिए यह बिल्कुल ठीक है। बस इतना जान लें कि इस डॉक्यूमेंट पर साथी कभी याद नहीं दिलाएगा। एक्सपायरी हो तो ऊपर लिख दें, वरना ऐसे ही सेव कर दें।",
+    addedNoExpiry: "डॉक्यूमेंट जुड़ गया — एक्सपायरी नहीं दी, इसलिए कोई रिमाइंडर नहीं आएगा",
+    notifyPlanTitle: "साथी कब याद दिलाएगा",
+    notifyPlanLead: "{n} दिन पहले",
+    notifyPlanOnDay: "एक्सपायरी वाले दिन",
+    notifyPlanPassed: "यह दिन बीत चुका है",
+    notifyPlanAtTime: "सुबह 9 बजे",
     saveFailed: "सेव नहीं हो पाया",
     cameraPermission: "कैमरा permission चाहिए",
     ocrExpiryFound: "एक्सपायरी मिल गई",
@@ -2340,6 +2569,8 @@ const hi: Dict = {
     emptyBody: "नीचे + दबाकर नया रिमाइंडर बनाएँ — बोलकर या टाइप करके।",
     today: "आज",
     upcoming: "आने वाले",
+    missed: "छूट गए",
+    missedHint: "इनका समय बीत चुका है",
     longPressHint: "डिलीट करने के लिए कार्ड को दबाए रखें",
     pausedTag: "प्लस खत्म होने पर रुका — देखने के लिए टैप करें",
     deleteConfirmTitle: "डिलीट करें?",
@@ -2962,7 +3193,8 @@ const en: Dict = {
     alertOk: "Okay, got it",
     alertDid: "Did you do this?",
     alertDone: "Yes, done",
-    alertLater: "Not yet",
+    alertLater: "In 5 min",
+    alertSnoozed: "Okay — I'll remind you again in 5 minutes ⏰",
     docAsk: "Is this sorted now?",
     docDone: "Lovely! 🎉 I've switched off the reminders for this document.",
     docLater: "No problem — I'll remind you again. 🙂",
@@ -3048,6 +3280,11 @@ const en: Dict = {
     nameRequired: "Enter your name",
     badEmail: "Enter a valid email",
     shortPassword: "Password must be at least 6 characters",
+    longPassword: "A password can't be longer than 72 characters",
+    pwWeak: "Weak",
+    pwOk: "Okay",
+    pwStrong: "Strong",
+    pwHint: "Mixing upper and lower case, a number and a symbol makes a password much stronger",
     confirmSent: "Sent a confirmation link to your email — please check",
     welcomeNew: "Welcome to Apka Saathi! 🎉",
     welcomeBackToast: "Welcome back! 🙂",
@@ -3132,6 +3369,37 @@ const en: Dict = {
     deleted: "Document deleted",
     deleteConfirmTitle: "Delete?",
     deleteConfirmBody: "Remove \"{name}\"?",
+    renewUpdate: "Renewed? Add the new expiry",
+    addExpiry: "Add an expiry date",
+  },
+  renewDoc: {
+    title: "Update expiry",
+    sub: "If the document has been renewed, just put in the new date — everything else stays as it is.",
+    lockedNote:
+      "The name and type don't change — this has to stay the same document. If it really is a different one, add it separately.",
+    photoLabel: "Photo",
+    photoKeep: "The old photo stays",
+    photoNew: "The new photo will be used",
+    photoUndo: "Remove",
+    newPhoto: "New photo",
+    scanExpiryOnly:
+      "As soon as you add a new photo Saathi reads it and fills in the new expiry. If there isn't one that's fine — it saves without an expiry too. The name and type stay as they are.",
+    compareTitle: "Before and after",
+    beforeLabel: "Before",
+    afterLabel: "After renewal",
+    samePhoto: "same photo",
+    noExpiryShort: "No expiry",
+    noPhoto: "No photo",
+    expiryLabel: "New expiry date",
+    clearExpiry: "Remove the expiry",
+    save: "Save",
+    saved: "Expiry updated 🎉",
+    savedNoNotif: "Expiry updated — allow notifications and I'll remind you",
+    savedExpired: "Expiry updated — but this date has passed too, so no reminder will be set",
+    savedNoExpiry: "Expiry removed — no reminder will come for this document now",
+    saveFailed: "Couldn't save",
+    nothingChanged: "Nothing changed",
+    notFound: "Couldn't find this document",
   },
   addDocument: {
     title: "Add document",
@@ -3148,15 +3416,25 @@ const en: Dict = {
     name: "Name",
     namePlaceholder: "Scan a photo, or type the name",
     expiry: "Expiry date",
-    expiryPlaceholder: "YYYY-MM-DD",
+    expiryPlaceholder: "Tap to pick a date",
     save: "Save",
     added: "Document added 🎉",
     addedNoNotif: "Document added — allow notifications and I'll remind you of the expiry",
     limitReached: "You've reached the Free limit — Saathi Plus for unlimited",
     nameRequired: "Enter a name (or scan a photo)",
     badDate: "Date format: YYYY-MM-DD",
+    badDateDay: "That date doesn't exist — {m} {y} only has {d} days",
     expiryPast: "This date has already passed — no reminder will be set for this document",
     addedExpired: "Document added — but the expiry has passed, so no reminder will be set",
+    noExpiryTitle: "No expiry date",
+    noExpiryBody:
+      "Documents like Aadhaar and PAN never expire — for those this is exactly right. Just know that Saathi will never remind you about this one. If it does have an expiry, add it above; otherwise save it as it is.",
+    addedNoExpiry: "Document added — no expiry date, so no reminder will come",
+    notifyPlanTitle: "When Saathi will remind you",
+    notifyPlanLead: "{n} days before",
+    notifyPlanOnDay: "On the expiry day",
+    notifyPlanPassed: "this day has already passed",
+    notifyPlanAtTime: "at 9 in the morning",
     saveFailed: "Couldn't save",
     cameraPermission: "Camera permission needed",
     ocrExpiryFound: "found the expiry",
@@ -3174,6 +3452,8 @@ const en: Dict = {
     emptyBody: "Tap + below to create one — by voice or typing.",
     today: "Today",
     upcoming: "Upcoming",
+    missed: "Missed",
+    missedHint: "These are already past their time",
     longPressHint: "Press and hold a card to delete",
     pausedTag: "Paused after Plus ended — tap to view",
     deleteConfirmTitle: "Delete?",

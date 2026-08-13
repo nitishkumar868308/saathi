@@ -53,11 +53,105 @@ export function dateAfterMonths(months: number, from: Date = new Date()): string
   return `${y}-${m}-${day}`;
 }
 
-/** 'YYYY-MM-DD' valid hai ya nahi (simple check). */
+/**
+ * 'YYYY-MM-DD' — shakl bhi sahi ho AUR wo din sach me maujood bhi ho.
+ *
+ * ⚠️ Yahan pehle sirf `new Date(s)` ka `isNaN` check tha, aur wo ek asli bug
+ * tha jise user ne theek pakda: `2027-02-29` par "Couldn't save" aata tha, bina
+ * koi wajah bataye.
+ *
+ * Wajah ye hai ki JavaScript din ke OVERFLOW ko chup-chaap aage sarka deta hai:
+ *
+ *     new Date("2027-02-29")  →  Mon Mar 01 2027   (Invalid Date NAHI)
+ *     new Date("2027-04-31")  →  Sat May 01 2027
+ *     new Date("2027-13-01")  →  Invalid Date      (mahina galat ho tabhi pakda)
+ *
+ * Yaani 29 Feb 2027 poora client paar kar jaata tha, aur Postgres ka `date`
+ * column use reject karta tha — jahan hamare paas sirf ek generic "save nahi
+ * hua" bacha tha. User ke liye wo bilkul bebuniyad error tha: usne to sahi
+ * format me hi likha tha.
+ *
+ * Aur ye sirf ek screen ki baat nahi thi. Yahi function AI ke padhe hue documents
+ * ki expiry bhi chhaanta hai — yaani AI kabhi 29 Feb padh leta to wo chup-chaap
+ * 1 March ban ke DB me baith jaata, aur reminder galat din bajta. Aisi galti
+ * pakadna lagbhag namumkin hota hai.
+ *
+ * Round-trip check hi ek bharosemand tareeka hai: date banao, aur phir poochho
+ * ki usme wahi teen ank bache hain kya. Sarak gaya ho to nahi bachenge.
+ */
 export function isValidDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(s);
-  return !isNaN(d.getTime());
+  const [y, m, d] = s.split("-").map(Number);
+  // Local midnight — poori file isi hisaab par chalti hai (upar `daysUntil`).
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+/**
+ * Shakl to theek hai, par wo din us mahine me hai hi nahi (jaise `2027-02-29`).
+ *
+ * ⚠️ Ye `isValidDate` se ALAG isliye hai kyunki dono galtiyan user ke liye
+ * bilkul alag hain, aur dono ko ek hi "Date format: YYYY-MM-DD" dikhana ulta
+ * galat raasta dikhata hai — format to bilkul sahi tha. Isse screen ye keh
+ * paati hai ki "Feb 2027 me sirf 28 din hain", jo aadmi seedha samajh leta hai.
+ */
+export function isImpossibleDay(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isValidDate(s);
+}
+
+/**
+ * Document expiry ka teen-qadam ladder: 7 din pehle, 1 din pehle, aur us din.
+ *
+ * ⚠️ Ye pehle `lib/notifications.ts` ke andar band tha, aur isi wajah se add
+ * wali screen user ko ye kabhi bata nahi paati thi ki khabar kab-kab aayegi.
+ * Ab ye yahan (bina kisi native module ke) rehta hai, aur `notifications.ts`
+ * isi ko import karta hai — do jagah do ladder ho hi nahi sakte.
+ *
+ * ⚠️ Web ka cron (`web/app/api/cron/document-expiry/route.ts`) bhi ISI ladder
+ * par email + WhatsApp bhejta hai. Ek jagah badla aur doosri jagah nahi, to
+ * notification aaj aayegi aur email kisi aur din — sabse bura tajurba.
+ */
+export const EXPIRY_LEAD_DAYS = [7, 1, 0] as const;
+
+/** Expiry ki khabar din ke kis waqt aati hai. */
+export const NOTIFY_HOUR = 9;
+
+/** Ek qadam — kab, kitne din pehle, aur kya wo abhi bhi aane wala hai. */
+export type ExpiryNotifyStep = {
+  /** Expiry se kitne din pehle. 0 = expiry wale din khud. */
+  lead: number;
+  /** Theek kis lamhe khabar aayegi. */
+  at: Date;
+  /**
+   * Ye qadam ab bhi aane wala hai?
+   *
+   * ⚠️ `false` bhi dikhana zaroori hai, chhupana nahi. 3 din baad expire hone
+   * wale document par "7 din pehle" wala qadam beet chuka hai — wo kabhi nahi
+   * aayega. Use chup-chaap gira dena user ko ye bhram deta hai ki app ne teenon
+   * laga diye hain.
+   */
+  willFire: boolean;
+};
+
+/**
+ * Is expiry par khabar kab-kab aayegi — user ko dikhane ke liye.
+ *
+ * Hisaab bilkul wahi hai jo `scheduleDocumentExpiry()` karta hai (local
+ * midnight + {@link NOTIFY_HOUR}), aur `willFire` bhi wahi shart hai jo
+ * `schedule()` lagata hai (beeta hua waqt par kuch nahi lagta). Isliye screen
+ * par jo likha hai, phone par theek wahi hota hai.
+ */
+export function expiryNotifyPlan(
+  expiry: string,
+  now: Date = new Date(),
+): ExpiryNotifyStep[] {
+  if (!isValidDate(expiry)) return [];
+  const [y, m, d] = expiry.split("-").map(Number);
+  return EXPIRY_LEAD_DAYS.map((lead) => {
+    const at = new Date(y, m - 1, d, NOTIFY_HOUR, 0, 0, 0);
+    at.setDate(at.getDate() - lead);
+    return { lead, at, willFire: at.getTime() > now.getTime() };
+  });
 }
 
 /**

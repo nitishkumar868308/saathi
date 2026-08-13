@@ -126,14 +126,53 @@ export async function signOutOtherDevices() {
   if (error) throw error;
 }
 
-function getParams(url: string): Record<string, string> {
+/**
+ * Deep-link se auth ke tokens nikaalo — `?query` AUR `#fragment`, DONO se.
+ *
+ * ⚠️ Ye `export` hai aur dono jagah padhta hai, aur wahi is app ka sabse chupa
+ * hua bug theek karta hai: **"Forgot password" ka email link kuch nahi karta
+ * tha.**
+ *
+ * Wajah ye thi ki Supabase ka client default `flowType: "implicit"` par chalta
+ * hai (dekho `lib/supabase.ts`), aur us flow me recovery link tokens **hash
+ * fragment** me bhejta hai:
+ *
+ *     saathi://auth#access_token=…&refresh_token=…&type=recovery
+ *
+ * `app/auth.tsx` un tokens ko `useLocalSearchParams()` se padh raha tha — aur wo
+ * sirf QUERY STRING padhta hai, fragment ko poori tarah gira deta hai. Yaani
+ * link par tap karne se app to khulti thi, par uske paas kuch hota hi nahi tha:
+ * session nahi banta tha, `type=recovery` dikhta hi nahi tha, aur screen chup-chaap
+ * home par chali jaati thi. User ke liye link "kaam hi nahi karta".
+ *
+ * Google login isi bug se bacha hua tha kyunki wo `openAuthSessionAsync` ka
+ * lautaya hua URL isi function se padhta hai — yaani fragment wala raasta yahan
+ * pehle se sahi tha, bas recovery link us raaste se aata hi nahi.
+ *
+ * ⚠️ Yahan PKCE par switch karna aasan lagta hai (tab sab kuch `?code=` me aata
+ * aur query hi kaafi hoti), par wo galat hoga: PKCE ka code_verifier USI phone
+ * par bana hota hai jisne reset maanga tha. Log email aksar doosre device par
+ * kholte hain, aur wahan PKCE poori tarah fail ho jaata. Implicit har jagah
+ * chalta hai — isliye flow wahi rehta hai aur padhna theek kiya gaya hai.
+ */
+export function getParams(url: string): Record<string, string> {
   const out: Record<string, string> = {};
-  const q = url.includes("#") ? url.split("#")[1] : url.split("?")[1];
-  if (!q) return out;
-  for (const pair of q.split("&")) {
-    const [k, v] = pair.split("=");
-    if (k) out[decodeURIComponent(k)] = decodeURIComponent(v ?? "");
-  }
+  const read = (chunk?: string) => {
+    if (!chunk) return;
+    for (const pair of chunk.split("&")) {
+      const [k, v] = pair.split("=");
+      if (k) out[decodeURIComponent(k)] = decodeURIComponent(v ?? "");
+    }
+  };
+  // Fragment PEHLE nahi — query pehle, taaki fragment (jo Supabase bharta hai)
+  // uske upar baithe. Dono me ek hi naam aa jaye to naya wala hi sach hai.
+  const hashAt = url.indexOf("#");
+  const qAt = url.indexOf("?");
+  const queryPart =
+    qAt >= 0 ? url.slice(qAt + 1, hashAt > qAt ? hashAt : undefined) : undefined;
+  const hashPart = hashAt >= 0 ? url.slice(hashAt + 1) : undefined;
+  read(queryPart);
+  read(hashPart);
   return out;
 }
 

@@ -56,6 +56,18 @@ function OwnerPoint({
   );
 }
 
+/** Password ki hadd. */
+const MIN_PASSWORD = 6;
+/**
+ * ⚠️ 72 ki hadd Supabase/bcrypt ki hai, hamari pasand nahi.
+ *
+ * bcrypt 72 BYTE ke baad sab kuch chup-chaap kaat deta hai. Pehle yahan koi rok
+ * hi nahi thi, aur uska natija ye tha ki 80 character ka password banane wala
+ * baad me apne pehle 72 character se bhi login kar jaata — bina kisi ko pata
+ * chale ki aakhri 8 kabhi gine hi nahi gaye.
+ */
+const MAX_PASSWORD = 72;
+
 /** apkasaathi.com/r/CODE ya koi bhi ?ref=CODE se code nikalta hai. */
 function referralFromUrl(url: string | null): string | null {
   if (!url) return null;
@@ -68,6 +80,32 @@ function referralFromUrl(url: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+/** Password ki takat: 0 = kamzor, 1 = theek, 2 = majboot. */
+function passwordScore(pw: string): 0 | 1 | 2 {
+  if (pw.length < MIN_PASSWORD) return 0;
+  /**
+   * Ginti "kitni tarah ke character hain" par hai, kisi lambi rule-list par
+   * nahi — aur ye soch samajh ke hai.
+   *
+   * Ye app bujurg logon ke liye bani hai. "Ek capital, ek number aur ek symbol
+   * ZAROORI hai" jaisi rok wahan sabse ulta asar deti hai: log haar ke
+   * "Password@123" jaisa kuch likh dete hain, jo yaad bhi nahi rehta aur
+   * majboot bhi nahi hota. Isliye yahan ROK nahi hai — sirf ek imaandaar
+   * naap, aur ek line jo batati hai ki behtar kaise karein.
+   */
+  const kinds =
+    (/[a-z]/.test(pw) ? 1 : 0) +
+    (/[A-Z]/.test(pw) ? 1 : 0) +
+    (/[0-9]/.test(pw) ? 1 : 0) +
+    (/[^A-Za-z0-9]/.test(pw) ? 1 : 0);
+  // Lambai apne aap me sabse badi takat hai — 14+ ka passphrase har "Abc@1" se
+  // behtar hai, chahe usme ek hi tarah ke character hon.
+  if (pw.length >= 14 && kinds >= 2) return 2;
+  if (kinds >= 3 && pw.length >= 10) return 2;
+  if (kinds >= 2 && pw.length >= 8) return 1;
+  return 0;
 }
 
 export default function Login() {
@@ -96,6 +134,7 @@ export default function Login() {
   const [refCode, setRefCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const pwScore = passwordScore(password);
 
   useEffect(() => {
     let alive = true;
@@ -128,8 +167,11 @@ export default function Login() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return toast.show(l.badEmail, "info");
     }
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD) {
       return toast.show(l.shortPassword, "info");
+    }
+    if (password.length > MAX_PASSWORD) {
+      return toast.show(l.longPassword, "info");
     }
     try {
       setLoading(true);
@@ -305,6 +347,18 @@ export default function Login() {
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              /**
+               * ⚠️ Signup par `new-password` — `current-password` nahi.
+               *
+               * Iske bina Android ka autofill naye account ke form me bhi purana
+               * SAVED password thop deta tha. User ne kuch bhara nahi hota tha
+               * aur khaana bhara hua milta tha — theek wahi "apne aap bhar
+               * jaata hai" wala shak.
+               */
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              textContentType={mode === "signup" ? "newPassword" : "password"}
+              // Hadd bcrypt ki hai (upar `MAX_PASSWORD` par poori wajah likhi hai).
+              maxLength={MAX_PASSWORD}
               style={[styles.input, styles.passInput]}
             />
             <Pressable
@@ -321,6 +375,49 @@ export default function Login() {
               />
             </Pressable>
           </View>
+
+          {/**
+           * Password kitna majboot hai — sirf SIGNUP par.
+           *
+           * ⚠️ Ye ek ROK nahi hai, aur wo jaan-boojh ke hai. Ye app bujurg logon
+           * ke liye bani hai; "ek capital, ek number aur ek symbol ZAROORI hai"
+           * jaisi shart wahan ulta asar deti hai — log haar ke "Password@123"
+           * likh dete hain, jo na yaad rehta hai na majboot hota hai.
+           *
+           * Isliye sirf ek imaandaar naap aur ek line jo raasta batati hai.
+           * Login par nahi dikhata: wahan password pehle se bana hua hai, aur
+           * uspar ab "kamzor" likhna sirf chidhana hai — user kuch kar bhi nahi
+           * sakta.
+           */}
+          {mode === "signup" && password.length > 0 && (
+            <View style={styles.pwWrap}>
+              <View style={styles.pwBar}>
+                {[0, 1, 2].map((i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.pwSeg,
+                      i <= pwScore && {
+                        backgroundColor:
+                          pwScore === 0 ? tc.danger : pwScore === 1 ? tc.amber : tc.sage,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text
+                style={[
+                  styles.pwLabel,
+                  { color: pwScore === 0 ? tc.danger : pwScore === 1 ? tc.amber : tc.sage },
+                ]}
+              >
+                {pwScore === 0 ? l.pwWeak : pwScore === 1 ? l.pwOk : l.pwStrong}
+              </Text>
+            </View>
+          )}
+          {mode === "signup" && password.length > 0 && pwScore < 2 && (
+            <Text style={styles.pwHint}>{l.pwHint}</Text>
+          )}
 
           {/**
            * "Password bhool gaye?" — sirf login par.
@@ -395,7 +492,25 @@ export default function Login() {
 
           {/* toggle */}
           <Pressable
-            onPress={() => setMode(mode === "login" ? "signup" : "login")}
+            onPress={() => {
+              /**
+               * ⚠️ Mode badalte hi khaane SAAF — aur ye seedhi shikayat ka jawab
+               * hai ("nayi registration me login details apne aap bhar jaate
+               * hain, trust issue lagta hai").
+               *
+               * Pehle `setMode` sirf mode badalta tha aur `email`/`password`
+               * waise ke waise pade rehte the. Yaani login form bhar ke "Naya
+               * account banao" dabao — aur naye account ke form me kisi AUR ka
+               * (ya apna purana) email-password bhara mile. User ke liye wo app
+               * ka apne aap kuch bhar dena hai, aur wahi sabse zyada shak
+               * paida karta hai.
+               */
+              setMode(mode === "login" ? "signup" : "login");
+              setEmail("");
+              setPassword("");
+              setName("");
+              setShowPassword(false);
+            }}
             style={styles.toggle}
           >
             <Text style={styles.toggleText}>
@@ -558,6 +673,12 @@ const useStyles = makeStyles((c) => ({
     color: c.ink,
     fontSize: 15,
   },
+  pwWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
+  pwBar: { flexDirection: "row", gap: 4, flex: 1 },
+  pwSeg: { flex: 1, height: 4, borderRadius: 2, backgroundColor: c.line },
+  pwLabel: { fontSize: 12, fontWeight: "800", minWidth: 62, textAlign: "right" },
+  pwHint: { marginTop: 7, fontSize: 12, lineHeight: 17, color: c.inkSoft },
+
   passWrap: { position: "relative", justifyContent: "center" },
   // Text aankh ke neeche na chala jaaye.
   passInput: { paddingRight: 52 },

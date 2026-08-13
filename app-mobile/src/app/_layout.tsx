@@ -385,6 +385,11 @@ function RootNavigator() {
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="new-password" />
       <Stack.Screen name="add-document" options={{ presentation: "modal" }} />
+      {/* Renew — expiry (aur chaho to photo) badalna. Modal isliye ki ye ek
+          "abhi ka" chhota kaam hai; document wapas usi jagah khula milta hai
+          jahan se user aaya tha. Naam/type yahan badal hi nahi sakte — wajah
+          `document-renew.tsx` ke upar poori likhi hai. */}
+      <Stack.Screen name="document-renew" options={{ presentation: "modal" }} />
       <Stack.Screen name="add-reminder" options={{ presentation: "modal" }} />
       <Stack.Screen name="notes" />
       <Stack.Screen name="app-lock" />

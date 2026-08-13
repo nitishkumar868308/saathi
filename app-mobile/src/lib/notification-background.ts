@@ -3,6 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import notifee, { EventType, type Notification } from "@notifee/react-native";
 
 import { alertUser, stopAlert } from "./alert-mode";
+/**
+ * ⚠️ Sirf `notify-core` — `notifications.ts` yahan KABHI import mat karna.
+ *
+ * Ye file ek headless task me chalti hai (upar poori wajah likhi hai), aur
+ * `notifications.ts` apne saath supabase, reminders aur documents ka poora stack
+ * le aati hai. `notify-core` me sirf notifee hai, isliye wo yahan surakshit hai —
+ * aur usi ki wajah se snooze app band hone par bhi lag jaata hai.
+ */
+import { ACTION_DONE, ACTION_LATER, snoozeNotification } from "./notify-core";
+
+export { ACTION_DONE, ACTION_LATER };
 
 /**
  * Notifee ka background/headless event handler — app ke BAAHAR wala hissa.
@@ -54,10 +65,6 @@ const PENDING_ACTIONS_KEY = "saathi-notif-actions";
 /** Itni purani notification ka modal ab dikhana bhadda lagta hai. */
 const PENDING_ALERT_MAX_AGE_MS = 30 * 60_000;
 
-/** Notification ke do button — id dono taraf ek jaisi honi chahiye. */
-export const ACTION_DONE = "reminder-done";
-export const ACTION_LATER = "reminder-later";
-
 export type PendingAction = {
   /** Notification id — repeat wale reminder me `<uuid>#3` bhi ho sakta hai. */
   id: string;
@@ -73,11 +80,38 @@ export type PendingAction = {
  * hi wo do cheezein hain jinke liye user ne khud kaha tha ki "yaad dilana".
  */
 function shouldSpeak(n: Notification): boolean {
-  const kind = (n.data as { kind?: string } | undefined)?.kind;
+  const data = n.data as { kind?: string; quiet?: string } | undefined;
+  /**
+   * ⚠️ Chup parchi par kabhi nahi bolna.
+   *
+   * Full-screen alert khulte hi `quietenNotification()` chillane wali
+   * notification hata ke usi id par ek chup copy baitha deta hai (taaki awaaz to
+   * ruke par khabar tray me bani rahe). Wo copy bhi ek DELIVERED event bhejti
+   * hai — aur bina is shart ke Saathi wahi reminder DOBARA bol deta, theek modal
+   * khulne ke lamhe par.
+   */
+  if (data?.quiet) return false;
+  const kind = data?.kind;
   return kind === "reminder" || kind === "expiry";
 }
 
-/** Button ka kaam kataar me daal do — app khulte hi server tak jayega. */
+/**
+ * Button ka kaam kataar me daal do — app khulte hi server tak jayega.
+ *
+ * ⚠️ Ye ab `export` hai, aur uski ek asli wajah hai. `onBackgroundEvent` sirf
+ * tab chalta hai jab app SAAMNE NA HO. Yaani app khuli ho aur user notification
+ * shade neeche kheench ke "Ho gaya" dabaye, to ye handler chalta hi nahi aur
+ * button bilkul bekaar ho jaata hai. Foreground wala listener
+ * (`reminder-alert.tsx`) ab isi function se wahi kataar bharta hai, taaki dono
+ * raaste ek hi jagah pahunchein.
+ */
+export async function queueNotificationAction(
+  id: string,
+  action: "done" | "later",
+): Promise<void> {
+  return queueAction(id, action);
+}
+
 async function queueAction(id: string, action: "done" | "later"): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(PENDING_ACTIONS_KEY);
@@ -120,7 +154,36 @@ if (Platform.OS !== "web") {
       if (pressId === ACTION_DONE || pressId === ACTION_LATER) {
         stopAlert();
         if (n?.id) {
-          await queueAction(n.id, pressId === ACTION_DONE ? "done" : "later");
+          /**
+           * ⚠️ "5 min baad" ka alarm YAHIN, ISI LAMHE lag jaata hai — kataar ke
+           * bharose nahi.
+           *
+           * Ye us bug ka asli hissa hai jo sabse aam soorat me dikhta tha. Pehle
+           * yahan sirf `queueAction(id, "later")` chalta tha, aur asli snooze
+           * `flushNotificationActions()` lagata tha — jo TABHI chalta hai jab
+           * user APP KHOLE. Yaani lock screen se "abhi nahi" dabao, phone jeb me
+           * rakho, aur 5 minute to kya, kabhi kuch nahi bajta. Snooze sirf tab
+           * lagta jab user khud app kholta — aur tab tak use yaad dilane ki
+           * zaroorat hi nahi bachti.
+           *
+           * `snoozeNotification` poori tarah self-contained hai (na network, na
+           * DB) aur alarm `AlarmManager` par baithta hai, jo OS ke paas hai.
+           * Iske baad app band ho jaye, phone band ho jaye, ya user recents se
+           * app hata de — alarm phir bhi bajta hai.
+           *
+           * Kataar phir bhi bharte hain, par ab uska kaam sirf itna hai ki
+           * SERVER ko baad me pata chale (Plus wale ka email/WhatsApp usi par
+           * chalta hai). Alarm uska intezaar nahi karta.
+           */
+          if (pressId === ACTION_LATER) {
+            await snoozeNotification(n).catch(() => {});
+            // ⚠️ Kataar me kuch NAHI daalte. "Later" ka server par koi matlab hai
+            // hi nahi (wahan sirf "done" kaam karta hai), aur daal dene par app
+            // khulne par `flushNotificationActions` DOBARA snooze laga deta —
+            // yaani alarm 5 minute aur aage sarak jaata, har baar app kholne par.
+          } else {
+            await queueAction(n.id, "done");
+          }
           await notifee.cancelNotification(n.id).catch(() => {});
         }
       }

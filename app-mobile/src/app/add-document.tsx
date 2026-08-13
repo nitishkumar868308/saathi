@@ -24,13 +24,46 @@ import { scanDocumentAI } from "@/lib/ai";
 import { withoutLock } from "@/lib/app-lock";
 import { logEvent } from "@/lib/analytics";
 import { markFirstDocument } from "@/lib/reviews";
-import { isPastDate, isValidDate } from "@/utils/expiry";
+import {
+  expiryNotifyPlan,
+  isImpossibleDay,
+  isPastDate,
+  isValidDate,
+  type ExpiryNotifyStep,
+} from "@/utils/expiry";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
 import { PermissionModal } from "@/components/permission-modal";
 import { shouldShowReliabilityPrompt } from "@/lib/reliability";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
+import { DateField } from "@/components/date-field";
+import { daysInMonth, formatDate, monthName, toIsoDate } from "@/utils/date-format";
+
+/**
+ * "2027-02-29" par asli wajah ke tukde — format nahi, DIN.
+ *
+ * ⚠️ Ye is screen ki sabse chhupi hui galti thi. Aisi date poore client se nikal
+ * jaati thi (JavaScript din ke overflow ko chup-chaap 1 March bana deta hai) aur
+ * Postgres ke `date` column par jaake girti thi — jahan hamare paas sirf ek
+ * bebuniyad "Save nahi ho paya" bacha tha. User ne sahi format hi likha tha,
+ * isliye wo error uske liye bilkul bekaar tha.
+ *
+ * `null` = mahina hi galat hai (jaise `2027-13-01`). Wo sach me format ki baat
+ * hai, isliye wahan purana `badDate` hi theek message hai.
+ */
+function impossibleDayParts(
+  s: string,
+  appLocale: string,
+): { m: string; y: string; d: string } | null {
+  const [y, m] = s.split("-").map(Number);
+  if (!y || !m || m < 1 || m > 12) return null;
+  return {
+    m: monthName(y, m, appLocale),
+    y: String(y),
+    d: String(daysInMonth(y, m)),
+  };
+}
 
 async function persistImage(cacheUri: string): Promise<string> {
   const dir = FileSystem.documentDirectory + "documents/";
@@ -71,8 +104,25 @@ export default function AddDocument() {
    * baat hai, minute ki nahi. Ise sirf aadhi raat wali soorat sambhalni hai.
    */
   const [expiryPast, setExpiryPast] = useState(false);
+  /**
+   * Is expiry par khabar kab-kab aayegi — user ko SAVE se pehle dikhane ke liye.
+   *
+   * ⚠️ Ye poori screen ka sabse bada khaali hissa tha. Document daalne ka maqsad
+   * hi ye hai ki "waqt par bata dena", par app kabhi ye batati nahi thi ki
+   * "waqt par" ka matlab kya hai. User ko na ye pata chalta tha ki khabar 7 din
+   * pehle aayegi, na ye ki subah 9 baje, aur na hi ye ki 3 din baad expire hone
+   * wale document par "7 din pehle" wala qadam beet hi chuka hai.
+   *
+   * Ginti `expiryNotifyPlan()` karta hai — wahi function jise
+   * `scheduleDocumentExpiry()` bhi use karta hai. Isliye jo yahan likha hai,
+   * phone par theek wahi hota hai.
+   */
+  const [plan, setPlan] = useState<ExpiryNotifyStep[]>([]);
   useEffect(() => {
-    const check = () => setExpiryPast(isPastDate(expiry));
+    const check = () => {
+      setExpiryPast(isPastDate(expiry));
+      setPlan(isValidDate(expiry) ? expiryNotifyPlan(expiry) : []);
+    };
     check();
     const id = setInterval(check, 60_000);
     return () => clearInterval(id);
@@ -211,8 +261,18 @@ export default function AddDocument() {
   async function save() {
     if (saving) return;
     if (!name.trim()) return toast.show(d.nameRequired, "info");
-    if (expiry && !isValidDate(expiry)) {
-      return toast.show(d.badDate, "error");
+    /**
+     * ⚠️ Do bilkul alag galtiyan, do alag jawab.
+     *
+     * Pehle dono par "Date format: YYYY-MM-DD" dikhta tha, aur `2027-02-29`
+     * wali soorat me wo to yahan tak pahunchti bhi nahi thi — wo chup-chaap paar
+     * ho jaati thi aur server par jaake "Save nahi ho paya" banti thi. Ab wajah
+     * theek wahi batayi jaati hai jo hai.
+     */
+    if (expiry.trim()) {
+      const parts = isImpossibleDay(expiry) ? impossibleDayParts(expiry, locale) : null;
+      if (parts) return toast.show(tpl(d.badDateDay, parts), "error");
+      if (!isValidDate(expiry)) return toast.show(d.badDate, "error");
     }
     try {
       setSaving(true);
@@ -263,11 +323,27 @@ export default function AddDocument() {
       checkReferralQualification().catch(() => {});
       // Review popup ka padav — document + reminder dono ho jaayein to poochho.
       markFirstDocument().catch(() => {});
-      // Beeti hui expiry wali baat sabse upar — user ne form par chetavni dekhi
-      // thi, aur "add ho gaya 🎉" uske theek ulta paigham deta hai.
+      /**
+       * Toast wahi kahe jo sach me hua.
+       *
+       * ⚠️ `addedNoExpiry` yahan naya hai, aur wo ek chup-chaap jhooth ko band
+       * karta hai. Bina expiry wale document par `scheduleDocumentExpiry()` kuch
+       * lagata hi nahi — par toast phir bhi "Document add ho gaya 🎉" kehta tha,
+       * aur user maan leta tha ki ab Saathi khayal rakhega. Aadhaar/PAN par
+       * expiry na hona bilkul theek hai; use "sab set hai" bata dena theek nahi.
+       *
+       * Rok yahan bhi nahi hai — sirf saaf baat.
+       */
+      const noExpiry = !doc.expiry;
       toast.show(
-        expired ? d.addedExpired : notifOk ? d.added : d.addedNoNotif,
-        expired || !notifOk ? "info" : "success",
+        noExpiry
+          ? d.addedNoExpiry
+          : expired
+            ? d.addedExpired
+            : notifOk
+              ? d.added
+              : d.addedNoNotif,
+        noExpiry || expired || !notifOk ? "info" : "success",
       );
 
       /**
@@ -384,19 +460,25 @@ export default function AddDocument() {
             style={[styles.input, scanned && name ? styles.inputFilled : null]}
           />
 
-          {/* Expiry (editable) */}
+          {/**
+           * Expiry — ab TYPE nahi hoti, CHUNI jaati hai.
+           *
+           * ⚠️ Yahan pehle ek `TextInput` tha jiska placeholder `YYYY-MM-DD`
+           * tha. Wo shakl sirf computer ki hai: India me log 15/08/2029 likhte
+           * hain, America me 08/15/2029, Europe me 15.08.2029 — aur ye app sirf
+           * India ke liye nahi hai. Us khaane me "03/11" ka matlab kabhi 3
+           * November hota tha aur kabhi 11 March, bina kisi ko pata chale.
+           *
+           * Picker se wo poora sawaal hi khatam ho jaata hai: user apne phone ki
+           * apni shakl me date chunta hai, aur app andar-andar ISO rakhti hai.
+           * 29 Feb jaisa namumkin din picker me maujood hi nahi hota.
+           */}
           <Text style={styles.label}>{d.expiry}</Text>
-          <TextInput
+          <DateField
             value={expiry}
-            onChangeText={setExpiry}
+            onChange={setExpiry}
             placeholder={d.expiryPlaceholder}
-            placeholderTextColor={tc.inkSoft}
-            style={[
-              styles.input,
-              scanned && expiry ? styles.inputFilled : null,
-              expiryPast ? styles.inputPast : null,
-            ]}
-            keyboardType="numbers-and-punctuation"
+            invalid={expiryPast}
           />
           {/**
            * Beeti hui expiry — chetavni yahin, turant.
@@ -413,10 +495,68 @@ export default function AddDocument() {
            * Yahan dikhane ka ek aur faayda: 2025 vs 2026 jaisa typo user ko
            * Save dabane se PEHLE hi dikh jaata hai.
            */}
-          {expiryPast ? (
+          {/**
+           * Expiry ke chaar haal — aur chaaron ka apna saaf jawab.
+           *
+           * ⚠️ Pehle yahan sirf EK haal ka jawab tha (beeti hui date). Baaki
+           * teen chup the, aur unki chuppi hi asli shikayat thi:
+           *
+           *   • Khaali expiry — "Aadhaar/PAN add ho gaya 🎉" dikhta tha aur user
+           *     maan leta tha ki ab Saathi khayal rakhega. Kuch lagta hi nahi
+           *     tha. (Rok yahan bilkul nahi lagayi — Aadhaar/PAN ki expiry hoti
+           *     hi nahi, unhe rokna poora feature maar dena hai. Sirf saaf baat.)
+           *   • Namumkin din (29 Feb 2027) — Save dabane par bebuniyad "Save
+           *     nahi ho paya". Ab wajah yahin, likhte hi.
+           *   • Sahi aur aane wali date — app kabhi nahi batati thi ki khabar
+           *     kab-kab aayegi. Ab teenon qadam saamne hain.
+           */}
+          {!expiry.trim() ? (
+            <View style={styles.noteCard}>
+              <View style={styles.noteHead}>
+                <Ionicons name="information-circle" size={15} color={tc.inkSoft} />
+                <Text style={styles.noteHeadText}>{d.noExpiryTitle}</Text>
+              </View>
+              <Text style={styles.noteBody}>{d.noExpiryBody}</Text>
+            </View>
+          ) : isImpossibleDay(expiry) ? (
+            <View style={styles.pastWarn}>
+              <Ionicons name="alert-circle" size={15} color={tc.danger} />
+              <Text style={styles.pastWarnText}>
+                {impossibleDayParts(expiry, locale)
+                  ? tpl(d.badDateDay, impossibleDayParts(expiry, locale)!)
+                  : d.badDate}
+              </Text>
+            </View>
+          ) : expiryPast ? (
             <View style={styles.pastWarn}>
               <Ionicons name="alert-circle" size={15} color={tc.danger} />
               <Text style={styles.pastWarnText}>{d.expiryPast}</Text>
+            </View>
+          ) : plan.length > 0 ? (
+            <View style={styles.planCard}>
+              <View style={styles.noteHead}>
+                <Ionicons name="notifications" size={14} color={tc.terracotta} />
+                <Text style={styles.planHeadText}>{d.notifyPlanTitle}</Text>
+              </View>
+              {plan.map((step) => (
+                <View key={step.lead} style={styles.planRow}>
+                  <Ionicons
+                    name={step.willFire ? "checkmark-circle" : "remove-circle-outline"}
+                    size={15}
+                    color={step.willFire ? tc.sage : tc.inkSoft}
+                  />
+                  <Text style={[styles.planText, !step.willFire && styles.planTextOff]}>
+                    <Text style={styles.planWhen}>
+                      {step.lead === 0
+                        ? d.notifyPlanOnDay
+                        : tpl(d.notifyPlanLead, { n: String(step.lead) })}
+                    </Text>
+                    {"  "}
+                    {formatDate(toIsoDate(step.at), locale)}
+                    {step.willFire ? `, ${d.notifyPlanAtTime}` : ` — ${d.notifyPlanPassed}`}
+                  </Text>
+                </View>
+              ))}
             </View>
           ) : null}
         </ScrollView>
@@ -605,6 +745,53 @@ const useStyles = makeStyles((c) => ({
     paddingHorizontal: 2,
   },
   pastWarnText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: "600", color: c.danger },
+
+  /** Sar-naam ki patti — "Expiry nahi di" aur "Saathi kab yaad dilayega", dono. */
+  noteHead: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  noteHeadText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: c.inkSoft,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  /**
+   * "Expiry nahi di" — chetavni ka rang JAAN-BOOJH KE nahi.
+   *
+   * Ye galti nahi hai; Aadhaar aur PAN ki expiry hoti hi nahi. Laal border user
+   * ko ye lagne deta ki usne kuch galat kiya hai, aur wo isi jhijhak me bekaar
+   * ki date bhar deta — jo asli nuksan hai (galat din ka reminder).
+   */
+  noteCard: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.line,
+    backgroundColor: c.surface,
+    padding: 14,
+  },
+  noteBody: { fontSize: 13, lineHeight: 19.5, color: c.inkSoft },
+
+  planCard: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.sage,
+    backgroundColor: "rgba(124,138,107,0.08)",
+    padding: 14,
+  },
+  planHeadText: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: c.terracotta,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  planRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 7 },
+  planText: { flex: 1, fontSize: 13, lineHeight: 19, color: c.ink },
+  planWhen: { fontWeight: "700" },
+  /** Beeta hua qadam — dikhta hai, par halka. Chhupana jhooth banta (upar wajah). */
+  planTextOff: { color: c.inkSoft, textDecorationLine: "line-through" },
   save: {
     margin: 20,
     marginTop: 8,

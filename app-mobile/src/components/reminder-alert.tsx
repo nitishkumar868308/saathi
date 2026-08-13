@@ -14,11 +14,25 @@ import { router } from "expo-router";
 import notifee, { EventType, type Notification } from "@notifee/react-native";
 
 import { makeStyles, useColors } from "@/theme/theme";
+import { useToast } from "@/components/toast";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { alertUser, stopAlert } from "@/lib/alert-mode";
 import { completeReminder, listReminders } from "@/lib/reminders";
-import { cancelReminder, scheduleReminderSeries, takePendingAlert } from "@/lib/notifications";
-import { alreadySpokenInBackground } from "@/lib/notification-background";
+import {
+  cancelReminder,
+  flushNotificationActions,
+  quietenNotification,
+  scheduleReminderSeries,
+  snoozeReminder,
+  takePendingAlert,
+} from "@/lib/notifications";
+import { baseReminderId, snoozeNotification } from "@/lib/notify-core";
+import {
+  ACTION_DONE,
+  ACTION_LATER,
+  alreadySpokenInBackground,
+  queueNotificationAction,
+} from "@/lib/notification-background";
 import { acknowledgeDocument, renewDocument } from "@/lib/doc-ack";
 import { emitDataChanged } from "@/lib/data-events";
 import { documentFollowUp, type DocFollowUp } from "@/lib/ai";
@@ -60,23 +74,6 @@ function docIdFrom(identifier: string): string | null {
 }
 
 /**
- * Notification id se ASLI reminder id.
- *
- * ⚠️ Roz/har-hafte wale reminder ke har occurrence ka apna notification id hota
- * hai — pehla `<uuid>`, uske baad `<uuid>#1`, `<uuid>#2`… (`notifications.ts`
- * ka `occId`). Ye suffix seedha server par bhej dena ek chupa hua bug tha:
- * `complete_reminder("<uuid>#3")` kabhi chalta hi nahi (wo valid uuid hai hi
- * nahi), aur `cancelReminder("<uuid>#3")` galat alarm dhoondhta tha.
- *
- * Yaani roz wale reminder me pehle din "Ho gaya" kaam karta tha, aur uske baad
- * kisi bhi din nahi — server par kuch nahi jaata tha aur agle din wahi reminder
- * phir aa jaata tha. Suffix yahan hata dete hain.
- */
-function reminderIdFrom(identifier: string): string {
-  return identifier.split("#")[0];
-}
-
-/**
  * Reminder/expiry ka full-screen alert — screen ke beech me ek zaroori message
  * ki tarah (spec #5). Sirf notification tray me chup-chaap nahi rehta:
  *   - App khula ho aur notification aaye        -> turant modal.
@@ -89,6 +86,7 @@ export function ReminderAlertHost() {
   const styles = useStyles();
   const { notif: n } = useT();
   const { locale } = useLocale();
+  const toast = useToast();
   const [alert, setAlert] = useState<Alert | null>(null);
   const scale = useRef(new Animated.Value(0.9)).current;
   const handledId = useRef<string | null>(null);
@@ -117,6 +115,39 @@ export function ReminderAlertHost() {
 
     // Foreground: notification aaye (DELIVERED) ya tap ho (PRESS) -> modal.
     const unsub = notifee.onForegroundEvent(({ type, detail }) => {
+      /**
+       * ⚠️ Tray ke button — app KHULI ho tab.
+       *
+       * `notifee.onBackgroundEvent` (jahan ye pehle se handle tha) sirf tab
+       * chalta hai jab app saamne na ho. Yaani app khuli rakh ke shade neeche
+       * kheencho aur "Ho gaya" dabao — kuch nahi hota tha, button bilkul mara
+       * hua. Pehle ye kam dikhta tha kyunki notification modal khulte hi mit
+       * jaati thi; ab wo chup parchi bankar tray me bani rehti hai, isliye ye
+       * raasta sach me chalna chahiye.
+       */
+      if (type === EventType.ACTION_PRESS) {
+        const pressId = detail.pressAction?.id;
+        const notif = detail.notification;
+        const nid = notif?.id;
+        if ((pressId === ACTION_DONE || pressId === ACTION_LATER) && nid) {
+          stopAlert();
+          if (pressId === ACTION_LATER) {
+            // Snooze seedha yahin — bilkul waise hi jaise app band hone par
+            // headless handler karta hai. Dono ek hi `snoozeNotification()` par
+            // jaate hain, isliye "5 min baad" ka matlab dono jagah ek hi hai.
+            void snoozeNotification(notif).catch(() => {});
+          } else {
+            void queueNotificationAction(nid, "done");
+            // Wahi kataar jo app start par chalti hai — turant chala do, warna
+            // "Ho gaya" ka asar agli baar app kholne tak dikhta hi nahi.
+            void flushNotificationActions().catch(() => {});
+          }
+          void notifee.cancelNotification(nid).catch(() => {});
+          // Modal isi reminder ka khula pada ho to use bhi hata do.
+          if (handledId.current === nid) dismiss();
+        }
+        return;
+      }
       if (type === EventType.DELIVERED || type === EventType.PRESS) {
         show(detail.notification);
       }
@@ -169,16 +200,24 @@ export function ReminderAlertHost() {
   useEffect(() => {
     if (!alert) return;
     /**
-     * Tray wali notification hata do — sabse pehle.
+     * Alarm ki AWAAZ band karo — par tray ki parchi zinda rakho.
      *
-     * ⚠️ Ye sirf saaf-safai nahi hai, ye AWAAZ BAND karta hai. Reminder ab
-     * `loopSound` + `FLAG_INSISTENT` ke saath bajta hai (alarm ki tarah, jab tak
-     * hataya na jaye). Full-screen intent app ko saamne le aata hai aur ye modal
-     * khul jaata hai — par notification tray me zinda rehti hai, yaani alarm
-     * modal ke peeche bajta rehta. User ko poora alert padhne ka mauka hi nahi
-     * milta.
+     * ⚠️ Yahan pehle seedha `cancelNotification()` tha, aur wo aadha sahi tha.
+     * Sahi hissa: reminder `loopSound` + `FLAG_INSISTENT` ke saath bajta hai,
+     * yaani awaaz modal ke PEECHE bajti rehti aur user ko padhne ka mauka hi
+     * nahi milta. Wo rukna hi chahiye.
+     *
+     * Galat hissa: uske saath notification bhi mar jaati thi. **Notification
+     * aur full-screen alert do alag cheezein hain, aur dono chahiye** — modal us
+     * LAMHE ke liye hai, aur tray ki parchi uske BAAD ke liye (jeb me pada
+     * phone, meeting me chup kiya hua alert, ya modal jo galti se hat gaya).
+     * Modal bina kuch kiye hat jaye to reminder poori tarah gayab ho jaata tha.
+     *
+     * `quietenNotification` dono kaam alag karta hai: chillane wali hatti hai,
+     * aur usi id par ek chup parchi (wahi baat + wahi "Ho gaya / Baad me"
+     * button) turant wapas baith jaati hai.
      */
-    void notifee.cancelNotification(alert.id).catch(() => {});
+    void quietenNotification(alert).catch(() => {});
     setStep("ask");
     setAi(null);
     scale.setValue(0.9);
@@ -230,11 +269,47 @@ export function ReminderAlertHost() {
   }, [alert, locale]);
 
   // Alert band ho ya component unmount ho to bolna rok do.
+  /**
+   * "5 min baad" — modal se.
+   *
+   * ⚠️ Ye button pehle sirf modal band karta tha, aur bas. Wahi shikayat thi ki
+   * "DONE / NOT YET ke saath phir se bajane ka option hona chahiye" — asal me
+   * haal usse bhi bura tha, kyunki button dikhta tha aur kuch karta hi nahi tha.
+   *
+   * Snooze wahi function lagata hai jo notification ke button se lagta hai, aur
+   * alarm `AlarmManager` par baithta hai — yaani app band ho jaye ya phone band
+   * ho jaye, 5 minute baad wo phir bhi bajta hai.
+   */
+  function snoozeAndClose() {
+    if (alert && alert.kind === "reminder") {
+      void snoozeReminder(alert.id, alert.body).then((ok) => {
+        if (ok) toast.show(n.alertSnoozed, "info");
+      });
+    }
+    dismiss();
+  }
+
   function dismiss() {
     stopAlert();
     setAlert(null);
     setAi(null);
     setStep("ask");
+    /**
+     * ⚠️ `handledId` yahan saaf karna zaroori hai.
+     *
+     * Wo guard sirf ek daud ke liye hai: ek hi notification par DELIVERED,
+     * PRESS aur pending-alert — teenon milli-second ke andar aa sakte hain, aur
+     * bina guard ke modal teen baar khulta.
+     *
+     * Par modal band karne ke BAAD wo guard ulta nuksan karta hai. Ab tray me
+     * chup parchi bachi rehti hai (`quietenNotification`), aur user ka use tap
+     * karke wapas "Ho gaya / Baad me" par aana bilkul sahi hai — guard laga
+     * rehta to wo tap kabhi kuch nahi karta.
+     *
+     * Purana pending alert wapas nahi khul sakta: `takePendingAlert()` padhte hi
+     * use storage se hata deta hai.
+     */
+    handledId.current = null;
   }
 
   /**
@@ -251,7 +326,16 @@ export function ReminderAlertHost() {
   function onDone() {
     // Roz wale reminder me notification id `<uuid>#3` jaisi hoti hai — server
     // ko hamesha bina suffix wali asli id chahiye.
-    const id = alert?.kind === "reminder" ? reminderIdFrom(alert.id) : null;
+    /**
+     * ⚠️ `baseReminderId` — seedha `alert.id` nahi.
+     *
+     * Do tarah ke suffix/prefix lagte hain aur dono server par bekaar hain:
+     * repeat wale reminder ka `<uuid>#3`, aur snooze wala `snooze:<uuid>`.
+     * Seedha bhej dena ek chupa hua bug tha — `complete_reminder("<uuid>#3")`
+     * kabhi chalta hi nahi (wo valid uuid hai hi nahi), yaani roz wale reminder
+     * me "Ho gaya" pehle din ke baad kabhi kaam nahi karta tha.
+     */
+    const id = alert?.kind === "reminder" ? baseReminderId(alert.id) : null;
     const title = alert?.body ?? "";
     dismiss();
     if (!id) return;
@@ -410,7 +494,7 @@ export function ReminderAlertHost() {
               <Text style={styles.didText}>{n.alertDid}</Text>
               <View style={styles.btnRow}>
                 <Pressable
-                  onPress={dismiss}
+                  onPress={snoozeAndClose}
                   style={({ pressed }) => [styles.btnAlt, pressed && { opacity: 0.9 }]}
                 >
                   <Text style={styles.btnAltText}>{n.alertLater}</Text>
