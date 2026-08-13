@@ -15,7 +15,7 @@ import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { resolveDocUri, type DocFile } from "@/lib/doc-cache";
 import { listVersions, versionDocFile, type DocVersion } from "@/lib/doc-versions";
-import { listDocuments, type Document } from "@/lib/documents";
+import { getDocument, type Document } from "@/lib/documents";
 import { useDataChanged } from "@/lib/data-events";
 import { formatDate, toIsoDate } from "@/utils/date-format";
 import { tpl } from "@/lib/i18n/dictionaries";
@@ -209,14 +209,18 @@ export default function DocumentView() {
    * screen hai, par reminder/expiry ka alert MODAL hai jo kisi screen ko chhodta
    * hi nahi (poori wajah `lib/data-events.ts` ke upar likhi hai).
    *
-   * `listDocuments()` isliye ki wahi offline cache wala raasta hai — net na ho
-   * to bhi cache se sahi row mil jaati hai. Wahi tareeka `document-renew` bhi
-   * apna document dhoondhne ke liye use karta hai.
+   * ⚠️ `getDocument()` hai, `listDocuments()` NAHI. Dekhne me dono ek hi kaam
+   * karte hain, par `listDocuments()` poori table utaarta hai, cache likhta hai,
+   * saari files utarna shuru karta hai aur upload kataar bhi flush karta hai. Ye
+   * listener har `emitDataChanged()` par jaagta hai — reminder save hone par bhi,
+   * alert modal band hone par bhi — yaani wo poora sync ek aisi screen se chhidta
+   * tha jise user us waqt dekh bhi nahi raha hota. Offline dono ek jaise hain:
+   * `getDocument()` bhi fail par usi cache se padhta hai.
    */
   const reload = useCallback(() => {
     if (!id) return;
-    void listDocuments()
-      .then((all) => setFresh(all.find((x) => x.id === id) ?? null))
+    void getDocument(id)
+      .then(setFresh)
       .catch(() => {});
     void listVersions(id).then(setVersions);
   }, [id]);

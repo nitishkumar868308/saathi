@@ -396,8 +396,21 @@ const GUARD_KEY = "saathi-lock-guard";
 let wrongTries = 0;
 let lockoutRound = 0;
 let lockedUntil = 0;
-/** Storage se ek baar padh liya? (`pinAttemptsLeft` sync hai, isliye mirror.) */
-let guardLoaded = false;
+/**
+ * Storage se padhne wala kaam khud — flag nahi, POORA PROMISE.
+ *
+ * ⚠️ Yahan promise rakhna zaroori hai, `let guardLoaded = false` jaisa boolean
+ * nahi. Boolean wale roop me flag `await` se PEHLE `true` hota tha, aur app
+ * khulte hi do jagah se ek saath `getLockState()` chalta hai (`lock-gate`, phir
+ * `lock-screen`). Doosra caller flag `true` dekh kar TURANT laut jaata tha —
+ * jabki ginti abhi storage se aayi hi nahi thi.
+ *
+ * Us jhiri me `pinAttemptsLeft()` zeroed ginti par "blocked: false" kehta, yaani
+ * chal raha lockout us ek pal ke liye gayab ho jaata aur countdown bhi kabhi
+ * dikhta hi nahi. Promise rakhne se doosra caller usi ek read ka intezaar karta
+ * hai — read hoti phir bhi ek hi baar hai, par ab sab uske BAAD chalte hain.
+ */
+let guardLoaded: Promise<void> | null = null;
 
 /**
  * Storage se ginti memory me le aao — ek hi baar.
@@ -405,9 +418,12 @@ let guardLoaded = false;
  * `getLockState()` se bulaya jaata hai, jo lock screen mount hote hi chalta hai.
  * Isliye pehla `checkPin()` aane se pehle ginti hamesha taiyaar hoti hai.
  */
-async function hydrateGuard(): Promise<void> {
-  if (guardLoaded) return;
-  guardLoaded = true;
+function hydrateGuard(): Promise<void> {
+  if (!guardLoaded) guardLoaded = readGuard();
+  return guardLoaded;
+}
+
+async function readGuard(): Promise<void> {
   const raw = await get(GUARD_KEY);
   if (!raw) return;
   try {
@@ -436,7 +452,9 @@ async function clearGuard(): Promise<void> {
   wrongTries = 0;
   lockoutRound = 0;
   lockedUntil = 0;
-  guardLoaded = true;
+  // Ginti ab memory me sahi hai — storage dobara padhne ki zaroorat nahi, aur
+  // padh lete to abhi-abhi saaf ki hui ginti wapas aa jaati.
+  guardLoaded = Promise.resolve();
   await del(GUARD_KEY);
 }
 

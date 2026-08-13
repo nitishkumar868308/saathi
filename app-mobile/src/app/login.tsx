@@ -158,7 +158,21 @@ function passwordScore(pw: string): 0 | 1 | 2 {
    * "Password@123" ki taraf dhakel rahe the jise ye poora function jaan-boojh ke
    * rokna chahta hai (upar wali wajah dekho).
    */
-  if (pw.length >= 14) return 2;
+  /**
+   * ⚠️ Lambai akeli kaafi NAHI hai — alag-alag akshar bhi utne hi zaroori hain.
+   *
+   * Sirf `pw.length >= 14` par "Majboot" kehna theek utna hi galat tha jitna
+   * passphrase ko "Kamzor" kehna, bas doosri taraf se: `11111111111111` aur
+   * `9876543210 1998` jaise password — jo is app ke user sabse pehle sochte hain
+   * — poore bharose ke saath "Majboot" dikhte the. Wahi ek jhoot hai jo user ko
+   * kamzor password par TIKA deta hai, kyunki app ne khud kaha ki sab theek hai.
+   *
+   * `distinct` dono ko alag kar deta hai: `chaipatti sardiyon me` me ~15 alag
+   * akshar hain, `11111111111111` me sirf 1.
+   */
+  const distinct = new Set(pw).size;
+
+  if (pw.length >= 14 && distinct >= 6) return 2;
   if (kinds >= 3 && pw.length >= 10) return 2;
   if (kinds >= 2 && pw.length >= 8) return 1;
   /**
@@ -167,8 +181,11 @@ function passwordScore(pw: string): 0 | 1 | 2 {
    * Bina is line ke 13 akshar ka passphrase "Kamzor" (0) hota aur 14 akshar ka
    * seedha "Majboot" (2) — ek akshar par do darje ki chhalang, jo user ko sirf
    * uljhati hai. Ab beech ka rasta bhi hai.
+   *
+   * ⚠️ Yahan 12 hai, 10 nahi. 10 par ye shart theek 10-ank ke mobile number ko
+   * "Theek" keh deti — aur wahi is app ke user ka sabse pehla anumaan hai.
    */
-  if (pw.length >= 10) return 1;
+  if (pw.length >= 12 && distinct >= 5) return 1;
   return 0;
 }
 

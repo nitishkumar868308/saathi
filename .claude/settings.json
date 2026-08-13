@@ -497,7 +497,16 @@
       "Bash(grep -vE \"^\\\\+\\\\s*\\\\*|^\\\\+\\\\s*/\\\\*\\\\*|^\\\\+\\\\s*//|^\\\\-\\\\-\\\\-|^\\\\+\\\\+\\\\+\")",
       "Bash(grep -vE \"^\\\\+\\\\s*$\")",
       "Bash(echo \"MOBILE tsc: $?\")",
-      "Bash(echo \"WEB tsc: $?\")"
+      "Bash(echo \"WEB tsc: $?\")",
+      "PowerShell(git diff HEAD~1 | Out-File -Encoding utf8 \"C:\\\\Users\\\\PRATIE~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--my-app\\\\b8ce7508-cdb1-4316-9eb8-a40aa1c8eac9\\\\scratchpad\\\\pr.diff\"; \\(Get-Content \"C:\\\\Users\\\\PRATIE~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--my-app\\\\b8ce7508-cdb1-4316-9eb8-a40aa1c8eac9\\\\scratchpad\\\\pr.diff\" | Measure-Object -Line\\).Lines)",
+      "PowerShell(cd d:\\\\my-app\\\\app-mobile; npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 30; \"MOBILE EXIT: $LASTEXITCODE\")",
+      "PowerShell(cd d:\\\\my-app\\\\web; npx tsc --noEmit 2>&1 | Select-Object -First 20; \"WEB EXIT: $LASTEXITCODE\")",
+      "Read(//c/Users/Pratiek A Jain/.claude/projects/d--my-app/memory//**)",
+      "Read(//c/Users/Pratiek A Jain/.claude-mem//**)",
+      "Bash(node -e \"const s=require\\('/c/Users/Pratiek A Jain/.claude/settings.json'\\);console.log\\(Object.keys\\(s\\)\\);console.log\\('env:',JSON.stringify\\(s.env||{}\\)\\)\")",
+      "Bash(echo \"--- TSC EXIT: $? \\(khaali = pass\\) ---\")",
+      "Bash(node -e \"const d=require\\('./package.json'\\).dependencies;Object.keys\\(d\\).filter\\(k=>/edge|safe-area|screens/.test\\(k\\)\\).forEach\\(k=>console.log\\(k,d[k]\\)\\)\")",
+      "Bash(node -e \"const c=require\\('@expo/config-plugins'\\);console.log\\(Object.keys\\(c\\).filter\\(k=>/Version|SDK/i.test\\(k\\)\\)\\)\")"
     ],
     "additionalDirectories": [
       "D:\\my-app\\.reel",

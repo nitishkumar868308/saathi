@@ -47,18 +47,56 @@ export type DocVersion = {
  * apna nahi hai). Caller ko us par RUKNA NAHI hai — 0 ka matlab sirf itna hai
  * ki nayi photo purane hi naam par jaayegi, bilkul jaise pehle jaati thi.
  */
-export async function snapshotVersion(docId: string): Promise<number> {
+export async function snapshotVersion(docId: string, state?: string): Promise<number> {
   if (!supabase) return 0;
+
+  // Wahi haal dobara = pichhli baar `documents` ki update chali hi nahi. Nayi
+  // entry mat banao, pichhli hi lauta do. (Tafseel `versionState` par likhi hai.)
+  if (state !== undefined) {
+    const seen = lastSnapshot.get(docId);
+    if (seen && seen.state === state) return seen.version;
+  }
+
   try {
     const { data, error } = await supabase.rpc("snapshot_document_version", {
       p_document_id: docId,
     });
     if (error) return 0;
     const n = Number(data);
-    return Number.isInteger(n) && n > 0 ? n : 0;
+    if (!Number.isInteger(n) || n <= 0) return 0;
+    if (state !== undefined) lastSnapshot.set(docId, { state, version: n });
+    return n;
   } catch {
     return 0;
   }
+}
+
+/**
+ * Is session me aakhri baar kis haal ka snapshot liya tha.
+ *
+ * Sirf memory me — app band hone par mit jaata hai, aur yahi theek hai: jis
+ * naakaam koshish se ye bachata hai wo usi screen par, usi pal hoti hai.
+ */
+const lastSnapshot = new Map<string, { state: string; version: number }>();
+
+/**
+ * Document ka "renew se pehle wala haal", ek line me — retry pehchanne ke liye.
+ *
+ * ⚠️ Ye kyun chahiye: snapshot `documents` ki update se PEHLE chalta hai (aur
+ * chalna bhi wahin chahiye, warna wo purana nahi naya haal copy karega). Par
+ * beech me update fail ho sakti hai — net jhatka kha gaya, RLS ne rok diya —
+ * aur tab user wahi "Save" dobara dabata hai, jo bilkul sahi bartaav hai.
+ *
+ * Bina is shart ke har aisi koshish ek nayi history entry banati: "Purane
+ * versions" me ek hi date ki do-teen bilkul ek jaisi entry, jo theek us
+ * `changing` wali shart ka maqsad tod deti hai jo upar iske liye lagai gayi hai.
+ *
+ * Kaamyab renew ke baad document ka haal khud badal jaata hai (expiry ya
+ * file_path), isliye agli asli renew par ye key alag hoti hai aur naya snapshot
+ * banta hai — jaisa banna chahiye.
+ */
+export function versionState(doc: { expiry: string | null; file_path?: string | null }): string {
+  return `${doc.expiry ?? ""}|${doc.file_path ?? ""}`;
 }
 
 /** Is document ke saare purane version — sabse naya pehle. */

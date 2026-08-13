@@ -117,6 +117,25 @@ export async function isUploadPending(docId: string): Promise<boolean> {
   return (await read()).some((x) => x.docId === docId);
 }
 
+/**
+ * Kataar me padi file kis version ke naam par chadhne wali hai. `0` = kuch nahi.
+ *
+ * ⚠️ Ye `documents.file_path` ka net-ke-bina wala jawab hai, aur renew ko isi ki
+ * zaroorat hai. Version number asal me `documents.file_path` se banta hai, par wo
+ * column upload COMMIT hone par bharta hai — yaani net aane par. Beech me
+ * (offline renew ke baad) wo column purani file par hi khada rehta hai.
+ *
+ * Bina iske dobara renew karne par snapshot wahi purana path dobara copy kar
+ * leta tha: history me ek jaisi do entry ban jaati (dono purani photo dikhati),
+ * aur `queueUpload` beech wali photo ko kataar se gira deta — wo kabhi upload
+ * hoti hi nahi. Caller ise dekh kar samajh jaata hai ki pichhla renew abhi cloud
+ * tak pahuncha hi nahi, aur nayi photo usi version ke naam par bhej deta hai.
+ */
+export async function pendingUploadVersion(docId: string): Promise<number> {
+  const hit = (await read()).find((x) => x.docId === docId);
+  return hit?.version ?? 0;
+}
+
 let flushing = false;
 
 /**
