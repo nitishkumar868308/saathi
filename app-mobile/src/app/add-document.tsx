@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import { scanDocumentAI } from "@/lib/ai";
 import { withoutLock } from "@/lib/app-lock";
 import { logEvent } from "@/lib/analytics";
 import { markFirstDocument } from "@/lib/reviews";
-import { isValidDate } from "@/utils/expiry";
+import { isPastDate, isValidDate } from "@/utils/expiry";
 import { iconForType, labelForType } from "@/theme/status";
 import { useToast } from "@/components/toast";
 import { PermissionModal } from "@/components/permission-modal";
@@ -59,6 +59,24 @@ export default function AddDocument() {
   const [type, setType] = useState("other");
   const [name, setName] = useState("");
   const [expiry, setExpiry] = useState("");
+  /**
+   * Bhari hui expiry beet chuki hai?
+   *
+   * ⚠️ State me hai, render me hisaab lagakar nahi — bilkul `note-reminder.tsx`
+   * ki tarah, aur usi do wajah se: `Date.now()` render me impure hai
+   * (`react-hooks/purity` isse pakadta hai), aur aadhi raat paar karte hi
+   * chetavni apne aap aa jaani chahiye.
+   *
+   * Interval yahan 60 second ka hai (reminder wale 20 ke muqable) — ye DIN ki
+   * baat hai, minute ki nahi. Ise sirf aadhi raat wali soorat sambhalni hai.
+   */
+  const [expiryPast, setExpiryPast] = useState(false);
+  useEffect(() => {
+    const check = () => setExpiryPast(isPastDate(expiry));
+    check();
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+  }, [expiry]);
   /** AI scan ka poora samajh — DB me save hota hai. */
   const [summary, setSummary] = useState("");
   const [saving, setSaving] = useState(false);
@@ -128,8 +146,39 @@ export default function AddDocument() {
          * AI na chale to hum khaali chhod dete hain aur user khud bhar leta hai.
          * Khaali khaana galat khaane se hamesha behtar hai.
          */
-        const ai = await scanDocumentAI(asset.base64, locale);
-        if (ai && (ai.name || ai.expiry || (ai.type && ai.type !== "other"))) {
+        const scan = await scanDocumentAI(asset.base64, locale);
+
+        /**
+         * ── Fail hua to WAJAH batao ──────────────────────────────────────
+         *
+         * ⚠️ Pehle yahan paanch bilkul alag halaat ek hi line dikhati thi:
+         * "Padha, par saaf nahi — details khud daal do". Net band ho, net dheema
+         * ho, Gemini bhara ho, server ki dikkat ho, ya AI ne sach me kuch na
+         * dhoondha ho — user ke liye sab ek jaisa tha.
+         *
+         * Pehli chaar soorat me wo line JHOOTH thi: AI ne kuch padha hi nahi
+         * tha. Aur wo jhooth mehnga tha — user "saaf nahi" padh kar photo dobara
+         * kheenchta tha, behtar roshni me, ek aur baar… jabki dikkat photo ki
+         * thi hi nahi, net ki thi.
+         *
+         * `add-reminder.tsx` me ye pehle se theek hai (`tellWhyAiFailed`) —
+         * yahan wahi baat, usi tarah.
+         */
+        if (!scan.ok) {
+          setScanned(true);
+          if (scan.failure === "offline") toast.show(d.ocrOffline, "info");
+          else if (scan.failure === "busy" || scan.failure === "slow") {
+            toast.show(d.ocrBusy, "info");
+          } else if (scan.failure === "unclear") {
+            // Ek hi soorat jisme AI SACH ME chala tha — yahan "khud bhar do"
+            // kehna sahi hai.
+            toast.show(d.ocrUnclear, "info");
+          } else toast.show(d.ocrFailed, "error");
+          return;
+        }
+
+        const ai = scan.data;
+        if (ai.name || ai.expiry || (ai.type && ai.type !== "other")) {
           rType = ai.type || "other";
           rName = ai.name || "";
           rExpiry = ai.expiry && isValidDate(ai.expiry) ? ai.expiry : null;
@@ -192,10 +241,19 @@ export default function AddDocument() {
         uploadDocumentImage(doc.id, savedUri).catch(() => {});
       }
 
-      // Expiry ke liye notification (14 din pehle, 3 din pehle, aur us din).
-      // Permission tabhi maango jab expiry hai — warna prompt bekaar lagta hai.
+      /**
+       * Expiry ke liye notification (7 din pehle, 1 din pehle, aur us din).
+       * Permission tabhi maango jab expiry hai — warna prompt bekaar lagta hai.
+       *
+       * ⚠️ Aur beeti hui expiry par bhi nahi. Us par koi notification lag hi
+       * nahi sakti (teenon qadam — 7 din pehle, 1 din pehle, us din — sab beet
+       * chuke hote hain), to permission maangna user se aisi cheez maangna hai
+       * jiska yahan koi kaam hi nahi. Pehle prompt aata tha, user allow karta
+       * tha, aur phir bhi kabhi kuch nahi bajta tha.
+       */
+      const expired = !!doc.expiry && isPastDate(doc.expiry);
       let notifOk = true;
-      if (doc.expiry) {
+      if (doc.expiry && !expired) {
         notifOk = await ensureNotifPermission();
         if (notifOk) await scheduleDocumentExpiry(doc.id, doc.name, doc.expiry);
       }
@@ -205,7 +263,12 @@ export default function AddDocument() {
       checkReferralQualification().catch(() => {});
       // Review popup ka padav — document + reminder dono ho jaayein to poochho.
       markFirstDocument().catch(() => {});
-      toast.show(notifOk ? d.added : d.addedNoNotif, notifOk ? "success" : "info");
+      // Beeti hui expiry wali baat sabse upar — user ne form par chetavni dekhi
+      // thi, aur "add ho gaya 🎉" uske theek ulta paigham deta hai.
+      toast.show(
+        expired ? d.addedExpired : notifOk ? d.added : d.addedNoNotif,
+        expired || !notifOk ? "info" : "success",
+      );
 
       /**
        * Expiry wale document par wahi reliability check jo reminder par hai.
@@ -216,7 +279,9 @@ export default function AddDocument() {
        * Sab allow ho to modal khulta hi nahi aur screen seedha band ho jaati
        * hai; ek bhi step baaki ho to pehle modal, band karne par wapas.
        */
-      if (doc.expiry && (await shouldShowReliabilityPrompt())) {
+      // `!expired` bhi: ye modal notification ko bharosemand banane ke liye hai,
+      // aur beeti hui expiry par koi notification hai hi nahi.
+      if (doc.expiry && !expired && (await shouldShowReliabilityPrompt())) {
         setPermModal(true);
         return;
       }
@@ -326,9 +391,34 @@ export default function AddDocument() {
             onChangeText={setExpiry}
             placeholder={d.expiryPlaceholder}
             placeholderTextColor={tc.inkSoft}
-            style={[styles.input, scanned && expiry ? styles.inputFilled : null]}
+            style={[
+              styles.input,
+              scanned && expiry ? styles.inputFilled : null,
+              expiryPast ? styles.inputPast : null,
+            ]}
             keyboardType="numbers-and-punctuation"
           />
+          {/**
+           * Beeti hui expiry — chetavni yahin, turant.
+           *
+           * ⚠️ Ye ROK nahi hai, aur wo jaan-boojh ke hai: expire ho chuka
+           * document daalna bilkul theek hai (app me uske liye "expired" filter
+           * aur poora renewal-guide hai). Rok se wo feature hi mar jaata.
+           *
+           * Par chup rehna usse bhi bura tha. Beeti hui date par `schedule()`
+           * kuch lagata hi nahi, aur user ko "Document add ho gaya 🎉" dikhta
+           * tha — wo maan leta tha ki reminder lag gaya hai. Wahi ek chup-chaap
+           * fail tha jise pakadna namumkin hota hai.
+           *
+           * Yahan dikhane ka ek aur faayda: 2025 vs 2026 jaisa typo user ko
+           * Save dabane se PEHLE hi dikh jaata hai.
+           */}
+          {expiryPast ? (
+            <View style={styles.pastWarn}>
+              <Ionicons name="alert-circle" size={15} color={tc.danger} />
+              <Text style={styles.pastWarnText}>{d.expiryPast}</Text>
+            </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -498,6 +588,23 @@ const useStyles = makeStyles((c) => ({
     fontSize: 15,
   },
   inputFilled: { borderColor: c.sage, backgroundColor: "rgba(124,138,107,0.08)" },
+  /**
+   * Beeti hui expiry — `inputFilled` ke BAAD lagta hai, isliye AI ka bhara hua
+   * hara border bhi ismein dhak jaata hai. Wahi sahi hai: AI ne bhi agar beeti
+   * hui date padhi ho to wo "sab theek hai" wala hara nahi dikhna chahiye.
+   *
+   * Rang `c.danger` hai (token), hardcoded #B23B3B nahi — wo dark page par
+   * 3.4:1 par gir jaata hai. Token dark me halka ujla shade deta hai.
+   */
+  inputPast: { borderColor: c.danger, backgroundColor: "rgba(178,59,59,0.07)" },
+  pastWarn: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7,
+    marginTop: 8,
+    paddingHorizontal: 2,
+  },
+  pastWarnText: { flex: 1, fontSize: 12.5, lineHeight: 18, fontWeight: "600", color: c.danger },
   save: {
     margin: 20,
     marginTop: 8,

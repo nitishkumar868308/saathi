@@ -61,6 +61,19 @@ import SaathiLogo from "@/components/saathi-logo";
  * Sab kuch `translateX`/`opacity` par hai (width par nahi), isliye poori
  * animation native driver par chalti hai — JS thread busy ho tab bhi (jaise AI
  * ka jawab aate waqt) makkhan chalti hai.
+ *
+ * ── Naam ke DO rang ─────────────────────────────────────────────────────
+ *
+ * "Apka" dabaa hua, "Saathi" brand ke rang me. Neeche `wordStyle()` par poori
+ * baat likhi hai, par ek baat yahan bhi zaroori hai:
+ *
+ * ⚠️ Naam ka rang PARDE ke hisaab se chunna hai, theme ke hisaab se nahi.
+ * `LoaderOverlay` ka parda (`scrimLoader`) dono theme me gehra hai, isliye
+ * wahan `onInkSoft`/`onInkAccent` — jo dono theme me ujle rehte hain. Cream
+ * page par (`ScreenLoader`) theme-wale `inkSoft`/`terracotta`.
+ *
+ * Ye ulta karne par theek wo bug wapas aata hai jiske liye ye likha gaya:
+ * light theme me gehre parde par gehra naam, yaani naam gayab.
  */
 
 /** Ek poori saans — andar 900ms, bahar 900ms. */
@@ -182,9 +195,29 @@ function BrandLoader({
     if (w > 0 && w !== current) set(w);
   };
 
-  const nameStyle = [
+  /**
+   * Do shabd, do rang — aur ye sajawat se zyada padhne ki baat hai.
+   *
+   * "Apka" dabaa hua (muted) hai aur "Saathi" brand ke rang me. Isse nazar
+   * apne aap us shabd par jaati hai jo brand ka asli naam hai, aur ek hi mote
+   * rang me likhe do shabd jaisa flat nahi lagta.
+   *
+   * ⚠️ Rang parde ke hisaab se badalte hain, THEME ke hisaab se nahi — aur yahi
+   * wo fark hai jo pehle chhoot gaya tha. `onDark` ka matlab hai "naam gehre
+   * parde par baitha hai", aur wo parda DONO theme me gehra hi rehta hai
+   * (`scrimLoader`). Isliye wahan theme-wale token (`inkSoft`/`terracotta`)
+   * lagana ulta galat hai: light theme me wo gehre parde par gehre rang de dete
+   * hain. Cream page par (`ScreenLoader`) theme-wale token hi sahi hain.
+   */
+  const wordStyle = (accent: boolean) => [
     styles.name,
-    onDark ? styles.nameOnDark : styles.nameOnLight,
+    onDark
+      ? accent
+        ? styles.saathiOnDark
+        : styles.apkaOnDark
+      : accent
+        ? styles.saathiOnLight
+        : styles.apkaOnLight,
     { fontSize },
   ];
 
@@ -221,7 +254,7 @@ function BrandLoader({
                   },
                 ]}
               >
-                <Text numberOfLines={1} style={nameStyle}>
+                <Text numberOfLines={1} style={wordStyle(false)}>
                   Apka
                 </Text>
               </Animated.View>
@@ -246,7 +279,7 @@ function BrandLoader({
                   },
                 ]}
               >
-                <Text numberOfLines={1} style={nameStyle}>
+                <Text numberOfLines={1} style={wordStyle(true)}>
                   Saathi
                 </Text>
               </Animated.View>
@@ -441,14 +474,29 @@ const useStyles = makeStyles((c) => ({
    */
   nameWindow: { position: "absolute", top: 0, overflow: "hidden", zIndex: 1 },
   nameSlider: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
-  name: { fontWeight: "800", letterSpacing: 0.3 },
-  nameOnDark: {
-    color: c.cream,
-    textShadowColor: "rgba(0,0,0,0.35)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  nameOnLight: { color: c.ink, opacity: 0.9 },
+  // letterSpacing 0.3 se 0.6 — chhote size par bhi shabd khule-khule padhte hain,
+  // aur logo ke bagal se nikalte waqt "chipke hue" nahi lagte.
+  name: { fontWeight: "800", letterSpacing: 0.6 },
+
+  /* ── Gehre parde par (LoaderOverlay) ────────────────────────────────
+   *
+   * ⚠️ Yahan koi textShadow nahi hai, aur wo jaan-boojh ke hataya gaya hai.
+   * Pehle shadow isliye tha kyunki naam parde par ghul jaata tha — wo asli
+   * dikkat (kam contrast) ka ilaaj nahi, uspar parda tha. Ab parda khud gehra
+   * hai (`scrimLoader`) aur dono rang 5.5:1 se upar hain, to shadow sirf text
+   * ko dhundhla karta.
+   */
+  apkaOnDark: { color: c.onInkSoft },
+  saathiOnDark: { color: c.onInkAccent },
+
+  /* ── Saadi cream page par (ScreenLoader) ────────────────────────────
+   *
+   * Yahan theme-wale token hi sahi hain — ye dono theme me apne aap ulte ho
+   * jaate hain. `ink` ki jagah `inkSoft`: "Apka" ko dabaana hai, aur pehle wala
+   * `ink` + opacity 0.9 wahi kaam ghuma ke karta tha.
+   */
+  apkaOnLight: { color: c.inkSoft },
+  saathiOnLight: { color: c.terracotta },
   label: { fontSize: 14, color: c.inkSoft, fontWeight: "600", textAlign: "center" },
   screen: {
     flex: 1,
@@ -460,10 +508,20 @@ const useStyles = makeStyles((c) => ({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    // Theme ke hisaab se — light par 45% garam-kaala, dark par 72%. Pehle
-    // yahan ek hi hardcoded rgba tha, jo dark mode me gehre page par bilkul
-    // dikhta hi nahi tha.
-    backgroundColor: c.scrim,
+    /**
+     * ⚠️ Ye `c.scrim` NAHI hai — aur wahi is fix ki jad thi.
+     *
+     * `scrim` aam modal ka parda hai aur light theme me sirf 45% hai (peeche ka
+     * form dikhta rehna chahiye). Loader ka naam us halke parde par cream me
+     * likha jaata tha — cream page + 45% parda milke ~#9C9790 banta tha, aur us
+     * par cream text sirf 2.6:1 par tha. Yaani light mode me naam likha to
+     * jaata tha, dikhta nahi tha; dark mode me wahi naam 17.5:1 par saaf tha.
+     * User ke liye ye "text mode ke hisaab se badalta nahi" jaisa dikhta tha.
+     *
+     * `scrimLoader` dono theme me gehra hai — blocking loader ke peeche kuch
+     * dikhna zaroori bhi nahi hai.
+     */
+    backgroundColor: c.scrimLoader,
   },
   card: {
     flexDirection: "row",

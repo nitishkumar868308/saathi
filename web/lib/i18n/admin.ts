@@ -57,6 +57,8 @@ export type AdminDict = {
     payments: string;
     notes: string;
     documents: string;
+    /** Kaun sa user kaun se phone se chal raha hai. */
+    devices: string;
     reviews: string;
     logs: string;
     contacts: string;
@@ -75,6 +77,7 @@ export type AdminDict = {
     | "payments"
     | "notes"
     | "documents"
+    | "devices"
     | "reviews"
     | "logs"
     | "contacts"
@@ -892,6 +895,7 @@ const en: AdminDict = {
     payments: "Payments",
     notes: "Notes",
     documents: "Documents",
+    devices: "Devices",
     reviews: "Reviews",
     logs: "Logs",
     contacts: "Contacts",
@@ -916,6 +920,7 @@ const en: AdminDict = {
     payments: { title: "Payments", sub: "Every Play Store purchase, renewal and refund — who paid, when, and how much." },
     notes: { title: "Notes", sub: "Who writes notes, and how many turn into a reminder. What people write is never shown." },
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
+    devices: { title: "Devices", sub: "Which user is on which phone. Only one phone stays active at a time — reminders and alerts go only there. If a code never reaches their email, activate their phone from here." },
     reviews: { title: "Reviews & Ratings", sub: "Reviews from the app. A review reaches the website only when the user allowed it AND you approve it — nothing goes live on its own." },
     logs: { title: "Logs & Issues", sub: "What broke in app/web — full stack + context. New errors also go to email." },
     // ⚠️ `sub` jaan-boojh ke khaali hai — AdminDashboard is EK section par
@@ -1514,6 +1519,7 @@ const hi: AdminDict = {
     payments: "पेमेंट",
     notes: "नोट्स",
     documents: "डॉक्युमेंट्स",
+    devices: "डिवाइस",
     reviews: "रिव्यूज़",
     logs: "लॉग्स",
     contacts: "कॉन्टैक्ट",
@@ -1538,6 +1544,7 @@ const hi: AdminDict = {
     payments: { title: "पेमेंट", sub: "हर Play Store परचेज़, रिन्यूअल और रिफ़ंड — किसने, कब, कितना दिया।" },
     notes: { title: "नोट्स", sub: "कौन नोट लिखता है, और उनमें से कितनों का रिमाइंडर बनता है। लोग क्या लिखते हैं वह कभी नहीं दिखता।" },
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
+    devices: { title: "डिवाइस", sub: "कौन सा user कौन से फ़ोन से चल रहा है। एक समय में एक ही फ़ोन active रहता है — रिमाइंडर और अलर्ट उसी पर जाते हैं। जिसके email पर कोड न पहुँचे, उसका फ़ोन यहाँ से चालू करें।" },
     reviews: { title: "रिव्यूज़ और रेटिंग", sub: "ऐप में आए रिव्यूज़। वेबसाइट पर रिव्यू तभी जाता है जब यूज़र ने अनुमति दी हो और आप मंज़ूरी दें — अपने आप कुछ लाइव नहीं होता।" },
     logs: { title: "लॉग्स और इशू", sub: "ऐप/वेब में क्या टूटा — पूरा stack + context. नए errors ईमेल पर भी जाते हैं।" },
     // ⚠️ `sub` jaan-boojh ke khaali hai — AdminDashboard is EK section par
@@ -2140,6 +2147,7 @@ const hinglish: AdminDict = {
     payments: "Payments",
     notes: "Notes",
     documents: "Documents",
+    devices: "Devices",
     reviews: "Reviews",
     logs: "Logs",
     contacts: "Contacts",
@@ -2164,6 +2172,7 @@ const hinglish: AdminDict = {
     payments: { title: "Payments", sub: "Har Play Store kharidari, renewal aur refund — kisne, kab, kitna diya." },
     notes: { title: "Notes", sub: "Kaun note likhta hai, aur unme se kitno ka reminder banta hai. Log kya likhte hain wo kabhi nahi dikhta." },
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
+    devices: { title: "Devices", sub: "Kaun sa user kaun se phone se chal raha hai. Ek waqt me ek hi phone active rehta hai — reminder aur alert usi par jaate hain. Jiske email par code na pahunche, uska phone yahan se chaalu karo." },
     reviews: { title: "Reviews & Ratings", sub: "App me aaye reviews. Website par review tabhi jaata hai jab user ne anumati di ho AUR aap manzoori dein — apne aap kuch live nahi hota." },
     logs: { title: "Logs & Issues", sub: "App/web me kya toota — poora stack + context. Naye errors email pe bhi jaate hain." },
     // ⚠️ `sub` jaan-boojh ke khaali hai — AdminDashboard is EK section par

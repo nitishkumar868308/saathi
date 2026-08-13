@@ -1223,3 +1223,88 @@ export async function sendAppLockResetEmail(t: {
     userId: t.userId,
   });
 }
+
+/* ---------------------- naya phone chaalu karne ka code ---------------------- */
+
+/**
+ * "Naya phone" ka code.
+ *
+ * ⚠️ Is email ka sabse zaroori hissa `warn` wali line hai, aur wo PIN reset wali
+ * se ALAG honi chahiye. Yahan khatra alag hai: is code se koi doosra phone
+ * "aapka" ban jaata hai — yaani aapke reminder aur alert USKE phone par jaane
+ * lagte hain aur aapke phone par aana BAND ho jaate hain. Aam OTP wali "kisi ko
+ * mat batao" line ye baat nahi kehti.
+ *
+ * ⚠️ `ignore` wali line bhi jaan-boojh ke saaf hai. Jisne ye code manga hi nahi,
+ * uske liye ye email ek chetavni hai — kisi ne uske account me login kiya hai.
+ * Us soorat me "kuch mat kariye" kaafi nahi, isliye password badalne ko bhi kaha
+ * jaata hai.
+ */
+const DEVICE_APPROVAL: Record<
+  EmailLocale,
+  { title: string; hello: string; intro: string; expires: string; warn: string; ignore: string; subject: string }
+> = {
+  hinglish: {
+    title: "Naye phone ka code 📱",
+    hello: "Namaste",
+    intro: "Is naye phone par apne reminder aur alert chaalu karne ke liye ye code Saathi me daalo:",
+    expires: "Ye code {m} minute me expire ho jayega.",
+    warn: "Ye code kisi ko mat batao — isse aapke saare reminder us phone par chale jaate hain, aur purane phone par aana band ho jaate hain.",
+    ignore: "Aapne ye nahi manga tha? Tab kisi ne aapke account me login kiya hai — apna password turant badal lijiye.",
+    subject: "Apka Saathi — naye phone ka code",
+  },
+  hi: {
+    title: "नए फ़ोन का कोड 📱",
+    hello: "नमस्ते",
+    intro: "इस नए फ़ोन पर अपने रिमाइंडर और अलर्ट चालू करने के लिए यह कोड साथी में डालिए:",
+    expires: "यह कोड {m} मिनट में एक्सपायर हो जाएगा।",
+    warn: "यह कोड किसी को न बताएँ — इससे आपके सारे रिमाइंडर उस फ़ोन पर चले जाते हैं, और पुराने फ़ोन पर आना बंद हो जाते हैं।",
+    ignore: "आपने यह नहीं माँगा था? तब किसी ने आपके अकाउंट में लॉगिन किया है — अपना पासवर्ड तुरंत बदल लीजिए।",
+    subject: "आपका साथी — नए फ़ोन का कोड",
+  },
+  en: {
+    title: "Code for your new phone 📱",
+    hello: "Hi",
+    intro: "Enter this code in Saathi to turn on your reminders and alerts on this new phone:",
+    expires: "This code expires in {m} minutes.",
+    warn: "Don't share this code with anyone — it moves all your reminders to that phone, and stops them on your old one.",
+    ignore: "Didn't ask for this? Then someone has signed in to your account — change your password right away.",
+    subject: "Apka Saathi — code for your new phone",
+  },
+};
+
+export async function sendDeviceApprovalEmail(t: {
+  to: string;
+  name?: string | null;
+  code: string;
+  minutes: number;
+  locale?: EmailLocale;
+  userId?: string | null;
+}) {
+  const l = DEVICE_APPROVAL[t.locale ?? "hinglish"] ?? DEVICE_APPROVAL.hinglish;
+  const greet = t.name ? `${l.hello} ${escapeHtml(t.name)},` : `${l.hello},`;
+
+  const html = renderEmail(
+    l.title,
+    emailParagraph(greet) +
+      emailParagraph(l.intro) +
+      // Code sabse bada aur sabse saaf — monospace + letter-spacing se 6 ank
+      // ek-ek karke padhe jaate hain (0/O aur 1/l ka bhram bhi kam hota hai).
+      `<div style="margin:6px 0 18px;padding:20px;background:${CREAM};border:1px solid ${LINE};border-radius:16px;text-align:center;">
+         <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:700;letter-spacing:9px;color:${INK};">${escapeHtml(t.code)}</div>
+         <div style="margin-top:10px;font-size:13px;color:${SOFT};">${escapeHtml(l.expires.replace("{m}", String(t.minutes)))}</div>
+       </div>` +
+      `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:${INK};font-weight:600;">${escapeHtml(l.warn)}</p>` +
+      `<p style="margin:0;font-size:13.5px;line-height:1.6;color:${SOFT};">${escapeHtml(l.ignore)}</p>`,
+    `${t.code} — ${l.title}`,
+    t.locale ?? "hinglish",
+  );
+
+  return sendMail({
+    to: t.to,
+    subject: l.subject,
+    html,
+    kind: "device_approval",
+    userId: t.userId,
+  });
+}

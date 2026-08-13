@@ -60,6 +60,32 @@ export function isValidDate(s: string): boolean {
   return !isNaN(d.getTime());
 }
 
+/**
+ * Ye date beet chuki hai? (aaj wali date beeti hui NAHI hai.)
+ *
+ * ⚠️ Ye `expiryStatus()` par hi tika hai, apna alag hisaab nahi karta — aur ye
+ * jaan-boojh ke hai. Dono jagah alag ganit hone par ek hi document par do alag
+ * baatein dikhtin: card par "aaj expire ho raha hai" aur form par "ye date beet
+ * chuki hai". Aisi do-zubani galti pakadna sabse mushkil hoti hai.
+ *
+ * Isliye ek hi jagah se jawab: `daysUntil` ka wahi LOCAL-midnight wala hisaab
+ * (upar uski poori wajah likhi hai), aur wahi "aaj = abhi expired nahi" wala
+ * niyam.
+ *
+ * Kis kaam ka: `add-document` isse form par turant chetavni dikhata hai. Beeti
+ * hui expiry par notification lag hi nahi sakti (`schedule()` beete waqt par
+ * kuch nahi lagata), aur pehle ye baat user ko kahin batayi hi nahi jaati thi —
+ * use "Document add ho gaya 🎉" dikhta tha aur wo maan leta tha ki reminder lag
+ * gaya.
+ *
+ * ⚠️ Ye ROK nahi hai. Expire ho chuka document daalna bilkul theek hai — app me
+ * uske liye "expired" filter hai aur poora renewal-guide bhi (`renewal.ts`).
+ * Isliye ye sirf batata hai, rokta nahi.
+ */
+export function isPastDate(s: string): boolean {
+  return isValidDate(s) && expiryStatus(s) === "expired";
+}
+
 /** Labels for {@link expiryLabel} — user ki chuni bhasha se aate hain. */
 export type ExpiryLabels = {
   expired: string;

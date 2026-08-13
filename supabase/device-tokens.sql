@@ -41,6 +41,22 @@ create index if not exists device_tokens_user_idx
 -- phone ka token DOOSRE user ke naam par bhi ho sakta hai (ek hi phone par pehle
 -- koi aur login tha). Aise me row ka maalik badal dena zaroori hai — warna
 -- purane user ko naye user ke phone par notification chali jaati.
+/**
+ * ⚠️ YE VERSION PURANA HAI — `device-approval.sql` ise badal deta hai.
+ *
+ * Wahan `save_device_token(p_token, p_platform, p_device_id)` banta hai (teesra
+ * parameter, default null). Wajah: bina `device_id` ke ye pata hi nahi chalta ki
+ * kaun sa token kis phone ka hai, aur "purane phone ka token hata do" karna
+ * namumkin ho jaata hai.
+ *
+ * ⚠️ Isliye `device-approval.sql` chala lene ke BAAD ye file DOBARA MAT
+ * CHALANA. Wo pehle 2-parameter wale version ko `drop` karta hai; ise dobara
+ * chalane par wo wapas aa jaayega aur Postgres ke paas do overload ho jayenge.
+ * Tab har 2-argument wali call par "function is not unique" aata hai — yaani
+ * HAR phone ka token save hona band ho jaata hai, chup-chaap.
+ *
+ * Is table ke baaki hisse (policy, index) dobara chalane par bhi safe hain.
+ */
 create or replace function public.save_device_token(p_token text, p_platform text)
 returns void
 language sql

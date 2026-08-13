@@ -12,6 +12,7 @@ import notifee, {
 } from "@notifee/react-native";
 
 import { completeReminder, listReminders } from "./reminders";
+import { ensureDeviceState } from "./device-approval";
 import { emitDataChanged } from "./data-events";
 import { listDocuments } from "./documents";
 import { reportError } from "./report-error";
@@ -157,7 +158,7 @@ async function schedule(
   title: string,
   body: string,
   when: Date,
-  kind: "reminder" | "expiry" = "reminder",
+  kind: "reminder" | "expiry" | "test" = "reminder",
 ): Promise<boolean> {
   if (when.getTime() <= Date.now()) return false;
 
@@ -198,6 +199,18 @@ async function schedule(
    * intent ki patrata).
    */
   const isReminder = kind === "reminder";
+  /**
+   * Test alarm ko asli reminder jaisa hi bajna chahiye — warna wo kuch saabit
+   * hi nahi karta. Isliye awaaz, full-screen aur screen jagana sab wahi.
+   *
+   * Do cheezein jaan-boojh ke ALAG hain:
+   *   • `ongoing` nahi — asli reminder ke do button hote hain jinse wo hat-ta
+   *     hai; test me wo button nahi hain, to ongoing use hataana namumkin bana
+   *     deta.
+   *   • action button nahi — "Ho gaya" server par ek aisi id bhejta jo hai hi
+   *     nahi.
+   */
+  const isAlarmLike = kind === "reminder" || kind === "test";
 
   const notification = {
     id,
@@ -221,13 +234,13 @@ async function schedule(
        * Android ko seedha kehta hai ki awaaz tab tak dohraate raho jab tak
        * notification hat na jaye. Dono saath me har phone par chalte hain.
        */
-      loopSound: isReminder,
-      flags: isReminder ? [AndroidFlags.FLAG_INSISTENT] : undefined,
+      loopSound: isAlarmLike,
+      flags: isAlarmLike ? [AndroidFlags.FLAG_INSISTENT] : undefined,
       // Swipe se galti se hat na jaye — hatane ka raasta neeche ke button hain.
       ongoing: isReminder,
       autoCancel: !isReminder,
       // Alarm ki chhat — 60 second baad khud chup (upar wajah likhi hai).
-      timeoutAfter: isReminder ? ALARM_TIMEOUT_MS : undefined,
+      timeoutAfter: isAlarmLike ? ALARM_TIMEOUT_MS : undefined,
       /**
        * App khole bina hi nipat jaye.
        *
@@ -461,6 +474,41 @@ export async function flushNotificationActions(): Promise<void> {
   if (changed) emitDataChanged();
 }
 
+/* ----------------------------- test alarm ----------------------------- */
+
+const TEST_ID = "saathi-test-alarm";
+
+/** Test alarm kitni der baad — itna ki user phone lock kar sake. */
+export const TEST_ALARM_SECONDS = 60;
+
+/**
+ * Ek asli alarm, abhi se {@link TEST_ALARM_SECONDS} baad.
+ *
+ * ⚠️ Ye debug ka jugaad nahi hai — ye is poore feature ka ek zaroori hissa hai.
+ * "Reminder nahi aaya" wali shikayat ka jawab dena bina iske lagbhag namumkin
+ * hai: Android par alarm bajne ke liye PAANCH cheezein chahiye (dekho
+ * `reliability.ts`), un paanch me se do ka status OS kisi API se batata hi nahi,
+ * aur asli reminder ka intezaar ghanton ka hota hai. User ke paas "sab allow kar
+ * diya, ab pata kaise chale?" ka koi raasta hi nahi tha.
+ *
+ * Ye wahi `schedule()` chalata hai jo asli reminder chalata hai — wahi channel,
+ * wahi `CATEGORY_ALARM`, wahi `fullScreenAction`, wahi `loopSound` +
+ * `FLAG_INSISTENT`, wahi exact alarm. Isliye ye sach me wahi cheez jaanchta hai;
+ * ek alag "test wala" raasta banane par wo kuch bhi saabit na karta.
+ *
+ * ⚠️ Yahan device-approval wala gate JAAN-BOOJH KE nahi lagta. Ye Android ki
+ * taraf jaanchta hai (permission, channel, exact alarm, full-screen), aur user
+ * ne khud dabaya hai. Us waqt "aapka phone active nahi hai" keh ke chup ho jaana
+ * theek us sawaal ka jawab na dena hoga jo poochha gaya tha.
+ */
+export async function scheduleTestAlarm(): Promise<boolean> {
+  const n = await notifDict();
+  // Purana test pada ho to hata do — do test alarm ek saath bhaddey lagte hain.
+  await cancel(TEST_ID);
+  const when = new Date(Date.now() + TEST_ALARM_SECONDS * 1000);
+  return schedule(TEST_ID, n.testTitle, n.testBody, when, "test");
+}
+
 /* -------------------------- document expiry -------------------------- */
 
 const docNotifId = (docId: string, lead: number) => `doc:${docId}:${lead}`;
@@ -536,6 +584,36 @@ export function syncNotifications(opts: { force?: boolean } = {}): Promise<void>
 async function runSync(): Promise<void> {
   try {
     if (!(await hasNotifPermission())) return;
+
+    /**
+     * ⚠️ Ye phone abhi "active" nahi hai — alarm mat lagao, aur PURANE HATA DO.
+     *
+     * Ek waqt me ek hi phone active rehta hai
+     * (`supabase/device-approval.sql`). Alarm notifee se phone ke ANDAR lagte
+     * hain, isliye server se unhe rokna namumkin hai — rok yahin lag sakti hai.
+     *
+     * Bina is gate ke poora feature aadha reh jaata: token to na jaata (push
+     * ruk jaata), par har local alarm phir bhi bajta rehta. User ke liye wo
+     * sabse uljhan wali soorat hoti — "notification band hai phir bhi alarm
+     * kyun baj raha hai".
+     *
+     * ⚠️ `ensureDeviceState()` — `deviceState()` nahi. Cache ka default
+     * `active: true` hai, aur ye function app khulte hi chalta hai. Sirf cache
+     * padhne par pehla sync INACTIVE phone par bhi saare alarm laga deta, aur
+     * uske baad ye gate unhe kabhi hata nahi paata.
+     *
+     * ⚠️ Purane alarm CANCEL karna zaroori hai, sirf "naye mat lagao" kaafi
+     * nahi. Ek phone offline rehte hue inactive ho sakta hai (doosre phone par
+     * verify hua), aur uske pehle se lage hue alarm bajte rahenge — theek wahi
+     * "ek reminder do phone par" wali dikkat jiske liye ye poora feature hai.
+     *
+     * Kuch khota nahi: alarm server ke data se BANTE hain. Verify hote hi
+     * `syncNotifications({ force: true })` sabko wapas laga deta hai.
+     */
+    if (!(await ensureDeviceState()).active) {
+      await notifee.cancelTriggerNotifications().catch(() => {});
+      return;
+    }
 
     const [reminders, documents] = await Promise.all([listReminders(), listDocuments()]);
 

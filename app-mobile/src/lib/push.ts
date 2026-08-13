@@ -8,6 +8,8 @@ import notifee, {
 import { supabase } from "./supabase";
 import { reportError } from "./report-error";
 import { recordPushOpenFrom, routeFromPush } from "./message-track";
+import { ensureDeviceState } from "./device-approval";
+import { getDeviceId } from "./device";
 
 /**
  * Push notification (FCM) — admin panel se aane wali khabar (item 8).
@@ -75,10 +77,30 @@ let lastSaved: string | null = null;
  */
 async function saveToken(token: string): Promise<void> {
   if (!token || token === lastSaved || !supabase) return;
+  /**
+   * ⚠️ Ye phone abhi "active" nahi hai — token mat bhejo.
+   *
+   * Ek waqt me ek hi phone active rehta hai (`supabase/device-approval.sql`).
+   * Token yahan bhej dena poore feature ko bekaar kar deta: `save_device_token`
+   * row ka maalik badal deta hai, aur us pal se user ke reminder ki har
+   * notification IS phone par aane lagti — chahe usne ise chaalu kiya ho ya
+   * nahi. Wahi to wo bug hai jiske liye ye poora raasta bana hai.
+   *
+   * Verify hote hi `refreshDeviceState()` cache badal deta hai aur agla
+   * `registerPush()` (app saamne aane par) token bhej deta hai.
+   *
+   * ⚠️ `ensureDeviceState()` — `deviceState()` nahi. Cache ka default
+   * `active: true` hai aur ye function app khulte hi chalta hai, isliye sirf
+   * cache padhne par INACTIVE phone ka token bhi pehle hi sync me chala jaata.
+   */
+  if (!(await ensureDeviceState()).active) return;
   try {
     const { error } = await supabase.rpc("save_device_token", {
       p_token: token,
       p_platform: Platform.OS,
+      // Kis phone ka token hai — iske bina "purane phone ka token hatao" karna
+      // namumkin hai (device_tokens me pehle ye column tha hi nahi).
+      p_device_id: await getDeviceId(),
     });
     if (error) throw error;
     lastSaved = token;

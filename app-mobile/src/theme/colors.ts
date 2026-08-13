@@ -24,6 +24,27 @@ export const lightColors = {
    */
   scrim: "rgba(46,40,35,0.45)",
 
+  /**
+   * Blocking loader ke peeche ka parda — `scrim` se ALAG, aur jaan-boojh ke.
+   *
+   * ⚠️ Ye token us bug ke liye bana hai jo SIRF light theme me dikhta tha.
+   * `LoaderOverlay` apne naam ("Apka Saathi") ko hamesha ujle rang me likhta hai,
+   * kyunki uske peeche parda hai. Par light theme me `scrim` sirf 45% hai, aur
+   * cream page par wo milke ~#9C9790 ban jaata tha — ek beech ka sletee rang.
+   * Us par ujla naam sirf **2.6:1** par tha (AA chahiye 4.5:1), yaani text
+   * maujood hote hue bhi dikhta hi nahi tha. Dark theme me wahi naam 17.5:1 par
+   * bilkul saaf tha — isiliye ye "dark me theek, light me gayab" wala fark tha.
+   *
+   * `scrim` ko gehra karna galat hota: wo aam modal ka parda hai, aur uska kaam
+   * peeche ki screen dabana hai — poori tarah chhupana nahi. Loader ka parda ulta
+   * hai: wahan peeche kuch dikhna zaroori hi nahi, kaam poora hone tak user ko
+   * rokna hi maksad hai.
+   *
+   * Isliye dono theme me GEHRA — taaki naam ka rang ek hi rakha ja sake aur wo
+   * dono jagah AA paas kare.
+   */
+  scrimLoader: "rgba(26,23,20,0.92)",
+
   /* ── "Ulta" highlight card ──────────────────────────────────────────
    *
    * Wo gehra card jisme ujla text hota hai — home ka "Aaj ka brief", profile ka
@@ -49,6 +70,23 @@ export const lightColors = {
   onInkSoft: "rgba(247,242,233,0.72)",
   /** Us card ke andar ki lakeer. */
   onInkLine: "rgba(247,242,233,0.16)",
+  /**
+   * Us gehre parde/card par brand ka accent — loader ka "Saathi".
+   *
+   * ⚠️ Saada `terracotta` yahan kaam NAHI karta, aur ye ganit ki baat hai, pasand
+   * ki nahi. Terracotta (#C25A37) ek beech ka rang hai; gehre parde par uska
+   * contrast sirf **1.7:1** aata hai — yaani naam bilkul ghul jaata hai. Dark
+   * theme ka #D2653C bhi wahan 3.2:1 se aage nahi jaata.
+   *
+   * Isliye ek halka kiya hua terracotta, sirf gehri surface ke liye: parde par
+   * 5.5:1 (light theme) aur 7.4:1 (dark theme). Hue wahi brand ka hai, bas dark
+   * background ke liye tuned — bilkul waise hi jaise dark theme apne terracotta
+   * ko ujla karta hai.
+   *
+   * ⚠️ Ise saadi cream/surface par mat lagana — wahan ye bahut halka pad jaata
+   * hai. Cream page par `terracotta` hi sahi hai.
+   */
+  onInkAccent: "#E8875F",
 
   /* ── Ujle accent (amber / sage) par ka rang ─────────────────────────
    *
@@ -126,6 +164,10 @@ export const darkColors: Colors = {
   // bilkul nahi dikhta tha, yaani "app abhi busy hai" ka koi ishaara hi nahi
   // jaata tha. 72% par peeche ka content dab jaata hai aur parda saaf padhta hai.
   scrim: "rgba(8,6,5,0.72)",
+  // Loader ka parda yahan pehle se hi kaafi gehra tha — isliye light theme wale
+  // se bhi thoda aur gehra rakha hai, taaki dono theme me naam ek jaisa saaf
+  // padhe (light par 5.5:1, yahan 7.4:1).
+  scrimLoader: "rgba(8,6,5,0.94)",
 
   /**
    * Dark theme me card page se THODA UJLA hai, gehra nahi.
@@ -139,6 +181,9 @@ export const darkColors: Colors = {
   onInk: "#F2EAE0",
   onInkSoft: "rgba(242,234,224,0.72)",
   onInkLine: "rgba(242,234,224,0.16)",
+  // ⚠️ Light theme jaisa hi — ye rang GEHRI surface ke liye hai, theme ke liye
+  // nahi. Use ulta karne ka matlab hoga wahi 1.7:1 wala bug wapas laana.
+  onInkAccent: "#E8875F",
   // ⚠️ Light theme jaisa hi — amber/sage yahan aur bhi UJLE hain, isliye un par
   // ka rang ulta karna theek wo bug wapas laa dega jiske liye ye token bana hai.
   onAccent: "#241F1A",

@@ -16,7 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
-import { syncNotifications } from "@/lib/notifications";
+import { scheduleTestAlarm, syncNotifications } from "@/lib/notifications";
+import { useToast } from "@/components/toast";
 import {
   checkReadiness,
   confirmStep,
@@ -56,6 +57,8 @@ export function PermissionModal({
   const { reliability: r, common } = useT();
   const [state, setState] = useState<Readiness | null>(null);
   const [busy, setBusy] = useState<StepKey | null>(null);
+  const [testing, setTesting] = useState(false);
+  const toast = useToast();
   const scale = useRef(new Animated.Value(0.94)).current;
 
   /**
@@ -126,6 +129,22 @@ export function PermissionModal({
     // ye wala 60-second throttle me atak jaata — yaani permission mil to jaati
     // par alarm phir bhi na lagte, jo bilkul wahi purani shikayat hai.
     if (key === "notif" || key === "alarm") void syncNotifications({ force: true });
+  }
+
+  /**
+   * Asli alarm, 1 minute baad.
+   *
+   * ⚠️ Modal band kar dete hain, aur ye jaan-boojh ke hai: full-screen alert app
+   * ke UPAR nahi aa sakta — Android use tabhi dikhata hai jab screen band/locked
+   * ho. Modal khula chhod dene par user yahin baitha rehta aur "kuch nahi hua"
+   * samajh leta, jabki alarm theek chal raha hota.
+   */
+  async function onTest() {
+    setTesting(true);
+    const ok = await scheduleTestAlarm().catch(() => false);
+    setTesting(false);
+    toast.show(ok ? r.testScheduled : r.testFailed, ok ? "success" : "error");
+    if (ok) onClose();
   }
 
   /** "Haan, on kar diya" — sirf un steps par jinka status OS nahi batata. */
@@ -244,6 +263,31 @@ export function PermissionModal({
               ))}
             </ScrollView>
 
+            {/**
+             * Test alarm — is poore modal ka sabse zaroori button.
+             *
+             * ⚠️ Iske bina ye screen sirf ek WAADA hai. Paanch me se do steps ka
+             * status Android kisi API se batata hi nahi (`fsi` aur `oem`) —
+             * unpar hum user ke "haan kar diya" par bharosa karte hain, jo galat
+             * bhi ho sakta hai. Aur asli reminder ka intezaar ghanton ka hota
+             * hai, isliye galti pakadne me hafte lag jaate the.
+             *
+             * Ye button wahi asli alarm 1 minute baad laga deta hai — wahi
+             * channel, wahi full-screen, wahi awaaz. Phone lock karo aur 60
+             * second me pakka pata chal jaata hai.
+             */}
+            <Pressable
+              onPress={() => void onTest()}
+              disabled={testing}
+              style={({ pressed }) => [
+                styles.testBtn,
+                (pressed || testing) && { opacity: 0.7 },
+              ]}
+            >
+              <Ionicons name="alarm-outline" size={16} color={tc.terracotta} />
+              <Text style={styles.testText}>{r.testCta}</Text>
+            </Pressable>
+
             <Pressable
               onPress={onClose}
               style={({ pressed }) => [
@@ -361,6 +405,27 @@ const useStyles = makeStyles((c) => ({
   // taaki row ki chaudai teen bhashaon me na toote.
   confirmRow: { alignItems: "flex-end", gap: 5 },
   retryText: { fontSize: 11.5, fontWeight: "600", color: c.inkSoft, textDecorationLine: "underline" },
+  /**
+   * Test alarm ka button — outline, bhara hua nahi.
+   *
+   * Neeche wala `cta` is screen ka mukhya button hai ("Baad me" / "Ho gaya").
+   * Test usse halka rehna chahiye: wo ek jaanch hai, aage badhne ka raasta nahi.
+   * Do bhare hue button ek doosre se lad-te hain aur user ko pata nahi chalta ki
+   * kaun sa asli hai.
+   */
+  testBtn: {
+    marginTop: 14,
+    height: 46,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: c.terracotta,
+    backgroundColor: "rgba(194,90,55,0.07)",
+  },
+  testText: { fontSize: 14.5, fontWeight: "800", color: c.terracotta },
   cta: {
     marginTop: 12,
     height: 50,

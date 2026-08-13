@@ -58,6 +58,9 @@ export type Dict = {
   notif: {
     reminderTitle: string;
     expiryTitle: string;
+    /** Test alarm ka text — `scheduleTestAlarm()`. */
+    testTitle: string;
+    testBody: string;
     /** {name} */
     expiryToday: string;
     /** {name} {n} */
@@ -160,6 +163,10 @@ export type Dict = {
     stepOem: string;
     stepOemSub: string;
     allSetTitle: string;
+    /** Asli alarm, 1 minute baad — yahi ek tareeka hai pakka jaanne ka. */
+    testCta: string;
+    testScheduled: string;
+    testFailed: string;
     allSetBody: string;
   };
   login: {
@@ -346,6 +353,10 @@ export type Dict = {
     limitReached: string;
     nameRequired: string;
     badDate: string;
+    /** Expiry beet chuki — field ke neeche wali chetavni. */
+    expiryPast: string;
+    /** Save ho gaya, par expiry beeti hui thi — koi reminder nahi laga. */
+    addedExpired: string;
     saveFailed: string;
     cameraPermission: string;
     ocrExpiryFound: string;
@@ -353,6 +364,10 @@ export type Dict = {
     ocrReadTpl: string;
     ocrUnclear: string;
     ocrFailed: string;
+    /** Net hi nahi tha — AI chala hi nahi. */
+    ocrOffline: string;
+    /** Net dheema / Gemini bhara hua — dobara koshish karne layak. */
+    ocrBusy: string;
     imageFailed: string;
   };
   reminders: {
@@ -961,6 +976,46 @@ export type Dict = {
   };
 
   /**
+   * "Ye naya phone hai" — is phone par reminder/alert chaalu karne ka raasta.
+   *
+   * ⚠️ `deviceOwner` aur `multiDevice` se ALAG. Wo dono CHETAVNI hain — baat
+   * keh ke band ho jaate hain. Ye ek HAALAT hai jo abhi chal rahi hai: is phone
+   * par sach me alarm nahi lag rahe (dekho supabase/device-approval.sql).
+   */
+  deviceApproval: {
+    /** Patti — hat-ti nahi, kyunki haalat abhi chal rahi hai. */
+    bannerText: string;
+    bannerCta: string;
+    title: string;
+    intro: string;
+    alarmTitle: string;
+    alarmBody: string;
+    notifTitle: string;
+    notifBody: string;
+    dataTitle: string;
+    dataBody: string;
+    sendCode: string;
+    sending: string;
+    /** {email} — mask kiya hua */
+    sentTo: string;
+    verify: string;
+    verifying: string;
+    resend: string;
+    /** {s} — bache hue second */
+    resendIn: string;
+    support: string;
+    later: string;
+    errNoEmail: string;
+    errNotConfigured: string;
+    errTooMany: string;
+    errWrongCode: string;
+    errExpired: string;
+    errLocked: string;
+    errNetwork: string;
+    errFailed: string;
+  };
+
+  /**
    * "Aapka account aur bhi phones par login hai" — `deviceOwner` ka ULTA.
    *
    * ⚠️ `deviceOwner` ek phone par do log ki baat karta hai. Ye ek account ke
@@ -1209,6 +1264,8 @@ const hinglish: Dict = {
   notif: {
     reminderTitle: "🔔 Saathi ka reminder",
     expiryTitle: "📄 Saathi ka alert",
+    testTitle: "⏰ Test alarm",
+    testBody: "Ye dikh aur sunai de raha hai, to aapke reminder kaam karenge.",
     expiryToday: "{name} aaj expire ho raha hai — abhi dekh lo. 🙂",
     expiryInDays: "{name} {n} din me expire ho raha hai. Main yaad dila raha hoon 🙂",
     alertReminder: "Reminder",
@@ -1267,6 +1324,9 @@ const hinglish: Dict = {
     stepOem: "Auto-start on karo",
     stepOemSub: "Phone ki apni setting — Saathi ko background me rehne do",
     allSetTitle: "Sab set hai 🎉",
+    testCta: "Test alarm bajaao (1 minute)",
+    testScheduled: "Ho gaya — ab phone lock kar do. 1 minute me alarm bajega.",
+    testFailed: "Test alarm set nahi ho paya — upar ke steps poore karo.",
     allSetBody: "Ab har reminder theek apne time pe aayega — app band ho ya phone lock.",
   },
   login: {
@@ -1408,12 +1468,16 @@ const hinglish: Dict = {
     limitReached: "Free me itne hi documents — unlimited ke liye Saathi Plus dekhein",
     nameRequired: "Naam daalo (ya photo scan karo)",
     badDate: "Date format: YYYY-MM-DD",
+    expiryPast: "Ye date beet chuki hai — is document ka koi reminder nahi lagega",
+    addedExpired: "Document add ho gaya — par expiry beet chuki hai, reminder nahi lagega",
     saveFailed: "Save nahi ho paya",
     cameraPermission: "Camera permission chahiye",
     ocrExpiryFound: "expiry mil gayi",
     ocrReadTpl: "Padh liya: {bits} ✨",
     ocrUnclear: "Padha, par saaf nahi — details khud daal do",
     ocrFailed: "Photo padhne mein dikkat — details khud daal do",
+    ocrOffline: "Net nahi hai — photo padhi nahi ja saki. Details khud daal do, ya net aane par dobara scan karo.",
+    ocrBusy: "Net dheema hai ya Saathi busy hai — photo padhi nahi ja saki. Thodi der me dobara, ya details khud daal do.",
     imageFailed: "Image select nahi hui",
   },
   reminders: {
@@ -1867,6 +1931,37 @@ const hinglish: Dict = {
     bannerMore: "Poori baat padho",
     toast: "Ye phone {who} ke naam par set hai — aapke reminder yahan nahi aayenge.",
   },
+
+  deviceApproval: {
+    bannerText: "Is phone par reminder aur alert abhi band hain",
+    bannerCta: "Chaalu karo",
+    title: "Ye naya phone hai",
+    intro:
+      "Aapka account pehle se ek doosre phone par chalu hai. Ek waqt me sirf EK phone par hi reminder aate hain — warna ek hi reminder do phone par do alag waqt par bajta hai. Is phone par laane ke liye email par bheja code daal do.",
+    alarmTitle: "Reminder ke alarm",
+    alarmBody: "Abhi is phone par koi alarm nahi lag raha. Chaalu karte hi sab yahan aa jayenge.",
+    notifTitle: "Notification",
+    notifBody: "Document expiry aur baaki khabar abhi purane phone par ja rahi hai.",
+    dataTitle: "Aapka data surakshit hai",
+    dataBody: "Documents aur notes yahan pehle se dikh rahe hain — sirf alarm aur notification ruke hain.",
+    sendCode: "Email par code bhejo",
+    sending: "Bhej rahe hain…",
+    sentTo: "{email} par 6 ank ka code bhej diya hai",
+    verify: "Chaalu karo",
+    verifying: "Ho raha hai…",
+    resend: "Code dobara bhejo",
+    resendIn: "Dobara bhejne me {s}s",
+    support: "Code nahi aa raha? Support se baat karo",
+    later: "Baad me",
+    errNoEmail: "Is account par email nahi hai — support se baat karo, wo aapka phone chaalu kar denge.",
+    errNotConfigured: "Email bhejne ka setup abhi nahi hai — support se baat karo.",
+    errTooMany: "Bahut zyada koshish ho gayi — thodi der baad dobara.",
+    errWrongCode: "Code galat hai. Dobara dekh ke daalo.",
+    errExpired: "Ye code expire ho gaya — naya mangwa lo.",
+    errLocked: "Is code par bahut galat koshish ho gayi — naya code mangwao.",
+    errNetwork: "Internet nahi hai — net aane par dobara koshish karo.",
+    errFailed: "Kuch gadbad ho gayi — thodi der baad dobara.",
+  },
   multiDevice: {
     title: "Aapki ID aur phones par bhi login hai",
     intro: "Is phone ke alawa aapki ID {count} aur phones par login hai. Bas itna jaan lo.",
@@ -2023,6 +2118,8 @@ const hi: Dict = {
   notif: {
     reminderTitle: "🔔 साथी का रिमाइंडर",
     expiryTitle: "📄 साथी का अलर्ट",
+    testTitle: "⏰ टेस्ट अलार्म",
+    testBody: "यह दिख और सुनाई दे रहा है, तो आपके रिमाइंडर काम करेंगे।",
     expiryToday: "{name} आज एक्सपायर हो रहा है — अभी देख लो। 🙂",
     expiryInDays: "{name} {n} दिन में एक्सपायर हो रहा है। मैं याद दिला रहा हूँ 🙂",
     alertReminder: "रिमाइंडर",
@@ -2081,6 +2178,9 @@ const hi: Dict = {
     stepOem: "ऑटो-स्टार्ट ऑन करें",
     stepOemSub: "फ़ोन की अपनी सेटिंग — साथी को बैकग्राउंड में रहने दें",
     allSetTitle: "सब सेट है 🎉",
+    testCta: "टेस्ट अलार्म बजाएँ (1 मिनट)",
+    testScheduled: "हो गया — अब फ़ोन लॉक कर दीजिए। 1 मिनट में अलार्म बजेगा।",
+    testFailed: "टेस्ट अलार्म सेट नहीं हो पाया — ऊपर के steps पूरे कीजिए।",
     allSetBody: "अब हर रिमाइंडर ठीक अपने समय पर आएगा — ऐप बंद हो या फ़ोन लॉक।",
   },
   login: {
@@ -2221,12 +2321,16 @@ const hi: Dict = {
     limitReached: "फ्री में इतने ही डॉक्युमेंट — अनलिमिटेड के लिए साथी प्लस देखें",
     nameRequired: "नाम डालें (या फ़ोटो स्कैन करें)",
     badDate: "डेट फ़ॉर्मैट: YYYY-MM-DD",
+    expiryPast: "यह डेट बीत चुकी है — इस डॉक्यूमेंट का कोई रिमाइंडर नहीं लगेगा",
+    addedExpired: "डॉक्यूमेंट जुड़ गया — पर एक्सपायरी बीत चुकी है, रिमाइंडर नहीं लगेगा",
     saveFailed: "सेव नहीं हो पाया",
     cameraPermission: "कैमरा permission चाहिए",
     ocrExpiryFound: "एक्सपायरी मिल गई",
     ocrReadTpl: "पढ़ लिया: {bits} ✨",
     ocrUnclear: "पढ़ा, पर साफ़ नहीं — details खुद डाल दें",
     ocrFailed: "फ़ोटो पढ़ने में दिक्कत — details खुद डाल दें",
+    ocrOffline: "नेट नहीं है — फ़ोटो पढ़ी नहीं जा सकी। Details खुद डाल दें, या नेट आने पर दोबारा scan करें।",
+    ocrBusy: "नेट धीमा है या साथी व्यस्त है — फ़ोटो पढ़ी नहीं जा सकी। थोड़ी देर में दोबारा, या details खुद डाल दें।",
     imageFailed: "इमेज सेलेक्ट नहीं हुई",
   },
   reminders: {
@@ -2662,6 +2766,37 @@ const hi: Dict = {
     bannerMore: "पूरी बात पढ़िए",
     toast: "यह फ़ोन {who} के नाम पर सेट है — आपके रिमाइंडर यहाँ नहीं आएँगे।",
   },
+
+  deviceApproval: {
+    bannerText: "इस फ़ोन पर रिमाइंडर और अलर्ट अभी बंद हैं",
+    bannerCta: "चालू करें",
+    title: "यह नया फ़ोन है",
+    intro:
+      "आपका अकाउंट पहले से एक दूसरे फ़ोन पर चालू है। एक समय में सिर्फ़ एक ही फ़ोन पर रिमाइंडर आते हैं — वरना एक ही रिमाइंडर दो फ़ोन पर दो अलग समय पर बजता है। इस फ़ोन पर लाने के लिए email पर भेजा कोड डालिए।",
+    alarmTitle: "रिमाइंडर के अलार्म",
+    alarmBody: "अभी इस फ़ोन पर कोई अलार्म नहीं लग रहा। चालू करते ही सब यहाँ आ जाएँगे।",
+    notifTitle: "नोटिफ़िकेशन",
+    notifBody: "डॉक्युमेंट एक्सपायरी और बाक़ी ख़बर अभी पुराने फ़ोन पर जा रही है।",
+    dataTitle: "आपका डेटा सुरक्षित है",
+    dataBody: "डॉक्युमेंट और नोट्स यहाँ पहले से दिख रहे हैं — सिर्फ़ अलार्म और नोटिफ़िकेशन रुके हैं।",
+    sendCode: "Email पर कोड भेजें",
+    sending: "भेज रहे हैं…",
+    sentTo: "{email} पर 6 अंक का कोड भेज दिया है",
+    verify: "चालू करें",
+    verifying: "हो रहा है…",
+    resend: "कोड दोबारा भेजें",
+    resendIn: "दोबारा भेजने में {s}s",
+    support: "कोड नहीं आ रहा? सपोर्ट से बात करें",
+    later: "बाद में",
+    errNoEmail: "इस अकाउंट पर email नहीं है — सपोर्ट से बात करें, वे आपका फ़ोन चालू कर देंगे।",
+    errNotConfigured: "Email भेजने का सेटअप अभी नहीं है — सपोर्ट से बात करें।",
+    errTooMany: "बहुत ज़्यादा कोशिश हो गई — थोड़ी देर बाद दोबारा।",
+    errWrongCode: "कोड ग़लत है। दोबारा देख कर डालिए।",
+    errExpired: "यह कोड एक्सपायर हो गया — नया मँगवा लीजिए।",
+    errLocked: "इस कोड पर बहुत ग़लत कोशिश हो गई — नया कोड मँगवाइए।",
+    errNetwork: "इंटरनेट नहीं है — नेट आने पर दोबारा कोशिश करें।",
+    errFailed: "कुछ गड़बड़ हो गई — थोड़ी देर बाद दोबारा।",
+  },
   multiDevice: {
     title: "आपकी ID और फ़ोनों पर भी लॉगिन है",
     intro: "इस फ़ोन के अलावा आपकी ID {count} और फ़ोनों पर लॉगिन है। बस इतना जान लीजिए।",
@@ -2818,6 +2953,8 @@ const en: Dict = {
   notif: {
     reminderTitle: "🔔 Reminder from Saathi",
     expiryTitle: "📄 Alert from Saathi",
+    testTitle: "⏰ Test alarm",
+    testBody: "If you can see and hear this, your reminders will work.",
     expiryToday: "{name} expires today — take a look now. 🙂",
     expiryInDays: "{name} expires in {n} days. Just a heads-up 🙂",
     alertReminder: "Reminder",
@@ -2876,6 +3013,9 @@ const en: Dict = {
     stepOem: "Turn on auto-start",
     stepOemSub: "Your phone's own setting — let Saathi stay in the background",
     allSetTitle: "All set 🎉",
+    testCta: "Ring a test alarm (1 minute)",
+    testScheduled: "Done — now lock your phone. The alarm rings in 1 minute.",
+    testFailed: "Couldn't set the test alarm — finish the steps above.",
     allSetBody: "Every reminder will now arrive right on time — app closed or phone locked.",
   },
   login: {
@@ -3015,12 +3155,16 @@ const en: Dict = {
     limitReached: "You've reached the Free limit — Saathi Plus for unlimited",
     nameRequired: "Enter a name (or scan a photo)",
     badDate: "Date format: YYYY-MM-DD",
+    expiryPast: "This date has already passed — no reminder will be set for this document",
+    addedExpired: "Document added — but the expiry has passed, so no reminder will be set",
     saveFailed: "Couldn't save",
     cameraPermission: "Camera permission needed",
     ocrExpiryFound: "found the expiry",
     ocrReadTpl: "Read it: {bits} ✨",
     ocrUnclear: "Read it, but it wasn't clear — please fill in the details",
     ocrFailed: "Trouble reading the photo — please fill in the details",
+    ocrOffline: "No internet — couldn't read the photo. Fill in the details yourself, or scan again once you're back online.",
+    ocrBusy: "Slow connection or Saathi is busy — couldn't read the photo. Try again shortly, or fill in the details yourself.",
     imageFailed: "Couldn't select the image",
   },
   reminders: {
@@ -3455,6 +3599,37 @@ const en: Dict = {
       "For {who}. Signing in with a different ID turns off their notifications and AI.",
     bannerMore: "Read what changes",
     toast: "This phone is set up for {who} — your reminders won't arrive here.",
+  },
+
+  deviceApproval: {
+    bannerText: "Reminders and alerts are off on this phone",
+    bannerCta: "Turn on",
+    title: "This is a new phone",
+    intro:
+      "Your account is already active on another phone. Reminders only ever go to ONE phone at a time — otherwise the same reminder rings at two different times on two phones. Enter the code we email you to move them here.",
+    alarmTitle: "Reminder alarms",
+    alarmBody: "No alarms are being set on this phone right now. Turn it on and they all move here.",
+    notifTitle: "Notifications",
+    notifBody: "Document expiry and other alerts are still going to your old phone.",
+    dataTitle: "Your data is safe",
+    dataBody: "Documents and notes already show here — only alarms and notifications are paused.",
+    sendCode: "Email me a code",
+    sending: "Sending…",
+    sentTo: "We sent a 6-digit code to {email}",
+    verify: "Turn on",
+    verifying: "Working…",
+    resend: "Send the code again",
+    resendIn: "Resend in {s}s",
+    support: "Code not arriving? Talk to support",
+    later: "Later",
+    errNoEmail: "There's no email on this account — talk to support and they'll turn your phone on.",
+    errNotConfigured: "Email isn't set up yet — please talk to support.",
+    errTooMany: "Too many attempts — please try again in a little while.",
+    errWrongCode: "That code is wrong. Please check and try again.",
+    errExpired: "That code has expired — ask for a new one.",
+    errLocked: "Too many wrong attempts on that code — ask for a new one.",
+    errNetwork: "No internet — try again once you're back online.",
+    errFailed: "Something went wrong — please try again shortly.",
   },
   multiDevice: {
     title: "Your ID is signed in on other phones too",

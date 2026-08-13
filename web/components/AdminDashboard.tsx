@@ -19,6 +19,7 @@ import {
   Globe,
   Bug,
   FileText,
+  Smartphone,
   NotebookPen,
   Megaphone,
   LineChart,
@@ -45,6 +46,7 @@ import AdminSpend from "@/components/AdminSpend";
 import AdminPayments from "@/components/AdminPayments";
 import AdminBroadcast from "@/components/AdminBroadcast";
 import AdminDocuments from "@/components/AdminDocuments";
+import AdminDevices from "@/components/AdminDevices";
 import AdminNotes from "@/components/AdminNotes";
 import AdminPricing from "@/components/AdminPricing";
 import AdminLogs from "@/components/AdminLogs";
@@ -98,6 +100,9 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   // admin unhe ek saath dekhta hai.
   { key: "notes", icon: NotebookPen },
   { key: "documents", icon: FileText },
+  // Devices documents ke theek neeche — support par sawaal aksar isi jodi me
+  // aata hai ("mere documents dikh rahe hain par reminder nahi aa rahe").
+  { key: "devices", icon: Smartphone },
   // Renew guides documents ke theek neeche — wo unhi documents ka agla sawaal
   // hai ("expire ho raha hai, ab karun kya?").
   { key: "renewals", icon: RotateCw },
@@ -545,6 +550,7 @@ function Dashboard({
               {section === "payments" && <AdminPayments />}
               {section === "notes" && <AdminNotes />}
               {section === "documents" && <AdminDocuments />}
+              {section === "devices" && <AdminDevices />}
               {section === "reviews" && <AdminReviews />}
               {section === "logs" && <AdminLogs />}
               {section === "analytics" && <AdminAnalytics />}

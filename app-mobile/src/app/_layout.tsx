@@ -13,6 +13,7 @@ import { ReminderAlertHost } from "@/components/reminder-alert";
 import { ReviewPrompt } from "@/components/review-prompt";
 import { DeviceOwnerWarning } from "@/components/device-owner-warning";
 import { MultiDeviceWarning } from "@/components/multi-device-warning";
+import { DeviceApprovalGate } from "@/components/device-approval-gate";
 import { LockGate } from "@/components/lock-gate";
 import { OfflineGate } from "@/components/offline-gate";
 import { AccountGate } from "@/components/account-gate";
@@ -94,6 +95,11 @@ export default function RootLayout() {
               <ThemeFab />
               {/* Internet nahi/dheema — sabse upar patli patti. */}
               <NetworkBanner />
+              {/* "Ye naya phone hai — reminder yahan band hain" ki patti.
+                  ⚠️ NetworkBanner ke NEECHE: net ki dikkat aksar chand second ki
+                  hoti hai, ye haalat tab tak rehti hai jab tak user code na
+                  daale. Upar hamesha wo rehna chahiye jo abhi badal raha hai. */}
+              <DeviceApprovalGate />
               {/* Net ki wajah se koi kaam ruka — beech screen me popup + retry. */}
               <NetAlertModal />
               </OfflineGate>

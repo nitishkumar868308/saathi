@@ -49,8 +49,17 @@
  * bahar nahi nikalta. Naam/gap sab `em` me hain, to size ke saath khud scale
  * karte hain — koi alag breakpoint nahi chahiye.
  *
- * Rang: naam `text-ink` par hai, jo dono theme me apne aap ulta ho jaata hai
- * (globals.css ke CSS variables) — light page par gehra, dark par ujla.
+ * Rang: naam DO rango me hai — "Apka" dabaa hua (`text-ink-soft`) aur "Saathi"
+ * brand ke rang me (`text-terracotta`). Isse nazar us shabd par jaati hai jo
+ * brand ka asli naam hai, aur ek hi mote rang me likhe do shabd jaisa flat nahi
+ * lagta. Dono token globals.css ke CSS variables se aate hain, isliye dono theme
+ * me apne aap sahi rang milta hai.
+ *
+ * ⚠️ Web par parda `bg-cream/70` hai (LoadingOverlay) — yaani wo THEME ke saath
+ * ulta hota hai, hamesha gehra nahi rehta. Isliye yahan theme-wale token hi sahi
+ * hain. App me maamla ulta hai: wahan loader ka parda dono theme me gehra rehta
+ * hai, to wahan `onInkSoft`/`onInkAccent` lagte hain. Dono files ka look ek hi
+ * hai, par token ek jaise NAHI hain — copy karte waqt ye dhyaan rakhna.
  */
 export default function Loader({
   size = 48,
@@ -81,10 +90,10 @@ export default function Loader({
         {showName && (
           <>
             <span className="sa-win sa-win-l" aria-hidden>
-              <span className="sa-name sa-name-l text-ink">Apka</span>
+              <span className="sa-name sa-name-l text-ink-soft">Apka</span>
             </span>
             <span className="sa-win sa-win-r" aria-hidden>
-              <span className="sa-name sa-name-r text-ink">Saathi</span>
+              <span className="sa-name sa-name-r text-terracotta">Saathi</span>
             </span>
           </>
         )}

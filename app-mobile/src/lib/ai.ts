@@ -567,28 +567,56 @@ export type DocumentAI = {
  * Document image (base64) ko Gemini vision se samajho.
  * Fail/no-key ho to null — caller local OCR pe fallback kar sakta hai.
  */
+/**
+ * Scan ka nateeja — kaamyabi, ya wajah.
+ *
+ * ⚠️ Pehle ye sirf `DocumentAI | null` tha, aur `null` ka koi matlab nahi tha.
+ * Ye bilkul wahi galti thi jo `parseReminderAI` me pakdi ja chuki hai (upar
+ * `ReminderParse` par likhi hai), bas yahan wo theek karna chhoot gaya tha —
+ * aur document wali screen par ye zyada chubhti hai, kyunki wahan user ek photo
+ * kheench chuka hota hai aur intezaar kar raha hota hai.
+ *
+ * Paanch bilkul alag halaat ek hi line dikhati thi ("Padha, par saaf nahi —
+ * details khud daal do"): net band, net dheema, Gemini bhara hua, server ki
+ * dikkat, aur AI ka sach me kuch na dhoondh paana. Pehli chaar me wo line
+ * JHOOTH hai — AI ne kuch padha hi nahi tha.
+ *
+ * `unclear` isliye alag hai: wo akela aisa nateeja hai jisme AI sach me chala
+ * tha. Us par "details khud daal do" kehna sahi hai; baaki par dobara koshish
+ * karne ko kehna sahi hai.
+ */
+export type DocumentScan =
+  | { ok: true; data: DocumentAI }
+  /** AI chala aur jawab bhi diya, par usme kuch kaam ka nahi tha. */
+  | { ok: false; failure: "unclear" }
+  | { ok: false; failure: AiFailure };
+
 export async function scanDocumentAI(
   base64: string,
   locale?: string,
   mime = "image/jpeg",
-): Promise<DocumentAI | null> {
-  if (!supabase || !base64) return null;
+): Promise<DocumentScan> {
+  if (!supabase || !base64) return { ok: false, failure: "server" };
   try {
     const data = await callAi<(Partial<DocumentAI> & { error?: string }) | null>(
       { task: "scan", image: base64, mime, locale },
       // Image bhejni hai — scan ko thodi zyada mohlat.
       TASK_TIMEOUT_MS * 2,
     );
-    if (!data) return null;
+    // Server ne jawab diya, par usme samajh nahi thi — ye AI ki apni baat hai,
+    // net ki nahi. Isliye `unclear`, `server` nahi.
+    if (!data || data.error) return { ok: false, failure: "unclear" };
     const r = data;
-    if (r.error) return null;
     return {
-      type: r.type || "other",
-      name: r.name || "",
-      expiry: r.expiry ?? null,
-      summary: r.summary || "",
+      ok: true,
+      data: {
+        type: r.type || "other",
+        name: r.name || "",
+        expiry: r.expiry ?? null,
+        summary: r.summary || "",
+      },
     };
-  } catch {
-    return null;
+  } catch (e) {
+    return { ok: false, failure: failureOf(e) };
   }
 }

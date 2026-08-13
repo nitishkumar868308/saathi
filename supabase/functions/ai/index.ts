@@ -73,19 +73,49 @@ const SB_URL = Deno.env.get("SUPABASE_URL");
 const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY");
 const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-/** Caller ka user id (JWT se). Referral anti-fraud ke liye server-side chahiye. */
-async function getUserId(req: Request): Promise<string | null> {
+/**
+ * Caller kaun hai — ya wo kyun pata nahi chala.
+ *
+ * ⚠️ Pehle ye sirf `string | null` lautata tha, aur har fail ek jaisa dikhta
+ * tha. Ab jab iske jawab par POORA function ruk-ta hai (neeche dekho), wo ek
+ * khatarnaak simplification ban jaati: Supabase ka ek pal ka jhatka ya ek
+ * missing env var HAR asli user ko "unauthorized" keh deta. Yaani ek chhoti si
+ * network dikkat poore AI ko band kar deti, aur error bhi jhooth bolta.
+ *
+ * Isliye teen alag wajah:
+ *   no_token / bad_token  → sach me unauthorized (401)
+ *   unavailable           → hum jaanch hi nahi paaye (503, dobara koshish)
+ *   not_configured        → env hi nahi hai (503, server ki galti)
+ */
+type Caller =
+  | { ok: true; uid: string }
+  | { ok: false; reason: "no_token" | "bad_token" | "unavailable" | "not_configured" };
+
+async function getCaller(req: Request): Promise<Caller> {
+  if (!SB_URL || !SB_ANON) return { ok: false, reason: "not_configured" };
+
   const auth = req.headers.get("Authorization");
-  if (!auth || !SB_URL || !SB_ANON) return null;
+  if (!auth) return { ok: false, reason: "no_token" };
+
   try {
     const res = await fetch(`${SB_URL}/auth/v1/user`, {
       headers: { Authorization: auth, apikey: SB_ANON },
     });
-    if (!res.ok) return null;
+    /**
+     * ⚠️ Anon key bhi ek valid JWT hai aur wo app ke bundle me public padi hai.
+     * Supabase uspar `/auth/v1/user` par 401 deta hai (koi user hai hi nahi) —
+     * yahi wo ek jaanch hai jo "koi bhi bulaa le" aur "logged-in user" me fark
+     * karti hai. Isliye 4xx ko token ki galti maano.
+     */
+    if (res.status >= 400 && res.status < 500) return { ok: false, reason: "bad_token" };
+    // 5xx = Supabase ki apni dikkat. Ise "galat token" kehna asli user ko bahar
+    // kar dena hai.
+    if (!res.ok) return { ok: false, reason: "unavailable" };
     const u = await res.json();
-    return u?.id ?? null;
+    return u?.id ? { ok: true, uid: String(u.id) } : { ok: false, reason: "bad_token" };
   } catch {
-    return null;
+    // Network hi nahi pahunchi — hum jaanch NAHI paaye. Ye "galat token" nahi hai.
+    return { ok: false, reason: "unavailable" };
   }
 }
 
@@ -444,6 +474,38 @@ const STUB_REPLY =
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  /**
+   * ── Login zaroori hai — har task ke liye, sabse pehle ────────────────────
+   *
+   * ⚠️ Pehle `getUserId()` yahan se BAHUT neeche chalta tha aur uska jawab sirf
+   * logging (`track`, `logUsage`) aur Plus-gate ke liye use hota tha. `null`
+   * hone par kahin koi rok NAHI thi — yaani `chat`, `scan`, `reminder` aur
+   * `docfollow`, sab bina kisi logged-in user ke chal jaate the.
+   *
+   * Ye sirf ek theory nahi thi. Supabase ka anon key JAAN-BOOJH KE public hai —
+   * wo app ke bundle me shipped hota hai aur kisi bhi APK se nikala ja sakta
+   * hai. Supabase ka apna `verify_jwt` bhi yahan nahi bachata, kyunki anon key
+   * KHUD ek valid JWT hai. Matlab koi bhi Gemini ki har call chala sakta tha aur
+   * bill hamara banta. `scan` sabse mehnga hai (vision model + poori image).
+   *
+   * Isliye ab jaanch sabse upar hai: payload padhne se pehle, `health` se pehle,
+   * aur Gemini ki kisi bhi call se pehle. Ek bhi token kharch hone se pehle.
+   *
+   * ⚠️ `health` bhi iske peeche hai, jaan-boojh ke. Wo GEMINI_API_KEY ki lambai,
+   * uska prefix aur uske aage-peeche space hai ya nahi — sab bata deta hai. Wo
+   * debug ke liye kaafi kaam ka hai, par sirf hamare liye.
+   */
+  const caller = await getCaller(req);
+  if (!caller.ok) {
+    if (caller.reason === "not_configured" || caller.reason === "unavailable") {
+      // Hamari taraf ki dikkat — user ko "aapka login galat hai" kehna jhooth
+      // hoga, aur wo bekaar me logout karne lagega.
+      return json({ error: "abhi jaanch nahi ho pa rahi, thodi der me try karo" }, 503);
+    }
+    return json({ error: "unauthorized" }, 401);
+  }
+  const uid = caller.uid;
+
   let payload: any;
   try {
     payload = await req.json();
@@ -555,16 +617,12 @@ Deno.serve(async (req) => {
   if (!KEY) {
     if (task === "chat") {
       const userMsg = payload.message ?? "";
-      const uid = await getUserId(req);
-      if (uid && userMsg.trim()) await recordChat(uid, userMsg, STUB_REPLY);
+      // `uid` upar auth se aa chuka hai — yahan wo hamesha maujood hai.
+      if (userMsg.trim()) await recordChat(uid, userMsg, STUB_REPLY);
       return json({ reply: STUB_REPLY, stub: true });
     }
     return json({ error: "GEMINI_API_KEY set nahi hai" }, 500);
   }
-
-  // Ek hi baar nikaalo — har task ke hisaab me user ka pata chahiye (item 3),
-  // aur chat me referral verify ke liye bhi wahi chahiye.
-  const uid = await getUserId(req);
 
   try {
     // 1. CHAT — app ke sawaal + AGENTIC reminder banana. Bahar ka nahi.
@@ -816,7 +874,8 @@ Deno.serve(async (req) => {
       }
 
       // Server-side record (referral "first chat" isi se verify hota hai).
-      if (uid && userMsg.trim()) await recordChat(uid, userMsg, reply);
+      // `uid` upar auth se aata hai — ab wo kabhi null nahi hota.
+      if (userMsg.trim()) await recordChat(uid, userMsg, reply);
 
       return json({ reply, action });
     }

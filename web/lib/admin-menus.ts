@@ -31,6 +31,16 @@ export const ADMIN_MENUS = [
   "payments",
   "notes",
   "documents",
+  /**
+   * Kaun sa user kaun se phone se chal raha hai — aur support ka wo raasta jab
+   * email par code na pahunche.
+   *
+   * ⚠️ `users` se alag menu hai, aur alag hi rehna chahiye. Yahan se ek admin
+   * kisi ka bhi phone "chaalu" kar sakta hai — yaani uske saare reminder aur
+   * alert us phone par bhej sakta hai. Wo `users` wali aam padhne wali permission
+   * se kahin bhaari haq hai, aur use alag se diya jaana chahiye.
+   */
+  "devices",
   "renewals",
   "reviews",
   "logs",

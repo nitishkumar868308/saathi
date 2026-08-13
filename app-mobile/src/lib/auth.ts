@@ -2,6 +2,8 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { supabase } from "./supabase";
 import { forgetLocalLock } from "./app-lock";
+import { getDeviceId } from "./device";
+import { resetDeviceState } from "./device-approval";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -82,7 +84,33 @@ export async function signOut() {
    * atka hua logout is se kahin zyada bura hai.
    */
   await forgetLocalLock().catch(() => {});
+
+  /**
+   * ⚠️ Is phone ka notification token bhi hatao — session hatane se PEHLE.
+   *
+   * Ye ek asli bug tha jo audit me pakda gaya. `device_tokens` ki row par purana
+   * `user_id` pada reh jaata tha, aur us row se admin ka broadcast aur reminder
+   * ki push seedha bheji jaati hai. Yaani LOGOUT KE BAAD BHI is phone par us
+   * user ke reminder aur message aate rehte the. Bech diya hua ya kisi ko diya
+   * hua phone iska sabse bura roop hai — uspar aapke reminder ka poora text
+   * dikhta rehta.
+   *
+   * Session ke BAAD nahi kar sakte: tab `auth.uid()` khatam ho chuka hota hai
+   * aur RPC apni hi row nahi dhoondh paata (wo `auth.uid()` par chalti hai).
+   *
+   * Fail ho to logout rukna NAHI chahiye — atka hua logout is se kahin bura hai.
+   * Server par row reh jayegi, par agla login usi token ka maalik badal dega.
+   */
+  try {
+    const sb = client();
+    await sb.rpc("forget_my_device_tokens", { p_device_id: await getDeviceId() });
+  } catch {
+    /* best-effort */
+  }
+
   await client().auth.signOut();
+  // Agla user is phone par aaye to use purana haal na dikhe.
+  resetDeviceState();
 }
 
 /**
