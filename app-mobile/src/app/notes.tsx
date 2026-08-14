@@ -31,6 +31,7 @@ import {
   type NoteWithReminder,
 } from "@/lib/notes";
 import { useDataChanged } from "@/lib/data-events";
+import { useKeyboardPad } from "@/components/keyboard-view";
 
 /**
  * Notes ki list.
@@ -115,6 +116,8 @@ export default function Notes() {
    *      se nikalti hai.
    */
   const insets = useSafeAreaInsets();
+  /** Keyboard khula ho to utni aur jagah — search karte waqt neeche wale note bhi dikhein. */
+  const kbPad = useKeyboardPad();
   const { width } = useWindowDimensions();
   /** Ek card kam se kam itna chauda — isse neeche text padhne laayak nahi rehta. */
   const columnCount = Math.max(1, Math.min(4, Math.floor((width - 24) / 165)));
@@ -277,7 +280,15 @@ export default function Notes() {
           styles.scroll,
           // FAB + system nav bar dono ke liye jagah. Tay 110 par 3-button
           // navigation wale phone par aakhri card FAB ke peeche chala jaata tha.
-          { paddingBottom: 110 + insets.bottom },
+          //
+          // ⚠️ `kbPad` bhi: is screen par ek TextInput hai (search) aur wo poore
+          // app me ekmatra aisa tha jiske liye keyboard ki oonchai kahin naapi hi
+          // nahi jaati thi. Search box khud upar hai isliye wo to dikhta rehta
+          // tha, par keyboard khulte hi list ke neeche wale note uske peeche chale
+          // jaate the — aur dhoondhte waqt neeche wala hissa hi sabse zaroori
+          // hota hai. Baaki har TextInput wali screen par `KeyboardView` /
+          // `useKeyboardPad` pehle se hai (wajah `components/keyboard-view.tsx`).
+          { paddingBottom: 110 + insets.bottom + kbPad },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={

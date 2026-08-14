@@ -42,3 +42,8 @@ example
 # generated native folders
 /ios
 /android
+
+# Next.js ka build output — is folder me app ka apna koi code nahi hai.
+# (Asli Next app `web/` me hai; ye yahan galti se ban gaya tha aur commit bhi
+# ho gaya tha. eslint.config.js me bhi isi wajah se `.next/*` ignore hai.)
+.next/

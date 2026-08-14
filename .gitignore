@@ -1,0 +1,4 @@
+# Supabase CLI ki local state (project ref, versions, pooler URL).
+# Ye machine-specific hai aur `supabase link` par apne aap banta hai —
+# repo me rakhne ki koi wajah nahi.
+supabase/.temp/

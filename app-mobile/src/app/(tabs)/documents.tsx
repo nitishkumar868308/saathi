@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
 import { makeStyles, useColors } from "@/theme/theme";
+import { useDataChanged } from "@/lib/data-events";
 import { SkeletonList } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
 import { timed } from "@/lib/network";
@@ -71,6 +72,28 @@ export default function Documents() {
       load();
     }, [load]),
   );
+
+  /**
+   * Badlaav ki khabar seedhe — focus ke intezaar ke bina.
+   *
+   * ⚠️ Ye tab, Home/Reminders/Notes ke ulta, sirf `useFocusEffect` par tika tha —
+   * aur wahi wo galti hai jo `lib/data-events.ts` band karne ke liye bana tha.
+   * `document-renew` aur Home ka delete dono `emitDataChanged()` chalate hain aur
+   * unki tippani saaf kehti hai "Documents tab bhi khula ho sakta hai" — par
+   * yahan use sunne wala koi tha hi nahi.
+   *
+   * Jo raaste focus chhodte hi nahi, wahan farak dikhta hai: reminder/expiry ka
+   * alert MODAL hai (poore app ke upar khulta hai, kisi screen ka focus nahi
+   * leta), aur offline upload ki kataar app khuli rehte hue hi khali hoti hai.
+   * Un dono par ye list purani padi rehti thi jab tak user doosre tab pe jaake
+   * wapas na aaye.
+   *
+   * `load(true)` — chup-chaap taaza karo. Skeleton dobara dikhana yahan jhatka
+   * lagta hai; list to pehle se saamne hai (wahi tareeka Home par hai).
+   */
+  useDataChanged(() => {
+    void load(true);
+  });
 
   async function runDelete(doc: Document) {
     setPendingDelete(null);
