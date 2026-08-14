@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  KeyboardAvoidingView,
   Keyboard,
   RefreshControl,
 } from "react-native";
@@ -13,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { Loader } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
@@ -301,9 +301,9 @@ export default function Support() {
       )}
 
       {view === "new" && (
-        // Yahan bhi wahi baat: Android par `undefined` behavior se keyboard
-        // message wale bade box ko dhak leta tha.
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={0}>
+        // Yahan bhi wahi baat: keyboard message wale bade box ko dhak leta tha.
+        // (Poori wajah `components/keyboard-view.tsx` par likhi hai.)
+        <KeyboardView>
           <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.formTitle}>{s.newTitle}</Text>
 
@@ -341,28 +341,18 @@ export default function Support() {
 
             <Text style={styles.hint}>{s.createdHint}</Text>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardView>
       )}
 
       {view === "thread" && (
         /**
-         * ⚠️ Yahan `behavior` Android par `undefined` tha — yaani Android par ye
-         * view kuch karti hi nahi thi. Wo sirf tab chalta hai jab window khud
-         * keyboard ke liye chhoti ho jaye (adjustResize), aur naye Android
-         * (edge-to-edge) me app poore screen par khinchti hai — window chhoti
-         * hoti hi nahi. Natija: keyboard khulte hi likhne ka box uske NEECHE
-         * chala jaata tha, user ko apna type kiya hua dikhta hi nahi tha
-         * (item 5).
-         *
-         * `padding` dono platform par ek jaisa chalta hai — ye keyboard ki
-         * unchai khud naapta hai (Saathi wali chat tab isi tarah kaam karti
-         * hai, aur wahan ye dikkat kabhi aayi hi nahi).
+         * ⚠️ Yahan pehle `KeyboardAvoidingView` tha aur wo naye Android par kuch
+         * karta hi nahi (edge-to-edge me window keyboard ke liye chhoti hoti hi
+         * nahi — poori wajah `components/keyboard-view.tsx` par likhi hai).
+         * Natija: keyboard khulte hi likhne ka box uske NEECHE chala jaata tha,
+         * aur user ko apna type kiya hua dikhta hi nahi tha (item 5).
          */
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior="padding"
-          keyboardVerticalOffset={0}
-        >
+        <KeyboardView>
           <ScrollView
             ref={scrollRef}
             contentContainerStyle={styles.threadContent}
@@ -424,7 +414,7 @@ export default function Support() {
               <Ionicons name="arrow-up" size={19} color={tc.white} />
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardView>
       )}
     </SafeAreaView>
   );

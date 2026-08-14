@@ -5,13 +5,12 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import { useT } from "@/lib/i18n/LanguageProvider";
@@ -113,10 +112,7 @@ export default function Contact() {
           </Pressable>
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardView>
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
@@ -171,7 +167,7 @@ export default function Contact() {
             <Ionicons name="paper-plane" size={17} color={tc.white} />
             <Text style={styles.sendText}>{sending ? c.sending : c.send}</Text>
           </Pressable>
-        </KeyboardAvoidingView>
+        </KeyboardView>
       )}
 
       <LoaderOverlay visible={sending} />

@@ -222,8 +222,25 @@ const INSTANT_DEATH_MS = 1500;
  *     hamesha ke liye nahi ghoomta rahega.
  *   • `LISTEN_MAX_MS` — mic khuli chhod dena battery aur privacy dono ke liye
  *     bura hai. Ek minute me har asli baat khatam ho jaati hai.
+ *
+ * ⚠️ `RESTART_MAX` 5 se 2 par laaya gaya, aur wajah AWAAZ hai.
+ *
+ * Android ka recognizer har `start()` par ek "ting" aur har `end()` par doosri
+ * bajata hai — ye tone system ki hai, app use band nahi kar sakti. 5 restart ka
+ * matlab tha ek hi hold me 10 tak beep. User ne bilkul yahi likha: "beech beech
+ * me start band ka sound aata hai".
+ *
+ * Aur ye sirf shor ki baat nahi thi. Har restart ke beech mic ~200-400ms ke liye
+ * BAND hoti hai, aur us khidki me bola hua sab kuch gir jaata hai. Jo user
+ * lagatar bolta rehta hai (aur wahi swabhavik hai) uske liye ye "bol raha hoon
+ * par kuch ho nahi raha" jaisa hi dikhta hai.
+ *
+ * Do restart chuppi wale asli maamle (user ne 2-3 second sochne me lagaye) ko
+ * ab bhi sambhaal lete hain, par shor aur gum hui baat dono ek-tihaayi reh
+ * jaate hain. Iske saath neeche `androidTuning()` me chuppi ka sabra bhi badha
+ * diya gaya hai — yaani restart ki zaroorat hi pehle se kam padti hai.
  */
-const RESTART_MAX = 5;
+const RESTART_MAX = 2;
 const LISTEN_MAX_MS = 60_000;
 
 /**
@@ -344,10 +361,25 @@ function googleService(): string | null {
 function androidTuning(): Record<string, string | number | boolean> {
   const tiramisu = Number(Platform.Version) >= 33;
   return {
-    // Beech me saans lene par session band na ho — 2s chuppi ke baad hi "baat
-    // khatam" maano. Default (~1s) bahut jaldi kaat deta tha.
-    EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 2000,
-    EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 1600,
+    /**
+     * Beech me saans lene par session band na ho.
+     *
+     * ⚠️ 2000 → 3000 (aur 1600 → 2400). Ye seedha us shikayat ka ilaaj hai ki
+     * "bol rahe hain par kuch nahi hota, aur beech-beech me start/band ka sound
+     * aata hai".
+     *
+     * Chain aisi thi: recognizer 2 second ki chuppi par session khatam maan leta
+     * tha → `keepListening()` use dobara chalu karta tha → Android start/end ki
+     * tone bajata tha → aur us restart ki khidki me bola hua hissa gir jaata tha.
+     * Jo user bolte waqt rukta hai (naam yaad karne me, ya wakya soch ke) — yaani
+     * lagbhag har wo user jiske liye ye app bani hai — uske liye ye har baar
+     * hota tha.
+     *
+     * 3 second aam viraam se lamba hai par itna bhi nahi ki hold chhodne ke baad
+     * ka intezaar mehsoos ho (chhodte hi `stop()` waise bhi chala jaata hai).
+     */
+    EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+    EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 2400,
     /**
      * ⚠️ Pehle yahan 2000 tha, aur wo hold-to-talk ko todta tha.
      *
@@ -771,6 +803,18 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     volumeTicks.current = 0;
     gotResult.current = false;
     lastInterim.current = "";
+    /**
+     * ⚠️ Purani loop pehle ROKO.
+     *
+     * `beginUi()` har restart par dobara chalta hai (chuppi wala `keepListening`,
+     * aur `escalated` wala doosra attempt). Bina is line ke har baar ek NAYI
+     * `Animated.loop` chadh jaati thi aur purani chalti rehti — do-teen loop ek
+     * hi value ko alag-alag taraf kheenchte hain, aur mic ka button kaanpta hua
+     * dikhne lagta hai. Us kaanpte button ko dekh ke user ko lagta hai app hi
+     * atak gayi.
+     */
+    pulse.stopAnimation();
+    pulse.setValue(1);
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.18, duration: 500, useNativeDriver: true }),
@@ -954,12 +998,28 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
         release();
         return;
       }
-      // Permission ka popup khula tha aur us beech iraada khatam ho gaya (user ne
-      // ungli hata li ya doosri jagah tap kar diya) — ab mic chalu karna bekaar
-      // hai, aur wo chup kamre me chalti rehti.
+      /**
+       * Permission ka popup khula tha aur us beech iraada khatam ho gaya (user
+       * ne ungli hata li ya doosri jagah tap kar diya) — ab mic chalu karna
+       * bekaar hai, aur wo chup kamre me chalti rehti.
+       *
+       * ⚠️ Yahan pehle sirf DO ref saaf hote the (`starting`, `deadSession`) aur
+       * `release()` chalta hi nahi tha. Wahi is file ka sabse bura bug tha, aur
+       * user ki shikayat theek uske upar baithti hai ("voice kaam nahi kar raha,
+       * bol rahe hain lekin kuch nahi hota"):
+       *
+       *   • `listening` (React state) TRUE pada reh jaata tha — mic ka button
+       *     hamesha ke liye laal, jaise wo abhi bhi sun raha ho.
+       *   • `activeOwner` is button ke naam par claimed reh jaata tha — yaani us
+       *     screen par (aur kisi bhi doosre mic par) agli baar `startListening`
+       *     pehle `abort()` maarta aur sab kuch aur uljh jaata.
+       *
+       * Aur ye soorat aam hai, kinare ki nahi: `keepListening()` ka restart
+       * 150ms ke timer par chalta hai, aur ungli uske theek beech me uthna
+       * bilkul normal hai. Ek baar aisa hote hi us screen par voice khatam.
+       */
       if (intent.current === "none") {
-        starting.current = false;
-        deadSession.current = false;
+        release();
         return;
       }
 

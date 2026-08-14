@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { documentUrl } from "./storage";
+import { belongsToDoc, cacheFileName } from "../utils/doc-file-name";
 import type { Document } from "./documents";
 
 /**
@@ -59,39 +60,20 @@ const DIR = (FileSystem.documentDirectory ?? "") + "doccache/";
 /**
  * Is document ki cached file ka rasta — bina kuch padhe, sirf hisaab se.
  *
- * Ext `file_path` se (upload wahi ext use karta hai), warna `mime_type` se.
+ * Naam ka poora hisaab (ext, aur renew ka version) `utils/doc-file-name.ts` me
+ * hai — wo file kyun alag hai iski wajah wahin likhi hai (chhota saar: wo naam
+ * app aur server ke beech ka contract hai, aur use seedha jaancha ja sakna
+ * chahiye). Yahan sirf folder joda jaata hai.
+ *
  * Deterministic hone ka faayda ye hai ki koi manifest file rakhni hi nahi
  * padti — rasta hamesha nikala ja sakta hai, offline bhi.
  */
-function cachePath(doc: Pick<DocFile, "id" | "file_path" | "mime_type">): string {
-  const raw = doc.file_path?.split(".").pop()?.split("?")[0] ?? "";
-  // ⚠️ Sirf saaf-suthre akshar. Bina is jaanch ke ek aisa `file_path` jisme
-  // aakhri dot ke BAAD slash ho (jaise "a/b.c/d") ext ko "c/d" bana deta, aur
-  // rasta `doccache/<id>.c/d` — yaani cache folder se bahar. Ext ki jagah ext
-  // hi aana chahiye.
-  const ext = /^[a-z0-9]{1,5}$/i.test(raw)
-    ? raw.toLowerCase()
-    : extForMime(doc.mime_type);
-  return `${DIR}${doc.id}.${ext}`;
-}
-
-/**
- * Mime → extension. Bilkul wahi map jo server ke `extFor()` me hai
- * (`web/lib/storage-server.ts`).
- *
- * ⚠️ Dono ka ek jaisa hona ZAROORI hai, aur ye baat dikhti nahi hai. Upload ke
- * baad `file_path` ka ext SERVER tay karta hai, aur uske baad `cachePath()`
- * wahi ext use karta hai. Agar hum file cache me kisi aur naam se rakh dein, to
- * upload ke baad wahi document "cache me nahi hai" gina jaayega aur dobara
- * download hoga — yaani jo file phone par pehle se padi hai, uske liye net ka
- * intezaar. Pehle yahan sirf png/jpg tha, isliye har PDF aur WEBP par theek
- * yahi hota tha.
- */
-function extForMime(mime: string | null | undefined): string {
-  if (mime === "image/png") return "png";
-  if (mime === "image/webp") return "webp";
-  if (mime === "application/pdf") return "pdf";
-  return "jpg";
+function cachePath(
+  doc: Pick<DocFile, "id" | "file_path" | "mime_type">,
+  /** Upload se PEHLE (jab `file_path` abhi bhara hi nahi) — caller version deta hai. */
+  version?: number,
+): string {
+  return DIR + cacheFileName(doc, version);
 }
 
 async function ensureDir(): Promise<void> {
@@ -194,14 +176,31 @@ export async function primeCachedFile(
   docId: string,
   localUri: string,
   mime: string,
+  /**
+   * Renew ka version — upload wahi number use karta hai.
+   *
+   * ⚠️ Ye dena ZAROORI hai jab renew ho raha ho. Bina iske ye file `<id>.<ext>`
+   * par baithti hai, jabki upload ke baad `file_path` `<id>-v3.<ext>` ho jaata
+   * hai — aur `cachePath()` phir usi nayi jagah dhoondhta hai. Do nateeje, dono
+   * bure: nayi photo dobara R2 se utarti hai (offline me bilkul nahi khulti),
+   * aur purani copy cache me hamesha ke liye padi rehti hai.
+   */
+  version?: number,
 ): Promise<void> {
   try {
     // ⚠️ `file_path` yahan jaan-boojh ke null hai — upload abhi hua hi nahi.
-    // Naam mime se banta hai, aur wahi mime server ko bhi jaata hai, isliye
-    // upload ke baad bhi rasta bilkul yahi rahega.
-    const dest = cachePath({ id: docId, file_path: null, mime_type: mime });
-    if (await exists(dest)) return;
+    // Naam mime + version se banta hai, aur dono wahi hain jo server ko bhi
+    // jaate hain, isliye upload ke baad bhi rasta bilkul yahi rahega.
+    const dest = cachePath({ id: docId, file_path: null, mime_type: mime }, version);
+    // ⚠️ `exists` par TURANT nahi lautte — file ko OVERWRITE karte hain.
+    //
+    // Pehle yahan `if (await exists(dest)) return;` tha. Renew ke raaste par wo
+    // seedha nuksan karta tha: rasta pehle se bhara hota tha (purani photo se)
+    // aur ye function chup-chaap laut jaata tha — yaani nayi photo cache me
+    // pahunchti hi nahi thi. Ab version naam me hai isliye ye takraav lagbhag
+    // hota hi nahi, par overwrite rakhna ise har soorat me sach banata hai.
     await ensureDir();
+    await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
     await FileSystem.copyAsync({ from: localUri, to: dest });
   } catch {
     /* copy na ho paye to bhi `file_uri` wala raasta bacha hua hai */
@@ -221,12 +220,34 @@ export async function addToCachedDocs(uid: string, doc: Document): Promise<void>
   await writeCachedDocs(uid, [doc, ...cached.filter((d) => d.id !== doc.id)]);
 }
 
-/** Document delete hua — uski file bhi le jao. */
+/**
+ * Is document ki HAR cached nakal hatao — saare version, saare ext.
+ *
+ * ⚠️ Pehle sirf ek rasta hatta tha (`cachePath(doc)`). Ab naam me version bhi
+ * hai, isliye ek document ke kai rastey ho sakte hain — aur do jagah ye galat
+ * jaata tha:
+ *
+ *   • **Renew** — purani `<id>-v2.jpg` padi rehti thi. Wo sirf jagah ghere
+ *     rehti hai (padhi kabhi nahi jaati), par 50 documents wale user par ye
+ *     chup-chaap dugni storage ho jaati hai.
+ *   • **Delete** — user ne document hi hata diya, par uski photo phone par
+ *     padi rehti thi. Ye sirf safai nahi, suraksha ki baat hai: "hata diya" ka
+ *     matlab hata diya hona chahiye.
+ */
 export async function removeCachedFile(
   doc: Pick<DocFile, "id" | "file_path" | "mime_type">,
 ): Promise<void> {
   try {
-    await FileSystem.deleteAsync(cachePath(doc), { idempotent: true });
+    const names = await FileSystem.readDirectoryAsync(DIR).catch(() => [] as string[]);
+    // `<id>.jpg`, `<id>-v2.png`, `<id>-v2.jpg.part` — sab isi document ke hain.
+    const mine = names.filter((n) => belongsToDoc(n, doc.id));
+    for (const n of mine) {
+      await FileSystem.deleteAsync(DIR + n, { idempotent: true }).catch(() => {});
+    }
+    // Directory padhi hi na ja saki (pehli baar) — kam se kam hisaab wala rasta.
+    if (names.length === 0) {
+      await FileSystem.deleteAsync(cachePath(doc), { idempotent: true });
+    }
   } catch {
     /* na hui to na sahi */
   }

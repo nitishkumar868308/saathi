@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Image,
-  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +13,7 @@ import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
@@ -384,7 +384,7 @@ export default function AddDocument() {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <KeyboardView>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Photo scan — primary */}
           <View style={styles.scanBox}>
@@ -560,7 +560,7 @@ export default function AddDocument() {
             </View>
           ) : null}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
 
       <Pressable
         onPress={save}

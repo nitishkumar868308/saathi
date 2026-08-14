@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +17,7 @@ import {
   type CountryCode,
 } from "libphonenumber-js";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { OtpModal } from "@/components/otp-modal";
@@ -323,7 +323,7 @@ export default function ProfileDetails() {
       {loading ? (
         <ScreenLoader />
       ) : (
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <KeyboardView>
           <ScrollView
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
@@ -531,7 +531,7 @@ export default function ProfileDetails() {
           >
             <Text style={styles.saveText}>{t.save}</Text>
           </Pressable>
-        </KeyboardAvoidingView>
+        </KeyboardView>
       )}
 
       {/* Save/photo-upload — beech me overlay loader, peeche form blocked. */}

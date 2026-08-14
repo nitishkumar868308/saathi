@@ -62,6 +62,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "check": "node scripts/check-logic.mjs",
     "apk": "node ./scripts/apk-link.mjs",
     "build:apk": "eas build --platform android --profile preview"
   },

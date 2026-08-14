@@ -100,7 +100,11 @@ export async function uploadDocumentImage(
    * File to abhi is phone par padi hi hai; use copy karne me na net lagta hai
    * na intezaar. Isliye offline ka intezaam pehle, cloud backup uske baad.
    */
-  await primeCachedFile(docId, localUri, mime);
+  // ⚠️ `version` yahan bhejna ZAROORI hai — wahi number server bhi `file_path`
+  // me daalta hai. Bina iske cache ka naam aur `file_path` ka naam alag ho jaate
+  // hain, aur abhi-abhi rakhi hui file agli baar "mili hi nahi" gini jaati.
+  // (Poori wajah `doc-cache.ts` ke `cachePath()` par likhi hai.)
+  await primeCachedFile(docId, localUri, mime, version);
   await flushUploads();
 }
 

@@ -243,7 +243,11 @@ export function PermissionModal({
                       >
                         <Text style={styles.allowText}>{r.stepConfirmYes}</Text>
                       </Pressable>
-                      <Pressable onPress={() => allow(s.key)} hitSlop={6}>
+                      <Pressable
+                        onPress={() => allow(s.key)}
+                        hitSlop={10}
+                        style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.6 }]}
+                      >
                         <Text style={styles.retryText}>{r.stepOpenAgain}</Text>
                       </Pressable>
                     </View>
@@ -404,7 +408,17 @@ const useStyles = makeStyles((c) => ({
   // "Ho gaya?" ke saath "phir se kholo" — dono chhote, ek ke neeche doosra,
   // taaki row ki chaudai teen bhashaon me na toote.
   confirmRow: { alignItems: "flex-end", gap: 5 },
-  retryText: { fontSize: 11.5, fontWeight: "600", color: c.inkSoft, textDecorationLine: "underline" },
+  // ⚠️ Underline hata di — poore app me wahi shikayat thi ("anchor tag jaisa
+  // lag raha hai"). Ab ek chhota kinare wala chip: dikhne me dabane laayak, aur
+  // uska apna tap-nishana bhi hai (pehle sirf akshar jitna tha).
+  retryBtn: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: c.line,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  retryText: { fontSize: 11.5, fontWeight: "700", color: c.inkSoft },
   /**
    * Test alarm ka button — outline, bhara hua nahi.
    *

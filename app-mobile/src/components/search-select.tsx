@@ -6,13 +6,12 @@ import {
   Modal,
   TextInput,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 
 type Item = { id: number; name: string };
@@ -80,16 +79,17 @@ export function SearchSelect({
       >
         {/*
           Sheet ko keyboard ke upar rakho.
+
           Pehle sheet screen ke neeche chipki thi, isliye keyboard khulte hi
           results uske peeche chale jaate the — 2-3 match hone par list bilkul
           gayab lagti thi aur user samajhta tha "data hi nahi hai".
-          KeyboardAvoidingView sheet ko upar utha deta hai, aur list ki min-height
-          se kam-se-kam do rows hamesha dikhti hain.
+
+          ⚠️ Yahan pehle `KeyboardAvoidingView` tha, aur Android par wo kuch
+          karta hi nahi (poori wajah `components/keyboard-view.tsx` par likhi
+          hai) — yaani ye sheet Android par aaj bhi keyboard ke NEECHE dabi
+          rehti thi. `KeyboardView` dono platform par ek hi kaam karta hai.
         */}
-        <KeyboardAvoidingView
-          style={styles.backdrop}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
+        <KeyboardView style={styles.backdrop}>
           <Pressable style={{ flex: 1 }} onPress={() => setOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 14) }]}>
             <View style={styles.sheetHandle} />
@@ -139,7 +139,7 @@ export function SearchSelect({
               }}
             />
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardView>
       </Modal>
     </>
   );

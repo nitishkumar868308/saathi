@@ -6,9 +6,11 @@ import {
   Modal,
   Animated,
   Easing,
+  ScrollView,
   AppState,
   type AppStateStatus,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import notifee, { EventType, type Notification } from "@notifee/react-native";
@@ -89,6 +91,15 @@ export function ReminderAlertHost() {
   const toast = useToast();
   const [alert, setAlert] = useState<Alert | null>(null);
   const scale = useRef(new Animated.Value(0.9)).current;
+  /**
+   * Icon ke peeche dhadakti hui ring — alarm ka "abhi, isi waqt" wala ehsaas.
+   *
+   * ⚠️ Ye sirf sajawat nahi hai. Ye screen aksar tab khulti hai jab phone jeb se
+   * nikala gaya hai aur user ne abhi PIN daala hai — us pal ek jamI hui screen
+   * aur ek chalti hui screen me bahut farq hai. Chalti hui cheez aankh kheenchti
+   * hai, aur user ko turant pata chalta hai ki KUCH HUA hai.
+   */
+  const ring = useRef(new Animated.Value(0)).current;
   const handledId = useRef<string | null>(null);
 
   /**
@@ -253,6 +264,21 @@ export function ReminderAlertHost() {
       easing: Easing.out(Easing.back(1.4)),
       useNativeDriver: true,
     }).start();
+
+    // Dhadkan — alert khule rehne tak chalti hai, band hote hi ruk jaati hai.
+    ring.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(ring, {
+          toValue: 1,
+          duration: 1100,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ring, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
     /**
      * Naam le ke bulao, phir reminder/document ka kaam bolo — user ko phone
      * uthake padhna na pade. Ring/vibrate/silent Settings se tay hota hai.
@@ -265,7 +291,8 @@ export function ReminderAlertHost() {
      * ek doosre ke upar chadh jaati thi.
      */
     if (!alreadySpokenInBackground()) void alertUser(alert.body);
-  }, [alert, scale]);
+    return () => loop.stop();
+  }, [alert, scale, ring]);
 
   /**
    * Expiry alert khulte hi Saathi se uske apne shabd maango.
@@ -438,22 +465,77 @@ export function ReminderAlertHost() {
   const isExpiry = alert.kind === "expiry";
 
   return (
-    <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={dismiss}>
-      <View style={styles.backdrop}>
+    /**
+     * ── Poori screen, chhota card nahi ──────────────────────────────────
+     *
+     * ⚠️ Ye badlaav seedha user ki baat se aaya: "full screen jaise Rapido ya
+     * AstroTalk pe chalta hai waisa chahiye… abhi PIN daalte hi seedha page
+     * khul jaata hai, ye nahi chahiye — alag layout chahiye jisse user ko pata
+     * chale ki hua KYA hai, aur click kare tab kuch ho".
+     *
+     * Baat bilkul theek thi. Pehle ye ek chhota sa card tha jo app ki kisi bhi
+     * screen ke UPAR khulta tha. Alarm ke us pal me — phone jeb se nikla hai,
+     * PIN daala gaya hai — user ko peeche ki poori app dikhti thi aur beech me
+     * ek chhoti parchi. Uska matlab wo ek aam popup samajh ke hata deta tha, ya
+     * peeche ki screen padhne lagta tha. Incoming-call jaisi screen wo galti
+     * hone hi nahi deti: pehle poora sandesh, phir do bade button, aur tab tak
+     * kuch nahi hota jab tak wo khud na dabaye.
+     *
+     * `transparent={false}` — background sach me poori screen dhakta hai. Bas
+     * itna hi kaafi hai; dono platform par yahi default full-screen modal hai.
+     *
+     * ⚠️ Yahan `presentationStyle="fullScreen"` mat jodna. Wo sirf iOS par asar
+     * karta hai aur `transparent` ko poori tarah anadekha kar deta hai — yaani
+     * ek aur vyavhaar jo do platform par do tarah se chalta hai. Ye app ki sabse
+     * zaroori screen hai (alarm ka wahi ek lamha); yahan jitne kam anjaan
+     * hisse, utna behtar.
+     */
+    <Modal
+      statusBarTranslucent
+      navigationBarTranslucent
+      transparent={false}
+      animationType="fade"
+      visible
+      onRequestClose={dismiss}
+    >
+      <SafeAreaView style={[styles.screen, isExpiry && styles.screenExpiry]} edges={["top", "bottom"]}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          // Lamba reminder (ya Hindi ka lamba wakya) chhoti screen par kat na
+          // jaye — us haal me hi user ko sabse zyada padhna hota hai.
+          bounces={false}
+        >
         <Animated.View style={[styles.card, { transform: [{ scale }] }]}>
-          <View style={[styles.iconWrap, isExpiry && styles.iconExpiry]}>
-            {/*
-              ⚠️ Rang icon ke saath badalta hai. Reminder ka gol terracotta ka
-              hai (gehra) — uspar safed theek hai. Par expiry wala AMBER ka
-              hai, jo dono theme me ujla hai: wahan safed icon 1.9:1 (light)
-              aur 1.6:1 (dark) par tha — yaani app ki sabse zaroori screen ka
-              sabse bada icon hi sabse dhundhla.
-            */}
-            <Ionicons
-              name={isExpiry ? "document-text" : "alarm"}
-              size={34}
-              color={isExpiry ? tc.onAccent : tc.white}
+          <View style={styles.iconStack}>
+            {/* Dhadakti hui ring — icon ke peeche se bahar ki taraf. */}
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulse,
+                isExpiry && styles.pulseExpiry,
+                {
+                  opacity: ring.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+                  transform: [
+                    { scale: ring.interpolate({ inputRange: [0, 1], outputRange: [1, 2.1] }) },
+                  ],
+                },
+              ]}
             />
+            <View style={[styles.iconWrap, isExpiry && styles.iconExpiry]}>
+              {/*
+                ⚠️ Rang icon ke saath badalta hai. Reminder ka gol terracotta ka
+                hai (gehra) — uspar safed theek hai. Par expiry wala AMBER ka
+                hai, jo dono theme me ujla hai: wahan safed icon 1.9:1 (light)
+                aur 1.6:1 (dark) par tha — yaani app ki sabse zaroori screen ka
+                sabse bada icon hi sabse dhundhla.
+              */}
+              <Ionicons
+                name={isExpiry ? "document-text" : "alarm"}
+                size={44}
+                color={isExpiry ? tc.onAccent : tc.white}
+              />
+            </View>
           </View>
           <Text style={styles.kicker}>{isExpiry ? n.alertExpiry : n.alertReminder}</Text>
           <Text style={styles.body}>{alert.body}</Text>
@@ -536,94 +618,121 @@ export function ReminderAlertHost() {
             </>
           )}
         </Animated.View>
-      </View>
+        </ScrollView>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const useStyles = makeStyles((c) => ({
-  backdrop: {
-    flex: 1,
-    backgroundColor: c.scrim,
+  /**
+   * Poori screen — aur uska apna background.
+   *
+   * ⚠️ `cream` (page ka aam rang) yahan JAAN-BOOJH KE nahi hai. Ye screen app ki
+   * baaki screens jaisi dikhni hi nahi chahiye: user ko ek nazar me pata chalna
+   * chahiye ki ye "app" nahi, ek ALERT hai. Halka rangeen parda wahi kaam karta
+   * hai jo incoming-call screen ka rang karta hai.
+   */
+  screen: { flex: 1, backgroundColor: c.creamDeep },
+  screenExpiry: { backgroundColor: c.creamDeep },
+  scroll: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
   },
   card: {
     width: "100%",
-    maxWidth: 380,
+    // Tablet/foldable par content beech me hi rehna chahiye — poori chaudai me
+    // phaila hua alert padha hi nahi jaata.
+    maxWidth: 460,
     alignItems: "center",
-    borderRadius: 28,
-    backgroundColor: c.surface,
-    paddingHorizontal: 24,
-    paddingVertical: 30,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 16,
   },
+  /** Ring + icon ek hi jagah par — ring peeche, icon uske upar. */
+  iconStack: { alignItems: "center", justifyContent: "center" },
+  pulse: {
+    position: "absolute",
+    height: 100,
+    width: 100,
+    borderRadius: 34,
+    backgroundColor: c.terracotta,
+  },
+  pulseExpiry: { backgroundColor: c.amber },
   iconWrap: {
-    height: 76,
-    width: 76,
-    borderRadius: 26,
+    // 76 → 100: ye screen ki sabse pehli cheez hai jo aankh pakadti hai.
+    height: 100,
+    width: 100,
+    borderRadius: 34,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: c.terracotta,
   },
   iconExpiry: { backgroundColor: c.amber },
   kicker: {
-    marginTop: 16,
-    fontSize: 12.5,
+    marginTop: 26,
+    fontSize: 13,
     fontWeight: "800",
-    letterSpacing: 1,
+    letterSpacing: 1.4,
     textTransform: "uppercase",
-    color: c.inkSoft,
+    color: c.terracotta,
   },
+  /**
+   * ⚠️ 20 → 26px. Poori screen mil gayi hai to uska poora faayda yahi hai:
+   * reminder ka matn door se, bina chashme ke, padha ja sake. Yahi ek line hai
+   * jiske liye ye screen khuli hai.
+   */
   body: {
-    marginTop: 8,
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: "700",
+    marginTop: 12,
+    fontSize: 26,
+    lineHeight: 36,
+    fontWeight: "800",
     color: c.ink,
     textAlign: "center",
   },
   didText: {
-    marginTop: 18,
-    fontSize: 14,
+    marginTop: 26,
+    fontSize: 15,
     fontWeight: "600",
     color: c.inkSoft,
     textAlign: "center",
   },
-  btnRow: { flexDirection: "row", gap: 10, alignSelf: "stretch", marginTop: 12 },
+  btnRow: { flexDirection: "row", gap: 12, alignSelf: "stretch", marginTop: 18 },
+  /**
+   * Button bade — 52 se 60.
+   *
+   * ⚠️ Ye screen aksar aadhi neend me, ya chalte-chalte dabai jaati hai. Us haal
+   * me chhota button galat dab jaata hai, aur yahan galat dabna mehnga hai:
+   * "Ho gaya" wapas nahi aata.
+   */
   btn: {
-    marginTop: 24,
+    marginTop: 28,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     alignSelf: "stretch",
-    height: 52,
-    borderRadius: 16,
+    height: 60,
+    borderRadius: 20,
     backgroundColor: c.terracotta,
   },
-  btnText: { fontSize: 16, fontWeight: "800", color: c.white },
+  btnText: { fontSize: 17, fontWeight: "800", color: c.white },
   btnAlt: {
     alignItems: "center",
     justifyContent: "center",
-    height: 52,
-    borderRadius: 16,
-    borderWidth: 1,
+    height: 60,
+    borderRadius: 20,
+    borderWidth: 1.5,
     borderColor: c.line,
     backgroundColor: c.surface,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
   },
-  btnAltText: { fontSize: 15, fontWeight: "700", color: c.inkSoft },
-  btnAltWide: { alignSelf: "stretch", marginTop: 10 },
+  btnAltText: { fontSize: 16, fontWeight: "700", color: c.inkSoft },
+  btnAltWide: { alignSelf: "stretch", marginTop: 12 },
   addNewText: {
-    marginTop: 14,
-    fontSize: 14,
-    lineHeight: 20,
+    marginTop: 16,
+    fontSize: 14.5,
+    lineHeight: 21,
     color: c.inkSoft,
     textAlign: "center",
   },

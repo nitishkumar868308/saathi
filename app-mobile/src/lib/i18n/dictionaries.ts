@@ -389,6 +389,14 @@ export type Dict = {
     versionUntil: string;
     /** Purani photo khul nahi payi (net nahi, ya file hi nahi bachi). */
     versionNoFile: string;
+    /**
+     * Photo ke kone par ki chhoti patti — "tap karo, poori screen par khulegi".
+     *
+     * ⚠️ Ye patti zaroori hai. Sirf tap chalne se kuch nahi hota agar user ko
+     * pata hi na ho ki photo tappable hai, aur is app ke user photo par tap
+     * karne ki koshish karte hi nahi.
+     */
+    zoomHint: string;
   };
   /**
    * Document renew — expiry (aur chaho to nayi photo) badalne wali screen.
@@ -532,6 +540,18 @@ export type Dict = {
      */
     missed: string;
     missedHint: string;
+    /**
+     * Beet chuke aur BAND/nipte hue reminder â apna alag khaana.
+     *
+     * ⚠️ Ye pehle tha hi nahi, aur uski kami user ne seedha pakdi: "jo ho
+     * gaya h wo aane wale me aata h". `missed` sirf CHALU reminder ke liye
+     * hai; jo reminder nipat chuka hai (ya user ne khud band kar diya hai) wo
+     * `upcoming` me gir jaata tha, kyunki upcoming ki poori shart sirf "aaj ka
+     * nahi + chhoota hua nahi" thi. 11 August ka nipta hua reminder 14 August
+     * ko bhi "Aane wale" me baitha rehta tha â app ka saaf-saaf jhooth.
+     */
+    past: string;
+    pastHint: string;
     longPressHint: string;
     pausedTag: string;
     deleteConfirmTitle: string;
@@ -1615,6 +1635,7 @@ const hinglish: Dict = {
     versionNoExpiry: "Expiry nahi thi",
     versionUntil: "{date} tak chala",
     versionNoFile: "Purani photo abhi nahi khul payi",
+    zoomHint: "Bada karke dekho",
   },
   renewDoc: {
     title: "Expiry update karo",
@@ -1698,6 +1719,8 @@ const hinglish: Dict = {
     upcoming: "Aane wale",
     missed: "Chhoot gaye",
     missedHint: "Inka waqt beet chuka hai",
+    past: "Ho chuke",
+    pastHint: "Inka waqt nikal chuka hai — ya aapne inhe band kar diya tha",
     longPressHint: "Delete karne ke liye card ko dabaye rakho",
     pausedTag: "Plus khatam hone pe paused — dekhne ke liye tap karein",
     deleteConfirmTitle: "Delete karein?",
@@ -2524,6 +2547,7 @@ const hi: Dict = {
     versionNoExpiry: "एक्सपायरी नहीं थी",
     versionUntil: "{date} तक चला",
     versionNoFile: "पुरानी फ़ोटो अभी खुल नहीं पाई",
+    zoomHint: "बड़ा करके देखें",
   },
   renewDoc: {
     title: "एक्सपायरी अपडेट करें",
@@ -2607,6 +2631,8 @@ const hi: Dict = {
     upcoming: "आने वाले",
     missed: "छूट गए",
     missedHint: "इनका समय बीत चुका है",
+    past: "हो चुके",
+    pastHint: "इनका समय निकल चुका है — या आपने इन्हें बंद कर दिया था",
     longPressHint: "डिलीट करने के लिए कार्ड को दबाए रखें",
     pausedTag: "प्लस खत्म होने पर रुका — देखने के लिए टैप करें",
     deleteConfirmTitle: "डिलीट करें?",
@@ -3414,6 +3440,7 @@ const en: Dict = {
     versionNoExpiry: "No expiry date",
     versionUntil: "Used until {date}",
     versionNoFile: "Couldn't open the old photo",
+    zoomHint: "Tap to enlarge",
   },
   renewDoc: {
     title: "Update expiry",
@@ -3497,6 +3524,8 @@ const en: Dict = {
     upcoming: "Upcoming",
     missed: "Missed",
     missedHint: "These are already past their time",
+    past: "Done & past",
+    pastHint: "Their time has passed — or you switched them off",
     longPressHint: "Press and hold a card to delete",
     pausedTag: "Paused after Plus ended — tap to view",
     deleteConfirmTitle: "Delete?",

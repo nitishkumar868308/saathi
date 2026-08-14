@@ -1,10 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bug, ChevronDown, RefreshCw, Smartphone, Globe } from "lucide-react";
+import {
+  AlertTriangle,
+  Bug,
+  CheckCircle2,
+  ChevronDown,
+  RefreshCw,
+  Send,
+  Smartphone,
+  Globe,
+  XCircle,
+} from "lucide-react";
 import { SkeletonRows } from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
 import { useAdminT } from "@/lib/i18n/admin";
+
+type DeliveryHealth = {
+  config: {
+    twilio: boolean;
+    smtp: boolean;
+    waReminder: "exact" | "fallback" | "none";
+    waDocument: "exact" | "fallback" | "none";
+    cronSecret: boolean;
+  };
+  cron: { overdueUntouched: number; oldestOverdueAt: string | null; lastNotifiedAt: string | null };
+  verdict: { level: "ok" | "warn" | "down"; title: string; detail: string };
+};
 
 type AppError = {
   id: string;
@@ -22,6 +44,37 @@ type AppError = {
 
 // Range ke labels dictionary se aate hain (neeche component me), yahan sirf din.
 const RANGE_DAYS = [1, 2, 7, 30] as const;
+
+/**
+ * "Aaj" / "Kal se" ka ASLI matlab — aadhi raat se, 24 ghante peeche se nahi.
+ *
+ * ── ⚠️ Ye shikayat ki jad thi ───────────────────────────────────────────
+ *
+ * Shikayat: "aaj ya kal pe click karte h to nhi chalta h".
+ *
+ * Button par likha tha "Aaj", par server ko sirf `days=1` jaata tha aur wo
+ * `now - 24 ghante` se filter karta tha. Do bilkul alag cheezein hain:
+ *
+ *   • Subah 9 baje "Aaj" dabao -> KAL SHAAM 6 baje wali errors bhi aa jaati
+ *     thi (wo 24 ghante ke andar hain). Button jhooth bol raha tha.
+ *   • Aur raat 11 baje "Aaj" dabao -> aaj subah ki error to aati thi, par
+ *     agar aaj kuch hua hi nahi to list khaali — jabki "7 din" bhari hui.
+ *     User ke liye iska matlab seedha "Aaj wala button kaam nahi karta" tha.
+ *
+ * Ab hisaab CLIENT par hota hai, aur yahi sahi jagah hai: aadhi raat admin ke
+ * apne timezone ki hoti hai (India me IST), jabki server UTC par chalta hai.
+ * Server par IST hardcode karna ek naya jhooth hota — wahan se 5:30 ka farq
+ * hamesha galat din deta.
+ *
+ * `days = 1` -> aaj ki aadhi raat se. `2` -> kal ki aadhi raat se. `7` -> aaj
+ * milaake 7 din. Yaani jo likha hai, wahi hota hai.
+ */
+function sinceFor(days: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - (days - 1));
+  return d.toISOString();
+}
 
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString("en-IN", {
@@ -45,17 +98,30 @@ export default function AdminLogs() {
   const [errors, setErrors] = useState<AppError[] | null>(null);
   const [error, setError] = useState("");
   const [days, setDays] = useState<number>(7);
-  const [source, setSource] = useState<"all" | "app" | "web">("all");
+  /**
+   * ⚠️ `delivery` ab ek alag source hai.
+   *
+   * WhatsApp/email ki chhooti hui khabar app/web ki asli crashes ke saath ghul
+   * jaati to dono taraf nuksan hota: crash dhoondhna mushkil, aur delivery ki
+   * dikkat crash ke shor me dabi hui. (Poori wajah `lib/delivery-log.ts` par.)
+   */
+  const [source, setSource] = useState<"all" | "app" | "web" | "delivery">("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [health, setHealth] = useState<DeliveryHealth | null>(null);
 
   const load = useCallback(async () => {
     setError("");
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/errors?days=${days}&source=${source}`, {
-        cache: "no-store",
-      });
+      // `since` client se — aadhi raat admin ke apne timezone ki (upar wajah
+      // likhi hai). `days` bhi bhejte hain taaki purane deploy par bhi kuch na
+      // toote: server `since` na samjhe to wahi purana hisaab laga lega.
+      const res = await fetch(
+        `/api/admin/errors?days=${days}&since=${encodeURIComponent(sinceFor(days))}` +
+          `&source=${source}`,
+        { cache: "no-store" },
+      );
       const body = (await res.json()) as { errors?: AppError[]; error?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setErrors(body.errors ?? []);
@@ -70,6 +136,28 @@ export default function AdminLogs() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * Delivery ki sehat — errors se ALAG call.
+   *
+   * ⚠️ Jaan-boojh ke alag: ye filters (`days`/`source`) se nahi badalti, aur
+   * agar `app_errors` ki query fail ho jaye (table hi na bani ho) to bhi ye card
+   * dikhna chahiye — aksar wahi ek jawab hota hai jiske liye admin yahan aaya
+   * hai. Ise usi call me jodne par ek ka fail doosre ko bhi le doobta.
+   */
+  const loadHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/delivery", { cache: "no-store" });
+      if (!res.ok) return;
+      setHealth((await res.json()) as DeliveryHealth);
+    } catch {
+      /* card na dikhe to bhi baaki page chalta rahe */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHealth();
+  }, [loadHealth]);
 
   /** Ek jaisa message = ek group (kitni baar aaya). */
   const groups = useMemo(() => {
@@ -100,6 +188,11 @@ export default function AdminLogs() {
         </div>
       )}
 
+      {/* ⚠️ Sabse UPAR — kyunki "WhatsApp/email kyun nahi gaya" wo sawaal hai
+          jiske liye admin sabse zyada baar yahan aata hai, aur uska jawab
+          error-list me kabhi tha hi nahi. */}
+      {health && <DeliveryCard h={health} onRefresh={loadHealth} />}
+
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
         <Stat label={d.totalErrors} value={errors.length} />
         <Stat label={d.distinct} value={groups.length} />
@@ -122,7 +215,7 @@ export default function AdminLogs() {
           ))}
         </div>
         <div className="flex rounded-2xl border border-line bg-surface p-1">
-          {(["all", "app", "web"] as const).map((s) => (
+          {(["all", "app", "web", "delivery"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSource(s)}
@@ -235,6 +328,99 @@ export default function AdminLogs() {
         30 min me <b>saathi8683@gmail.com</b> pe jaata hai.
       </p>
     </div>
+  );
+}
+
+/**
+ * "WhatsApp/email chal raha hai ya nahi" — ek nazar me.
+ *
+ * ⚠️ Ye card isliye bana ki asli sawaal ("env to set hai, phir kyun nahi chal
+ * raha?") ka jawab kahin dikhta hi nahi tha. Vercel ka env poori zanjeer ka
+ * sirf AAKHRI kadam hai; usse pehle Supabase ka cron job aur uska CRON_SECRET
+ * aate hain, aur wahi sabse zyada toote milte hain. Poori soch
+ * `lib/delivery-health.ts` par likhi hai.
+ *
+ * Sabse upar ek line ka nateeja — kyunki har cheez ka haal alag-alag dikhana
+ * wahi kaam admin par daal dena hai jo ye card kar sakta hai.
+ */
+function DeliveryCard({ h, onRefresh }: { h: DeliveryHealth; onRefresh: () => void }) {
+  const tone =
+    h.verdict.level === "ok"
+      ? { box: "border-sage/35 bg-sage/10", icon: "text-sage", Icon: CheckCircle2 }
+      : h.verdict.level === "warn"
+        ? { box: "border-amber/45 bg-amber/10", icon: "text-ink", Icon: AlertTriangle }
+        : { box: "border-terracotta/35 bg-terracotta/10", icon: "text-terracotta-dark", Icon: XCircle };
+
+  return (
+    <div className={`rounded-3xl border p-4 shadow-soft ${tone.box}`}>
+      <div className="flex items-start gap-3">
+        <span className={`mt-0.5 shrink-0 ${tone.icon}`}>
+          <tone.Icon size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Send size={13} className="shrink-0 text-ink-soft" />
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-soft">
+              WhatsApp &amp; email
+            </p>
+          </div>
+          <p className="mt-1 font-semibold leading-snug text-ink">{h.verdict.title}</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">{h.verdict.detail}</p>
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            <Chip ok={h.config.cronSecret} label="CRON_SECRET" />
+            <Chip ok={h.config.smtp} label="SMTP" />
+            <Chip ok={h.config.twilio} label="Twilio" />
+            {/* `fallback` = us bhasha ka template nahi hai, Hinglish wala
+                jaayega. Pahunchta hai — par galat bhasha me, aur wo chup-chaap
+                nikal jaata hai. Isliye wo bhi ek haal hai, chhupana nahi. */}
+            <Chip
+              ok={h.config.waReminder !== "none"}
+              warn={h.config.waReminder === "fallback"}
+              label="WA template · reminder"
+            />
+            <Chip
+              ok={h.config.waDocument !== "none"}
+              warn={h.config.waDocument === "fallback"}
+              label="WA template · document"
+            />
+          </div>
+
+          <p className="mt-3 text-xs leading-relaxed text-ink-soft">
+            Cron ne aakhri baar kaam kiya:{" "}
+            <b className="text-ink">
+              {h.cron.lastNotifiedAt ? fmt(h.cron.lastNotifiedAt) : "kabhi nahi"}
+            </b>
+            {h.cron.overdueUntouched > 0 && (
+              <>
+                {" · "}atke hue reminder:{" "}
+                <b className="text-terracotta-dark">{h.cron.overdueUntouched}</b>
+              </>
+            )}
+          </p>
+        </div>
+        <button
+          onClick={onRefresh}
+          className="shrink-0 rounded-xl border border-line bg-surface p-2 text-ink-soft transition hover:text-terracotta"
+          aria-label="refresh"
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Chip({ ok, warn, label }: { ok: boolean; warn?: boolean; label: string }) {
+  const cls = !ok
+    ? "border-terracotta/40 bg-terracotta/10 text-terracotta-dark"
+    : warn
+      ? "border-amber/50 bg-amber/15 text-ink"
+      : "border-sage/40 bg-sage/12 text-sage";
+  return (
+    <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${cls}`}>
+      {ok ? (warn ? "△" : "✓") : "✕"} {label}
+    </span>
   );
 }
 

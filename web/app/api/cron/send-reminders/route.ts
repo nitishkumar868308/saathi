@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sendReminderWhatsApp } from "@/lib/twilio";
+import { sendReminderWhatsApp, twilioConfigured, waTemplateState } from "@/lib/twilio";
+import { emailConfigured } from "@/lib/email";
 import {
   PROFILE_SELECT,
   toReminderProfile,
@@ -7,6 +8,7 @@ import {
   type ReminderProfile,
 } from "@/lib/reminder-channels";
 import { sendReminderEmail } from "@/lib/email";
+import { logDeliverySkip } from "@/lib/delivery-log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,9 +124,24 @@ export async function POST(request: Request) {
       `user_details?user_id=eq.${uid}&select=phone,phone_verified_at`,
     ).catch(() => []);
     const row = rows[0];
+    rawPhoneCache.set(uid, Boolean(row?.phone));
     const v = row?.phone && row.phone_verified_at ? row.phone : null;
     phoneCache.set(uid, v);
     return v;
+  }
+
+  /**
+   * Number DAALA hua hai? (Verify hua ya nahi, ye alag baat hai.)
+   *
+   * ⚠️ Ye farq admin ke liye sab kuch hai. "Number daala hi nahi" ka ilaaj user
+   * ko profile bharne ko kehna hai; "number verify nahi hua" ka ilaaj use OTP
+   * poora karne ko kehna hai. Dono ko ek hi "WhatsApp nahi gaya" bata dena wahi
+   * andhera hai jise ye poora kaam hata raha hai.
+   */
+  const rawPhoneCache = new Map<string, boolean>();
+  async function hasPhone(uid: string): Promise<boolean> {
+    if (!rawPhoneCache.has(uid)) await getPhone(uid);
+    return rawPhoneCache.get(uid) ?? false;
   }
 
   /** Jo kuch bhi galat gaya — jawab me aata hai, taaki chup-chaap na rahe. */
@@ -209,8 +226,28 @@ export async function POST(request: Request) {
       if (!profile.isPlus) {
         skippedFree++;
       } else {
+        /**
+         * ⚠️ Yahan se aage har chhooti hui delivery admin > Logs me jaati hai.
+         *
+         * Pehle ye poora hissa CHUP tha: number verify na ho to `if (phone)`
+         * chup-chaap nikal jaata tha, email na ho to `if (profile.email)` waise
+         * hi, aur env na ho to `sendWhatsApp`/`sendMail` bina kuch bole
+         * `{ sent: false }` lauta dete the. Teenon soorat me ginti me `0` dikhta
+         * tha — aur `0` do bilkul alag baaton ka jawab hai ("koi due hi nahi tha"
+         * aur "sab ruk gaya"). Isi wajah se "kyun nahi gaya" ka jawab kahin se
+         * milta hi nahi tha. (Poori soch `lib/delivery-log.ts` par likhi hai.)
+         */
         const phone = await getPhone(r.user_id);
-        if (phone) {
+        if (!phone) {
+          const has = await hasPhone(r.user_id);
+          logDeliverySkip({
+            channel: "whatsapp",
+            kind: "reminder",
+            reason: has ? "phone_unverified" : "no_phone",
+            userId: r.user_id,
+            itemId: r.id,
+          });
+        } else {
           try {
             const res = await sendReminderWhatsApp(
               phone,
@@ -227,11 +264,38 @@ export async function POST(request: Request) {
               profile.name,
             );
             if (res.sent) wa++;
+            // `skipped` = Twilio ka env hi set nahi tha.
+            else {
+              logDeliverySkip({
+                channel: "whatsapp",
+                kind: "reminder",
+                reason: "twilio_off",
+                userId: r.user_id,
+                itemId: r.id,
+              });
+            }
           } catch (e) {
             errors.push(`wa ${r.id}: ${String(e)}`);
+            logDeliverySkip({
+              channel: "whatsapp",
+              kind: "reminder",
+              reason: "send_failed",
+              userId: r.user_id,
+              itemId: r.id,
+              detail: String(e),
+            });
           }
         }
-        if (profile.email) {
+
+        if (!profile.email) {
+          logDeliverySkip({
+            channel: "email",
+            kind: "reminder",
+            reason: "no_email",
+            userId: r.user_id,
+            itemId: r.id,
+          });
+        } else {
           try {
             const res = await sendReminderEmail(
               profile.email,
@@ -242,8 +306,26 @@ export async function POST(request: Request) {
               r.user_id,
             );
             if (res.sent) mail++;
+            // `skipped` = SMTP ka env hi set nahi tha.
+            else {
+              logDeliverySkip({
+                channel: "email",
+                kind: "reminder",
+                reason: "smtp_off",
+                userId: r.user_id,
+                itemId: r.id,
+              });
+            }
           } catch (e) {
             errors.push(`mail ${r.id}: ${String(e)}`);
+            logDeliverySkip({
+              channel: "email",
+              kind: "reminder",
+              reason: "send_failed",
+              userId: r.user_id,
+              itemId: r.id,
+              detail: String(e),
+            });
           }
         }
       }
@@ -271,6 +353,28 @@ export async function POST(request: Request) {
     // Ye ginti dikhna zaroori hai: "email 0 kyun gaye" ka jawab yahin milta hai
     // (free users the), warna lagta hai SMTP hi toot gaya.
     skippedFreePlan: skippedFree,
+    /**
+     * Server ka apna haal — har jawab ke saath.
+     *
+     * ⚠️ Ye isliye joda gaya ki "WhatsApp/email nahi aa raha" ki jaanch me sabse
+     * zyada waqt yahi pata karne me jaata tha ki galti KAHAN hai — env me,
+     * plan me, ya number verify na hone me. Ginti akele jhoothi tasalli deti
+     * thi: `whatsapp: 0` do bilkul alag baaton se aata hai — "koi due tha hi
+     * nahi" aur "Twilio set hi nahi hai" — aur dono ek jaise dikhte the.
+     *
+     * `waTemplate: "none"` sabse chupa hua kaatil hai: Twilio ka env poora set
+     * ho sakta hai, par bina Meta-approved template ke production me WhatsApp
+     * REJECT ho jaata hai. Wahan sab kuch theek dikhta hai aur message kabhi
+     * nahi pahunchta.
+     *
+     * Ek-ek user ki poori jaanch admin panel me hai (`lib/delivery-check.ts` —
+     * Users > user > delivery), jo Plus, email, aur number-verify tak batati hai.
+     */
+    config: {
+      twilio: twilioConfigured(),
+      smtp: emailConfigured(),
+      waTemplate: waTemplateState("reminder", "hinglish"),
+    },
     errors: errors.slice(0, 10),
   });
 }

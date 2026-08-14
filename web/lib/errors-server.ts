@@ -59,10 +59,17 @@ function normalize(err: unknown): { error: Error; details: Record<string, unknow
   return { error: new Error(err == null ? "Unknown error" : String(err)), details: {} };
 }
 
-/** Server-side error record karo. Best-effort — kabhi throw nahi karta. */
+/**
+ * Server-side error record karo. Best-effort — kabhi throw nahi karta.
+ *
+ * `opts` se `source`/`level` badle ja sakte hain. Wo isliye chahiye tha ki
+ * delivery ki chhooti hui khabar (`lib/delivery-log.ts`) app/web ki asli
+ * crashes ke saath ghul na jaye — us par poori wajah wahin likhi hai.
+ */
 export async function logServerError(
   err: unknown,
   context: Record<string, unknown> = {},
+  opts: { source?: string; level?: string } = {},
 ): Promise<void> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return;
   const { error: e, details } = normalize(err);
@@ -71,10 +78,12 @@ export async function logServerError(
       method: "POST",
       headers: headers({ Prefer: "return=minimal" }),
       body: JSON.stringify({
-        source: "web",
-        level: "error",
+        source: opts.source ?? "web",
+        level: opts.level ?? "error",
         message: (e.message || "Unknown error").slice(0, 2000),
-        stack: e.stack?.slice(0, 8000) ?? null,
+        // ⚠️ Delivery wali lines par stack bekaar hai (wo ek haalat hai, crash
+        // nahi) — aur wo Logs ki har row ko bevajah lamba kar deta hai.
+        stack: opts.source === "delivery" ? null : (e.stack?.slice(0, 8000) ?? null),
         context: Object.keys(details).length ? { ...context, ...details } : context,
         platform: "web",
       }),

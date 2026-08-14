@@ -4,8 +4,6 @@ import {
   Text,
   TextInput,
   Pressable,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   Modal,
 } from "react-native";
@@ -14,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
@@ -298,10 +297,7 @@ export default function Login() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardView>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -612,7 +608,7 @@ export default function Login() {
             </Text>
           </Pressable>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
 
       {/* Login / Google — dono ke liye ek hi center overlay loader. */}
       <LoaderOverlay visible={loading || googleLoading} />

@@ -5,7 +5,6 @@ import {
   Pressable,
   Modal,
   ScrollView,
-  TextInput,
   Animated,
   Easing,
   useWindowDimensions,
@@ -15,6 +14,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 
+import { useKeyboardPad } from "@/components/keyboard-view";
+import { OtpInput } from "@/components/otp-input";
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
@@ -66,7 +67,17 @@ export function DeviceApprovalGate() {
 
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const maxCardHeight = Math.max(320, height - insets.top - insets.bottom - 48);
+  /**
+   * Keyboard ki oonchai.
+   *
+   * ⚠️ Code aate hi input `autoFocus` par khul jaata hai, yaani keyboard
+   * hamesha saath aata hai — aur uske neeche "Verify karo", "Dobara bhejo" aur
+   * support ka raasta, teenon dab jaate the. User ka screenshot bilkul yahi
+   * dikhata hai. Card ki oonchai bhi keyboard ke hisaab se ghatani padti hai,
+   * warna wo apni poori lambai leke uske peeche chala jaata hai.
+   */
+  const kbPad = useKeyboardPad(12);
+  const maxCardHeight = Math.max(280, height - insets.top - insets.bottom - 48 - kbPad);
 
   /* code bhejne/daalne ki haalat */
   const [sending, setSending] = useState(false);
@@ -207,7 +218,7 @@ export function DeviceApprovalGate() {
         <View
           style={[
             styles.backdrop,
-            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 + kbPad },
           ]}
         >
           <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
@@ -240,16 +251,19 @@ export function DeviceApprovalGate() {
                         {tpl(d.sentTo, { email: sentTo })}
                       </Text>
                     </View>
-                    <TextInput
-                      value={code}
-                      onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      placeholder="000000"
-                      placeholderTextColor={tc.inkSoft}
-                      style={styles.codeInput}
-                      autoFocus
-                    />
+                    {/**
+                     * ⚠️ Yahan pehle ek chaudi input thi (`letterSpacing: 10`)
+                     * — `otp-modal` wali nakal, aur usi ki tarah adhoora code
+                     * dikhane me kamzor. Ab wahi ek component jo phone ke OTP
+                     * par bhi hai, taaki dono jagah code daalna ek jaisa lage.
+                     *
+                     * `fromSms={false}` — ye code EMAIL par jaata hai, SMS par
+                     * nahi. `sms-otp` autofill maangna yahan sirf keyboard ko
+                     * ek aisa suggestion dikhwata hai jo kabhi aayega hi nahi.
+                     */}
+                    <View style={styles.codeWrap}>
+                      <OtpInput value={code} onChange={setCode} autoFocus fromSms={false} />
+                    </View>
                   </>
                 ) : null}
 
@@ -302,22 +316,35 @@ export function DeviceApprovalGate() {
                * ya code spam me chala jaata hai). Admin panel se unka phone
                * haath se chaalu kiya ja sakta hai.
                */}
-              <Pressable
-                onPress={() => {
-                  setOpen(false);
-                  router.push("/support" as never);
-                }}
-                style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.linkText}>{d.support}</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => setOpen(false)}
-                style={({ pressed }) => [styles.link, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.linkText}>{d.later}</Text>
-              </Pressable>
+              {/**
+               * ⚠️ Ye dono pehle underline wale text the — web ke `<a>` jaise.
+               * Phone par wo do tarah se galat hai: underline ka matlab hi log
+               * nahi jaante (wo aksar "kuch toota hua hai" lagta hai), aur tap
+               * ka nishana sirf akshar jitna hota hai. Ab dono ek chhui ja
+               * sakne wali row hain, 44px se ooncha, apne icon ke saath.
+               */}
+              <View style={styles.footRow}>
+                <Pressable
+                  onPress={() => setOpen(false)}
+                  style={({ pressed }) => [styles.footBtn, pressed && styles.footBtnPressed]}
+                >
+                  <Text style={styles.footBtnText} numberOfLines={1}>
+                    {d.later}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setOpen(false);
+                    router.push("/support" as never);
+                  }}
+                  style={({ pressed }) => [styles.footBtn, pressed && styles.footBtnPressed]}
+                >
+                  <Ionicons name="help-buoy-outline" size={15} color={tc.inkSoft} />
+                  <Text style={styles.footBtnText} numberOfLines={1}>
+                    {d.support}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </Animated.View>
         </View>
@@ -368,11 +395,19 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.amber,
   },
   bannerText: { flex: 1, fontSize: 12.5, lineHeight: 17, fontWeight: "700", color: c.onAccent },
+  // ⚠️ Underline hata di — poore app me wahi ek shikayat thi ("anchor tag jaisa
+  // lag raha hai"). Ek chhota sa kinara wala chip wahi kaam karta hai aur
+  // dabane laayak dikhta bhi hai.
   bannerCta: {
     fontSize: 12.5,
     fontWeight: "800",
     color: c.onAccent,
-    textDecorationLine: "underline",
+    borderWidth: 1,
+    borderColor: "rgba(36,31,26,0.35)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    overflow: "hidden",
   },
 
   backdrop: {
@@ -441,19 +476,7 @@ const useStyles = makeStyles((c) => ({
     paddingVertical: 10,
   },
   sentText: { flex: 1, fontSize: 13, lineHeight: 19, fontWeight: "600", color: c.ink },
-  codeInput: {
-    marginTop: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: c.line,
-    backgroundColor: c.cream,
-    paddingVertical: 14,
-    textAlign: "center",
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: 10,
-    color: c.ink,
-  },
+  codeWrap: { marginTop: 12 },
   errBox: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -488,6 +511,17 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.surface,
   },
   ghostText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
-  link: { marginTop: 10, alignItems: "center" },
-  linkText: { fontSize: 13, fontWeight: "700", color: c.inkSoft, textDecorationLine: "underline" },
+  footRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  footBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+  },
+  footBtnPressed: { backgroundColor: c.creamDeep },
+  footBtnText: { fontSize: 13, fontWeight: "700", color: c.inkSoft },
 }));

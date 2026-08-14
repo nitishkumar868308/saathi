@@ -7,13 +7,13 @@ import {
   Animated,
   Easing,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
+  StyleSheet,
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
@@ -75,9 +75,33 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   const [resendIn, setResendIn] = useState(0);
 
   /**
-   * Asli input ka haath.
+   * Asli input ka haath — EK, do nahi.
    *
-   * ⚠️ Pehle yahan `autoFocus` tha aur wahi DO shikayaton ki jad thi:
+   * ⚠️ Yahan pehle DO TextInput the (`pinRef` aur `codeRef`), dono
+   * `position: absolute` par ek doosre ke UPAR, aur dono dots wale Pressable ke
+   * andar. Wahi shikayat ki jad thi: "wo dot jaha pe pin daalna h waha click
+   * karte h to ek baar me sahi se nhi hota".
+   *
+   * Hota ye tha ki upar wala (code wala) input PIN wale mode me
+   * `editable={false}` hota tha — par wo Android par tap phir bhi kha jaata tha.
+   * Yaani pehli ungli us mari hui input par padti thi: na focus, na keyboard,
+   * kuch nahi. Doosri tap kabhi-kabhi Pressable tak pahunch jaati thi.
+   *
+   * Ab ek hi input hai (mode ke hisaab se `key` badal ke naya banta hai), aur wo
+   * hamesha `editable` hai. Ab dono raaste chalte hain, aur DONO ka chalna
+   * jaan-boojh ke hai — ye screen wo ek jagah hai jahan kuch toota to user apne
+   * hi documents se bahar reh jaata hai:
+   *
+   *   • Ungli dots ke BEECH padi        -> seedha input par, native focus.
+   *   • Ungli kisi dot ke UPAR padi     -> dot chhoota nahi, tap Pressable tak
+   *                                        pahunchta hai, aur wo `focus()` karta hai.
+   *
+   * ⚠️ Yahan `pointerEvents="none"` mat lagana. Wo saaf lagta hai (tap ka ek hi
+   * raasta) par uske saath ek anjaan khatra aata hai: us haal me keyboard SIRF
+   * `focus()` se khulta hai, aur agar kisi OEM par wo call na chale to PIN
+   * daalne ka koi raasta hi nahi bachta. Do raaste rakhna yahan sasta beema hai.
+   *
+   * ⚠️ Pehle `autoFocus` bhi tha aur wo DO aur shikayaton ki jad thi:
    *
    *   • **Fingerprint do baar lagana padta tha.** Android ka BiometricPrompt ek
    *     alag window hai. `autoFocus` mount hote hi keyboard khol deta hai, aur
@@ -93,8 +117,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
    *
    * Ab focus HUM dete hain, aur hamesha biometric ka faisla ho jaane ke BAAD.
    */
-  const pinRef = useRef<TextInput>(null);
-  const codeRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInput>(null);
 
   /** Biometric ek hi baar chale — effect dobara chal jaye tab bhi. */
   const bioTried = useRef(false);
@@ -102,11 +125,30 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   /* ─────────────────────────── entry animation ─────────────────────────── */
 
   /**
-   * Logo peeche se aage aata hai, aur naam do taraf se aa ke jud jaata hai.
+   * Poori SCREEN ki entry — sirf logo ki nahi.
    *
-   * ⚠️ Teenon cheezein (perspective + rotateX + scale) ek saath chahiye. Inme se
-   * `perspective` hataane par `rotateX` sirf ek flat squeeze dikhta hai, aur
-   * poori cheez 3D ki jagah "dabi hui" lagti hai.
+   * ⚠️ Shikayat seedhi thi: "logo ke saath 3D animation chaiye wo pura screen
+   * animation me do". Pehle sirf logo ka chhota sa tile ghoomta tha aur baaki
+   * screen (naam, title, dots) bina kisi harkat ke, ek dam se, wahin chipak
+   * jaati thi. Ek chalta hua hissa aur baaki sab jam gaya — wo animation lagta
+   * hi nahi, wo ek jhatka lagta hai.
+   *
+   * Ab teen parat ek hi ghadi (`enter`) par chalti hain, thodi-thodi der aage-
+   * peeche:
+   *
+   *   1. **Aura** — screen bhar ka do naram gol, peeche se khulta hua. Yahi wo
+   *      cheez hai jo animation ko "poori screen ka" banati hai; iske bina
+   *      background bilkul mara hua rehta hai.
+   *   2. **Logo** — perspective + rotateX + rotateY + scale. Chaaron ek saath
+   *      chahiye: `perspective` hataane par `rotateX` sirf ek flat squeeze
+   *      dikhta hai, aur `rotateY` ke bina wo palat-ta hua nahi, bas jhukta hua
+   *      lagta hai.
+   *   3. **Naam aur neeche ka sab** — logo ke BAAD, warna sab ek saath aane par
+   *      bhaari lagta hai.
+   *
+   * ⚠️ Har transform `useNativeDriver: true` par hai. Lock screen app ka pehla
+   * frame hai — us waqt JS thread booting me busy hota hai, aur JS-driven
+   * animation wahin latak jaati hai (user ko wo "app hang ho gaya" dikhta hai).
    *
    * Travel (naam kitni door se aata hai) screen ki chaudai se nikalta hai, tay
    * number se nahi — chhote phone par 120px ka safar naam ko screen ke bahar le
@@ -116,11 +158,15 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   const travel = Math.min(140, Math.max(60, width * 0.32));
   const compact = height < 700;
   const logoSize = Math.round(Math.min(104, Math.max(66, width * 0.22)));
+  /** Aura ka naap — screen ke bade kinare se bhi bada, taaki wo bhare hue lage. */
+  const auraSize = Math.round(Math.max(width, height) * 1.15);
 
   useEffect(() => {
     const a = Animated.timing(enter, {
       toValue: 1,
-      duration: 620,
+      // 620 se 780 — poori screen ki harkat ko saans lene ki jagah chahiye.
+      // Isse tez rakhne par aura "phaila" nahi, "chamak ke bujha" lagta hai.
+      duration: 780,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
@@ -130,6 +176,8 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   /** Naam logo ke thoda BAAD aata hai — dono ek saath aayein to bhaari lagta hai. */
   const word = enter.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 0, 1] });
+  /** Neeche ka sab (title, dots, buttons) — naam ke bhi thoda baad. */
+  const rest = enter.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] });
 
   /* ──────────────────────────── countdowns ──────────────────────────── */
 
@@ -207,7 +255,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
    * hoti). Ek frame ka intezaar ise pakka kar deta hai.
    */
   function focusPin() {
-    setTimeout(() => pinRef.current?.focus(), 120);
+    setTimeout(() => inputRef.current?.focus(), 120);
   }
 
   async function submit(value: string) {
@@ -280,7 +328,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     setResendIn(res.retryAfter || 60);
     setCode("");
     setMode("resetCode");
-    setTimeout(() => codeRef.current?.focus(), 150);
+    setTimeout(() => inputRef.current?.focus(), 150);
   }
 
   function onChangeCode(v: string) {
@@ -293,7 +341,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
       // qadam: naya PIN.
       setPin("");
       setMode("resetNew");
-      setTimeout(() => pinRef.current?.focus(), 150);
+      setTimeout(() => inputRef.current?.focus(), 150);
     }
   }
 
@@ -317,7 +365,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     if (err === "wrong_code" || err === "expired" || err === "locked") {
       setCode("");
       setMode("resetCode");
-      setTimeout(() => codeRef.current?.focus(), 150);
+      setTimeout(() => inputRef.current?.focus(), 150);
     } else {
       focusPin();
     }
@@ -348,14 +396,55 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/**
+       * ── Poori screen ka aura ──────────────────────────────────────────
+       *
+       * ScrollView ke BAHAR aur `pointerEvents="none"` par — dono zaroori hain.
+       * Andar rakhne par ye scroll ke saath khisakta (aur wo background nahi,
+       * content lagta), aur bina `pointerEvents` ke ye poori screen ke tap kha
+       * jaata — yaani dots par ungli lagti hi nahi.
+       */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Animated.View
+          style={[
+            styles.aura,
+            {
+              height: auraSize,
+              width: auraSize,
+              borderRadius: auraSize / 2,
+              marginLeft: -auraSize / 2,
+              marginTop: -auraSize / 2,
+              opacity: enter.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+              transform: [
+                { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }) },
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.auraInner,
+            {
+              height: auraSize * 0.55,
+              width: auraSize * 0.55,
+              borderRadius: (auraSize * 0.55) / 2,
+              marginLeft: -(auraSize * 0.55) / 2,
+              marginTop: -(auraSize * 0.55) / 2,
+              opacity: enter.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+              transform: [
+                { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) },
+              ],
+            },
+          ]}
+        />
+      </View>
+
+      <KeyboardView>
         {/*
           ⚠️ ScrollView jaan-boojh ke, chahe content chhota hi ho.
 
-          Keyboard khulte hi Android window ko chhota kar deta hai, aur ek
+          Keyboard khulte hi content ke UPAR aa jaata hai (Android edge-to-edge —
+          poori wajah `components/keyboard-view.tsx` par likhi hai), aur ek
           `justifyContent: center` wale View me se upar ka text seedha kat jaata
           hai — user ne theek yahi pakda tha ("keyboard aata hai to text chhup
           jata hai"). Scroll me wahi content sirf khisak jaata hai, kat-ta nahi,
@@ -366,7 +455,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Logo: peeche se aage aata hua ── */}
+          {/* ── Logo: peeche se, ghoomta hua aage aata hua ── */}
           <Animated.View
             style={{
               opacity: enter,
@@ -375,11 +464,17 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
                 {
                   rotateX: enter.interpolate({
                     inputRange: [0, 1],
-                    outputRange: ["16deg", "0deg"],
+                    outputRange: ["24deg", "0deg"],
                   }),
                 },
-                { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) },
-                { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) },
+                {
+                  rotateY: enter.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["-28deg", "0deg"],
+                  }),
+                },
+                { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [34, 0] }) },
+                { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
               ],
             }}
           >
@@ -428,109 +523,150 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
             </Animated.Text>
           </View>
 
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.sub}>{sub}</Text>
-
-          {/*
-            Asli input chhupa hua hai; dikhne wale dots neeche hain. Isse har
-            platform par apne aap secure keyboard aur paste-block milta hai,
-            bina apna keypad likhe.
-
-            ⚠️ `onPress` ab sach me kuch karta hai — pehle wo `() => {}` tha,
-            yaani keyboard ek baar band ho jaye to use wapas laane ka koi raasta
-            hi nahi bachta tha.
-          */}
-          <Pressable
-            style={styles.dots}
-            onPress={() => (isCodeStep ? codeRef.current : pinRef.current)?.focus()}
-            hitSlop={16}
+          {/* Title se neeche ka sab ek saath, logo/naam ke thoda baad. */}
+          <Animated.View
+            style={{
+              alignSelf: "stretch",
+              alignItems: "center",
+              opacity: rest,
+              transform: [
+                { translateY: rest.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) },
+              ],
+            }}
           >
-            <TextInput
-              ref={pinRef}
-              value={pin}
-              onChangeText={mode === "resetNew" ? onChangeNewPin : onChangePin}
-              keyboardType="number-pad"
-              secureTextEntry
-              editable={!checking && !isCodeStep}
-              maxLength={PIN_LENGTH}
-              style={styles.hiddenInput}
-              caretHidden
-            />
-            <TextInput
-              ref={codeRef}
-              value={code}
-              onChangeText={onChangeCode}
-              keyboardType="number-pad"
-              editable={isCodeStep}
-              maxLength={6}
-              style={styles.hiddenInput}
-              caretHidden
-            />
-            {Array.from({ length: slots }).map((_, i) => (
-              <View
-                key={i}
-                style={[styles.dot, isCodeStep && styles.dotSmall, i < filled && styles.dotOn]}
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.sub}>{sub}</Text>
+
+            {/*
+              Asli input chhupa hua hai; dikhne wale dots neeche hain. Isse har
+              platform par apne aap secure keyboard aur paste-block milta hai,
+              bina apna keypad likhe.
+
+              ⚠️ Input par `pointerEvents="none"` — poori wajah `inputRef` ke
+              upar likhi hai. Chhoti si baat lagti hai par yahi wo cheez thi
+              jiski wajah se pehli tap par keyboard nahi aata tha.
+            */}
+            <Pressable
+              style={styles.dots}
+              onPress={() => inputRef.current?.focus()}
+              hitSlop={20}
+              accessibilityRole="button"
+              accessibilityLabel={title}
+            >
+              <TextInput
+                // `key` — mode badalne par naya input. Ek hi input ka
+                // `secureTextEntry` beech me badalna Android par IME ko uljha
+                // deta hai (kabhi keyboard hi nahi aata).
+                key={isCodeStep ? "code" : "pin"}
+                ref={inputRef}
+                value={isCodeStep ? code : pin}
+                onChangeText={
+                  isCodeStep ? onChangeCode : mode === "resetNew" ? onChangeNewPin : onChangePin
+                }
+                keyboardType="number-pad"
+                secureTextEntry={!isCodeStep}
+                editable={!checking}
+                maxLength={slots}
+                style={styles.hiddenInput}
+                caretHidden
               />
-            ))}
-          </Pressable>
-
-          {wait > 0 ? (
-            <Text style={styles.err}>{tpl(l.tooManyPin, { s: wait })}</Text>
-          ) : (
-            !!error && <Text style={styles.err}>{error}</Text>
-          )}
-
-          {mode === "pin" && bioOn && wait === 0 && (
-            <Pressable
-              onPress={() =>
-                void unlockWithBiometric(l.biometricPrompt, l.enterPin).then((ok) =>
-                  ok ? done() : focusPin(),
-                )
-              }
-              style={({ pressed }) => [styles.bioBtn, pressed && { opacity: 0.85 }]}
-            >
-              <Ionicons name="finger-print" size={19} color={tc.terracotta} />
-              <Text style={styles.bioText}>{l.useBiometric}</Text>
+              {Array.from({ length: slots }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, isCodeStep && styles.dotSmall, i < filled && styles.dotOn]}
+                />
+              ))}
             </Pressable>
-          )}
 
-          {/* PIN bhool gaye — email par code. Lock hatata nahi, PIN badalta hai. */}
-          {mode === "pin" && (
-            <Pressable
-              onPress={() => void askForCode()}
-              disabled={sending}
-              hitSlop={8}
-              style={({ pressed }) => [styles.forgot, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={styles.forgotText}>{sending ? l.resetSending : l.forgotPin}</Text>
-            </Pressable>
-          )}
+            {wait > 0 ? (
+              <Text style={styles.err}>{tpl(l.tooManyPin, { s: wait })}</Text>
+            ) : (
+              !!error && <Text style={styles.err}>{error}</Text>
+            )}
 
-          {isCodeStep && (
-            <>
+            {mode === "pin" && bioOn && wait === 0 && (
+              <Pressable
+                onPress={() =>
+                  void unlockWithBiometric(l.biometricPrompt, l.enterPin).then((ok) =>
+                    ok ? done() : focusPin(),
+                  )
+                }
+                style={({ pressed }) => [styles.bioBtn, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="finger-print" size={19} color={tc.terracotta} />
+                <Text style={styles.bioText}>{l.useBiometric}</Text>
+              </Pressable>
+            )}
+
+            {/* PIN bhool gaye — email par code. Lock hatata nahi, PIN badalta hai. */}
+            {mode === "pin" && (
               <Pressable
                 onPress={() => void askForCode()}
-                disabled={resendIn > 0 || sending}
-                hitSlop={8}
-                style={({ pressed }) => [styles.forgot, pressed && { opacity: 0.6 }]}
+                disabled={sending}
+                hitSlop={10}
+                style={({ pressed }) => [styles.linkBtn, pressed && styles.linkBtnPressed]}
               >
-                <Text style={[styles.forgotText, resendIn > 0 && { opacity: 0.5 }]}>
-                  {resendIn > 0 ? tpl(l.resetResendIn, { s: resendIn }) : l.resetResend}
+                <Ionicons name="mail-outline" size={15} color={tc.inkSoft} />
+                <Text style={styles.linkBtnText}>
+                  {sending ? l.resetSending : l.forgotPin}
                 </Text>
               </Pressable>
-              <Pressable onPress={backToPin} hitSlop={8} style={styles.cancel}>
-                <Text style={styles.cancelText}>{c.cancel}</Text>
-              </Pressable>
-            </>
-          )}
+            )}
+
+            {isCodeStep && (
+              <>
+                <Pressable
+                  onPress={() => void askForCode()}
+                  disabled={resendIn > 0 || sending}
+                  hitSlop={10}
+                  style={({ pressed }) => [
+                    styles.linkBtn,
+                    resendIn > 0 && { opacity: 0.5 },
+                    pressed && styles.linkBtnPressed,
+                  ]}
+                >
+                  <Ionicons name="refresh" size={15} color={tc.inkSoft} />
+                  <Text style={styles.linkBtnText}>
+                    {resendIn > 0 ? tpl(l.resetResendIn, { s: resendIn }) : l.resetResend}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={backToPin} hitSlop={10} style={styles.cancel}>
+                  <Text style={styles.cancelText}>{c.cancel}</Text>
+                </Pressable>
+              </>
+            )}
+          </Animated.View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
     </SafeAreaView>
   );
 }
 
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
+  /**
+   * Screen bhar ka naram gol — entry animation ka "poori screen" wala hissa.
+   *
+   * ⚠️ Rang jaan-boojh ke bahut halka hai (5% / 8%). Yahan tez rang daalne par
+   * lock screen ek rangeen poster ban jaati hai aur uska asli kaam — 4 dots
+   * saaf dikhna — dab jaata hai. Ye ek ehsaas hai, ek design nahi.
+   *
+   * `top/left: "50%"` + ulta margin = beech me. RN me `transform: translate(-50%)`
+   * chalta nahi (percentage transform nahi hote), isliye margin se centre karte
+   * hain aur naap component me nikalti hai.
+   */
+  aura: {
+    position: "absolute",
+    top: "42%",
+    left: "50%",
+    backgroundColor: "rgba(194,90,55,0.05)",
+  },
+  auraInner: {
+    position: "absolute",
+    top: "42%",
+    left: "50%",
+    backgroundColor: "rgba(194,90,55,0.08)",
+  },
   scroll: {
     flexGrow: 1,
     alignItems: "center",
@@ -568,40 +704,56 @@ const useStyles = makeStyles((c) => ({
     color: c.inkSoft,
     textAlign: "center",
   },
+  /**
+   * Dots ka poora patta — ab ek asli, dikhne wala tap-target.
+   *
+   * ⚠️ Pehle ye ek khaali row thi. User ko dikhta hi nahi tha ki "dabana kahan
+   * hai" — sirf chaar chhote gol the, aur unke beech ki khaali jagah bhi tap ka
+   * hissa thi ye kisi ko pata nahi chalta tha. Ab ek halka sa patta hai jo saaf
+   * kehta hai "yahan dabao", aur uski oonchai (68) angoothe ke liye kaafi hai.
+   */
   dots: {
     marginTop: 28,
     flexDirection: "row",
-    gap: 14,
+    gap: 18,
     alignItems: "center",
     justifyContent: "center",
     // Tap ka nishana bada — chhote dots par ungli aksar chook jaati hai aur
     // keyboard wapas nahi aata.
-    paddingVertical: 10,
-  },
-  // Input dikhta nahi par tappable rehna chahiye — warna keyboard band hone ke
-  // baad wapas laane ka koi raasta hi nahi bachta.
-  hiddenInput: { position: "absolute", opacity: 0, height: 48, width: "100%" },
-  /**
-   * ⚠️ 15px se 21px.
-   *
-   * Shikayat seedhi thi: "OOOO circle thoda bada hona chahiye, lock page par
-   * dabana mushkil hai". Tap ka nishana pehle hi theek kar diya gaya tha
-   * (`hitSlop` + `onPress` jo sach me keyboard laata hai), par asli baat wo thi
-   * hi nahi — baat DIKHNE ki thi. 15px par ye batana hi mushkil ho jaata hai ki
-   * kitne ank pad chuke hain, aur ye app un logon ke liye bani hai jinki nazar
-   * kamzor hai.
-   */
-  dot: {
-    height: 21,
-    width: 21,
-    borderRadius: 11,
-    borderWidth: 1.5,
+    minHeight: 68,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 22,
+    borderWidth: 1,
     borderColor: c.line,
     backgroundColor: c.surface,
   },
+  /**
+   * Input dikhta nahi — aur tap bhi nahi leta.
+   *
+   * ⚠️ `pointerEvents="none"` component me lagta hai (yahan style me nahi), aur
+   * wahi is screen ka asli fix hai. Poori wajah `inputRef` ke upar likhi hai.
+   */
+  hiddenInput: { position: "absolute", opacity: 0, height: 60, width: "100%" },
+  /**
+   * ⚠️ 15px → 21px → 26px.
+   *
+   * Shikayat do baar aayi, aur doosri baar bhi wahi thi: "wo thoda bada karo".
+   * Tap ka nishana pehle hi theek ho chuka tha; baat hamesha DIKHNE ki thi. 26px
+   * par ek nazar me ginta ja sakta hai ki kitne ank pad chuke hain — aur ye app
+   * un logon ke liye bani hai jinki nazar kamzor hai.
+   */
+  dot: {
+    height: 26,
+    width: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: c.line,
+    backgroundColor: c.cream,
+  },
   // 6 ank ke code me 4 wale naap se pankti chhoti screen par bahar nikal jaati.
   /** 6-ank wala reset code — utne dots ek line me aane chahiye, isliye thode chhote. */
-  dotSmall: { height: 17, width: 17, borderRadius: 9 },
+  dotSmall: { height: 20, width: 20, borderRadius: 10 },
   dotOn: { backgroundColor: c.terracotta, borderColor: c.terracotta },
   err: {
     marginTop: 14,
@@ -623,14 +775,35 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: "rgba(194,90,55,0.07)",
   },
   bioText: { fontSize: 14, fontWeight: "700", color: c.terracotta },
-  forgot: { marginTop: 22, paddingVertical: 6, paddingHorizontal: 10 },
-  forgotText: {
-    fontSize: 13.5,
-    fontWeight: "600",
-    color: c.inkSoft,
-    textAlign: "center",
-    textDecorationLine: "underline",
+  /**
+   * "PIN bhool gaye" / "Dobara bhejo" — link nahi, BUTTON.
+   *
+   * ⚠️ Shikayat: "bahut jaha jo h anchor tag jaisa lag raha h app me jaise pin
+   * screen me jo h pin bhool gaye ho otp daalo". Wo bilkul sahi tha — yahan ek
+   * underline wala neela-jaisa text pada tha, seedha web ke `<a>` jaisa. Phone
+   * par underline wala text ek link ki tarah padha hi nahi jaata; wo ya to
+   * galti lagta hai ya us par ungli hi nahi padti (nishana sirf akshar jitna
+   * hota hai).
+   *
+   * Ab ye ek saaf, chhui ja sakne wali cheez hai: icon + text, 44px se ooncha
+   * (Android/iOS dono ka minimum tap-target), apne kinare ke saath.
+   */
+  linkBtn: {
+    marginTop: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.line,
+    backgroundColor: c.surface,
   },
-  cancel: { marginTop: 6, padding: 8 },
+  linkBtnPressed: { backgroundColor: c.creamDeep },
+  linkBtnText: { fontSize: 13.5, fontWeight: "700", color: c.inkSoft, textAlign: "center" },
+  cancel: { marginTop: 10, minHeight: 44, justifyContent: "center", paddingHorizontal: 16 },
   cancelText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
 }));

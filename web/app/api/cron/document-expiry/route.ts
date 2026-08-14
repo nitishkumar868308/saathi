@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { sendDocumentWhatsApp } from "@/lib/twilio";
-import { sendDocumentExpiryEmail } from "@/lib/email";
+import { sendDocumentWhatsApp, twilioConfigured, waTemplateState } from "@/lib/twilio";
+import { sendDocumentExpiryEmail, emailConfigured } from "@/lib/email";
+import { logDeliverySkip } from "@/lib/delivery-log";
 import {
   PROFILE_SELECT,
   toReminderProfile,
@@ -149,9 +150,22 @@ export async function POST(request: Request) {
       `user_details?user_id=eq.${uid}&select=phone,phone_verified_at`,
     ).catch(() => []);
     const row = rows[0];
+    rawPhoneCache.set(uid, Boolean(row?.phone));
     const v = row?.phone && row.phone_verified_at ? row.phone : null;
     phoneCache.set(uid, v);
     return v;
+  }
+
+  /**
+   * Number DAALA hua hai? (Verify hua ya nahi, ye alag baat hai.)
+   *
+   * Dono ka ilaaj alag hai — poori wajah `api/cron/send-reminders/route.ts` par
+   * likhi hai, jahan bilkul yahi jodi hai.
+   */
+  const rawPhoneCache = new Map<string, boolean>();
+  async function hasPhone(uid: string): Promise<boolean> {
+    if (!rawPhoneCache.has(uid)) await getPhone(uid);
+    return rawPhoneCache.get(uid) ?? false;
   }
 
   /**
@@ -171,6 +185,52 @@ export async function POST(request: Request) {
     if (res.status === 409) return false; // pehle ja chuki
     if (!res.ok) throw new Error(`log ${channel}: ${res.status}`);
     return true;
+  }
+
+  /**
+   * Claim wapas lo — khabar sach me gayi hi nahi.
+   *
+   * ⚠️ Ye is route ka sabse mehnga bug tha, aur bilkul chup tha. Tarteeb aisi
+   * hai: pehle `claim()` (dedupe ke liye — do cron ek saath chal sakte hain),
+   * phir bhejna. Par bhejna DO tarah se bina exception ke fail hota hai:
+   *
+   *   • SMTP ka env set na ho  -> `sendDocumentExpiryEmail` chup-chaap
+   *     `{ sent: false, skipped: true }` lauta deta hai (`lib/email.ts`).
+   *   • Twilio ka env set na ho -> `sendWhatsApp` bhi bilkul waise hi.
+   *
+   * Aur claim tab bhi TABLE ME PADI REH JAATI thi. Uska matlab: us (document,
+   * moment, channel) ki khabar HAMESHA ke liye "bhej di gayi" mark ho gayi.
+   * Baad me SMTP/Twilio theek kar bhi lo — un documents ka wo alert dobara
+   * kabhi nahi jaata, kyunki wo moment ek hi baar aata hai.
+   *
+   * Yahi wajah hai ki "email/WhatsApp nahi aa raha" env theek karne ke BAAD bhi
+   * theek nahi hota tha — jitne din config toota raha, utne din ke alert
+   * hamesha ke liye jal chuke the.
+   *
+   * Ab jo bheja hi nahi gaya, uski claim hata di jaati hai — agla cron (15
+   * minute baad) usi khidki me dobara koshish kar lega. Khidki 25 ghante ki hai,
+   * isliye ek raat ka outage bhi khabar nahi khaata.
+   *
+   * ⚠️ Ye SIRF `skipped` par chalta hai (env set hi nahi tha), THROW par NAHI.
+   * Ye farq zaroori hai. `sendMail` aur `sendWhatsApp` dono asli fail par throw
+   * karte hain — aur asli fail aksar pakki hoti hai (template reject ho gaya,
+   * number block hai, SMTP ka password badal gaya). Us par claim wapas lene ka
+   * matlab hota: har 15 minute, 25 ghante tak, wahi fail hone wali call — yaani
+   * ek document par ~100 bekaar koshishein, aur Twilio ke logs bhar jaate.
+   * Fail `errors` me chala jaata hai; use dekh ke theek karna hi sahi raasta
+   * hai, andhe retry nahi.
+   */
+  async function unclaim(docId: string, dueIso: string, channel: string): Promise<void> {
+    try {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/document_notify_log` +
+          `?document_id=eq.${docId}&due_at=eq.${encodeURIComponent(dueIso)}` +
+          `&channel=eq.${channel}`,
+        { method: "DELETE", headers: sbHeaders({ Prefer: "return=minimal" }), cache: "no-store" },
+      );
+    } catch {
+      /* Hata na paye to bas ek alert chhoot gaya — dobara bhejne se behtar hai. */
+    }
   }
 
   let mail = 0;
@@ -216,8 +276,10 @@ export async function POST(request: Request) {
 
     // --- Email ---
     if (profile.email) {
+      let claimed = false;
       try {
-        if (await claim(doc.id, dueIso, "email")) {
+        claimed = await claim(doc.id, dueIso, "email");
+        if (claimed) {
           const res = await sendDocumentExpiryEmail(
             profile.email,
             doc.name,
@@ -225,11 +287,44 @@ export async function POST(request: Request) {
             profile.language,
             doc.user_id,
           );
-          if (res.sent) mail++;
+          if (res.sent) {
+            mail++;
+            claimed = false; // sach me chala gaya — claim ab sahi hai, rehne do
+          } else {
+            // SMTP env hi nahi tha — claim jalane ka koi matlab nahi (upar
+            // `unclaim` par poori wajah likhi hai).
+            errors.push(`mail ${doc.id}: not sent (SMTP configured?)`);
+            logDeliverySkip({
+              channel: "email",
+              kind: "document",
+              reason: "smtp_off",
+              userId: doc.user_id,
+              itemId: doc.id,
+            });
+          }
         }
       } catch (e) {
+        // Asli fail — claim RAKHI rehti hai (upar `unclaim` par wajah likhi hai).
+        claimed = false;
         errors.push(`mail ${doc.id}: ${String(e)}`);
+        logDeliverySkip({
+          channel: "email",
+          kind: "document",
+          reason: "send_failed",
+          userId: doc.user_id,
+          itemId: doc.id,
+          detail: String(e),
+        });
       }
+      if (claimed) await unclaim(doc.id, dueIso, "email");
+    } else {
+      logDeliverySkip({
+        channel: "email",
+        kind: "document",
+        reason: "no_email",
+        userId: doc.user_id,
+        itemId: doc.id,
+      });
     }
 
     // --- WhatsApp ---
@@ -239,9 +334,22 @@ export async function POST(request: Request) {
     if (doc.expiry_ack_at && new Date(doc.expiry_ack_at).getTime() >= hit.moment) continue;
 
     const phone = await getPhone(doc.user_id);
-    if (!phone) continue;
+    if (!phone) {
+      // ⚠️ Pehle yahan seedha `continue` tha — poori tarah chup. Yahi wo sabse
+      // aam wajah hai jiska jawab admin ko kabhi milta hi nahi tha.
+      logDeliverySkip({
+        channel: "whatsapp",
+        kind: "document",
+        reason: (await hasPhone(doc.user_id)) ? "phone_unverified" : "no_phone",
+        userId: doc.user_id,
+        itemId: doc.id,
+      });
+      continue;
+    }
+    let waClaimed = false;
     try {
-      if (await claim(doc.id, dueIso, "whatsapp")) {
+      waClaimed = await claim(doc.id, dueIso, "whatsapp");
+      if (waClaimed) {
         const res = await sendDocumentWhatsApp(
           phone,
           doc.name,
@@ -253,11 +361,37 @@ export async function POST(request: Request) {
           // hai, yaani us user ka message bilkul hi nahi jaata.
           profile.name,
         );
-        if (res.sent) wa++;
+        if (res.sent) {
+          wa++;
+          waClaimed = false; // sach me chala gaya — claim rehne do
+        } else {
+          // Twilio ka env hi nahi tha — claim jalane ka koi matlab nahi.
+          errors.push(`wa ${doc.id}: not sent (Twilio configured?)`);
+          logDeliverySkip({
+            channel: "whatsapp",
+            kind: "document",
+            reason: "twilio_off",
+            userId: doc.user_id,
+            itemId: doc.id,
+          });
+        }
       }
     } catch (e) {
+      // Asli fail — claim RAKHI rehti hai (upar `unclaim` par wajah likhi hai).
+      waClaimed = false;
       errors.push(`wa ${doc.id}: ${String(e)}`);
+      logDeliverySkip({
+        channel: "whatsapp",
+        kind: "document",
+        reason: "send_failed",
+        userId: doc.user_id,
+        itemId: doc.id,
+        detail: String(e),
+      });
     }
+    // Env hi set nahi tha — claim wapas, taaki env theek hote hi agla cron isse
+    // bhej de. (Asli fail upar `catch` me hi nipat chuka hai.)
+    if (waClaimed) await unclaim(doc.id, dueIso, "whatsapp");
   }
 
   return NextResponse.json({
@@ -266,6 +400,14 @@ export async function POST(request: Request) {
     whatsapp: wa,
     // "email 0 kyun gaye" ka jawab — free users the, SMTP kharab nahi hai.
     skippedFreePlan: skippedFree,
+    // Server ka apna haal — poori wajah `api/cron/send-reminders/route.ts` par
+    // likhi hai. Dono cron ek jaisa jawab dete hain, taaki jaanch ek jagah se
+    // ho sake.
+    config: {
+      twilio: twilioConfigured(),
+      smtp: emailConfigured(),
+      waTemplate: waTemplateState("document", "hinglish"),
+    },
     errors: errors.slice(0, 10),
   });
 }

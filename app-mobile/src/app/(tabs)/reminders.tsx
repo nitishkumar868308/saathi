@@ -32,6 +32,7 @@ import {
 } from "@/lib/reminder-outbox";
 import { scheduleReminderSeries, cancelReminder } from "@/lib/notifications";
 import { repeatLine } from "@/lib/repeat-label";
+import { bucketOf } from "@/utils/reminder-bucket";
 import { formatWhen } from "@/utils/parse-time";
 import { Pagination, usePaged, PAGE_SIZE } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
@@ -40,50 +41,12 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { emitDataChanged, useDataChanged } from "@/lib/data-events";
 
-/** Ye reminder aaj hi bajega? (Home tab bhi bilkul yahi hisaab lagata hai.) */
-function isToday(iso: string | null): boolean {
-  if (!iso) return false;
-  const d = new Date(iso);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
-
 /**
- * Is reminder ka waqt beet chuka hai (aur aaj ka bhi nahi hai)?
- *
- * ⚠️ Ye check pehle KAHIN THA HI NAHI, aur wahi shikayat ki jad thi: "Aug 5 ke
- * reminder 'Aane wale' me dikh rahe hain". Bucket sirf DO the — `isToday` aur
- * "baaki sab" — isliye har beeta hua reminder definition se hi "aane wala" ban
- * jaata tha. App user ko saaf-saaf galat baat dikha rahi thi.
- *
- * `remind_at` khaali ho to `false`: bina waqt wala reminder beeta hua nahi hai,
- * wo bas abhi tay nahi hua. Wo "Aane wale" me hi rehta hai.
- *
- * ⚠️ Band aur paused reminder kabhi "chhoot gaye" nahi hote.
- *
- * Pehle yahan sirf waqt dekha jaata tha, aur uska nateeja ulta tha: user ne jo
- * reminder KHUD switch se band kiya hai (ya jo Plus khatam hone par apne aap
- * pause hua hai) wo bhi beetne ke baad "Chhoot gaye" me sabse UPAR aa baithta
- * tha — us khaane ke saath jo kehta hai "inka waqt nikal chuka hai". Band karne
- * ka matlab hi ye tha ki ab uski yaad nahi chahiye; usko sabse pehle dikhana us
- * faisle ko ulta deta hai, aur list us kachre se bhar jaati hai jise user pehle
- * hi na keh chuka hai.
- *
- * Aise reminder "Aane wale" me chale jaate hain, jahan card khud apna haal saaf
- * dikhata hai — Switch band, aur paused par "Plus" wali patti.
+ * Khaane ka poora hisaab ab `utils/reminder-bucket.ts` me hai — pure aur
+ * jaanchne laayak. Wo file kyun bani, iski poori wajah wahin likhi hai (chhota
+ * saar: yahi hisaab do baar galat nikla, aur dono baar wajah ye thi ki chaar
+ * shartein alag-alag jagah bikhri hui thi).
  */
-function isMissed(r: Pick<Reminder, "remind_at" | "is_on" | "is_paused">): boolean {
-  if (!r.is_on || r.is_paused) return false;
-  const iso = r.remind_at;
-  if (!iso || isToday(iso)) return false;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return new Date(iso).getTime() < start.getTime();
-}
 
 export default function Reminders() {
   const tc = useColors();
@@ -240,24 +203,32 @@ export default function Reminders() {
   // Home tab pehle se hi `remind_at` se hisaab lagata hai (`isToday`). Ab dono
   // screen ek hi sach dikhate hain.
   /**
-   * Teen khaane, do nahi.
+   * CHAAR khaane — aur chaaron alag-alag zaroori hain.
    *
-   * ⚠️ Pehle sirf `today` aur `upcoming` the, aur `upcoming` ki poori shart
-   * `!isToday(...)` thi — yaani 5 August ka beeta hua reminder bhi "Aane wale"
-   * me baith jaata tha (upar `isMissed` par poori wajah likhi hai).
+   *   • **Chhoot gaye** — waqt nikal gaya, reminder abhi bhi chalu. Inpar kuch
+   *     karna baaki hai, isliye sabse upar.
+   *   • **Aaj** — aaj hi bajega.
+   *   • **Aane wale** — aage ka. ⚠️ Ab ismein SIRF aage ka hi hai: `isDonePast`
+   *     wali shart lagne se pehle nipta hua/band reminder bhi yahin gir jaata
+   *     tha (poori wajah `isDonePast` ke upar likhi hai).
+   *   • **Ho chuke** — waqt bhi gaya aur switch bhi band. Ye chhupte nahi (user
+   *     dobara chalu kar sakta hai) par "aane wale" ka jhooth bhi nahi bolte.
    *
-   * "Chhoot gaye" apna alag khaana isliye deta hai, chhupata nahi: wo reminder
-   * abhi bhi chalu hai aur user ne use nipatana hai. List se gayab kar dena use
-   * dobara kabhi na dikhne dena hota.
+   * ⚠️ Chaaron shart mil ke poori list ko baant deti hain — koi reminder do
+   * khaane me nahi ja sakta, aur koi bahar bhi nahi reh sakta. Ye ganit hi is
+   * screen ka bharosa hai: ek reminder ka "kahin dikhna hi band ho jaana" is
+   * app ka sabse mehnga bug hai.
    */
-  const missed = items.filter((r) => isMissed(r));
-  const today = items.filter((r) => isToday(r.remind_at));
-  const upcoming = items.filter((r) => !isToday(r.remind_at) && !isMissed(r));
+  const missed = items.filter((r) => bucketOf(r) === "missed");
+  const today = items.filter((r) => bucketOf(r) === "today");
+  const upcoming = items.filter((r) => bucketOf(r) === "upcoming");
+  const donePast = items.filter((r) => bucketOf(r) === "past");
 
   // 7 se zyada hote hi pagination — har list me (item 21).
   const mp = usePaged(missed, PAGE_SIZE);
   const tp = usePaged(today, PAGE_SIZE);
   const up = usePaged(upcoming, PAGE_SIZE);
+  const dp = usePaged(donePast, PAGE_SIZE);
 
   // Card pe time hamesha current bhasha me — stored label ki jagah remind_at se.
   const timeOf = (r: Reminder): string | null =>
@@ -313,6 +284,15 @@ export default function Reminders() {
           <Pagination page={tp.page} pageCount={tp.pageCount} onPage={tp.setPage} />
           <Section title={r0.upcoming} items={up.pageItems} {...rowProps} />
           <Pagination page={up.page} pageCount={up.pageCount} onPage={up.setPage} />
+          {/* Ho chuke — sabse NEECHE, kyunki inpar ab kuch karna baaki nahi.
+              Khaali ho to `Section` khud kuch nahi dikhata. */}
+          {donePast.length > 0 && (
+            <>
+              <Section title={r0.past} items={dp.pageItems} {...rowProps} />
+              <Text style={styles.missedHint}>{r0.pastHint}</Text>
+              <Pagination page={dp.page} pageCount={dp.pageCount} onPage={dp.setPage} />
+            </>
+          )}
         </ScrollView>
       )}
 

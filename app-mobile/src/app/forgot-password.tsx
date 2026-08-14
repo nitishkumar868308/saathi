@@ -5,13 +5,12 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
@@ -70,10 +69,7 @@ export default function ForgotPassword() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardView>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
@@ -134,7 +130,7 @@ export default function ForgotPassword() {
             <Text style={styles.backText}>{sent ? l.forgotBack : c.back}</Text>
           </Pressable>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
 
       <LoaderOverlay visible={busy} />
     </SafeAreaView>

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +14,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, TopProgress } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
@@ -575,10 +575,7 @@ export default function AddReminder() {
           itna batati hai. Kuch block nahi hota. */}
       <TopProgress visible={parsing} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardView>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -776,7 +773,7 @@ export default function AddReminder() {
 
           <View style={{ height: 20 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
 
       <Pressable
         onPress={save}

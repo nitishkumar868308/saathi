@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { View, Text, Pressable, ScrollView, Image, KeyboardAvoidingView } from "react-native";
+import { View, Text, Pressable, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
+import { ImageViewer } from "@/components/image-viewer";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { PermissionModal } from "@/components/permission-modal";
 import { useToast } from "@/components/toast";
@@ -97,6 +99,16 @@ export default function DocumentRenew() {
    * RTO/bank ke bahar hi hota hai.
    */
   const [oldPhoto, setOldPhoto] = useState<string | null>(null);
+
+  /**
+   * Comparison ki chhoti photo par tap = poori screen + zoom.
+   *
+   * ⚠️ Yahan iski zaroorat sabse zyada hai. Thumbnail 128px ka hai; us naap par
+   * ye batana hi namumkin hai ki nayi photo saaf aayi ya nahi, ya expiry ki
+   * date usme padhi ja sakti hai ya nahi. Aur "Save karo" dabane se PEHLE wahi
+   * ek sawaal hota hai.
+   */
+  const [zoom, setZoom] = useState<{ uri: string; title: string } | null>(null);
 
   /**
    * Document offline bhi mil jaata hai — `listDocuments()` net na hone par cache
@@ -358,7 +370,7 @@ export default function DocumentRenew() {
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      <KeyboardView>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <Text style={styles.sub}>{r.sub}</Text>
 
@@ -406,7 +418,13 @@ export default function DocumentRenew() {
               <View style={styles.compareCol}>
                 <Text style={styles.compareLabel}>{r.beforeLabel}</Text>
                 {oldPhoto ? (
-                  <Image source={{ uri: oldPhoto }} style={styles.thumb} resizeMode="cover" />
+                  <Pressable
+                    onPress={() => setZoom({ uri: oldPhoto, title: r.beforeLabel })}
+                    style={{ width: "100%", alignItems: "center" }}
+                    accessibilityRole="imagebutton"
+                  >
+                    <Image source={{ uri: oldPhoto }} style={styles.thumb} resizeMode="cover" />
+                  </Pressable>
                 ) : (
                   <View style={[styles.thumb, styles.thumbEmpty]}>
                     <Ionicons name="document-outline" size={22} color={tc.inkSoft} />
@@ -425,11 +443,17 @@ export default function DocumentRenew() {
               <View style={styles.compareCol}>
                 <Text style={[styles.compareLabel, styles.compareLabelNew]}>{r.afterLabel}</Text>
                 {newPhoto ? (
-                  <Image
-                    source={{ uri: newPhoto }}
-                    style={[styles.thumb, styles.thumbNew]}
-                    resizeMode="cover"
-                  />
+                  <Pressable
+                    onPress={() => setZoom({ uri: newPhoto, title: r.afterLabel })}
+                    style={{ width: "100%", alignItems: "center" }}
+                    accessibilityRole="imagebutton"
+                  >
+                    <Image
+                      source={{ uri: newPhoto }}
+                      style={[styles.thumb, styles.thumbNew]}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
                 ) : oldPhoto ? (
                   /* Nayi photo nahi li — wahi purani chalegi. Use halka rakhte
                      hain, warna do bilkul ek jaisi photo dekh ke user ko lagta
@@ -562,7 +586,7 @@ export default function DocumentRenew() {
             </Pressable>
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardView>
 
       <Pressable
         onPress={save}
@@ -580,6 +604,14 @@ export default function DocumentRenew() {
           setPermModal(false);
           router.back();
         }}
+      />
+
+      {/* Thumbnail par tap — poori screen par, zoom ke saath. */}
+      <ImageViewer
+        visible={!!zoom}
+        uri={zoom?.uri ?? null}
+        title={zoom?.title}
+        onClose={() => setZoom(null)}
       />
     </SafeAreaView>
   );

@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { View, Text, TextInput, Pressable, ScrollView, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useToast } from "@/components/toast";
@@ -44,6 +45,20 @@ export default function AppLock() {
   const [second, setSecond] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [askOff, setAskOff] = useState(false);
+  /**
+   * Dots par tap = keyboard wapas.
+   *
+   * ⚠️ Yahan pehle ye tha hi nahi. `autoFocus` ek baar keyboard laata hai, par
+   * user ek baar back daba de (ya "Ho gaya" wale key se keyboard band kar de) to
+   * use wapas laane ka koi raasta hi nahi bachta tha — screen par chaar gol
+   * dikhte the aur unpar ungli lagane se kuch nahi hota tha. Bilkul wahi bug jo
+   * lock screen par tha.
+   *
+   * Do raaste chalte hain (dots ke beech tap = seedha input; kisi dot ke upar
+   * tap = Pressable ka `focus()`), aur dono ka hona jaan-boojh ke hai — poori
+   * wajah `components/lock-screen.tsx` par `inputRef` ke upar likhi hai.
+   */
+  const pinRef = useRef<TextInput>(null);
 
   const refresh = useCallback(async () => {
     setState(await getLockState());
@@ -141,6 +156,7 @@ export default function AppLock() {
         <Text style={styles.title}>{l.title}</Text>
       </View>
 
+      <KeyboardView>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {step === "idle" ? (
           <>
@@ -213,9 +229,16 @@ export default function AppLock() {
             </Text>
             <Text style={styles.setupSub}>{step === "new" ? l.setSub : l.confirmSub}</Text>
 
-            <View style={styles.dots}>
+            <Pressable
+              style={styles.dots}
+              onPress={() => pinRef.current?.focus()}
+              hitSlop={20}
+              accessibilityRole="button"
+              accessibilityLabel={step === "new" ? l.setTitle : l.confirmTitle}
+            >
               <TextInput
                 key={step}
+                ref={pinRef}
                 value={step === "new" ? first : second}
                 onChangeText={step === "new" ? onFirst : onSecond}
                 keyboardType="number-pad"
@@ -234,16 +257,17 @@ export default function AppLock() {
                   ]}
                 />
               ))}
-            </View>
+            </Pressable>
 
             {!!error && <Text style={styles.err}>{error}</Text>}
 
-            <Pressable onPress={() => setStep("idle")} hitSlop={8} style={styles.cancel}>
+            <Pressable onPress={() => setStep("idle")} hitSlop={10} style={styles.cancel}>
               <Text style={styles.cancelText}>{c.cancel}</Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
+      </KeyboardView>
 
       <ConfirmModal
         visible={askOff}
@@ -350,18 +374,39 @@ const useStyles = makeStyles((c) => ({
     textAlign: "center",
     paddingHorizontal: 20,
   },
-  dots: { marginTop: 30, flexDirection: "row", gap: 16, alignItems: "center" },
-  hiddenInput: { position: "absolute", opacity: 0, height: 48, width: "100%" },
-  dot: {
-    height: 15,
-    width: 15,
-    borderRadius: 8,
-    borderWidth: 1.5,
+  /**
+   * Dots ka patta — lock screen jaisa hi.
+   *
+   * ⚠️ Dono jagah ek jaisa dikhna aur ek jaisa chalna zaroori hai. Yahan PIN
+   * banta hai aur wahan wahi PIN daala jaata hai; naap alag hone par user ko
+   * lagta hai ye do alag cheezein hain.
+   */
+  dots: {
+    marginTop: 30,
+    flexDirection: "row",
+    gap: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 68,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 22,
+    borderWidth: 1,
     borderColor: c.line,
     backgroundColor: c.surface,
   },
+  hiddenInput: { position: "absolute", opacity: 0, height: 60, width: "100%" },
+  // 15px → 26px: lock screen ke dots ke barabar (wahan wajah poori likhi hai).
+  dot: {
+    height: 26,
+    width: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: c.line,
+    backgroundColor: c.cream,
+  },
   dotOn: { backgroundColor: c.terracotta, borderColor: c.terracotta },
   err: { marginTop: 18, fontSize: 13.5, fontWeight: "700", color: c.terracottaDark },
-  cancel: { marginTop: 26, padding: 8 },
+  cancel: { marginTop: 26, minHeight: 44, justifyContent: "center", paddingHorizontal: 16 },
   cancelText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
 }));

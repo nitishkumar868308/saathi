@@ -118,17 +118,32 @@ export async function listVersions(docId: string): Promise<DocVersion[]> {
 /**
  * Purane version ki file kahan hai — `resolveDocUri()` ke liye shape.
  *
- * ⚠️ `id` yahan `<docId>-v<n>` hai, sirf `docId` nahi. Ye zaroori hai: cache ka
- * rasta `doccache/<id>.<ext>` hota hai, isliye asli docId dene par purana
- * version CURRENT document ki cached file ke upar baith jaata — aur user ko
- * document-view par purani photo dikhne lagti, ulta bug.
+ * ⚠️ `id` yahan SEEDHA `document_id` hai, aur ye badla hua hai.
+ *
+ * Pehle yahan `${document_id}-v${version}` daala jaata tha, aur uski wajah
+ * theek thi: cache ka naam us waqt sirf `<id>.<ext>` hota tha, isliye asli
+ * docId dene par purana version CURRENT document ki cached file ke UPAR baith
+ * jaata — aur user ko document-view par purani photo dikhne lagti.
+ *
+ * Ab wo jugaad ki zaroorat nahi rahi: cache ka naam khud `file_path` se version
+ * nikaal leta hai (`utils/doc-file-name.ts`), isliye har version ka apna naam
+ * apne aap ban jaata hai. Ulta, purani jugaad ke saath naam me version DO baar
+ * chadh jaata tha (`<docId>-v2-v2.jpg`) — chalta to tha, par wo ek aisi cheez
+ * hai jise agla padhne wala "galti" samajh ke theek karne baith jaata.
+ *
+ * Ab cache ka naam R2 ki key ke aakhri hisse se hubahu milta hai — wahi sabse
+ * saaf niyam hai jo yahan ho sakta tha.
+ *
+ * ⚠️ `file_path` null ho to koi takraav nahi hota: `cachedFileUri()` aur
+ * `downloadToCache()` dono uspar turant `null` laut jaate hain, yaani us version
+ * ki koi file dhoondhi hi nahi jaati.
  *
  * `file_uri` hamesha null: purana version is phone par kabhi tha hi nahi (wo
  * doosre phone par bhi ho sakta hai), wo hamesha R2 se hi aata hai.
  */
 export function versionDocFile(v: DocVersion): DocFile {
   return {
-    id: `${v.document_id}-v${v.version}`,
+    id: v.document_id,
     file_uri: null,
     file_path: v.file_path,
     mime_type: v.mime_type,

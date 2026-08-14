@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { makeStyles, useColors } from "@/theme/theme";
+import { ImageViewer } from "@/components/image-viewer";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { resolveDocUri, type DocFile } from "@/lib/doc-cache";
 import { listVersions, versionDocFile, type DocVersion } from "@/lib/doc-versions";
@@ -109,6 +110,15 @@ export default function DocumentView() {
 
   const [resolved, setResolved] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * Poori screen wala viewer — kaunsi photo khuli hai.
+   *
+   * ⚠️ Ek hi state, current aur purane version dono ke liye. Do alag state
+   * rakhne par dono ek saath khul sakte the (list me tap + upar wali photo par
+   * tap), aur upar wala hamesha jeet jaata — user ne purana version maanga hota
+   * aur use current dikhta.
+   */
+  const [zoom, setZoom] = useState<{ uri: string; title: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -303,11 +313,31 @@ export default function DocumentView() {
         {loading ? (
           <ScreenLoader />
         ) : resolved ? (
-          <Image
-            source={{ uri: resolved }}
-            style={{ width: width - 32, height: height * 0.45 }}
-            resizeMode="contain"
-          />
+          /**
+           * Photo par tap = poori screen + zoom.
+           *
+           * ⚠️ Neeche "Bada karke dekho" ki patti jaan-boojh ke hai. Sirf tap
+           * chalne se koi faayda nahi hota agar user ko pata hi na ho ki photo
+           * tappable hai — aur is app ke user photo par tap karne ki koshish
+           * karte hi nahi. Ek chhoti si saaf line usse poora feature khol deti
+           * hai.
+           */
+          <Pressable
+            onPress={() => setZoom({ uri: resolved, title: docName })}
+            style={({ pressed }) => [styles.photoTap, pressed && { opacity: 0.9 }]}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={docName}
+          >
+            <Image
+              source={{ uri: resolved }}
+              style={{ width: width - 32, height: height * 0.45 }}
+              resizeMode="contain"
+            />
+            <View style={styles.zoomHint}>
+              <Ionicons name="expand-outline" size={14} color={tc.white} />
+              <Text style={styles.zoomHintText}>{d.zoomHint}</Text>
+            </View>
+          </Pressable>
         ) : (
           <View style={styles.empty}>
             <Ionicons name="document-outline" size={40} color={tc.inkSoft} />
@@ -449,11 +479,25 @@ export default function DocumentView() {
 
                     {open &&
                       (uri ? (
-                        <Image
-                          source={{ uri }}
-                          style={{ width: width - 64, height: height * 0.35, marginTop: 10 }}
-                          resizeMode="contain"
-                        />
+                        // Purani version ki photo bhi utni hi zaroori hoti hai
+                        // (purana passport, purani policy) — wahi zoom yahan bhi.
+                        <Pressable
+                          onPress={() =>
+                            setZoom({ uri, title: tpl(d.versionLabel, { n: v.version }) })
+                          }
+                          style={({ pressed }) => [styles.photoTap, pressed && { opacity: 0.9 }]}
+                          accessibilityRole="imagebutton"
+                        >
+                          <Image
+                            source={{ uri }}
+                            style={{ width: width - 64, height: height * 0.35, marginTop: 10 }}
+                            resizeMode="contain"
+                          />
+                          <View style={styles.zoomHint}>
+                            <Ionicons name="expand-outline" size={14} color={tc.white} />
+                            <Text style={styles.zoomHintText}>{d.zoomHint}</Text>
+                          </View>
+                        </Pressable>
                       ) : (
                         // `undefined` = abhi utar rahi hai, `null` = nahi mili.
                         // Dono par ek hi line thodi galat hoti, par yahan wo line
@@ -650,9 +694,27 @@ export default function DocumentView() {
       )}
 
       <LoaderOverlay visible={!!busy} />
+
+      {/* Poori screen par photo — pinch, double-tap, aur +/− ke button. */}
+      <ImageViewer
+        visible={!!zoom}
+        uri={zoom?.uri ?? null}
+        title={zoom?.title}
+        onClose={() => setZoom(null)}
+      />
     </SafeAreaView>
   );
 }
+
+/**
+ * Chaudi screen (tablet / foldable / landscape) par sab kuch beech me.
+ *
+ * ⚠️ Baaki har screen par ye pehle se hai; document-view chhoot gaya tha, aur
+ * yahan uski kami sabse zyada dikhti hai — photo ki chaudai seedhe screen se
+ * banti hai (`width - 32`), isliye 10-inch tablet par ek passport ka page poori
+ * screen ghere hue, dhundhla khincha hua dikhta tha.
+ */
+const CONTENT = { width: "100%", maxWidth: 640, alignSelf: "center" } as const;
 
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
@@ -662,6 +724,7 @@ const useStyles = makeStyles((c) => ({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    ...CONTENT,
   },
   back: { padding: 4 },
   title: {
@@ -672,6 +735,29 @@ const useStyles = makeStyles((c) => ({
     color: c.ink,
   },
   body: { alignItems: "center", padding: 16, paddingBottom: 8, gap: 16 },
+  /** Photo ka poora dabba — `relative` taaki patti uske kone me baith sake. */
+  photoTap: { position: "relative", alignItems: "center", justifyContent: "center" },
+  /**
+   * "Bada karke dekho" — photo ke kone par.
+   *
+   * ⚠️ Rang yahan tay hai (theme se nahi aata) aur ye jaan-boojh ke hai: ye
+   * patti PHOTO ke upar baithti hai, page ke upar nahi. Photo kaali bhi ho
+   * sakti hai aur ujli bhi, isliye ek gehra parda + safed text hi dono par
+   * padha jaata hai. Theme ka rang yahan aadhe documents par gayab ho jaata.
+   */
+  zoomHint: {
+    position: "absolute",
+    right: 8,
+    bottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  zoomHintText: { fontSize: 11.5, fontWeight: "700", color: "#FFFFFF" },
   empty: { alignItems: "center", gap: 12, paddingVertical: 40 },
   emptyText: { fontSize: 15, color: c.inkSoft, textAlign: "center" },
 

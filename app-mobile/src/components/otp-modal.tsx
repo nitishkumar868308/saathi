@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   Pressable,
   Modal,
   Animated,
   Easing,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { useKeyboardPad } from "@/components/keyboard-view";
+import { OtpInput } from "@/components/otp-input";
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
@@ -101,6 +103,18 @@ function OtpBody({
   const [note, setNote] = useState<string | null>(null);
   const [left, setLeft] = useState(RESEND_AFTER);
   const [scale] = useState(() => new Animated.Value(0.94));
+  /**
+   * Keyboard ki oonchai.
+   *
+   * ⚠️ Ye modal `autoFocus` par khulta hai, yaani keyboard hamesha saath me
+   * aata hai. Pehle card screen ke theek beech me tha aur uske neeche ka poora
+   * hissa — "Verify karo" ka button aur "Dobara bhejo" — keyboard ke PEECHE
+   * chala jaata tha. User ka apna screenshot yahi dikhata hai: code bhara hua,
+   * "Code bhej diya" likha hua, aur uske neeche ka orange button aadha kat-a
+   * hua. Us haalat me code daal ke aage badhne ka koi raasta hi nahi bachta —
+   * modal band karne ke alawa.
+   */
+  const kbPad = useKeyboardPad(12);
 
   const message = (e: PhoneError): string =>
     ({
@@ -193,7 +207,15 @@ function OtpBody({
   }
 
   return (
-    <View style={styles.backdrop}>
+    <ScrollView
+      style={styles.backdrop}
+      contentContainerStyle={[styles.backdropInner, { paddingBottom: 18 + kbPad }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      // Keyboard khulte hi card upar chala jaata hai; chhoti screen par uska
+      // neeche ka hissa scroll me aa jaata hai — kat-ta nahi.
+      bounces={false}
+    >
       <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
         <View style={styles.card}>
           <View style={styles.head}>
@@ -223,25 +245,24 @@ function OtpBody({
           </Text>
           <Text style={styles.sub}>{error ? tpl(t.otpForPhone, { phone }) : t.otpSub}</Text>
 
-          <TextInput
-            value={code}
-            onChangeText={(v) => {
-              // Log SMS se copy karte waqt space/dash bhi le aate hain.
-              const digits = v.replace(/\D/g, "").slice(0, CODE_LEN);
-              setCode(digits);
-              if (error) setError(null);
-            }}
-            placeholder={t.otpPh}
-            placeholderTextColor={tc.inkSoft}
-            keyboardType="number-pad"
-            // Android/iOS dono SMS se code khud bhar dete hain — ek bhi tap
-            // bachana yahan sach me kaam ka hai.
-            autoComplete="sms-otp"
-            textContentType="oneTimeCode"
-            autoFocus
-            maxLength={CODE_LEN}
-            style={styles.input}
-          />
+          {/**
+           * ⚠️ Yahan pehle ek chaudi input thi jisme `letterSpacing: 8` se ank
+           * "alag-alag" dikhaane ki koshish thi. Wo sirf poore code par theek
+           * lagti hai — aadha bhara hua code beech me latakta hai aur ye batata
+           * hi nahi ki ab kaunse ank ki baari hai. Ab wahi 6-khaane wala
+           * component jo naye-phone wale modal me bhi hai.
+           */}
+          <View style={styles.codeWrap}>
+            <OtpInput
+              value={code}
+              onChange={(digits) => {
+                setCode(digits);
+                if (error) setError(null);
+              }}
+              length={CODE_LEN}
+              autoFocus
+            />
+          </View>
 
           {!!error && <Text style={styles.err}>{error}</Text>}
           {!error && !!note && <Text style={styles.note}>{note}</Text>}
@@ -279,7 +300,7 @@ function OtpBody({
           </Pressable>
         </View>
       </Animated.View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -289,9 +310,18 @@ const useStyles = makeStyles((c) => ({
     // Theme-aware parda. Pehle yahan ek hardcoded rgba tha jo dark mode me
     // gehre page par bilkul dikhta hi nahi tha.
     backgroundColor: c.scrim,
+  },
+  /**
+   * `flexGrow: 1` + `justifyContent: center` — card chhota ho to beech me, aur
+   * keyboard ke saath bada ho jaye to scroll ho jaata hai. Sirf `flex: 1` par
+   * scroll kabhi chalta hi nahi.
+   */
+  backdropInner: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingTop: 18,
   },
   cardWrap: { width: "100%", maxWidth: 400 },
   card: {
@@ -328,20 +358,7 @@ const useStyles = makeStyles((c) => ({
     lineHeight: 25,
   },
   sub: { marginTop: 6, fontSize: 13.5, lineHeight: 20, color: c.inkSoft },
-  input: {
-    marginTop: 16,
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: c.line,
-    backgroundColor: c.cream,
-    // Code padhne me aasan ho — bada, beech me, aur ank alag-alag dikhein.
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: 8,
-    textAlign: "center",
-    color: c.ink,
-  },
+  codeWrap: { marginTop: 16 },
   err: {
     marginTop: 9,
     fontSize: 13,

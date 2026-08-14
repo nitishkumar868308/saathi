@@ -6,8 +6,9 @@ import {
   Pressable,
   ScrollView,
   RefreshControl,
+  useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 
@@ -95,6 +96,29 @@ export default function Notes() {
   const { locale } = useLocale();
   const bcp = locale === "hi" ? "hi-IN" : "en-IN";
 
+  /**
+   * ── Screen ke naap ke hisaab se ──────────────────────────────────────
+   *
+   * ⚠️ Shikayat: "note wala screen responsive nhi h, wo phone screen ke ander
+   * chala jata h". Do alag cheezein thi aur dono sach thi:
+   *
+   *   1. **Neeche ka hissa nav bar ke peeche.** `SafeAreaView` sirf `top` par
+   *      tha, aur "Naya note" wala FAB `bottom: 26` par tay tha. 3-button
+   *      navigation wale phone par (Samsung/Realme ka ||| ○ <) wo bar lagbhag
+   *      48dp leta hai — yaani button aadha uske neeche chala jaata tha aur
+   *      dabane par phone ka apna back/home dab jaata tha. Gesture wale phone
+   *      par ye theek dikhta tha, isliye ye bug har phone par nahi dikhta tha.
+   *
+   *   2. **Column hamesha DO.** Chhote phone par do column me note ka text ek
+   *      shabd prati line par aa jaata tha, aur tablet/foldable par do bahut
+   *      chaude column poori screen kha jaate the. Ab column ki ginti chaudai
+   *      se nikalti hai.
+   */
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  /** Ek card kam se kam itna chauda — isse neeche text padhne laayak nahi rehta. */
+  const columnCount = Math.max(1, Math.min(4, Math.floor((width - 24) / 165)));
+
   const [items, setItems] = useState<NoteWithReminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -145,13 +169,18 @@ export default function Notes() {
     );
   }, [items, query]);
 
-  /** Do column — chhote cards ki wajah se list aadhi lambai me aa jaati hai. */
+  /**
+   * Masonry columns — chhote cards ki wajah se list aadhi lambai me aa jaati hai.
+   *
+   * ⚠️ Ginti ab tay nahi hai (pehle hamesha 2 thi) — wajah upar `columnCount`
+   * par likhi hai. Note bari-bari se columns me daale jaate hain, isliye har
+   * column lagbhag barabar lamba rehta hai.
+   */
   const columns = useMemo(() => {
-    const left: NoteWithReminder[] = [];
-    const right: NoteWithReminder[] = [];
-    shown.forEach((x, i) => (i % 2 === 0 ? left : right).push(x));
-    return [left, right];
-  }, [shown]);
+    const cols: NoteWithReminder[][] = Array.from({ length: columnCount }, () => []);
+    shown.forEach((x, i) => cols[i % columnCount].push(x));
+    return cols;
+  }, [shown, columnCount]);
 
   async function togglePin(note: NoteWithReminder) {
     const next = !note.is_pinned;
@@ -244,7 +273,12 @@ export default function Notes() {
       <UpgradeBanner compact />
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          // FAB + system nav bar dono ke liye jagah. Tay 110 par 3-button
+          // navigation wale phone par aakhri card FAB ke peeche chala jaata tha.
+          { paddingBottom: 110 + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -351,9 +385,15 @@ export default function Notes() {
         )}
       </ScrollView>
 
+      {/* ⚠️ `bottom` insets se — tay 26 par ye 3-button navigation wale phone
+          par bar ke peeche chala jaata tha (upar poori wajah likhi hai). */}
       <Pressable
         onPress={() => router.push("/note-edit" as never)}
-        style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
+        style={({ pressed }) => [
+          styles.fab,
+          { bottom: 20 + insets.bottom },
+          pressed && { opacity: 0.9 },
+        ]}
       >
         <Ionicons name="add" size={24} color={tc.white} />
         <Text style={styles.fabText}>{n.add}</Text>
@@ -374,6 +414,16 @@ export default function Notes() {
   );
 }
 
+/**
+ * Chaudi screen (tablet / foldable / landscape) par sab kuch beech me.
+ *
+ * ⚠️ Baaki har list screen par ye pehle se hai (`reminders`, `documents`,
+ * `add-reminder`…); sirf Notes chhoot gaya tha. Uske bina 10-inch tablet par
+ * header baayen kinare se chipka rehta tha aur cards poori chaudai me phail
+ * jaate the — wahi "responsive nahi hai" wali baat.
+ */
+const CONTENT = { width: "100%", maxWidth: 720, alignSelf: "center" } as const;
+
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
   header: {
@@ -383,6 +433,7 @@ const useStyles = makeStyles((c) => ({
     paddingHorizontal: 12,
     paddingTop: 6,
     paddingBottom: 10,
+    ...CONTENT,
   },
   back: { padding: 4 },
   title: { fontSize: 24, fontWeight: "800", color: c.ink },
@@ -391,7 +442,6 @@ const useStyles = makeStyles((c) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginHorizontal: 16,
     marginBottom: 10,
     paddingHorizontal: 12,
     height: 42,
@@ -399,12 +449,22 @@ const useStyles = makeStyles((c) => ({
     borderWidth: 1,
     borderColor: c.line,
     backgroundColor: c.surface,
+    // ⚠️ `marginHorizontal: 16` ki jagah — wo `maxWidth` wale container ke saath
+    // milkar chaudi screen par search box ko cards se alag chaudai de deta tha.
+    ...CONTENT,
+    maxWidth: 720 - 32,
   },
   search: { flex: 1, fontSize: 14.5, color: c.ink, padding: 0 },
-  // FAB list ke aakhri card ko dhak na le.
-  scroll: { paddingHorizontal: 12, paddingBottom: 110 },
-  grid: { flexDirection: "row", gap: 10 },
-  col: { flex: 1, gap: 10 },
+  // ⚠️ `paddingBottom` component me insets ke saath lagta hai — FAB aur system
+  // nav bar dono ke liye. Yahan tay likhne par 3-button wale phone par aakhri
+  // card FAB ke peeche chala jaata tha.
+  scroll: { paddingHorizontal: 12, ...CONTENT },
+  // `alignItems: flex-start` — warna chhota column apne aap lamba kheench jaata
+  // hai aur uska aakhri card baaki se alag naap ka dikhta hai.
+  grid: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  // `minWidth: 0` — bina iske lamba shabd column ko uski jagah se chauda kar
+  // deta hai aur aakhri column screen ke bahar nikal jaata hai.
+  col: { flex: 1, minWidth: 0, gap: 10 },
   card: {
     borderRadius: 18,
     borderWidth: 1,
@@ -450,7 +510,9 @@ const useStyles = makeStyles((c) => ({
   fab: {
     position: "absolute",
     right: 18,
-    bottom: 26,
+    // ⚠️ `bottom` component me insets ke saath lagta hai — yahan tay likhna hi
+    // wo bug tha (3-button navigation wale phone par button bar ke peeche chala
+    // jaata tha). Poori wajah component me `insets` ke paas likhi hai.
     flexDirection: "row",
     alignItems: "center",
     gap: 7,

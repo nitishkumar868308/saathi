@@ -6,11 +6,11 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
+import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors, useThemeMode } from "@/theme/theme";
 import { setAlertMode } from "@/lib/alert-mode";
 import { TypingDots as Dots } from "@/components/typing-dots";
@@ -648,11 +648,7 @@ export default function Chat() {
 
       <UpgradeBanner compact />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior="padding"
-        keyboardVerticalOffset={0}
-      >
+      <KeyboardView>
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
@@ -832,7 +828,7 @@ export default function Chat() {
             <Ionicons name="arrow-up" size={20} color={tc.white} />
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardView>
 
       {/* Chat se bana reminder time pe baje — notification, exact-alarm,
           battery aur OEM auto-start, sab ek hi jagah se allow. */}
