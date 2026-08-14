@@ -5,7 +5,36 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    /**
+     * ⚠️ `.next/*` yahan isliye hai ki us folder me app ka apna koi code hai hi
+     * nahi — wo Next.js ka build output hai jo galti se is folder me ban gaya
+     * tha (asli Next app `web/` me hai). Uske generated `.d.ts` se 7 error aate
+     * the (`import/no-unresolved`, `no-empty-object-type`), aur unka koi ilaaj
+     * nahi hai — wo file hum likhte hi nahi. Un 7 ki wajah se `npm run lint`
+     * hamesha laal rehta tha, yaani wo CI me lag hi nahi sakta tha.
+     */
+    ignores: ["dist/*", ".next/*"],
+  },
+  {
+    /**
+     * `scripts/` ki files Node par chalti hain (`node scripts/gen-icons.mjs`),
+     * app ke bundle me kabhi jaati hi nahi. Bina is block ke `Buffer` jaise Node
+     * ke apne global `no-undef` de dete the — ek aisi galti jo hai hi nahi.
+     */
+    files: ["scripts/**"],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        process: "readonly",
+        console: "readonly",
+        __dirname: "readonly",
+      },
+    },
+    rules: {
+      // `sharp` sirf icon banate waqt chahiye (dev-only, on-demand install) —
+      // isliye wo dependencies me nahi hai aur resolve bhi nahi hota.
+      "import/no-unresolved": "off",
+    },
   },
   {
     rules: {

@@ -560,15 +560,24 @@ export default function AddDocument() {
             </View>
           ) : null}
         </ScrollView>
-      </KeyboardView>
 
-      <Pressable
-        onPress={save}
-        disabled={saving}
-        style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
-      >
-        <Text style={styles.saveText}>{d.save}</Text>
-      </Pressable>
+        {/**
+         * ⚠️ Save button `KeyboardView` ke ANDAR — bahar nahi.
+         *
+         * Bahar hone par wo screen ke sabse neeche baithta tha aur keyboard use
+         * poori tarah dhak leta tha. Is screen par ye sabse zyada chubhta hai:
+         * document ka naam aur expiry dono yahin type hote hain, yaani keyboard
+         * khula hona aam baat hai — aur us poore waqt Save dikhta hi nahi tha.
+         * (Wahi tareeka `profile-details`/`contact` par pehle se hai.)
+         */}
+        <Pressable
+          onPress={save}
+          disabled={saving}
+          style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
+        >
+          <Text style={styles.saveText}>{d.save}</Text>
+        </Pressable>
+      </KeyboardView>
 
       {/* Scan + save — dono ke liye wahi ek center overlay loader. */}
       <LoaderOverlay visible={scanning || saving} />

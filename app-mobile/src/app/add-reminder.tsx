@@ -773,18 +773,32 @@ export default function AddReminder() {
 
           <View style={{ height: 20 }} />
         </ScrollView>
-      </KeyboardView>
 
-      <Pressable
-        onPress={save}
-        disabled={saving || !canSave}
-        style={({ pressed }) => [
-          styles.save,
-          (pressed || saving || !canSave) && { opacity: 0.55 },
-        ]}
-      >
-        <Text style={styles.saveText}>{a.save}</Text>
-      </Pressable>
+        {/**
+         * ⚠️ Save button `KeyboardView` ke ANDAR hona zaroori hai — bahar nahi.
+         *
+         * Bahar hone par wo `SafeAreaView` ke sabse neeche baith jaata tha, aur
+         * `KeyboardView` ka `paddingBottom` sirf ScrollView ko upar uthata tha.
+         * Yaani jaise hi user "Kya karna hai" me likhne lagta, keyboard poore
+         * Save button ko dhak leta — screen par wo hota hi nahi tha. User ke
+         * liye iska matlab seedha "reminder save hi nahi hota" tha: likhne ke
+         * baad Save dhoondhna padta tha (keyboard band karke).
+         *
+         * Andar hone par padding poore column ko upar uthati hai, isliye button
+         * hamesha keyboard ke theek upar rehta hai. Wahi tareeka
+         * `profile-details` aur `contact` par pehle se chal raha hai.
+         */}
+        <Pressable
+          onPress={save}
+          disabled={saving || !canSave}
+          style={({ pressed }) => [
+            styles.save,
+            (pressed || saving || !canSave) && { opacity: 0.55 },
+          ]}
+        >
+          <Text style={styles.saveText}>{a.save}</Text>
+        </Pressable>
+      </KeyboardView>
 
       {/* Sirf SAVE ke waqt blocking loader.
           AI ki samajh peeche chalti hai — uske liye poora form block karna galat

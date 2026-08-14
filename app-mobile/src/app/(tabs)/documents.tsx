@@ -246,18 +246,29 @@ export default function Documents() {
       )}
 
       {selectMode ? (
+        /**
+         * ⚠️ Do parat — patti poori chaudai par, button andar CONTENT ke bheetar.
+         *
+         * Pehle `CONTENT` (maxWidth 560 + alignSelf center) seedha is absolute
+         * patti par laga tha, aur wo tablet par galat baithta hai: jis absolute
+         * view par `left` aur `right` dono set hon, uspar `alignSelf` lagta hi
+         * nahi — patti 560px ki hoke screen ke BAAYIN kinare chipak jaati thi,
+         * jabki uske upar ki poori list beech me centered thi.
+         */
         <View style={styles.shareBar}>
-          <Pressable
-            onPress={onShareSelected}
-            disabled={selected.size === 0}
-            style={({ pressed }) => [
-              styles.shareBtn,
-              (pressed || selected.size === 0) && { opacity: 0.55 },
-            ]}
-          >
-            <Ionicons name="share-outline" size={18} color={tc.white} />
-            <Text style={styles.shareBtnText}>{tpl(d.shareSelected, { n: selected.size })}</Text>
-          </Pressable>
+          <View style={styles.shareInner}>
+            <Pressable
+              onPress={onShareSelected}
+              disabled={selected.size === 0}
+              style={({ pressed }) => [
+                styles.shareBtn,
+                (pressed || selected.size === 0) && { opacity: 0.55 },
+              ]}
+            >
+              <Ionicons name="share-outline" size={18} color={tc.white} />
+              <Text style={styles.shareBtnText}>{tpl(d.shareSelected, { n: selected.size })}</Text>
+            </Pressable>
+          </View>
         </View>
       ) : (
         <Pressable
@@ -356,8 +367,10 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.surface,
     borderTopWidth: 1,
     borderTopColor: c.line,
-    ...CONTENT,
   },
+  // Button khud utni hi chaudai le jitni list — `CONTENT` yahan lagta hai,
+  // upar wali absolute patti par nahi (wajah JSX me likhi hai).
+  shareInner: { ...CONTENT },
   shareBtn: {
     flexDirection: "row",
     alignItems: "center",

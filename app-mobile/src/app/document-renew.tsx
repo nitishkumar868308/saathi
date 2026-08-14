@@ -586,15 +586,24 @@ export default function DocumentRenew() {
             </Pressable>
           )}
         </ScrollView>
-      </KeyboardView>
 
-      <Pressable
-        onPress={save}
-        disabled={saving || scanning}
-        style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
-      >
-        <Text style={styles.saveText}>{r.save}</Text>
-      </Pressable>
+        {/**
+         * ⚠️ Save button `KeyboardView` ke ANDAR — bahar nahi.
+         *
+         * Bahar hone par keyboard use poori tarah dhak leta tha. Renew screen ka
+         * asli kaam hi nayi expiry TYPE karna hai, yaani keyboard yahan hamesha
+         * khula hota hai — aur us poore waqt Save dikhta hi nahi tha. User ko
+         * pehle keyboard band karna padta tha, aur bahut logon ke liye iska
+         * matlab "renew hota hi nahi" tha.
+         */}
+        <Pressable
+          onPress={save}
+          disabled={saving || scanning}
+          style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
+        >
+          <Text style={styles.saveText}>{r.save}</Text>
+        </Pressable>
+      </KeyboardView>
 
       <LoaderOverlay visible={scanning || saving} />
 
