@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
+import { useKeyboardPad } from "@/components/keyboard-view";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
 import {
@@ -45,6 +46,16 @@ export function ReviewPrompt() {
   const [allow, setAllow] = useState(false);
   const [saving, setSaving] = useState(false);
   const [thanks, setThanks] = useState(false);
+  /**
+   * Keyboard ke liye jagah — card usi hisaab se upar khisak jaata hai.
+   *
+   * ⚠️ Card screen ke beech me hai aur usme ek multiline TextInput hai. Feedback
+   * likhne ke liye tap karte hi keyboard uske neeche ka poora hissa dhak leta
+   * tha — "Bhejo" ka button aur "Baad me" dono. Yaani jo user sach me kuch
+   * likhne aaya tha, wahi bhej nahi paata tha. Wahi ek tareeka jo `otp-modal`
+   * par hai (poori wajah `lib/use-keyboard.ts` par likhi hai).
+   */
+  const kbPad = useKeyboardPad(12);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -100,7 +111,7 @@ export function ReviewPrompt() {
 
   return (
     <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={onLater}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { paddingBottom: 26 + kbPad }]}>
         <View style={styles.card}>
           {thanks ? (
             <>

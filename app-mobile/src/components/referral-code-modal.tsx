@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import { Loader } from "@/components/loader";
+import { useKeyboardPad } from "@/components/keyboard-view";
 import { applyReferralCode } from "@/lib/plan";
 import { useToast } from "@/components/toast";
 import { useLocale } from "@/lib/i18n/LanguageProvider";
@@ -99,6 +100,16 @@ export function ReferralCodeModal({
   const copy = COPY[locale] ?? COPY.hinglish;
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  /**
+   * Keyboard ke liye jagah — card usi hisaab se upar khisak jaata hai.
+   *
+   * ⚠️ Card screen ke theek beech me hai aur usme ek TextInput hai. Code par tap
+   * karte hi keyboard uske NEECHE ka poora hissa dhak leta tha — "Apply" ka
+   * button aur "Abhi nahi" dono. Yaani code daal ke aage badhne ka koi raasta hi
+   * nahi bachta tha. Wahi ek tareeka jo `otp-modal` par hai (poori wajah
+   * `lib/use-keyboard.ts` par likhi hai).
+   */
+  const kbPad = useKeyboardPad(12);
 
   async function apply() {
     const c = code.trim().toUpperCase();
@@ -122,7 +133,7 @@ export function ReferralCodeModal({
 
   return (
     <Modal statusBarTranslucent visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { paddingBottom: 24 + kbPad }]}>
         <View style={styles.card}>
           <View style={styles.iconWrap}>
             <Ionicons name="gift" size={26} color={tc.terracotta} />

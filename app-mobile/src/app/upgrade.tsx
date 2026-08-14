@@ -6,7 +6,7 @@ import {
   Pressable,
   Modal,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { makeStyles, useColors } from "@/theme/theme";
@@ -39,6 +39,15 @@ import { tpl } from "@/lib/i18n/dictionaries";
 export default function Upgrade() {
   const tc = useColors();
   const styles = useStyles();
+  /**
+   * ⚠️ `SafeAreaView` yahan `edges={["top"]}` par hai, isliye neeche ki jagah
+   * screen ko khud chhodni padti hai — aur wo chhooti hui thi. `paddingBottom`
+   * tay 40 tha, jabki Android ka 3-button navigation bar hi 48dp ka hota hai:
+   * sabse neeche wali baat (plan ka last feature / "Abhi lo" wala hissa) us
+   * patti ke peeche dab jaati thi. Edge-to-edge (Android 15+) me ye har phone
+   * par hota hai, kisi ek par nahi.
+   */
+  const insets = useSafeAreaInsets();
   const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
@@ -280,7 +289,7 @@ export default function Upgrade() {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: 40 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {loading ? (

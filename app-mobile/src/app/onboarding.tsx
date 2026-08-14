@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import SaathiLogo from "@/components/saathi-logo";
+import { KeyboardView } from "@/components/keyboard-view";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
 const pointIcons = ["documents-outline", "sunny-outline", "lock-closed-outline"];
@@ -20,44 +21,55 @@ export default function Onboarding() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <View style={styles.content}>
-        <View style={styles.logo}>
-          <SaathiLogo size={76} radius={26} />
-        </View>
+      {/**
+       * ⚠️ Naam ka input aur "Shuru karo" ka button screen ke sabse NEECHE hain
+       * (upar `flex: 1` ka spacer unhe wahan dhakelta hai). Naam likhne ke liye
+       * tap karte hi keyboard dono ko poori tarah dhak leta tha — yaani is
+       * screen se aage badhne ka koi raasta hi nahi bachta tha.
+       *
+       * `KeyboardView` dono platform par ek hi kaam karta hai; `KeyboardAvoidingView`
+       * naye Android par chalta hi nahi (poori wajah `lib/use-keyboard.ts` par).
+       */}
+      <KeyboardView>
+        <View style={styles.content}>
+          <View style={styles.logo}>
+            <SaathiLogo size={76} radius={26} />
+          </View>
 
-        <Text style={styles.title}>{o.title} 🙂</Text>
-        <Text style={styles.sub}>{o.sub}</Text>
+          <Text style={styles.title}>{o.title} 🙂</Text>
+          <Text style={styles.sub}>{o.sub}</Text>
 
-        <View style={styles.points}>
-          {points.map((p) => (
-            <View key={p.text} style={styles.point}>
-              <View style={styles.pIcon}>
-                <Ionicons name={p.icon as any} size={18} color={tc.terracotta} />
+          <View style={styles.points}>
+            {points.map((p) => (
+              <View key={p.text} style={styles.point}>
+                <View style={styles.pIcon}>
+                  <Ionicons name={p.icon as any} size={18} color={tc.terracotta} />
+                </View>
+                <Text style={styles.pText}>{p.text}</Text>
               </View>
-              <Text style={styles.pText}>{p.text}</Text>
-            </View>
-          ))}
+            ))}
+          </View>
+
+          <View style={{ flex: 1 }} />
+
+          <Text style={styles.label}>{o.nameLabel}</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={o.namePlaceholder}
+            placeholderTextColor={tc.inkSoft}
+            style={styles.input}
+          />
+
+          <Pressable
+            onPress={() => router.replace("/")}
+            style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.btnText}>{o.start}</Text>
+            <Ionicons name="arrow-forward" size={18} color={tc.white} />
+          </Pressable>
         </View>
-
-        <View style={{ flex: 1 }} />
-
-        <Text style={styles.label}>{o.nameLabel}</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder={o.namePlaceholder}
-          placeholderTextColor={tc.inkSoft}
-          style={styles.input}
-        />
-
-        <Pressable
-          onPress={() => router.replace("/")}
-          style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
-        >
-          <Text style={styles.btnText}>{o.start}</Text>
-          <Ionicons name="arrow-forward" size={18} color={tc.white} />
-        </Pressable>
-      </View>
+      </KeyboardView>
     </SafeAreaView>
   );
 }

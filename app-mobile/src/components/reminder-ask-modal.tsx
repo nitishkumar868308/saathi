@@ -19,6 +19,7 @@ import DateTimePicker, {
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 import { VoiceButton } from "@/components/voice-button";
+import { useKeyboardPad } from "@/components/keyboard-view";
 
 /**
  * "Jo Saathi na samajh paaya, wo khud poochh le."
@@ -98,6 +99,22 @@ export function ReminderAskModal({
   const [date, setDate] = useState<Date | null>(null);
   const [minutes, setMinutes] = useState<number | null>(null);
   const [iosPicker, setIosPicker] = useState<"date" | "time" | null>(null);
+
+  /**
+   * Keyboard ke liye jagah.
+   *
+   * ⚠️ "Kya yaad dilau?" wala pehla sawaal `autoFocus` par khulta hai, yaani
+   * keyboard is popup ke saath hi upar aa jaata hai. Card screen ke theek beech
+   * me hai, isliye uske neeche ka poora hissa — "Aage" ka button aur "Rehne
+   * do" — keyboard ke PEECHE chala jaata tha. Us haalat me jawab likh ke aage
+   * badhne ka koi raasta hi nahi bachta.
+   *
+   * Wahi ek tareeka jo `otp-modal` par pehle se hai: keyboard ki oonchai naap
+   * ke backdrop me neeche se jagah chhod dete hain, taaki centered card usi
+   * hisaab se upar khisak jaye. `KeyboardAvoidingView` yahan chalta hi nahi —
+   * poori wajah `lib/use-keyboard.ts` par likhi hai.
+   */
+  const kbPad = useKeyboardPad(12);
 
   const scale = useRef(new Animated.Value(0.92)).current;
 
@@ -220,7 +237,7 @@ export function ReminderAskModal({
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel} statusBarTranslucent>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { paddingBottom: 20 + kbPad }]}>
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
           <View style={[styles.card, { paddingBottom: 20 + Math.min(insets.bottom, 20) }]}>
             <View style={styles.head}>

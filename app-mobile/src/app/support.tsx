@@ -8,7 +8,7 @@ import {
   Keyboard,
   RefreshControl,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -93,6 +93,23 @@ export default function Support() {
   const [busy, setBusy] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+
+  /**
+   * System nav bar / home indicator ke liye jagah.
+   *
+   * ⚠️ `SafeAreaView` yahan sirf `edges={["top"]}` par hai — jaan-boojh ke, taaki
+   * neeche wali patti ka apna background poori chaudai me neeche tak jaye. Par
+   * uska matlab ye bhi hai ki neeche ki jagah is screen ko KHUD chhodni padti
+   * hai, aur wo chhooti hui thi: likhne ka box aur bhejne ka button 3-button
+   * navigation wale Android par system ki patti ke NEECHE dab jaate the, aur
+   * gesture wale phone par home ki lakeer unke upar aa jaati thi. Wahi shikayat:
+   * "screen ke neeche kuch chhup jaata hai".
+   *
+   * `Math.max(10, ...)` — jahan koi inset hai hi nahi (aam Android tablet),
+   * wahan patti ka apna padding banaa rehna chahiye.
+   */
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(10, insets.bottom);
 
   const load = useCallback(async () => {
     const list = await listTickets();
@@ -251,7 +268,8 @@ export default function Support() {
 
       {view === "list" && (
         <ScrollView
-          contentContainerStyle={styles.listContent}
+          // Aakhri ticket ka card system ki patti ke neeche na jaye.
+          contentContainerStyle={[styles.listContent, { paddingBottom: 40 + insets.bottom }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -304,7 +322,12 @@ export default function Support() {
         // Yahan bhi wahi baat: keyboard message wale bade box ko dhak leta tha.
         // (Poori wajah `components/keyboard-view.tsx` par likhi hai.)
         <KeyboardView>
-          <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            // "Bhejo" ka button aur uske neeche ki hint system ki patti ke
+            // neeche na jayein.
+            contentContainerStyle={[styles.listContent, { paddingBottom: 40 + insets.bottom }]}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.formTitle}>{s.newTitle}</Text>
 
             <Text style={styles.label}>{s.subjectLabel}</Text>
@@ -394,7 +417,7 @@ export default function Support() {
             )}
           </ScrollView>
 
-          <View style={styles.inputBar}>
+          <View style={[styles.inputBar, { paddingBottom: bottomPad }]}>
             <TextInput
               value={reply}
               onChangeText={setReply}
