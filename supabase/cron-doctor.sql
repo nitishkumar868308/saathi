@@ -226,7 +226,7 @@ step7 as (
     'len ' || length(substring(command from 'Bearer ([^"]+)'))::text
       || '   md5 ' || md5(substring(command from 'Bearer ([^"]+)')) as kya_mila,
     null::text as kab,
-    'Ise 401 ke jawab wale expected.len / expected.md5 se milao' as kya_karo
+    'Step 5 me 401 ho tabhi kaam ka — tab iska len+md5 wahan ke expected se milao' as kya_karo
   from cron.job
   where command like '%net.http_post%'
     and substring(command from 'Bearer ([^"]+)') is not null
