@@ -182,7 +182,7 @@ step6 as (
     and is_paused = false
     and notified_at is null
     and remind_at <= now() - interval '5 minutes'
-)
+),
 
 /* 7. Job ke andar pada secret — uska NAAP aur NISHAAN (value kabhi nahi).
       ⚠️ Ye step hi "dono jagah daal to diya, phir 401 kyun" ka aakhri jawab
