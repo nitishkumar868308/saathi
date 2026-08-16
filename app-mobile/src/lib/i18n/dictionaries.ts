@@ -123,6 +123,18 @@ export type Dict = {
      * jaanta hi nahi wo kabhi try nahi karega.
      */
     micHint: string;
+    /**
+     * Mic chalu hai — button ke upar taerti hui chhoti patti.
+     *
+     * ⚠️ Ye isliye chahiye tha ki "tap karke band karo" wala raasta MAUJOOD to
+     * tha par DIKHTA nahi tha. Button dono haalat me bilkul ek jaisa lagta tha,
+     * isliye user ko pata hi nahi chalta ki wo ab bol sakta hai aur baad me rok
+     * sakta hai — wo ungli dabaye rakhta tha aur haath thakne par chhod deta tha.
+     * WhatsApp me yahi baat waveform aur timer se saaf dikhti hai.
+     */
+    listening: string;
+    /** Us patti ka doosra hissa — "ab tap karke rok do". */
+    tapToStop: string;
   };
   phoneField: {
     placeholder: string;
@@ -1542,6 +1554,8 @@ const hinglish: Dict = {
     micBusy: "Mic abhi kisi aur app ke paas hai — use band karke dobara boliye",
     langMissing: "Ye bhasha is phone ke voice me nahi hai — Settings me language pack install karo",
     micHint: "Mic dabaye rakho aur bolo — ya ek tap karo, phir tap se band",
+    listening: "Sun raha hoon",
+    tapToStop: "tap karke roko",
   },
   phoneField: {
     placeholder: "Phone number",
@@ -2478,6 +2492,8 @@ const hi: Dict = {
     micBusy: "माइक अभी किसी और app के पास है — उसे बंद करके दोबारा बोलिए",
     langMissing: "यह भाषा इस फ़ोन की voice में नहीं है — Settings में language pack इंस्टॉल करें",
     micHint: "माइक दबाए रखें और बोलें — या एक टैप करें, फिर टैप से बंद",
+    listening: "सुन रहा हूँ",
+    tapToStop: "टैप करके रोकें",
   },
   phoneField: {
     placeholder: "फ़ोन नंबर",
@@ -3395,6 +3411,8 @@ const en: Dict = {
     micBusy: "Another app is using the mic — close it and speak again",
     langMissing: "This language isn't in your phone's voice — install the language pack in Settings",
     micHint: "Hold the mic and speak — or tap once, then tap to stop",
+    listening: "Listening",
+    tapToStop: "tap to stop",
   },
   phoneField: {
     placeholder: "Phone number",

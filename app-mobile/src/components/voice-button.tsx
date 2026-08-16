@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Platform, Pressable, Animated, View } from "react-native";
+import { Platform, Pressable, Animated, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -257,7 +257,42 @@ const INSTANT_DEATH_MS = 1500;
  * diya gaya hai — yaani restart ki zaroorat hi pehle se kam padti hai.
  */
 const RESTART_MAX = 2;
-const LISTEN_MAX_MS = 60_000;
+
+/**
+ * Jab kuch SUNA JA CHUKA ho, tab kitni baar dobara chalu karein.
+ *
+ * ⚠️ Ye 6 tha, aur 6 GALAT tha. Wo ek "kitni baar" wali chhat thi, jabki asli
+ * sawaal "kitni der" ka hai — aur uska jawab pehle se `LISTEN_MAX_MS` (2 minute)
+ * de raha hai.
+ *
+ * Purane Android par (jahan recognizer continuous ko anadekha kar deta hai) har
+ * viraam ek restart banta hai. Jo aadmi soch-soch kar bolta hai — yaani theek
+ * wahi aadmi jiske liye ye app bani hai — uske saatven viraam par app uski baat
+ * beech me kaat ke bhej deti thi, jabki uski ungli abhi bhi button par hoti thi.
+ * Wo phir wahi purani shikayat hai: "aadhi baat gayi".
+ *
+ * 40 chhat nahi, ek BACKSTOP hai — sirf us pathological soorat ke liye jahan
+ * recognizer turant-turant khaali nateeje deta rahe. Asli rok do hi hain, aur
+ * dono sahi hain: user ka rukna, aur 2 minute.
+ *
+ * `RESTART_MAX` (2) chhota hi rehta hai — wo KHAALI koshishon ke liye hai, jahan
+ * kuch suna hi nahi gaya. Wahan lambi ginti sirf beep ka loop deti hai.
+ */
+const RESTART_MAX_HEARD = 40;
+/**
+ * Mic zyada se zyada itni der khuli reh sakti hai.
+ *
+ * ⚠️ 60 se 120 second — `continuous` ke saath ye ab SACH ME lagne wali chhat
+ * hai, pehle jaisi kaagzi nahi. Pehle recognizer khud 3 second me ruk jaata tha,
+ * isliye 60 kabhi lagta hi nahi tha. Ab session tab tak zinda rehta hai jab tak
+ * user na roke, aur ye ginti seedha kaat deti hai.
+ *
+ * 60 reminder ke liye kaafi tha par note likhwane ke liye nahi (`note-edit` par
+ * bhi yahi button hai) — wahan aadmi soch-soch kar bolta hai. 2 minute me har
+ * asli baat poori ho jaati hai, aur bhooli hui khuli mic se bachaav bhi rehta
+ * hai (battery aur privacy, dono).
+ */
+const LISTEN_MAX_MS = 120_000;
 
 /**
  * ── "Voice bilkul kaam nahi karta" — asli do wajah ──────────────────────
@@ -306,7 +341,24 @@ const LISTEN_MAX_MS = 60_000;
  * talk me sabse bura hai (pehle do-teen shabd nikal jaate hain).
  */
 type Attempt = "tuned" | "plain" | "google";
-const ATTEMPTS: Attempt[] = ["tuned", "plain", "google"];
+
+/**
+ * ⚠️ Tarteeb badli gayi: `google` ab `plain` se PEHLE hai. Wajah `continuous` hai.
+ *
+ * Mic ka khula rehna (`continuous`) sirf `tuned` aur `google` me hai — `plain`
+ * ka poora maqsad hi "kuch mat bhejo" hai, aur wahi aakhri sahara hona chahiye.
+ *
+ * Purani tarteeb (tuned -> plain -> google) me Samsung/Xiaomi wale users — jinka
+ * default recognizer Bixby jaisa hota hai aur jinka `tuned` aksar fail hota hai
+ * — seedha `plain` par gir jaate the, yaani unhe continuous KABHI milta hi nahi.
+ * Wo India me bahut bada hissa hai. Ab wo `google` par jaate hain, jahan Google
+ * ka recognizer bhi hai aur mic khuli bhi rehti hai.
+ *
+ * Agar sach me `continuous` hi is phone par toota ho, to dono (tuned aur google)
+ * fail honge aur `plain` phir bhi bacha rehta hai — sirf ek koshish zyada lagti
+ * hai, aur wo ek hi baar (jo chali wo yaad rakh li jaati hai).
+ */
+const ATTEMPTS: Attempt[] = ["tuned", "google", "plain"];
 
 /** Is phone par kaunsi koshish chali thi. */
 const MODE_KEY = "saathi-voice-mode";
@@ -374,7 +426,33 @@ function googleService(): string | null {
  * me aaya, warna usse purane har phone par voice poori tarah band ho jaayegi
  * aur kahin koi error bhi nahi dikhega.
  */
-function androidTuning(): Record<string, string | number | boolean> {
+/**
+ * Is koshish me mic khuli rakhni hai?
+ *
+ * ⚠️ Yahan pehle `Android 13+` ki shart thi, aur wo GALAT thi. Library ka apna
+ * native code (`ExpoSpeechService.kt`) dono raaste rakhta hai:
+ *
+ *   • **Android 13+ (API 33)** — asli segmented session: audio seedha recognizer
+ *     ko stream hota hai (`EXTRA_AUDIO_SOURCE` + `EXTRA_SEGMENTED_SESSION`).
+ *     `onSegmentResults()` kai baar final deta hai aur session KHATAM NAHI karta.
+ *     Native code ka apna comment: isse start/stop wali **beep bhi nahi bajti**.
+ *
+ *   • **Android 12 aur purane** — wahan wo teen silence-extras 600000 (10 minute)
+ *     par set kar deta hai. Google ka recognizer inhe aksar anadekha karta hai,
+ *     par jahan maanta hai wahan mic khuli rehti hai. Aur jahan nahi maanta,
+ *     wahan hamara jama-karne wala raasta (`keepListening`) sambhal leta hai.
+ *
+ * Yaani purane Android par ise band karna kuch bachata nahi tha — sirf ek mauka
+ * chheenta tha. Ab har version par chalu hai.
+ *
+ * `plain` me JAAN-BOOJH KE nahi: wo aakhri sahara hai jiska poora matlab hi
+ * "recognizer ko kuch anjaan mat bhejo" hai.
+ */
+function canContinuous(mode: Attempt): boolean {
+  return mode === "tuned" || mode === "google";
+}
+
+function androidTuning(continuous: boolean): Record<string, string | number | boolean> {
   const tiramisu = Number(Platform.Version) >= 33;
   return {
     /**
@@ -394,8 +472,31 @@ function androidTuning(): Record<string, string | number | boolean> {
      * 3 second aam viraam se lamba hai par itna bhi nahi ki hold chhodne ke baad
      * ka intezaar mehsoos ho (chhodte hi `stop()` waise bhi chala jaata hai).
      */
-    EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
-    EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 2400,
+    /**
+     * ⚠️⚠️ Ye teen extras SIRF tab jaate hain jab `continuous` BAND ho — aur ye
+     * shart is poore feature ki sabse zaroori line hai.
+     *
+     * Native code (`ExpoSpeechService.kt`) user ke `androidIntentOptions` ko
+     * SABSE AAKHIR me lagata hai — continuous wale extras set karne ke BAAD.
+     * Yaani continuous purane Android par silence ko 600000 (10 minute) karta
+     * hai, aur uske turant baad hamari ye teen line use wapas 3000 (3 second)
+     * kar deti thi.
+     *
+     * Nateeja: `continuous: true` bhejne ke baawajood mic wahi 3 second wali
+     * command-mode me chalti rehti — yaani poora sudhaar chup-chaap bekaar. Aur
+     * pakadna namumkin, kyunki bhejne wale ki taraf sab kuch sahi dikhta hai.
+     *
+     * Android 13+ par ye extras nuksaan nahi karte (wahan session `EXTRA_AUDIO_
+     * SOURCE` se bandha hota hai, silence se nahi), par bhejne ka koi matlab bhi
+     * nahi — isliye dono jagah ek hi niyam.
+     */
+    ...(continuous
+      ? {}
+      : {
+          EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+          EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 2400,
+          EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 600,
+        }),
     /**
      * ⚠️ Pehle yahan 2000 tha, aur wo hold-to-talk ko todta tha.
      *
@@ -406,7 +507,6 @@ function androidTuning(): Record<string, string | number | boolean> {
      * deta hai. 600ms chhoti "hmm" wali dikkat se abhi bhi bachata hai par asli
      * chhoti baat ko kaatta nahi.
      */
-    EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 600,
     // free_form — poore wakya ke liye bana model. Kuch OEM default me
     // web_search rakhte hain, jo chhote search-jaise tukdon ke liye hai:
     // "kal subah aath baje dawai" ko wo tod-marod deta hai.
@@ -458,6 +558,15 @@ export function VoiceButton({
   const toast = useToast();
   const { voice: v } = useT();
   const [listening, setListening] = useState(false);
+  /**
+   * Kitne second se sun rahe hain — patti me dikhta hai.
+   *
+   * ⚠️ Ye sirf sajawat nahi hai. Mic khuli hone par user ko KOI nishaan nahi
+   * milta tha ki wo abhi chalu hai — aur `continuous` ke baad wo ghanton khuli
+   * reh sakti hai. WhatsApp/ChatGPT dono me ye ginti isiliye dikhti hai: wahi
+   * ek cheez hai jo "chal raha hai" aur "atak gaya" me farq karti hai.
+   */
+  const [secs, setSecs] = useState(0);
   const pulse = useRef(new Animated.Value(1)).current;
   /** Awaaz ka live level (0-1) — ring isse phailti hai. */
   const level = useRef(new Animated.Value(0)).current;
@@ -506,6 +615,16 @@ export function VoiceButton({
 
   /** `stop()` ke baad `end` na aaye to khud sambhalne wala timer. */
   const endGuard = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Mic ki apni chhat — {@link LISTEN_MAX_MS} ke baad khud band.
+   *
+   * ⚠️ `continuous` ke saath ye ZAROORI ho gaya. Pehle chhat `keepListening()`
+   * me lagti thi, aur wo sirf tab chalta hai jab recognizer khud session khatam
+   * kare. Continuous me wo kabhi khatam karta hi nahi — yaani user ne galti se
+   * tap kar diya aur phone jeb me rakh diya, to mic ghanton khuli rehti. Battery
+   * aur privacy, dono ke liye ye sabse buri soorat hai.
+   */
+  const maxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * Is session me awaaz kitni tez aayi — sabse oonchi aur kitni baar aayi.
@@ -575,20 +694,77 @@ export function VoiceButton({
   const lastAlts = useRef<string[]>([]);
 
   /**
-   * Ek session me transcript sirf EK BAAR jaata hai.
+   * ── POORE hold/tap ka jama hua text (restart ke aar-paar) ──────────────
    *
-   * `stop()` ke baad final `result` aata hai aur uske turant baad `end` — dono
-   * emit kar dete to text do baar append ho jaata.
+   * ⚠️ Ye is file ka sabse zaroori sudhaar hai, aur iske bina ek asli bug tha
+   * jise "kabhi sahi kar raha hai, kabhi nahi" ke alawa kisi tarah bayan hi nahi
+   * kiya ja sakta.
+   *
+   * Android ka recognizer 3 second ki chuppi par session KHATAM maan leta hai
+   * (`EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS`). Aadmi bolte waqt
+   * rukta hai — naam yaad karne me, wakya sochne me — aur wo viraam aksar 3
+   * second se lamba hota hai. Us pal recognizer `isFinal` bhej deta hai, ya
+   * seedha `end`.
+   *
+   * Purana code us pehle tukde ko hi POORI baat maan ke `onText` bhej deta tha
+   * aur `release()` kar deta tha — mic band. User ki ungli abhi bhi button par
+   * hoti thi, wo aage bolta rehta tha, aur wo poora hissa ek band mic me jaata
+   * tha. "Kal subah aath baje… dawai leni hai" me se sirf "kal subah aath baje"
+   * pahunchta tha.
+   *
+   * Aur yahi wo cheez hai jo use RANDOM banati thi: viraam chhota hua to poora
+   * wakya ek hi tukde me aa gaya (sahi), lamba hua to aadha kat gaya (galat).
+   * Ek hi user, ek hi wakya, do alag nateeje.
+   *
+   * Ab har tukda yahan jama hota hai, aur `onText` tabhi chalta hai jab user
+   * SACH ME ruk chuka ho (ungli uth gayi, ya tap se band kiya).
    */
-  function emitOnce(text: string, alts: string[] = []) {
+  const sessionText = useRef("");
+  /**
+   * Guess sirf PEHLE tukde ke.
+   *
+   * Baad wale tukdon ke guess poore wakya par lagane laayak nahi hote — wo kisi
+   * aur hisse ke roop hain, aur AI ko dikhane par wo unhe poore wakya ka
+   * vikalp samajh leta hai.
+   */
+  const sessionAlts = useRef<string[]>([]);
+  /** `onText` ek session me sirf EK BAAR. */
+  const emitted = useRef(false);
+
+  /** Is hold/tap me ab tak kuch suna gaya hai? */
+  const heard = () => sessionText.current.trim().length > 0;
+
+  /**
+   * Ek TUKDA jama karo — abhi bhejna nahi hai.
+   *
+   * Bhejna tabhi hota hai jab user sach me ruk jaye (`flushSession`). Poori
+   * wajah `sessionText` par likhi hai.
+   */
+  function commitPiece(text: string, alts: string[] = []) {
     const t = text.trim();
-    if (!t || gotResult.current) return;
-    gotResult.current = true;
+    if (!t) return;
+    // Wahi tukda dobara (final ke baad `end` par interim) — jodna nahi hai.
+    if (sessionText.current.endsWith(t)) return;
+    sessionText.current = sessionText.current ? `${sessionText.current} ${t}` : t;
+    if (sessionAlts.current.length === 0 && alts.length) sessionAlts.current = alts;
     // Jo koshish sach me chali, wo phone par yaad rakh lo — agli baar seedha
     // wahi chalegi aur mic bina der ke khulega.
     rememberAttempt(attemptRef.current);
+  }
+
+  /**
+   * Jama hua poora text screen ko de do — ek session me sirf EK BAAR.
+   *
+   * ⚠️ `release()` se PEHLE chalna chahiye: release session ka jama hua sab kuch
+   * saaf kar deta hai, aur uske baad bhejne ko kuch bachta hi nahi.
+   */
+  function flushSession() {
+    if (emitted.current) return;
+    const t = sessionText.current.trim();
+    if (!t) return;
+    emitted.current = true;
     // Khaali/duplicate guess AI ke liye sirf shor hain — chhaan ke bhejo.
-    const extra = alts
+    const extra = sessionAlts.current
       .map((a) => a.trim())
       .filter((a, i, all) => a && a !== t && all.indexOf(a) === i);
     onText(t, extra.length ? extra : undefined);
@@ -596,6 +772,15 @@ export function VoiceButton({
 
   /** Ye event abhi wale, zinda session ka hai? */
   const live = () => isMine() && !deadSession.current;
+
+  /**
+   * Aisi galti jispar dobara koshish ka koi matlab nahi.
+   *
+   * `not-allowed` = permission (ilaaj user ke haath me hai, chup-chaap dobara
+   * chalane se use kuch pata hi nahi chalta). `aborted` = humne KHUD kaata
+   * (doosri mic, screen band) — wo device ki kami nahi hai.
+   */
+  const fatalError = (err: string | undefined) => err === "not-allowed" || err === "aborted";
 
   useSpeechRecognitionEvent("result", (e) => {
     if (!live()) return;
@@ -605,7 +790,24 @@ export function VoiceButton({
     // OEM `isFinal` bhejte hi nahi (upar `lastInterim` par poori wajah likhi
     // hai) aur wahan bhi ye guess utne hi kaam ke hain.
     const alts = (e.results ?? []).slice(1).map((r) => r?.transcript ?? "");
-    if (e.isFinal) emitOnce(best, alts);
+    if (e.isFinal) {
+      // ⚠️ Jama karo, bhejo NAHI. Final ka matlab sirf itna hai ki RECOGNIZER ne
+      // is tukde par faisla kar liya — user ne apni baat khatam ki, ye uska
+      // saboot nahi hai. Bhejna `end` par hota hai, aur tabhi jab user sach me
+      // ruk chuka ho. (Poori wajah `sessionText` par likhi hai.)
+      commitPiece(best, alts);
+      gotResult.current = true;
+      /**
+       * ⚠️ Is tukde ka interim ab khatam — use saaf karna ZAROORI hai.
+       *
+       * Interim final se PEHLE aate hain aur aksar aadhe hote hain ("kal su"
+       * jabki final "kal subah" hai). Continuous me session ke aakhir me hum
+       * bacha hua interim bhi jama karte hain (neeche `end` me) — bina yahan
+       * saaf kiye wo aadha tukda poore wakya ke aage dobara jud jaata.
+       */
+      lastInterim.current = "";
+      lastAlts.current = [];
+    }
     // Final nahi hai — abhi likhna nahi, bas yaad rakhna.
     else {
       lastInterim.current = best;
@@ -619,15 +821,24 @@ export function VoiceButton({
    * koshish raaste me hai. Poori soch `ATTEMPTS` ke upar likhi hai.
    */
   function escalated(why: string): boolean {
-    if (gotResult.current || lastInterim.current) return false;
+    // Ek tukda bhi jama ho chuka ho to ye galat options/recognizer wali soorat
+    // hai hi nahi — wahan sab kuch chal raha hai.
+    if (heard() || gotResult.current || lastInterim.current) return false;
     if (volumeTicks.current > 0) return false; // mic sach me sun rahi thi
     if (Date.now() - startedAt.current > INSTANT_DEATH_MS) return false;
     if (intent.current === "none") return false; // user ne haath hi hata liya
 
     let next = nextAttempt(attemptRef.current);
-    // Google wali koshish ka koi matlab nahi agar us phone par Google ka
-    // recognizer hai hi nahi.
-    if (next === "google" && !googleService()) next = null;
+    /**
+     * Google wali koshish ka koi matlab nahi agar us phone par Google ka
+     * recognizer hai hi nahi.
+     *
+     * ⚠️ Yahan pehle `next = null` tha, aur tarteeb badalne ke baad wo ek asli
+     * bug ban jaata: ab `google` beech me hai, isliye uspar ruk jaane ka matlab
+     * hota ki `plain` (aakhri sahara) tak kabhi pahuncha hi na jaye. Us phone
+     * par voice hamesha ke liye band ho jaati. Isliye ab uske AAGE badhte hain.
+     */
+    if (next === "google" && !googleService()) next = nextAttempt("google");
     if (!next) return false;
 
     /**
@@ -662,6 +873,10 @@ export function VoiceButton({
     setTimeout(() => {
       if (!isMine() || intent.current === "none") {
         deadSession.current = false;
+        // Yahan text khaali hi hota hai (escalation tabhi chalta hai jab kuch
+        // suna hi na gaya ho), par har raaste par ek hi tarteeb rakhni hai:
+        // pehle bhejo, phir chhodo.
+        flushSession();
         release();
         return;
       }
@@ -678,14 +893,37 @@ export function VoiceButton({
    * `RESTART_MAX` ke upar likhi hai.
    */
   function keepListening(): boolean {
-    // Kuch mil gaya — ab dobara sunne ka koi matlab nahi.
-    if (gotResult.current || lastInterim.current) return false;
+    /**
+     * ⚠️ Yahan pehle sabse pehli line ye thi:
+     *
+     *     if (gotResult.current || lastInterim.current) return false;
+     *
+     * Yaani "kuch mil gaya — ab dobara sunne ka koi matlab nahi". Aur wahi is
+     * poore feature ka sabse bada bug tha.
+     *
+     * Kuch MIL jaana ye nahi batata ki user ki baat KHATAM ho gayi. Recognizer 3
+     * second ki chuppi par tukda band kar deta hai; aadmi bolte waqt itna rukta
+     * hi hai. Us line ki wajah se mic wahin band ho jaati thi, jabki ungli abhi
+     * bhi button par hoti thi — aur aage bola hua sab kuch ek band mic me jaata
+     * tha.
+     *
+     * Ab faisla sirf USER ke iraade se hota hai: ungli lagi hai (ya tap-mode
+     * chalu hai) to sunte raho, chahe ek tukda mil chuka ho. Jo mila hai wo
+     * `sessionText` me surakshit pada hai — kuch khota nahi.
+     */
     // User ne haath hi hata liya (hold chhoda / tap se band kiya).
     if (intent.current === "none") return false;
-    if (restarts.current >= RESTART_MAX) return false;
     if (listeningSince.current && Date.now() - listeningSince.current > LISTEN_MAX_MS) {
       return false;
     }
+    /**
+     * Do alag chhat, aur ye farq zaroori hai:
+     *   • Kuch suna hi nahi -> sirf 2 koshish. Toote hue recognizer par har
+     *     restart do beep bajata hai; wahan chhat chhoti honi chahiye.
+     *   • Kuch suna ja chuka hai -> 6 tak. Yahan har restart ka asli kaam hai:
+     *     user ke agle shabd pakadna.
+     */
+    if (restarts.current >= (heard() ? RESTART_MAX_HEARD : RESTART_MAX)) return false;
 
     restarts.current += 1;
     /**
@@ -698,6 +936,14 @@ export function VoiceButton({
     setTimeout(() => {
       if (!isMine() || intent.current === "none") {
         deadSession.current = false;
+        /**
+         * ⚠️ `flushSession()` yahan hona ZAROORI hai. Ungli theek is 150ms ke
+         * beech me uth jaana bilkul aam hai (user ne bolna khatam kiya aur
+         * chhod diya), aur bina is line ke us poore hold ka jama hua text
+         * `release()` ke saath chup-chaap mit jaata — user bolta rehta aur
+         * screen par kuch aata hi nahi.
+         */
+        flushSession();
         release();
         return;
       }
@@ -710,21 +956,44 @@ export function VoiceButton({
 
   useSpeechRecognitionEvent("end", () => {
     if (!live()) return;
-    // Final kabhi aaya hi nahi par interim mil chuka hai — wahi sach hai.
-    if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current, lastAlts.current);
-    if (!gotResult.current && escalated("end")) return;
-    // User abhi bhi bolna chahta hai — mic band mat karo (upar wajah likhi hai).
-    if (!gotResult.current && keepListening()) return;
+    /**
+     * Bacha hua interim bhi jama karo.
+     *
+     * ⚠️ Shart ab `!gotResult` par NAHI hai, aur ye continuous mode ki wajah se
+     * zaroori hai: wahan ek hi sunwaai me KAI final aate hain, aur `gotResult`
+     * pehle final par hi sach ho jaata hai. Purani shart ke saath aakhri wo
+     * tukda gir jaata jise recognizer stop hone se pehle finalize nahi kar paya
+     * — yaani user ka aakhri wakya. (Final aate hi uska interim saaf ho jaata
+     * hai, isliye yahan kuch dobara nahi judta.)
+     */
+    if (lastInterim.current) {
+      commitPiece(lastInterim.current, lastAlts.current);
+      gotResult.current = true;
+    }
+    // Kuch suna hi nahi — options/recognizer galat ho sakta hai.
+    if (!heard() && escalated("end")) return;
+    /**
+     * User abhi bhi bolna chahta hai — mic band mat karo.
+     *
+     * ⚠️ Ye shart ab `gotResult` par NAHI hai. Pehle thi, aur wahi bug tha: ek
+     * tukda milte hi mic band ho jaati thi jabki ungli button par hi thi. Ab
+     * faisla sirf user ke iraade se hota hai (poori wajah `keepListening()` par).
+     */
+    if (keepListening()) return;
     // Ab bhi kuch nahi — tabhi kuch kehna hai. Mil gaya to chup rehna behtar.
-    if (!gotResult.current) hintForSilence();
+    if (!heard()) hintForSilence();
+    flushSession();
     release();
   });
   useSpeechRecognitionEvent("error", (e) => {
     if (!live()) return;
     // Error ke baad bhi wo interim sach hi hai jo mic ne sun liya tha —
     // "no-speech" ke saath aksar aadha wakya pehle hi aa chuka hota hai.
-    if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current, lastAlts.current);
-    if (!gotResult.current) {
+    if (lastInterim.current) {
+      commitPiece(lastInterim.current, lastAlts.current);
+      gotResult.current = true;
+    }
+    if (!heard()) {
       /**
        * ⚠️ Permission wale error par agli koshish NAHI. Wo ek asli, samjhaane
        * laayak wajah hai jiska ilaaj user ke haath me hai; use chupchaap dobara
@@ -745,7 +1014,7 @@ export function VoiceButton({
        * chalane ka koi matlab nahi — ulta wo ek aisi koshish chala deta jise
        * user ne maanga hi nahi tha.
        */
-      const fatal = e?.error === "not-allowed" || e?.error === "aborted";
+      const fatal = fatalError(e?.error);
       if (!fatal && escalated(e?.error ?? "unknown")) return;
       /**
        * ⚠️ "Kuch sunayi nahi diya" par toast NAHI — dobara sunna.
@@ -760,7 +1029,19 @@ export function VoiceButton({
       const silence = e?.error === "no-speech" || e?.error === "speech-timeout";
       if (!fatal && silence && keepListening()) return;
       toast.show(errorLine(e?.error), "info");
+    } else if (!fatalError(e?.error) && keepListening()) {
+      /**
+       * Kuch suna ja chuka hai aur user abhi bhi bol raha hai — error ke baad
+       * bhi sunte raho.
+       *
+       * ⚠️ Ye branch pehle thi hi nahi: kuch mil jaane par error seedha
+       * `release()` par gir jaata tha aur baaki baat kho jaati thi. Aur yahi
+       * sabse aam raasta hai — lamba viraam par Android `no-speech` bhejta hai,
+       * `end` nahi.
+       */
+      return;
     }
+    flushSession();
     release();
   });
   // Shor me ye bahut madad karta hai: user ko dikhta hai ki uski awaaz pahunch
@@ -855,6 +1136,10 @@ export function VoiceButton({
   /** UI ko "sun raha hoon" wali haalat me le jao. */
   function beginUi() {
     setListening(true);
+    // Restart par ginti wapas 0 nahi honi chahiye — user ke liye wo ek hi
+    // lagatar sunwaai hai. Isliye reset sirf nayi shuruaat par (`startListening`
+    // me, `!keepAlive` wale hisse me).
+
     peak.current = 0;
     loudTicks.current = 0;
     volumeTicks.current = 0;
@@ -893,15 +1178,49 @@ export function VoiceButton({
     // Agli baar taazi shuruaat — warna ek murda-chihnit session ka jhanda agle
     // press par bhi laga rehta aur uske saare event chup-chaap gir jaate.
     deadSession.current = false;
+    /**
+     * Jama hua text yahin khatam hota hai.
+     *
+     * ⚠️ `release()` hamesha `flushSession()` ke BAAD chalta hai — har raaste
+     * par. Ulta kar diya to bhejne ko kuch bachta hi nahi, aur user ki poori
+     * baat chup-chaap mit jaati hai. Yahan saaf karna zaroori hai warna pichhle
+     * hold ka text agle hold ke aage jud jaata.
+     */
+    sessionText.current = "";
+    sessionAlts.current = [];
+    emitted.current = false;
     if (endGuard.current) {
       clearTimeout(endGuard.current);
       endGuard.current = null;
     }
+    if (maxTimer.current) {
+      clearTimeout(maxTimer.current);
+      maxTimer.current = null;
+    }
     setListening(false);
+    setSecs(0);
     pulse.stopAnimation();
     pulse.setValue(1);
     level.setValue(0);
   }
+
+  /**
+   * Ginti chalti rahe jab tak mic khuli hai.
+   *
+   * ⚠️ `setSecs(0)` yahan JAAN-BOOJH KE nahi hai (wo `startListening` me hota
+   * hai). Effect ke body me seedha setState karna is repo me rok hua hai
+   * (`react-hooks/set-state-in-effect`) aur wo rok sahi hai — wo ek extra
+   * render chain banata hai. Yahan sirf interval lagta hai.
+   *
+   * Restart ke aar-paar `listening` sach hi rehta hai, isliye ginti tootti nahi
+   * — user ke liye wo ek hi lagatar sunwaai hai.
+   */
+  useEffect(() => {
+    if (!listening) return;
+    const from = Date.now();
+    const id = setInterval(() => setSecs(Math.floor((Date.now() - from) / 1000)), 500);
+    return () => clearInterval(id);
+  }, [listening]);
 
   /**
    * Screen band ho gayi par mic abhi bhi sun raha tha.
@@ -922,9 +1241,19 @@ export function VoiceButton({
    */
   useEffect(() => {
     const me = meRef.current;
-    // Maalik badalne par purana button apna UI shaant kar sake — registry me
-    // apna haath rakh do.
-    ownerReset.set(me, release);
+    /**
+     * Maalik badalne par purana button apna UI shaant kar sake — registry me
+     * apna haath rakh do.
+     *
+     * ⚠️ `release` akela NAHI — pehle `flushSession()`. Add-reminder par DO mic
+     * hain; user pehle wale me bol chuka ho aur doosra daba de, to uska jama hua
+     * text yahin mit jaata tha (release sab saaf kar deta hai). Wo baat user ne
+     * sach me boli thi, aur wo usi field ki hai jahan bola tha.
+     */
+    ownerReset.set(me, () => {
+      flushSession();
+      release();
+    });
     const guard = endGuard;
     return () => {
       ownerReset.delete(me);
@@ -1092,6 +1421,30 @@ export function VoiceButton({
       if (!keepAlive) {
         listeningSince.current = Date.now();
         restarts.current = 0;
+        /**
+         * Nayi sunwaai — purana jama hua text saath mat le jao.
+         *
+         * `release()` waise bhi saaf kar deta hai, par har raaste par release
+         * chalta ho ye maan lena is file me pehle bhi mehnga pad chuka hai
+         * (permission ka popup, unmount, doosri mic). Do jagah saaf karna sasta
+         * hai; ek purana wakya agle reminder ke aage chipak jaana nahi.
+         */
+        sessionText.current = "";
+        sessionAlts.current = [];
+        emitted.current = false;
+        setSecs(0);
+        // Mic ki chhat — continuous me recognizer khud kabhi nahi rukta.
+        if (maxTimer.current) clearTimeout(maxTimer.current);
+        maxTimer.current = setTimeout(() => {
+          maxTimer.current = null;
+          if (!isMine()) return;
+          intent.current = "none";
+          if (live()) stopListening();
+          else {
+            flushSession();
+            release();
+          }
+        }, LISTEN_MAX_MS);
       }
       attemptRef.current = mode;
       // Purane, murda session ka pehra ab hata do — yahan se aage ke event is
@@ -1113,13 +1466,51 @@ export function VoiceButton({
          * mile tabhi ek baar likhe jaate hain.
          */
         interimResults: true,
-        continuous: false,
+        /**
+         * ── Mic khuli rahe, jab tak USER na roke ──────────────────────────
+         *
+         * ⚠️ Yahan pehle `false` tha, aur wahi is poore feature aur WhatsApp ke
+         * beech ka asli farq tha.
+         *
+         * `false` par Android ka recognizer ek "command" sunta hai: 3 second ki
+         * chuppi milte hi wo session KHATAM kar deta hai. Aadmi bolte waqt rukta
+         * hai, isliye ek hi wakya kai tukdon me tootta tha — aur har tukde ke
+         * beech mic band hoti thi, do system beep bajte the, aur us khidki me
+         * bola hua girta tha.
+         *
+         * `true` par (Android 13+ aur iOS) session tab tak zinda rehta hai jab
+         * tak hum khud `stop()` na bhejein — theek WhatsApp ke voice note jaisa.
+         * Beech ke viraam se kuch nahi hota, koi beep nahi, kuch girta nahi.
+         *
+         * ⚠️ Ye SIRF `tuned` me hai, aur ye jaan-boojh ke hai. Android 12 aur
+         * usse purane par ye option hai hi nahi, aur kuch OEM recognizer ise
+         * maante hi nahi. Wahan session bina kuch sune turant marta hai — aur
+         * wahi `escalated()` ki shart hai, jo agli koshish (`plain`) par le
+         * jaata hai jahan continuous hai hi nahi. Us phone par jo koshish chali
+         * wo yaad rakh li jaati hai, isliye ye jaanch ek hi baar hoti hai.
+         *
+         * Restart wala purana raasta hataya NAHI gaya — wo ab bhi un phones ko
+         * sambhalta hai jahan continuous nahi chalta (`keepListening()`).
+         */
+        continuous: canContinuous(mode),
         // Saare guess chahiye — chunav AI karta hai, app nahi. Poori wajah file
         // ke sar par likhi hai ("kabhi sahi, kabhi nahi" ki asli jad yahi thi).
         maxAlternatives: MAX_ALTERNATIVES,
-        // Biasing sirf `tuned` me. Saadi/Google wali koshish ka poora matlab hi
-        // ye hai ki recognizer ko kuch anjaan na bheja jaye (upar `ATTEMPTS`).
-        ...(mode === "tuned" ? { contextualStrings: BIAS_WORDS } : {}),
+        /**
+         * Biasing `tuned` aur `google` dono me — sirf `plain` me nahi.
+         *
+         * ⚠️ Pehle ye sirf `tuned` me tha, is darr se ki koi anjaan option
+         * purane Android par session maar dega. Wo darr `androidIntentOptions`
+         * ke liye SAHI hai (wahan native reflection use karta hai aur field na
+         * milne par poora intent gir jaata hai), par `contextualStrings` uska
+         * hissa hai hi nahi — native khud `Build.VERSION >= TIRAMISU` dekh ke
+         * lagata hai, warna chup-chaap chhod deta hai.
+         *
+         * Isliye Samsung/Xiaomi wale users (jo ab `google` par aate hain) bina
+         * wajah ke biasing se mehroom the — aur wo India me bahut bada hissa hai.
+         * `plain` aakhri sahara hai; wahan bare-minimum hi jaana chahiye.
+         */
+        ...(mode === "plain" ? {} : { contextualStrings: BIAS_WORDS }),
         addsPunctuation: false,
         volumeChangeEventOptions: { enabled: true, intervalMillis: 150 },
         // iOS ka apna noise/echo suppression — mic par extra signal processing.
@@ -1133,7 +1524,7 @@ export function VoiceButton({
           mode: "voiceChat",
         },
         ...(Platform.OS === "android" && mode === "tuned"
-          ? { androidIntentOptions: androidTuning() }
+          ? { androidIntentOptions: androidTuning(canContinuous(mode)) }
           : {}),
         // Google ka recognizer naam le kar — Bixby jaise OEM recognizer wale
         // phone yahi bachata hai.
@@ -1169,9 +1560,11 @@ export function VoiceButton({
       // `live()` — `isMine()` nahi. Agli koshish raaste me ho to ye purana
       // timer use beech me hi maar deta.
       if (!live()) return;
-      // Final nahi aaya par interim mil chuka tha — wahi likh do.
-      if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current, lastAlts.current);
-      if (!gotResult.current) hintForSilence();
+      // Bacha hua interim bhi jama karo (final aate hi wo saaf ho chuka hota
+      // hai, isliye yahan kuch dobara nahi judta).
+      if (lastInterim.current) commitPiece(lastInterim.current, lastAlts.current);
+      if (!heard()) hintForSilence();
+      flushSession();
       release();
     }, END_GUARD_MS);
   }
@@ -1224,10 +1617,18 @@ export function VoiceButton({
     if (intent.current === "tap") {
       intent.current = "none";
       // `live()` — beech me agli koshish raaste me ho to us pal recognizer chal
-      // hi nahi raha; escalation ka timer `intent === "none"` dekh ke khud ruk
-      // jaata hai aur UI shaant kar deta hai.
+      // hi nahi raha; restart/escalation ka timer `intent === "none"` dekh ke
+      // khud ruk jaata hai, jama hua text bhejta hai aur UI shaant kar deta hai.
+      //
+      // ⚠️ Yahan seedha `release()` MAT karna. Wo session ka jama hua saara text
+      // saaf kar deta hai, aur uske baad timer ke paas bhejne ko kuch bachta hi
+      // nahi — user ki poori boli hui baat chup-chaap gum ho jaati. Bhejna
+      // pehle, chhodna baad me — poore file me yahi ek tarteeb hai.
       if (live()) stopListening();
-      else release();
+      else {
+        flushSession();
+        release();
+      }
       return;
     }
 
@@ -1235,8 +1636,37 @@ export function VoiceButton({
     intent.current = "tap";
   }
 
+  /** 0:07 */
+  const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+
   return (
-    <Animated.View style={{ transform: [{ scale: pulse }] }}>
+    /**
+     * ⚠️ Ye bahar wala `View` sirf patti ke liye hai, aur patti `Animated.View`
+     * ke BAHAR honi chahiye. Andar rakhne par wo `pulse` ke saath phoolti-sikudti
+     * hai aur text kaanpta hua dikhta hai.
+     */
+    <View>
+      {/**
+       * "Sun raha hoon 0:07 · tap karke roko"
+       *
+       * ⚠️ Ye patti isliye hai ki tap-se-band karne wala raasta MAUJOOD to tha
+       * par kahin DIKHTA nahi tha — button dono haalat me bilkul ek jaisa lagta
+       * tha. User ungli dabaye rakhta tha aur haath thakne par chhod deta tha.
+       * WhatsApp aur ChatGPT dono me yahi baat timer aur stop se saaf dikhti hai.
+       *
+       * `position: absolute` — isse kisi bhi screen ka layout nahi hilta (ye
+       * button chaar alag jagah lagta hai, aur wahan chaudai badalna sabse bura
+       * hota). `pointerEvents="none"` taaki tap patti me nahi, button me jaye.
+       */}
+      {listening && (
+        <View pointerEvents="none" style={styles.pill}>
+          <View style={styles.pillDot} />
+          <Text style={styles.pillText} numberOfLines={1}>
+            {v.listening} {clock} · {v.tapToStop}
+          </Text>
+        </View>
+      )}
+      <Animated.View style={{ transform: [{ scale: pulse }] }}>
       <Pressable
         onPressIn={onPressIn}
         onPressOut={onPressOut}
@@ -1283,14 +1713,18 @@ export function VoiceButton({
           />
         )}
         <View>
+          {/* ⚠️ Sunte waqt STOP ka nishaan, mic ka nahi. Mic ka icon "abhi
+              bologe" kehta hai; user ko us pal ye jaanna hai ki "ab rok sakte
+              ho". Yahi ek nishaan tap-se-band wale raaste ko dikhata hai. */}
           <Ionicons
-            name={listening ? "mic" : "mic-outline"}
-            size={20}
+            name={listening ? "stop" : "mic-outline"}
+            size={listening ? 18 : 20}
             color={listening ? tc.white : tc.terracotta}
           />
         </View>
       </Pressable>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -1307,6 +1741,28 @@ const useStyles = makeStyles((c) => ({
     overflow: "hidden",
   },
   btnActive: { backgroundColor: c.terracotta, borderColor: c.terracotta },
+  /**
+   * Button ke UPAR taerti patti. `absolute` isliye ki ye chaar alag screens par
+   * lagta hai — wahan chaudai badalna input ko hila deta.
+   */
+  pill: {
+    position: "absolute",
+    bottom: 56,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: c.ink,
+    // Android par bina iske ye patti bhai-behen views ke NEECHE chali jaati hai.
+    elevation: 6,
+    zIndex: 10,
+  },
+  /** Laal bindi — "abhi chal raha hai" ka sabse seedha nishaan. */
+  pillDot: { height: 7, width: 7, borderRadius: 4, backgroundColor: c.danger },
+  pillText: { color: c.cream, fontSize: 12, fontWeight: "700" },
   level: {
     position: "absolute",
     height: 46,
