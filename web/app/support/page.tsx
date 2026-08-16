@@ -8,7 +8,7 @@ import SubHeader from "@/components/SubHeader";
 import Footer from "@/components/Footer";
 import BackHomeLink from "@/components/BackHomeLink";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 const SUPPORT_EMAIL = "info@apkasaathi.com";
 
 export function generateMetadata(): Promise<Metadata> {

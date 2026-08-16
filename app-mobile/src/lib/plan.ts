@@ -16,7 +16,25 @@ import { getDeviceId, getHardwareId } from "./device";
 export const FREE_DOC_LIMIT = 3;
 export const FREE_REMINDER_LIMIT = 5;
 
-export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://www.apkasaathi.com";
+/**
+ * Web ka pata — app yahan se apne API routes bulati hai.
+ *
+ * ⚠️ `www` JAAN-BOOJH KE nahi hai, aur wapas mat lagana. Production apex
+ * (`apkasaathi.com`) par hai, aur `www.apkasaathi.com` uspar **307 redirect**
+ * karta hai. Har HTTP client (okhttp/RN, NSURLSession, curl) doosre HOST par
+ * jaate waqt `Authorization` header JAAN-BOOJH KE gira deta hai — ye surakhsha
+ * ka niyam hai, koi bug nahi.
+ *
+ * Iska matlab: `www` ke saath app ki har LOGGED-IN call chup-chaap 401 ho
+ * jaati hai — document upload/download, phone ka OTP, device approval, app-lock
+ * reset, support. Redirect ke baad request pahunchti to hai, par bina token ke.
+ * Aur wo fail bilkul chup hota hai: user ko sirf "kaam nahi hua" dikhta hai.
+ *
+ * Yahi galti Supabase ke cron me bhi thi (`supabase/cron-setup.sql`) — wahan har
+ * call 401 hoti thi aur ek bhi reminder nahi jaata tha, jabki secret dono jagah
+ * bilkul sahi tha.
+ */
+export const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://apkasaathi.com";
 
 export type PlanId = "plus_monthly" | "plus_yearly";
 

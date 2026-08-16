@@ -18,7 +18,7 @@ select cron.schedule(
   '*/30 * * * *',
   $$
   select net.http_post(
-    url := 'https://www.apkasaathi.com/api/cron/error-digest',
+    url := 'https://apkasaathi.com/api/cron/error-digest',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <CRON_SECRET>'

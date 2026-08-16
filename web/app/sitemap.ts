@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 import { getPosts } from "@/lib/blog-server";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 
 /**
- * sitemap.xml — Google Search Console me `https://www.apkasaathi.com/sitemap.xml`
+ * sitemap.xml — Google Search Console me `https://apkasaathi.com/sitemap.xml`
  * submit karna hai. Next isse build par khud generate karta hai.
  *
  * Sirf wahi pages jo index hone chahiye. `/referral` yahan jaan-boojh ke nahi hai

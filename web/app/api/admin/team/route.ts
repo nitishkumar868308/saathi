@@ -21,7 +21,7 @@ import { sendAdminInviteEmail, sendAdminPasswordEmail, emailConfigured } from "@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 const ADMIN_URL = `${SITE_URL.replace(/\/+$/, "")}/admin`;
 
 function fail(err: unknown) {

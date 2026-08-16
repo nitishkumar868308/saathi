@@ -28,7 +28,7 @@ select cron.schedule(
   '*/15 * * * *',
   $$
   select net.http_post(
-    url := 'https://www.apkasaathi.com/api/cron/document-expiry',
+    url := 'https://apkasaathi.com/api/cron/document-expiry',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <CRON_SECRET>'

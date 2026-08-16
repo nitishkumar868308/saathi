@@ -38,8 +38,22 @@ declare
   -- Variables me jo hai, HUBAHU wahi — aage-peeche space bhi nahi).
   v_secret text := '<CRON_SECRET>';
 
-  -- Apna domain. www hai ya nahi, ye maayne rakhta hai (galat par 404/308).
-  v_base   text := 'https://www.apkasaathi.com';
+  /**
+   * Apna domain — aur yahan `www` MAT lagana.
+   *
+   * ⚠️ Ye is file ki sabse chupi hui galti thi, aur ye bilkul "galat secret"
+   * jaisi dikhti hai. Production apex (`apkasaathi.com`) par hai aur
+   * `www.apkasaathi.com` uspar 307 redirect karta hai. pg_net redirect follow
+   * karta hai, par wo curl par chalta hai — aur curl doosre HOST par jaate waqt
+   * `Authorization` header jaan-boojh ke gira deta hai (surakhsha ka niyam hai).
+   *
+   * Nateeja: route chalta hai, 401 deta hai, aur secret DONO jagah bilkul sahi
+   * hota hai. Ghanton isi ko dhoondha jaata hai.
+   *
+   * Domain badle to Vercel > Settings > Domains me dekh lena ki "Production"
+   * kis par likha hai — wahi yahan aana chahiye, redirect wala nahi.
+   */
+  v_base   text := 'https://apkasaathi.com';
 
   v_headers jsonb;
   v_job     record;

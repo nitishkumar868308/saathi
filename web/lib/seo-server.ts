@@ -21,7 +21,7 @@ import type { Metadata } from "next";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com";
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
 export const SITE_NAME = "Apka Saathi";
 
 /** DB row na mile to yahi chalta hai. */

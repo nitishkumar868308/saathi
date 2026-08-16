@@ -28,7 +28,7 @@ select cron.schedule(
   '30 22 * * *',
   $$
   select net.http_post(
-    url := 'https://www.apkasaathi.com/api/cron/sync-play-prices',
+    url := 'https://apkasaathi.com/api/cron/sync-play-prices',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <CRON_SECRET>'

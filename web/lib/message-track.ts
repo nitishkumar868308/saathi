@@ -29,7 +29,7 @@ import { PLAY_STORE_URL } from "@/lib/links";
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.apkasaathi.com"
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com"
 ).replace(/\/$/, "");
 
 const SECRET =

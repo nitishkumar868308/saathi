@@ -19,7 +19,7 @@ import { supabase } from "./supabase";
  * size ki koi rok lag hi nahi sakti; sach upload ke baad hi pata chalta hai.
  */
 
-const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://www.apkasaathi.com";
+const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? "https://apkasaathi.com";
 
 /** Net nahi tha — "fail" se alag, taaki user ko sahi baat batayi ja sake. */
 export class StorageOfflineError extends Error {
