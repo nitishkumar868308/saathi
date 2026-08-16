@@ -155,6 +155,68 @@ export function expiryNotifyPlan(
 }
 
 /**
+ * Khabar ka waqt beet chuka tha — us document ko kitni der baad bataayein.
+ *
+ * 5 minute, aur teenon wajah maayne rakhti hain:
+ *
+ *   • Itni der me user Save dabaa ke screen se nikal chuka hota hai. Usi screen
+ *     par bajne wala alert bhaddha lagta hai — wo abhi wahi kaam kar raha hai.
+ *   • Itna kam hai ki wo abhi bhi "abhi wali" khabar hi lagti hai.
+ *   • ⚠️ Aur ye ghadi ke farq ke liye jagah chhodta hai. Lamha `created_at` se
+ *     ginta hai, jo SERVER ki ghadi hai, jabki alarm PHONE ki ghadi par lagta
+ *     hai. Phone ki ghadi thodi aage ho (aam baat hai) aur ye number chhota ho,
+ *     to hisaab beeta hua waqt nikal aata aur `schedule()` chup-chaap kuch
+ *     lagata hi nahi — yaani wahi purana bug, bas ek nayi wajah se.
+ */
+export const CATCH_UP_DELAY_MS = 5 * 60_000;
+
+/**
+ * Aaj hi expire ho raha document, aur teenon qadam beet chuke — ab kab bataayein?
+ *
+ * ⚠️ Ye poora function ek asli, aur bilkul chup, khaali jagah bharta hai. Ladder
+ * ke teenon qadam ek FIXED lamhe par baithte hain (7 din pehle / 1 din pehle /
+ * us din — teenon subah 9 baje). Jo document DOPAHAR ko daala jaye aur AAJ HI
+ * expire ho raha ho, uske teenon lamhe daalne se PEHLE hi nikal chuke hote hain:
+ *
+ *     subah 9:00  ← lead 0 ka lamha
+ *     dopahar 2:30 ← user ne document daala
+ *
+ * `schedule()` beete waqt par kuch nahi lagata, isliye us document par EK BHI
+ * alarm nahi lagta tha — aur screen teen kati hui lines dikha ke chup ho jaati
+ * thi. User ne document isi liye daala tha ki use yaad dilaya jaye, aur usi din
+ * kuch nahi aata tha. (Email/WhatsApp wahan bhi chale jaate hain: web ka cron
+ * 25 ghante ki khidki rakhta hai — dekho `web/app/api/cron/document-expiry`.)
+ *
+ * Lamha `addedAt` se ginte hain, `Date.now()` se nahi, aur wahi is function ka
+ * dil hai: `syncNotifications()` HAR baar app saamne aane par chalta hai aur har
+ * document ka schedule dobara banata hai. "Abhi se 2 minute" hota to us din app
+ * jitni baar khulti, utni baar ek naya alert lagta. `created_at` se ginne par
+ * lamha hamesha WAHI ek nikalta hai — bajne ke baad wo beet chuka hota hai aur
+ * `schedule()` khud hi use chhod deta hai. Isliye alert theek EK baar aata hai,
+ * bina kisi jhande ya storage ke.
+ *
+ * `null` lauta to yahan kuch karna hi nahi hai — ya to ladder abhi zinda hai
+ * (koi qadam aane wala hai), ya date hi beet chuki hai (uski apni chetavni
+ * form par hai), ya date galat hai.
+ */
+export function expiryCatchUp(
+  expiry: string,
+  addedAt: Date | string | number = new Date(),
+  now: Date = new Date(),
+): Date | null {
+  const plan = expiryNotifyPlan(expiry, now);
+  // Date hi galat hai, ya ladder ka koi qadam abhi aana baaki hai.
+  if (plan.length === 0 || plan.some((s) => s.willFire)) return null;
+  // Din hi beet chuka — uski chetavni form par alag se hai, aur "aaj expire ho
+  // raha hai" wali khabar wahan jhooth hoti.
+  if (expiryStatus(expiry, now) === "expired") return null;
+
+  const base = new Date(addedAt).getTime();
+  if (!Number.isFinite(base)) return null;
+  return new Date(base + CATCH_UP_DELAY_MS);
+}
+
+/**
  * Ye date beet chuki hai? (aaj wali date beeti hui NAHI hai.)
  *
  * ⚠️ Ye `expiryStatus()` par hi tika hai, apna alag hisaab nahi karta — aur ye

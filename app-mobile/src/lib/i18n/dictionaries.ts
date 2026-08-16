@@ -247,6 +247,31 @@ export type Dict = {
     /** Jawab hamesha ek jaisa — chahe email register ho ya na ho. */
     forgotSent: string;
     forgotBack: string;
+    /**
+     * ── Reset ka doosra raasta: 6-ank ka code ───────────────────────────
+     *
+     * ⚠️ Ye poora hissa isliye hai ki LINK ka raasta un jagah tootta hai jahan
+     * hamara koi bas nahi chalta — Gmail/Outlook ka scanner link ko user se
+     * PEHLE khol ke ek-baar-chalne wala token kha jaata hai, mail laptop par
+     * khula ho to `saathi://` ko wahan koi nahi jaanta, aur link ki apni umar
+     * ek ghante ki hai. Teenon soorat me user ko bas "app login maang rahi hai"
+     * dikhta tha. Poori list `lib/auth.ts` ke `verifyPasswordResetCode()` par.
+     *
+     * ⚠️ Iske chalne ke liye Supabase ke "Reset Password" email template me
+     * `{{ .Token }}` hona zaroori hai — warna code email me aata hi nahi.
+     */
+    /** Link par tap karke wapas aa gaye, par wo link nahi chala. */
+    resetLinkDead: string;
+    resetCodeTitle: string;
+    resetCodeSub: string;
+    resetCodePlaceholder: string;
+    resetCodeSubmit: string;
+    /** Code to bhara par email khaali/galat hai — `verifyOtp` dono maangta hai. */
+    resetCodeNeedsEmail: string;
+    /** Code galat ya beet chuka. */
+    resetCodeBad: string;
+    /** Naya link + naya code bhejo. */
+    resetSendAgain: string;
     /** Recovery link se aane ke baad ka screen. */
     newPassTitle: string;
     newPassSub: string;
@@ -510,6 +535,26 @@ export type Dict = {
     notifyPlanPassed: string;
     /** Khabar din ke kis waqt aayegi — "subah 9 baje". */
     notifyPlanAtTime: string;
+    /**
+     * Teenon qadam beet chuke hain par document AAJ HI expire ho raha hai —
+     * Saathi phir bhi bataayega, bas thodi der me.
+     *
+     * ⚠️ Ye jodi (`Now` + `NowSub`) is card ki sabse zaroori line hai jab
+     * document dopahar ko daala jaye. Pehle wahan sirf teen kati hui lines
+     * dikhti thi, jinka matlab user ke liye "kuch nahi aayega" hai — aur wo sach
+     * bhi tha. Ab alert lagta hai (`utils/expiry.ts` ka `expiryCatchUp`).
+     */
+    notifyPlanNow: string;
+    notifyPlanNowSub: string;
+    /**
+     * Photo ke bina document save nahi hota.
+     *
+     * ⚠️ Ye rok pehle thi hi nahi. Sirf naam aur date wala "document" dekhne ke
+     * kaam ka hai hi nahi — na offline screen par, na share/download par, na
+     * renew par — aur backup me bhejne ko bhi kuch nahi hota. Poori wajah
+     * `add-document.tsx` ke `save()` par likhi hai.
+     */
+    photoRequired: string;
     saveFailed: string;
     cameraPermission: string;
     ocrExpiryFound: string;
@@ -780,6 +825,35 @@ export type Dict = {
      */
     voiceSending: string;
     voiceStop: string;
+  };
+  /**
+   * Plus khatam ho gaya — poori screen wala samjhane wala page.
+   *
+   * ⚠️ Ye section isliye hai ki downgrade ab apne aap hota hai
+   * (`supabase/cron-plan-expiry.sql`): Plus khatam hote hi free hadd se AAGE ke
+   * documents lock ho jaate hain aur aage ke reminders pause. Ye theek hai — par
+   * user ko iski khabar kahin se milti hi nahi thi, aur uske liye wo bilkul aisa
+   * dikhta tha jaise app kharab ho gayi ho ("mere documents kahan gaye",
+   * "reminder aana band kyun ho gaya").
+   *
+   * ⚠️ Poora lehja "sab surakshit hai" wala hai, "aapne kho diya" wala nahi —
+   * aur ye SACH hai: kuch delete nahi hota, sirf lock hota hai, aur Plus wapas
+   * lete hi sab khud khul jaata hai. Dara ke bechna is app ke mizaaj se ulta
+   * hai; ginti sirf isliye di jaati hai ki user ko apni haalat saaf dikhe.
+   */
+  planExpired: {
+    title: string;
+    /** Sabse zaroori line — sabse upar, sabse mota. */
+    safe: string;
+    body: string;
+    /** {docs} — kitne documents lock hain. */
+    lockedDocs: string;
+    /** {reminders} — kitne reminders pause hain. */
+    pausedReminders: string;
+    /** Free hadd ke andar hai — kuch lock hi nahi hua. */
+    nothingLocked: string;
+    back: string;
+    later: string;
   };
   upgrade: {
     title: string;
@@ -1551,6 +1625,16 @@ const hinglish: Dict = {
     forgotSend: "Reset link bhejo",
     forgotSent: "Agar ye email register hai to link bhej diya hai. Inbox (aur spam) dekh lo.",
     forgotBack: "Login par wapas",
+    resetLinkDead:
+      "Wo link ab nahi chalega — reset ke link ek hi baar chalte hain, aur email app khud unhe pehle khol leti hai. Neeche wala code seedha kaam karega.",
+    resetCodeTitle: "Ya email me aaya code daalo",
+    resetCodeSub:
+      "Usi email me 6 ank ka ek code bhi hai. Link na chale to wahi code yahan daal do — laptop par khula email bhi chalega.",
+    resetCodePlaceholder: "6 ank ka code",
+    resetCodeSubmit: "Code se aage badho",
+    resetCodeNeedsEmail: "Pehle apna email daalo",
+    resetCodeBad: "Ye code sahi nahi hai (ya beet chuka hai). Naya bhej ke dobara koshish karo.",
+    resetSendAgain: "Naya link aur code bhejo",
     newPassTitle: "Naya password banao",
     newPassSub: "Kam se kam 6 akshar. Yaad rakhne laayak rakhna.",
     newPassLabel: "Naya password",
@@ -1700,6 +1784,9 @@ const hinglish: Dict = {
     notifyPlanOnDay: "Expiry wale din",
     notifyPlanPassed: "ye din beet chuka hai",
     notifyPlanAtTime: "subah 9 baje",
+    notifyPlanNow: "Abhi",
+    notifyPlanNowSub: "subah wala waqt nikal chuka hai — Saathi kuch hi der me yaad dila dega",
+    photoRequired: "Pehle document ki photo lo ya gallery se chuno — bina photo ke document save nahi hota",
     saveFailed: "Save nahi ho paya",
     cameraPermission: "Camera permission chahiye",
     ocrExpiryFound: "expiry mil gayi",
@@ -1879,6 +1966,16 @@ const hinglish: Dict = {
     settingChanged: "Setting badal di ✓",
     voiceSending: "Bhej raha hoon…",
     voiceStop: "Roko",
+  },
+  planExpired: {
+    title: "Aapka Plus khatam ho gaya",
+    safe: "Kuch bhi delete nahi hua",
+    body: "Aapka har document aur har reminder waise ka waisa surakshit hai. Account ab free plan par hai, isliye free hadd se aage wale abhi lock hain. Plus wapas lete hi sab usi pal khul jaayega.",
+    lockedDocs: "{docs} documents abhi lock hain",
+    pausedReminders: "{reminders} reminders abhi pause hain",
+    nothingLocked: "Aapka saara data free plan ki hadd me aa jaata hai — kuch bhi lock nahi hua",
+    back: "Plus wapas lo",
+    later: "Baad me",
   },
   upgrade: {
     title: "Saathi Plus",
@@ -2464,6 +2561,16 @@ const hi: Dict = {
     forgotSend: "रीसेट लिंक भेजें",
     forgotSent: "अगर यह ईमेल रजिस्टर है तो लिंक भेज दिया है। इनबॉक्स (और स्पैम) देख लीजिए।",
     forgotBack: "लॉगिन पर वापस",
+    resetLinkDead:
+      "वह लिंक अब नहीं चलेगा — रीसेट के लिंक एक ही बार चलते हैं, और ईमेल ऐप खुद उन्हें पहले खोल लेती है। नीचे वाला कोड सीधे काम करेगा।",
+    resetCodeTitle: "या ईमेल में आया कोड डालिए",
+    resetCodeSub:
+      "उसी ईमेल में 6 अंकों का एक कोड भी है। लिंक न चले तो वही कोड यहाँ डाल दीजिए — लैपटॉप पर खुला ईमेल भी चलेगा।",
+    resetCodePlaceholder: "6 अंकों का कोड",
+    resetCodeSubmit: "कोड से आगे बढ़िए",
+    resetCodeNeedsEmail: "पहले अपना ईमेल डालिए",
+    resetCodeBad: "यह कोड सही नहीं है (या बीत चुका है)। नया भेजकर दोबारा कोशिश कीजिए।",
+    resetSendAgain: "नया लिंक और कोड भेजिए",
     newPassTitle: "नया पासवर्ड बनाएँ",
     newPassSub: "कम से कम 6 अक्षर। याद रखने लायक रखिए।",
     newPassLabel: "नया पासवर्ड",
@@ -2612,6 +2719,9 @@ const hi: Dict = {
     notifyPlanOnDay: "एक्सपायरी वाले दिन",
     notifyPlanPassed: "यह दिन बीत चुका है",
     notifyPlanAtTime: "सुबह 9 बजे",
+    notifyPlanNow: "अभी",
+    notifyPlanNowSub: "सुबह का समय निकल चुका है — साथी थोड़ी ही देर में याद दिला देगा",
+    photoRequired: "पहले डॉक्यूमेंट की फ़ोटो लीजिए या गैलरी से चुनिए — बिना फ़ोटो के डॉक्यूमेंट सेव नहीं होता",
     saveFailed: "सेव नहीं हो पाया",
     cameraPermission: "कैमरा permission चाहिए",
     ocrExpiryFound: "एक्सपायरी मिल गई",
@@ -2784,6 +2894,16 @@ const hi: Dict = {
     settingChanged: "सेटिंग बदल दी ✓",
     voiceSending: "भेज रहा हूँ…",
     voiceStop: "रोकें",
+  },
+  planExpired: {
+    title: "आपका Plus खत्म हो गया",
+    safe: "कुछ भी डिलीट नहीं हुआ",
+    body: "आपका हर डॉक्युमेंट और हर रिमाइंडर वैसे का वैसा सुरक्षित है। अकाउंट अब फ्री प्लान पर है, इसलिए फ्री हद से आगे वाले अभी लॉक हैं। Plus वापस लेते ही सब उसी पल खुल जाएगा।",
+    lockedDocs: "{docs} डॉक्युमेंट अभी लॉक हैं",
+    pausedReminders: "{reminders} रिमाइंडर अभी पॉज़ हैं",
+    nothingLocked: "आपका सारा डेटा फ्री प्लान की हद में आ जाता है — कुछ भी लॉक नहीं हुआ",
+    back: "Plus वापस लें",
+    later: "बाद में",
   },
   upgrade: {
     title: "साथी प्लस",
@@ -3358,6 +3478,16 @@ const en: Dict = {
     forgotSend: "Send reset link",
     forgotSent: "If that email is registered, the link is on its way. Check your inbox (and spam).",
     forgotBack: "Back to login",
+    resetLinkDead:
+      "That link won't work any more — reset links are single-use, and mail apps often open them before you do. The code below will work instead.",
+    resetCodeTitle: "Or enter the code from the email",
+    resetCodeSub:
+      "The same email also has a 6-digit code. If the link doesn't work, type that code here — it works even if the email is open on a laptop.",
+    resetCodePlaceholder: "6-digit code",
+    resetCodeSubmit: "Continue with code",
+    resetCodeNeedsEmail: "Enter your email first",
+    resetCodeBad: "That code isn't right (or has expired). Send a new one and try again.",
+    resetSendAgain: "Send a new link and code",
     newPassTitle: "Set a new password",
     newPassSub: "At least 6 characters. Pick something you'll remember.",
     newPassLabel: "New password",
@@ -3505,6 +3635,9 @@ const en: Dict = {
     notifyPlanOnDay: "On the expiry day",
     notifyPlanPassed: "this day has already passed",
     notifyPlanAtTime: "at 9 in the morning",
+    notifyPlanNow: "Right away",
+    notifyPlanNowSub: "the morning slot has passed — Saathi will remind you in a few minutes",
+    photoRequired: "Take a photo of the document or pick one from the gallery — a document can't be saved without it",
     saveFailed: "Couldn't save",
     cameraPermission: "Camera permission needed",
     ocrExpiryFound: "found the expiry",
@@ -3677,6 +3810,16 @@ const en: Dict = {
     settingChanged: "Setting changed ✓",
     voiceSending: "Sending…",
     voiceStop: "Stop",
+  },
+  planExpired: {
+    title: "Your Plus has ended",
+    safe: "Nothing has been deleted",
+    body: "Every document and every reminder is exactly where you left it. Your account is on the free plan now, so anything beyond the free limit is locked for the moment. Take Plus again and all of it unlocks instantly.",
+    lockedDocs: "{docs} documents are locked for now",
+    pausedReminders: "{reminders} reminders are paused for now",
+    nothingLocked: "Everything you have fits within the free plan — nothing is locked",
+    back: "Get Plus back",
+    later: "Later",
   },
   upgrade: {
     title: "Saathi Plus",

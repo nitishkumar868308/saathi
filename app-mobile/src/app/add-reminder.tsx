@@ -199,8 +199,15 @@ export default function AddReminder() {
     else toast.show(a.aiFailed, "info");
   }
 
-  /** Ek text ko AI se samjho, aur agar ye aakhri sawaal hai to screen par laga do. */
-  function parseText(text: string): Promise<AiParse | null> {
+  /**
+   * Ek text ko AI se samjho, aur agar ye aakhri sawaal hai to screen par laga do.
+   *
+   * `alts` = recognizer ke baaki guess (sirf bol ke likhwane par). Ye screen par
+   * kabhi nahi dikhte — sirf AI ko saath jaate hain, taaki wo tay kar sake ki
+   * insaan ne asal me kya kaha. Poori wajah `lib/ai.ts` ke `parseReminderAI()`
+   * par likhi hai.
+   */
+  function parseText(text: string, alts?: string[]): Promise<AiParse | null> {
     // Bilkul yahi text pehle se ja chuka hai — usi ka jawab saath me le lo.
     if (inflight.current?.text === text) return inflight.current.p;
 
@@ -208,7 +215,7 @@ export default function AddReminder() {
     setParsing(true);
     const p = (async (): Promise<AiParse | null> => {
       try {
-        const res = await parseReminderAI(text, locale);
+        const res = await parseReminderAI(text, locale, alts);
         if (!res.ok) {
           // Net/AI fail — pickers se user khud bhar sakta hai, par ab use
           // pata rahega ki hua kya.
@@ -260,8 +267,8 @@ export default function AddReminder() {
    * debounce par nahi: wahan popup keyboard se ladta hai aur likhna namumkin
    * ho jaata hai.
    */
-  async function parseThenAsk(text: string) {
-    const parsed = await parseText(text);
+  async function parseThenAsk(text: string, alts?: string[]) {
+    const parsed = await parseText(text, alts);
     if (askedOnce.current) return;
     // AI samajh hi nahi paaya — wajah pehle hi toast me ja chuki hai. Uske
     // upar popup daalna sirf gussa dilata hai.
@@ -604,7 +611,7 @@ export default function AddReminder() {
               multiline
             />
             <VoiceButton
-              onText={(txt) => {
+              onText={(txt, alts) => {
                 // Transcript aa gaya = poori baat aa gayi. Yahan 600ms ka
                 // intezaar karne ka koi matlab nahi — turant samjho aur jo
                 // baaki reh gaya wo poochho.
@@ -615,7 +622,17 @@ export default function AddReminder() {
                 const merged = titleRef.current ? titleRef.current + " " + txt : txt;
                 titleRef.current = merged;
                 setTitle(merged);
-                if (merged.trim().length >= 3) void parseThenAsk(merged.trim());
+                /**
+                 * ⚠️ `alts` sirf tab bhejte hain jab ye PEHLA tukda ho.
+                 *
+                 * Wo guess `txt` ke hain, `merged` ke nahi. Do transcript jud
+                 * chuke hon to "yahi ek baat ke alag roop hain" wali baat sach
+                 * nahi rehti — AI ko aadhe wakya ke guess dikha ke poore wakya
+                 * ka faisla karwana usse bhataka deta hai.
+                 */
+                if (merged.trim().length >= 3) {
+                  void parseThenAsk(merged.trim(), merged === txt ? alts : undefined);
+                }
               }}
             />
           </View>

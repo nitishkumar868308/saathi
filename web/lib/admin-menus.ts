@@ -42,6 +42,15 @@ export const ADMIN_MENUS = [
    */
   "devices",
   "renewals",
+  /**
+   * Jinka Plus khatam ho gaya — aur unhe iski khabar dena.
+   *
+   * ⚠️ `payments` se ALAG menu hai, aur alag hi rehna chahiye. `payments`
+   * padhne wali cheez hai (kisne kya diya); yahan se ek admin us user ko SEEDHA
+   * email aur notification bhejta hai. Bahar jaane wala message hamesha padhne
+   * ke haq se bhaari hota hai, isliye wo alag se diya jaana chahiye.
+   */
+  "planExpiry",
   "reviews",
   "logs",
   "contacts",

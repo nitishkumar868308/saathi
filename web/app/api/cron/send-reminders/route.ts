@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { beatCron } from "@/lib/cron-heartbeat";
 import { sendReminderWhatsApp, twilioConfigured, waTemplateState } from "@/lib/twilio";
 import { emailConfigured } from "@/lib/email";
 import {
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
   if (!CRON_SECRET || auth !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // Auth paar ho gayi — yaani cron ki call sach me aayi AUR secret bhi sahi
+  // tha. Yahi wo ek nishaan hai jo admin ko "job hi nahi hai" aur "job hai par
+  // secret purana hai" me farq karne deta hai (wajah `lib/cron-heartbeat.ts`).
+  beatCron("send-reminders");
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }

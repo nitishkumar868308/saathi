@@ -14,7 +14,7 @@ import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import SaathiLogo from "@/components/saathi-logo";
-import { setNewPassword } from "@/lib/auth";
+import { clearPendingPasswordReset, setNewPassword } from "@/lib/auth";
 import { reportIfNetwork } from "@/lib/net-alert";
 import { reportError } from "@/lib/report-error";
 import { useToast } from "@/components/toast";
@@ -52,6 +52,15 @@ export default function NewPassword() {
     setBusy(true);
     try {
       await setNewPassword(pass);
+      /**
+       * Kaam poora — "reset chal raha hai" wala nishaan hata do.
+       *
+       * ⚠️ Iske bina wo nishaan 24 ghante tak pada rehta, aur us dauraan koi
+       * Google login toot jaye to `app/auth.tsx` use reset ka natija samajh ke
+       * forgot-password screen par bhej deta — jabki us user ne reset kabhi
+       * maanga hi nahi tha.
+       */
+      await clearPendingPasswordReset();
       toast.show(l.newPassOk, "success");
       // Recovery session ab poora login hai — seedha app me. Dobara login
       // karwana yahan bekaar hai (aur user ko lagta hai kuch hua hi nahi).

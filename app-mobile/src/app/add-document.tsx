@@ -25,6 +25,7 @@ import { withoutLock } from "@/lib/app-lock";
 import { logEvent } from "@/lib/analytics";
 import { markFirstDocument } from "@/lib/reviews";
 import {
+  expiryCatchUp,
   expiryNotifyPlan,
   isImpossibleDay,
   isPastDate,
@@ -118,10 +119,26 @@ export default function AddDocument() {
    * phone par theek wahi hota hai.
    */
   const [plan, setPlan] = useState<ExpiryNotifyStep[]>([]);
+  /**
+   * Ladder ke teenon qadam beet chuke hain, par document AAJ HI expire ho raha
+   * hai — Saathi phir bhi bataayega, bas thodi der me.
+   *
+   * ⚠️ Ye line is screen ki sabse zaroori line hai jab document dopahar ko daala
+   * jaata hai. Us soorat me pehle teen KATI hui lines dikhti thi aur bas — user
+   * ke liye uska matlab seedha "kuch nahi aayega" tha, aur wo sach bhi tha
+   * (alarm sach me ek bhi nahi lagta tha). Ab wo alert lagta hai, aur wo baat
+   * yahan Save se PEHLE dikhni chahiye — warna badlaav hone par bhi user ko
+   * bharosa wahi purana rahega.
+   */
+  const [catchUp, setCatchUp] = useState(false);
   useEffect(() => {
     const check = () => {
       setExpiryPast(isPastDate(expiry));
       setPlan(isValidDate(expiry) ? expiryNotifyPlan(expiry) : []);
+      // Yahan `addedAt` "abhi" hi hai — document abhi bana nahi hai. Save par
+      // asli `created_at` chala jaata hai, aur wo isi lamhe ke aas-paas ka hota
+      // hai, isliye screen aur phone ek hi baat kehte hain.
+      setCatchUp(isValidDate(expiry) ? expiryCatchUp(expiry) !== null : false);
     };
     check();
     const id = setInterval(check, 60_000);
@@ -260,6 +277,28 @@ export default function AddDocument() {
 
   async function save() {
     if (saving) return;
+    /**
+     * Photo ke bina document document hai hi nahi.
+     *
+     * ⚠️ Ye rok pehle thi hi nahi, aur uska nateeja poore feature ko khokhla kar
+     * deta tha: sirf naam aur date bhar ke "document" bann jaata tha. Us row par
+     * dekhne ko kuch hota hi nahi — na offline screen par (jo poori tarah save
+     * ki hui file par chalti hai), na share/download par, na renew par, aur na
+     * admin ke Documents me. Backup ka poora waada (`uploadDocumentImage`) bhi
+     * us row par khaali hi baith jaata tha, kyunki bhejne ko kuch tha hi nahi.
+     *
+     * Aur wo galti chup thi: user ko "Document add ho gaya 🎉" dikhta tha, aur
+     * pata mahino baad chalta — theek us din jab use wo document sach me chahiye
+     * hota. Jo cheez baad me kabhi bhari nahi ja sakti, use aage badhne se pehle
+     * rokna hi sahi hai.
+     *
+     * Rok `savedUri` par hai, `imageUri` par nahi: `savedUri` wo copy hai jo app
+     * ke apne folder me chali gayi (`persistImage`), aur wahi baad tak zinda
+     * rehti hai. Camera/gallery ka cache wala `imageUri` OS kabhi bhi saaf kar
+     * deta hai. `persistImage` fail hone par wo khud hi `imageUri` par gir jaata
+     * hai, isliye ye shart photo lene wale ko kabhi galat nahi rokti.
+     */
+    if (!savedUri) return toast.show(d.photoRequired, "info");
     if (!name.trim()) return toast.show(d.nameRequired, "info");
     /**
      * ⚠️ Do bilkul alag galtiyan, do alag jawab.
@@ -315,7 +354,11 @@ export default function AddDocument() {
       let notifOk = true;
       if (doc.expiry && !expired) {
         notifOk = await ensureNotifPermission();
-        if (notifOk) await scheduleDocumentExpiry(doc.id, doc.name, doc.expiry);
+        // `created_at` bhejna zaroori hai — "aaj hi expire" wale document ka
+        // catch-up alert usi lamhe se ginta hai (wajah `expiryCatchUp()` par).
+        if (notifOk) {
+          await scheduleDocumentExpiry(doc.id, doc.name, doc.expiry, doc.created_at);
+        }
       }
 
       logEvent("document_added", { type: doc.type });
@@ -557,6 +600,24 @@ export default function AddDocument() {
                   </Text>
                 </View>
               ))}
+              {/**
+               * Teenon qadam kate hue hain — par khabar phir bhi aayegi.
+               *
+               * ⚠️ Iske bina ye card apne hi document par jhooth bolta tha: teen
+               * kati hui lines ka matlab user ke liye "kuch nahi aayega" hai,
+               * aur wo pehle sach bhi tha. Ab alert lagta hai (`expiryCatchUp`),
+               * isliye wo baat yahin dikhni chahiye.
+               */}
+              {catchUp && (
+                <View style={styles.planRow}>
+                  <Ionicons name="checkmark-circle" size={15} color={tc.sage} />
+                  <Text style={styles.planText}>
+                    <Text style={styles.planWhen}>{d.notifyPlanNow}</Text>
+                    {"  "}
+                    {d.notifyPlanNowSub}
+                  </Text>
+                </View>
+              )}
             </View>
           ) : null}
         </ScrollView>
@@ -570,10 +631,23 @@ export default function AddDocument() {
          * khula hona aam baat hai — aur us poore waqt Save dikhta hi nahi tha.
          * (Wahi tareeka `profile-details`/`contact` par pehle se hai.)
          */}
+        {/**
+         * ⚠️ Photo na hone par button DIM hai, par `disabled` nahi.
+         *
+         * Ye farq maayne rakhta hai. Ek mara hua button dabane par kuch nahi
+         * hota, aur user ko wajah kabhi pata nahi chalti — wo dobara dabata hai,
+         * phir dabata hai, aur maan leta hai ki app hi atak gayi. Dabne par
+         * toast saaf keh deta hai ki photo chahiye, aur halka rang wo baat
+         * dabane se PEHLE hi ishaare me de deta hai.
+         */}
         <Pressable
           onPress={save}
           disabled={saving}
-          style={({ pressed }) => [styles.save, (pressed || saving) && { opacity: 0.85 }]}
+          style={({ pressed }) => [
+            styles.save,
+            !savedUri && { opacity: 0.55 },
+            (pressed || saving) && { opacity: 0.85 },
+          ]}
         >
           <Text style={styles.saveText}>{d.save}</Text>
         </Pressable>

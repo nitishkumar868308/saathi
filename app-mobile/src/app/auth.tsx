@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { makeStyles } from "@/theme/theme";
 import { ScreenLoader } from "@/components/loader";
 import { supabase } from "@/lib/supabase";
-import { getParams } from "@/lib/auth";
+import { getParams, pendingPasswordReset } from "@/lib/auth";
 
 /**
  * Deep-link ka ek hi darwaza — do alag maqsad.
@@ -47,6 +47,9 @@ export default function AuthCallback() {
     access_token?: string;
     refresh_token?: string;
     type?: string;
+    /** Supabase ne mana kar diya — token khatam/istemaal ho chuka. */
+    error?: string;
+    error_code?: string;
   }>();
   /**
    * Poora deep-link URL — fragment ke saath.
@@ -69,6 +72,28 @@ export default function AuthCallback() {
     const access = String(params.access_token ?? fromUrl.access_token ?? "");
     const refresh = String(params.refresh_token ?? fromUrl.refresh_token ?? "");
     const type = String(params.type ?? fromUrl.type ?? "");
+    /**
+     * Supabase ne saaf-saaf MANA kiya hai — token khatam/istemaal ho chuka.
+     *
+     * ⚠️ Ye padhna zaroori hai, aur iske bina "reset link kaam hi nahi karta"
+     * wali shikayat ka jawab kabhi nahi milta tha. Us soorat me link par tokens
+     * hote hi nahi; uski jagah error aata hai:
+     *
+     *     saathi://auth#error=access_denied&error_code=otp_expired&error_description=…
+     *
+     * Purana code sirf tokens dhoondta tha, kuch na milne par chup-chaap `/` par
+     * chala jaata tha, aur bina session ke gate use login par phenk deta tha.
+     * User ke liye wo bilkul aisa dikhta tha jaise link ne kuch kiya hi nahi —
+     * na koi wajah, na agla kadam.
+     *
+     * Sabse aam wajah ye hai ki email ka apna scanner (Gmail/Outlook) link ko
+     * user se PEHLE khol chuka hota hai, aur recovery ka token ek hi baar chalta
+     * hai. Poori list `lib/auth.ts` ke `verifyPasswordResetCode()` par likhi hai
+     * — wahin uska ilaaj bhi hai (6-ank wala code).
+     */
+    const linkError = String(
+      fromUrl.error_code ?? fromUrl.error ?? params.error_code ?? params.error ?? "",
+    );
 
     const haveSomething = !!code || (!!access && !!refresh);
 
@@ -83,7 +108,7 @@ export default function AuthCallback() {
      * kisi aur tarah se `saathi://auth` par bhej diya). Us soorat me yahan hamesha
      * ke liye atak jaana sabse bura hoga.
      */
-    if (!haveSomething && !url) {
+    if (!haveSomething && !linkError && !url) {
       const t = setTimeout(() => {
         if (!handled.current) {
           handled.current = true;
@@ -108,11 +133,47 @@ export default function AuthCallback() {
           ok = true;
         }
       } catch {
-        // ignore — gate login pe wapas bhej dega
+        // ignore — neeche wala faisla ise "link nahi chala" hi maanta hai
       }
       // Recovery ka session ban gaya — ab naya password poocho.
       if (ok && type === "recovery") {
         router.replace("/new-password" as never);
+        return;
+      }
+
+      /**
+       * Link se session bana hi nahi — user ko WAJAH aur agla kadam do.
+       *
+       * ⚠️ Yahan pehle seedha `router.replace("/")` tha, aur wahi "reset ka link
+       * kaam nahi karta, app bas login maang leti hai" wali poori shikayat thi.
+       * Bina session ke gate use login par bhej deta tha, aur user ke paas na
+       * wajah hoti thi na koi doosra raasta — wo bas dobara link dabata rehta,
+       * jo (ek baar chalne wale token ki wajah se) kabhi chalne wala hi nahi tha.
+       *
+       * `type` par bharosa nahi kiya ja sakta: jab Supabase mana karta hai to
+       * jawab me sirf `error…` aata hai, `type=recovery` nahi. Isliye shart ye
+       * hai — "recovery tha, YA link ne saaf mana kiya, YA kuch mila hi nahi" —
+       * aur teenon soorat me sahi jagah ek hi hai: reset wali screen, khuli hui
+       * wajah ke saath.
+       *
+       * Jinke paas session PEHLE SE hai (Google se login kiye hue) unke liye ye
+       * raasta khulta hi nahi — unka `code`/`access_token` chal jaata hai aur wo
+       * upar hi nikal jaate hain.
+       */
+      /**
+       * ⚠️ `type` par akele bharosa nahi kiya ja sakta. Jab Supabase mana karta
+       * hai to jawab me sirf `error…` aata hai, `type=recovery` nahi — yaani us
+       * error ko dekh ke ye bataya hi nahi ja sakta ki link RESET ka tha ya
+       * Google login ka. Isliye doosra saboot phone ke apne nishaan se aata hai
+       * (`pendingPasswordReset`, poori wajah `lib/auth.ts` par likhi hai).
+       */
+      if (type === "recovery" || (await pendingPasswordReset())) {
+        router.replace({
+          pathname: "/forgot-password",
+          // `expired` = "wo link ab nahi chalega" — screen isi se wajah wala box
+          // kholti hai, jahan code wala doosra raasta bhi maujood hai.
+          params: { expired: "1" },
+        } as never);
         return;
       }
       router.replace("/");

@@ -65,6 +65,8 @@ export type AdminDict = {
     pricing: string;
     rewards: string;
     renewals: string;
+    /** Jinka Plus khatam ho gaya — aur unhe iski khabar dena. */
+    planExpiry: string;
     deleteRequests: string;
     team: string;
   };
@@ -87,6 +89,7 @@ export type AdminDict = {
     | "seo"
     | "blog"
     | "renewals"
+    | "planExpiry"
     | "deleteRequests"
     | "team",
     { title: string; sub: string }
@@ -665,6 +668,47 @@ export type AdminDict = {
       keywordsHint: string;
       noindex: string;
     };
+    /**
+     * "Plus khatam" — jinka Plus nikal chuka hai, unhe uski khabar dena.
+     *
+     * ⚠️ Khabar apne aap nahi jaati, admin ke click par jaati hai. Wajah poori
+     * `api/admin/plan-expiry/route.ts` par likhi hai: ek galat samjha hua
+     * downgrade par apne aap "aapka Plus khatam ho gaya" bhej dena bharosa
+     * seedha todta hai, aur us email ko wapas nahi liya ja sakta.
+     */
+    planExpiry: {
+      title: string;
+      sub: string;
+      /** Ek bhi user nahi gira. */
+      empty: string;
+      /** "Expire hua" column. */
+      expired: string;
+      /** "Khabar bhej di" — kab. */
+      notified: string;
+      /** Abhi tak nahi bataya. */
+      notNotified: string;
+      /** "{locked} documents lock · {paused} reminders pause" */
+      lockedLine: string;
+      /** Free hadd ke andar hai — kuch lock nahi hua. */
+      nothingLocked: string;
+      /** {docs} / {reminders} — user ke paas kul kitne hain. */
+      totals: string;
+      email: string;
+      push: string;
+      both: string;
+      sending: string;
+      sent: string;
+      /** Email hai hi nahi / koi phone registered nahi. */
+      noEmail: string;
+      noDevice: string;
+      /** Firebase set nahi hai — poore section ke sar par ek patti. */
+      pushOff: string;
+      /** Dobara bhejne se pehle poochho. */
+      confirmAgain: string;
+      failed: string;
+      /** User ki bhasha ka chhota label. */
+      lang: string;
+    };
     /** "Ye document renew kaise karein" — har desh ke liye. */
     renewals: {
       title: string;
@@ -902,6 +946,7 @@ const en: AdminDict = {
     pricing: "Pricing",
     rewards: "Rewards",
     renewals: "Renew guides",
+    planExpiry: "Plus ended",
     deleteRequests: "Delete requests",
     team: "Admin team",
   },
@@ -910,6 +955,7 @@ const en: AdminDict = {
     seo: { title: "SEO", sub: "Title, description and keywords for every page. Saving here updates the live site — no deploy needed." },
     blog: { title: "Blog", sub: "Write and edit posts. Published posts appear on the website and in the sitemap right away." },
     renewals: { title: "How to renew", sub: "What people should actually do when a document expires. Every country gets an answer — the all-countries guide is the fallback." },
+    planExpiry: { title: "Plus ended", sub: "People whose Plus has run out. Their documents and reminders beyond the free limit are locked — send them the email and notification that explains it." },
     deleteRequests: { title: "Delete requests", sub: "People asking to have their account deleted. See everything of theirs, then hide it or remove it for good." },
     analytics: { title: "Analytics", sub: "Where people go on the website and in the app — and what one user actually did." },
     rewards: { title: "Rewards & Referrals", sub: "Change offer and referral numbers here — they go live instantly." },
@@ -1313,6 +1359,28 @@ const en: AdminDict = {
         "Comma separated. Use words people actually search for — a long list does not help.",
       noindex: "Hide from search",
     },
+    planExpiry: {
+      title: "Plus ended",
+      sub: "Send the email and notification that explains what changed.",
+      empty: "Nobody's Plus has ended. Nothing to send.",
+      expired: "Ended",
+      notified: "Told",
+      notNotified: "Not told yet",
+      lockedLine: "{locked} documents locked · {paused} reminders paused",
+      nothingLocked: "Everything fits the free plan — nothing locked",
+      totals: "{docs} documents · {reminders} reminders",
+      email: "Email",
+      push: "Notification",
+      both: "Email + notification",
+      sending: "Sending…",
+      sent: "Sent ✓",
+      noEmail: "No email on file",
+      noDevice: "No phone registered",
+      pushOff: "Firebase isn't set up — only email can go out.",
+      confirmAgain: "This person has already been told. Send again?",
+      failed: "Couldn't send",
+      lang: "Language",
+    },
     renewals: {
       title: "How to renew",
       sub: "What a user should do when a document is expiring. Shown inside the app, works offline.",
@@ -1526,6 +1594,7 @@ const hi: AdminDict = {
     pricing: "प्राइसिंग",
     rewards: "रिवॉर्ड्स",
     renewals: "रिन्यू गाइड",
+    planExpiry: "Plus खत्म",
     deleteRequests: "डिलीट रिक्वेस्ट",
     team: "एडमिन टीम",
   },
@@ -1534,6 +1603,7 @@ const hi: AdminDict = {
     seo: { title: "SEO", sub: "हर पेज का टाइटल, डिस्क्रिप्शन और कीवर्ड। यहाँ सेव करते ही लाइव साइट पर लग जाता है — डिप्लॉय नहीं करना पड़ता।" },
     blog: { title: "ब्लॉग", sub: "पोस्ट लिखें और बदलें। पब्लिश्ड पोस्ट तुरंत वेबसाइट और sitemap दोनों में आ जाती है।" },
     renewals: { title: "रिन्यू कैसे करें", sub: "डॉक्युमेंट एक्सपायर होने पर लोगों को असल में क्या करना चाहिए। हर देश को जवाब मिलता है — सभी-देश वाली गाइड फ़ॉलबैक है।" },
+    planExpiry: { title: "Plus खत्म", sub: "जिनका Plus खत्म हो गया। फ्री हद से आगे के डॉक्युमेंट और रिमाइंडर लॉक हैं — उन्हें समझाने वाला ईमेल और नोटिफ़िकेशन यहाँ से भेजिए।" },
     deleteRequests: { title: "डिलीट रिक्वेस्ट", sub: "जो लोग अकाउंट डिलीट करवाना चाहते हैं। उनका सब कुछ देखें, फिर छुपाएँ या हमेशा के लिए हटाएँ।" },
     analytics: { title: "एनालिटिक्स", sub: "लोग वेबसाइट और ऐप में कहाँ जाते हैं — और एक यूज़र ने क्या किया।" },
     rewards: { title: "रिवॉर्ड्स और रेफरल", sub: "ऑफर और रेफरल के नंबर यहीं से बदलें — तुरंत लाइव हो जाते हैं।" },
@@ -1938,6 +2008,28 @@ const hi: AdminDict = {
         "कॉमा से अलग करें। वही शब्द लिखें जो लोग सच में सर्च करते हैं — लंबी लिस्ट से फ़ायदा नहीं होता।",
       noindex: "सर्च से छुपाएँ",
     },
+    planExpiry: {
+      title: "Plus खत्म",
+      sub: "क्या बदला — यह समझाने वाला ईमेल और नोटिफ़िकेशन भेजिए।",
+      empty: "किसी का Plus खत्म नहीं हुआ। भेजने को कुछ नहीं है।",
+      expired: "खत्म हुआ",
+      notified: "बता दिया",
+      notNotified: "अभी तक नहीं बताया",
+      lockedLine: "{locked} डॉक्युमेंट लॉक · {paused} रिमाइंडर पॉज़",
+      nothingLocked: "सब कुछ फ्री प्लान में आ जाता है — कुछ लॉक नहीं हुआ",
+      totals: "{docs} डॉक्युमेंट · {reminders} रिमाइंडर",
+      email: "ईमेल",
+      push: "नोटिफ़िकेशन",
+      both: "ईमेल + नोटिफ़िकेशन",
+      sending: "भेज रहे हैं…",
+      sent: "भेज दिया ✓",
+      noEmail: "इनका ईमेल नहीं है",
+      noDevice: "कोई फ़ोन रजिस्टर नहीं है",
+      pushOff: "Firebase सेट नहीं है — सिर्फ़ ईमेल जा सकता है।",
+      confirmAgain: "इन्हें पहले बता दिया गया है। दोबारा भेजें?",
+      failed: "भेज नहीं पाए",
+      lang: "भाषा",
+    },
     renewals: {
       title: "रिन्यू कैसे करें",
       sub: "डॉक्युमेंट एक्सपायर हो रहा हो तो यूज़र को क्या करना चाहिए। ऐप में दिखता है, ऑफ़लाइन भी चलता है।",
@@ -2154,6 +2246,7 @@ const hinglish: AdminDict = {
     pricing: "Pricing",
     rewards: "Rewards",
     renewals: "Renew guides",
+    planExpiry: "Plus khatam",
     deleteRequests: "Delete requests",
     team: "Admin team",
   },
@@ -2162,6 +2255,7 @@ const hinglish: AdminDict = {
     seo: { title: "SEO", sub: "Har page ka title, description aur keywords. Yahan save karte hi live site par lag jaata hai — deploy nahi karna padta." },
     blog: { title: "Blog", sub: "Post likho aur badlo. Published post turant website aur sitemap dono me aa jaati hai." },
     renewals: { title: "Renew kaise karein", sub: "Document expire hone par logon ko asal me kya karna chahiye. Har desh ko jawab milta hai — sab-desh wali guide fallback hai." },
+    planExpiry: { title: "Plus khatam", sub: "Jinka Plus khatam ho gaya. Free hadd se aage ke documents aur reminders lock hain — unhe samjhane wala email aur notification yahan se bhejo." },
     deleteRequests: { title: "Delete requests", sub: "Jo log account delete karwana chahte hain. Unka sab kuch dekho, phir chhupao ya hamesha ke liye hatao." },
     analytics: { title: "Analytics", sub: "Log website aur app me kahan jaate hain — aur ek user ne asal me kya kiya." },
     rewards: { title: "Rewards & Referrals", sub: "Offer aur referral ke numbers yahin se badlo — turant live ho jaate hain." },
@@ -2564,6 +2658,28 @@ const hinglish: AdminDict = {
       keywordsHint:
         "Comma se alag karo. Wahi shabd likho jo log sach me search karte hain — lambi list se faayda nahi hota.",
       noindex: "Search se chhupao",
+    },
+    planExpiry: {
+      title: "Plus khatam",
+      sub: "Kya badla — ye samjhane wala email aur notification bhejo.",
+      empty: "Kisi ka Plus khatam nahi hua. Bhejne ko kuch nahi hai.",
+      expired: "Khatam hua",
+      notified: "Bata diya",
+      notNotified: "Abhi tak nahi bataya",
+      lockedLine: "{locked} documents lock · {paused} reminders pause",
+      nothingLocked: "Sab kuch free plan me aa jaata hai — kuch lock nahi hua",
+      totals: "{docs} documents · {reminders} reminders",
+      email: "Email",
+      push: "Notification",
+      both: "Email + notification",
+      sending: "Bhej rahe hain…",
+      sent: "Bhej diya ✓",
+      noEmail: "Inka email nahi hai",
+      noDevice: "Koi phone registered nahi hai",
+      pushOff: "Firebase set nahi hai — sirf email ja sakta hai.",
+      confirmAgain: "Inhe pehle bata diya gaya hai. Dobara bhejein?",
+      failed: "Bhej nahi paye",
+      lang: "Bhasha",
     },
     renewals: {
       title: "Renew kaise karein",

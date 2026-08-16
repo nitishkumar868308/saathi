@@ -760,6 +760,40 @@ Deno.serve(async (req) => {
         `\n\nOUTPUT: SIRF strict JSON do, aur kuch nahi: {"reply":"<chat message, user ki bhasha me>","action": null | {create_reminder|navigate|set_theme|set_language|set_alert_mode}}. reply HAMESHA bharo, chhota rakho.`;
 
       const userMsg = payload.message ?? "";
+      /**
+       * Bol ke bheja gaya message — recognizer ke SAARE guess ek saath.
+       *
+       * ⚠️ Ye seedha us shikayat ka ilaaj hai ki "kabhi baat sahi karta hai
+       * kabhi nahi". Android ka recognizer ek hi awaaz ke kai guess banata hai,
+       * par Hinglish me uska PEHLA guess aksar galat hota hai — "dawai" ko "the
+       * way", "baje" ko "budget" — jabki sahi shabd doosre/teesre guess me pada
+       * hota hai. App pehle sirf pehla guess bhejti thi, isliye ek hi baat do
+       * baar bolne par do alag jawab aate the.
+       *
+       * Ab faisla model karta hai, jise dono roop saamne dikh rahe hain.
+       *
+       * ⚠️ `reply` me in guess ka zikr KABHI nahi hona chahiye — user ke liye ye
+       * app ka andaruni kaam hai. Bina is line ke model "aapne shayad ye kaha ya
+       * wo kaha?" jaisa jawab de deta tha, jo bilkul bhaddha lagta hai.
+       *
+       * Type kiya hua message is raaste se guzarta hi nahi — wahan `alts` khaali
+       * hota hai aur prompt bilkul purana rehta hai.
+       */
+      const chatAlts: string[] = Array.isArray(payload.alts)
+        ? payload.alts
+            .map((a: unknown) => String(a ?? "").trim())
+            .filter((a: string) => a.length > 0)
+            .slice(0, 4)
+        : [];
+      const chatText = chatAlts.length
+        ? `Ye message BOL KE bheja gaya hai. Phone ke speech recognizer ne ek hi awaaz ke kai guess diye hain — pehla uska sabse confident guess hai, par Hinglish me wo aksar galat hota hai:
+
+1. ${userMsg}
+${chatAlts.map((a, i) => `${i + 2}. ${a}`).join("
+")}
+
+Ye SAB ek hi baat hain. Khud tay karo ki insaan ne asal me kya kaha (jo guess Hinglish me sabse zyada matlab rakhta ho) aur USI ka jawab do. Apne reply me in guess ka, ya "aapne shayad ye kaha" jaisa, koi zikr mat karna — user ke liye ye app ka andaruni kaam hai.`
+        : userMsg;
       // Trimming: sirf aakhri 10 turns bhejo (token + cost kam, prompt cache friendly).
       const history: GeminiContent[] = (payload.history ?? [])
         .slice(-10)
@@ -771,7 +805,7 @@ Deno.serve(async (req) => {
       const base = SAATHI_SYSTEM + langNote(payload.locale) + scope;
       const contents: GeminiContent[] = [
         ...history,
-        { role: "user", parts: [{ text: userMsg }] },
+        { role: "user", parts: [{ text: chatText }] },
       ];
 
       const raw = await gemini({
@@ -937,10 +971,50 @@ REPEAT (bahut zaroori):
 - "90 din tak"/"3 mahine tak"/"31 December tak" → repeat_until me us AAKHRI din ki date (YYYY-MM-DD), upar diye abhi ke time se ginti karke. Kuch na bola ho → null.
 - remind_at hamesha PEHLI baar ka time hai. Roz wale me title me "roz" mat likho.
 - Repeat ho to needsDate false hi rakho jab tak pehla din saaf ho (jaise "roz subah 6" ka pehla din aaj/kal khud tay ho jaata hai).`;
+
+      /**
+       * Bol ke banaya gaya reminder — recognizer ke SAARE guess ek saath.
+       *
+       * ⚠️ Ye seedha us shikayat ka ilaaj hai ki "kabhi baat sahi karta hai
+       * kabhi nahi". Android ka recognizer ek hi awaaz ke kai guess banata hai,
+       * par Hinglish me uska PEHLA guess aksar galat hota hai — "dawai" ko "the
+       * way", "baje" ko "budget", "Sonu ko" ko "so new co" — jabki sahi shabd
+       * uske doosre/teesre guess me pada hota hai. Pehle app sirf pehla guess
+       * bhejti thi, isliye ek hi baat do baar bolne par do alag nateeje aate
+       * the: sahi guess kabhi pehle number par aata, kabhi doosre par.
+       *
+       * Ab faisla model karta hai, jise dono roop saamne dikh rahe hain — aur
+       * usi se wo "1 minute baad" bnaam "1 minute budget" jaisa farq khud pakad
+       * leta hai.
+       *
+       * ⚠️ `title` HAMESHA insaan ki baat hi rehna chahiye — model ko saaf mana
+       * kiya gaya hai ki wo guess ke tukde jod ke koi naya wakya na bana de.
+       * Bina is line ke wo do guess milaa ke aisa title bana deta tha jo user ne
+       * kabhi bola hi nahi tha.
+       *
+       * Likha hua reminder is raaste se guzarta hi nahi — wahan `alts` khaali
+       * hota hai aur prompt bilkul purana rehta hai.
+       */
+      const alts: string[] = Array.isArray(payload.alts)
+        ? payload.alts
+            .map((a: unknown) => String(a ?? "").trim())
+            .filter((a: string) => a.length > 0)
+            .slice(0, 4)
+        : [];
+      const spoken = payload.text ?? "";
+      const userText = alts.length
+        ? `Ye reminder BOL KE likhwaya gaya hai. Phone ke speech recognizer ne ek hi awaaz ke kai guess diye hain — pehla uska sabse confident guess hai, par Hinglish me wo aksar galat hota hai:
+
+1. ${spoken}
+${alts.map((a, i) => `${i + 2}. ${a}`).join("\n")}
+
+Ye SAB ek hi baat hain. Faisla tum karo ki insaan ne asal me kya kaha — jo guess Hinglish me sabse zyada matlab rakhta ho use hi maano (ek guess me "budget" aur doosre me "baje" ho to "baje" hi sahi hai). title me sirf wahi shabd likhna jo insaan ne bole; guess ke tukde jod ke naya wakya mat banana.`
+        : spoken;
+
       const text = await gemini({
         model: MODEL,
         system,
-        contents: [{ role: "user", parts: [{ text: payload.text ?? "" }] }],
+        contents: [{ role: "user", parts: [{ text: userText }] }],
         json: true,
         // ⚠️ Yahan 300 tha aur yahi wo jagah thi jahan LIKHA hua reminder aksar
         // "samajh me nahi aaya" (item 4). Model pehle apna soch-vichaar likhta
@@ -967,7 +1041,11 @@ REPEAT (bahut zaroori):
         const again = await gemini({
           model: MODEL,
           system,
-          contents: [{ role: "user", parts: [{ text: payload.text ?? "" }] }],
+          // ⚠️ `userText` — `payload.text` nahi. Dobara-koshish ko bhi wahi
+          // guess dikhne chahiye jo pehli baar dikhe the, warna retry pehli
+          // koshish se KAMZOR ho jaata hai (aur wahi retry sabse zyada wahan
+          // chalta hai jahan baat pehle hi mushkil thi).
+          contents: [{ role: "user", parts: [{ text: userText }] }],
           json: true,
           maxTokens: 1024,
           track: { kind: "reminder_retry", userId: uid },
@@ -977,7 +1055,10 @@ REPEAT (bahut zaroori):
 
       if (!r) {
         return json({
-          title: payload.text ?? "",
+          // ⚠️ Yahan `spoken` — `userText` nahi. Ye title seedha screen par
+          // dikhta hai; poora prompt (saare guess + samjhane wali lines) wahan
+          // chala jaata to user ko apne reminder ki jagah ek paragraph milta.
+          title: spoken,
           remind_at: null,
           label: null,
           needsDate: true,

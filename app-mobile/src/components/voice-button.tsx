@@ -56,9 +56,25 @@ import { reportError } from "@/lib/report-error";
  * `pickBest` callback unme se "sabse kaam ka" wakya chunta tha (screen us guess
  * ko chunti thi jisme local parser ko time/date dikh jaye). Wo hata diya gaya —
  * wo bhi ek tarah ki local parsing hi thi, aur ab reminder samajhna poori tarah
- * AI ka kaam hai. Recognizer ka apna pehla (sabse confident) guess seedha AI ko
- * jaata hai; AI kam saaf wakya bhi theek samajh leta hai, aur na samajhe to
- * khud poochh leta hai.
+ * AI ka kaam hai.
+ *
+ * ── Par baaki guess phenkna bhi galat tha (issue: "kabhi sahi, kabhi nahi") ──
+ *
+ * ⚠️ `pickBest` ke saath hum `maxAlternatives` bhi 1 par le aaye the — yaani
+ * recognizer ka sirf pehla guess bachta tha aur baaki chup-chaap gir jaate the.
+ * Aur yahi wo jagah hai jahan Hinglish sabse zyada tootti hai: recognizer ka
+ * pehla guess `en-IN` model ka hota hai, aur wo aksar "dawai" ko "the way",
+ * "baje" ko "budget", "Sonu ko" ko "so new co" sunta hai — jabki uske apne
+ * doosre/teesre guess me theek shabd pada hota hai. Ek hi baat do baar bolne par
+ * do alag nateeje isi wajah se aate the: kabhi sahi guess pehle number par aa
+ * jaata, kabhi doosre par — aur doosre par aane ka matlab tha ki wo AI tak
+ * pahunchta hi nahi.
+ *
+ * Ab saare guess AI ko jaate hain, aur chunav wahi karta hai. Ye `pickBest` ki
+ * wapsi NAHI hai — wahan faisla ek local time-parser karta tha (jo apni hi
+ * galtiyan laata tha); yahan app kuch chunti hi nahi, sirf jo suna wo poora aage
+ * de deti hai. Pehla guess phir bhi pehla hi rehta hai (screen par wahi likha
+ * jaata hai); baaki sirf AI ke liye saath jaate hain.
  */
 
 /**
@@ -414,7 +430,29 @@ function androidTuning(): Record<string, string | number | boolean> {
   };
 }
 
-export function VoiceButton({ onText }: { onText: (text: string) => void }) {
+/**
+ * Recognizer se kitne guess maangein.
+ *
+ * ⚠️ 1 se 5 par wapas laaya gaya — poori wajah file ke sar par likhi hai. Chhota
+ * karke wapas mat le jaana: 1 par Hinglish ka har wo wakya gir jaata hai jiska
+ * sahi roop recognizer ke doosre/teesre guess me hota hai (aur wo aam baat hai).
+ * Ye mehnga bhi nahi: alternatives ek hi pehchaan ke nateeje hain, koi doosri
+ * call nahi jaati.
+ */
+const MAX_ALTERNATIVES = 5;
+
+export function VoiceButton({
+  onText,
+}: {
+  /**
+   * Jo suna gaya.
+   *
+   * `alts` = recognizer ke BAAKI guess (pehla `text` khud hai). Ye sirf AI ke
+   * liye hain — screen par hamesha `text` hi likhna hai. Poori wajah file ke sar
+   * par likhi hai.
+   */
+  onText: (text: string, alts?: string[]) => void;
+}) {
   const tc = useColors();
   const styles = useStyles();
   const toast = useToast();
@@ -529,19 +567,31 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   const lastInterim = useRef("");
 
   /**
+   * Aakhri result ke BAAKI guess — pehle guess ke alawa.
+   *
+   * Ye screen par kabhi nahi jaate; sirf AI ko saath bheje jaate hain taaki wo
+   * sahi wala chun sake. Poori wajah file ke sar par likhi hai.
+   */
+  const lastAlts = useRef<string[]>([]);
+
+  /**
    * Ek session me transcript sirf EK BAAR jaata hai.
    *
    * `stop()` ke baad final `result` aata hai aur uske turant baad `end` — dono
    * emit kar dete to text do baar append ho jaata.
    */
-  function emitOnce(text: string) {
+  function emitOnce(text: string, alts: string[] = []) {
     const t = text.trim();
     if (!t || gotResult.current) return;
     gotResult.current = true;
     // Jo koshish sach me chali, wo phone par yaad rakh lo — agli baar seedha
     // wahi chalegi aur mic bina der ke khulega.
     rememberAttempt(attemptRef.current);
-    onText(t);
+    // Khaali/duplicate guess AI ke liye sirf shor hain — chhaan ke bhejo.
+    const extra = alts
+      .map((a) => a.trim())
+      .filter((a, i, all) => a && a !== t && all.indexOf(a) === i);
+    onText(t, extra.length ? extra : undefined);
   }
 
   /** Ye event abhi wale, zinda session ka hai? */
@@ -551,9 +601,16 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     if (!live()) return;
     const best = e.results?.[0]?.transcript?.trim();
     if (!best) return;
-    if (e.isFinal) emitOnce(best);
+    // Baaki guess — pehle ke alawa. Interim par bhi rakh lete hain, kyunki kai
+    // OEM `isFinal` bhejte hi nahi (upar `lastInterim` par poori wajah likhi
+    // hai) aur wahan bhi ye guess utne hi kaam ke hain.
+    const alts = (e.results ?? []).slice(1).map((r) => r?.transcript ?? "");
+    if (e.isFinal) emitOnce(best, alts);
     // Final nahi hai — abhi likhna nahi, bas yaad rakhna.
-    else lastInterim.current = best;
+    else {
+      lastInterim.current = best;
+      lastAlts.current = alts;
+    }
   });
   /**
    * Session bina kuch sune hi turant mar gaya — agli koshish par chalo.
@@ -654,7 +711,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   useSpeechRecognitionEvent("end", () => {
     if (!live()) return;
     // Final kabhi aaya hi nahi par interim mil chuka hai — wahi sach hai.
-    if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current);
+    if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current, lastAlts.current);
     if (!gotResult.current && escalated("end")) return;
     // User abhi bhi bolna chahta hai — mic band mat karo (upar wajah likhi hai).
     if (!gotResult.current && keepListening()) return;
@@ -666,7 +723,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     if (!live()) return;
     // Error ke baad bhi wo interim sach hi hai jo mic ne sun liya tha —
     // "no-speech" ke saath aksar aadha wakya pehle hi aa chuka hota hai.
-    if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current);
+    if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current, lastAlts.current);
     if (!gotResult.current) {
       /**
        * ⚠️ Permission wale error par agli koshish NAHI. Wo ek asli, samjhaane
@@ -803,6 +860,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
     volumeTicks.current = 0;
     gotResult.current = false;
     lastInterim.current = "";
+    lastAlts.current = [];
     /**
      * ⚠️ Purani loop pehle ROKO.
      *
@@ -1056,9 +1114,9 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
          */
         interimResults: true,
         continuous: false,
-        // Ek hi guess chahiye — recognizer ka sabse confident wala. (Pehle 5
-        // mangwate the taaki `pickBest` unme se chun sake; wo hat chuka hai.)
-        maxAlternatives: 1,
+        // Saare guess chahiye — chunav AI karta hai, app nahi. Poori wajah file
+        // ke sar par likhi hai ("kabhi sahi, kabhi nahi" ki asli jad yahi thi).
+        maxAlternatives: MAX_ALTERNATIVES,
         // Biasing sirf `tuned` me. Saadi/Google wali koshish ka poora matlab hi
         // ye hai ki recognizer ko kuch anjaan na bheja jaye (upar `ATTEMPTS`).
         ...(mode === "tuned" ? { contextualStrings: BIAS_WORDS } : {}),
@@ -1112,7 +1170,7 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
       // timer use beech me hi maar deta.
       if (!live()) return;
       // Final nahi aaya par interim mil chuka tha — wahi likh do.
-      if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current);
+      if (!gotResult.current && lastInterim.current) emitOnce(lastInterim.current, lastAlts.current);
       if (!gotResult.current) hintForSilence();
       release();
     }, END_GUARD_MS);

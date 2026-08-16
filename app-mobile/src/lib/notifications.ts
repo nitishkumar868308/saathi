@@ -26,7 +26,7 @@ import {
   type AlarmKind,
 } from "./notify-core";
 
-import { EXPIRY_LEAD_DAYS, expiryNotifyPlan } from "../utils/expiry";
+import { EXPIRY_LEAD_DAYS, expiryCatchUp, expiryNotifyPlan } from "../utils/expiry";
 import { completeReminder, listReminders } from "./reminders";
 import { ensureDeviceState } from "./device-approval";
 import { emitDataChanged } from "./data-events";
@@ -388,16 +388,21 @@ const docNotifId = (docId: string, lead: number) => `doc:${docId}:${lead}`;
  * `willFire: false` wale qadam skip ho jaate hain — beeta hua waqt par `schedule()`
  * waise bhi kuch nahi lagata, par yahan chhaan lene se ek bekaar native call bhi
  * bach jaati hai.
+ *
+ * `addedAt` (document ka `created_at`) neeche wale catch-up ke liye hai — poori
+ * wajah `expiryCatchUp()` par likhi hai. Na do to "abhi" maan liya jaata hai.
  */
 export async function scheduleDocumentExpiry(
   docId: string,
   name: string,
   expiry: string | null,
+  addedAt?: string | null,
 ): Promise<void> {
   await cancelDocumentExpiry(docId);
   if (!expiry) return;
 
   const n = await notifDict();
+  let anyStep = false;
   for (const step of expiryNotifyPlan(expiry)) {
     if (!step.willFire) continue;
     const body =
@@ -405,6 +410,34 @@ export async function scheduleDocumentExpiry(
         ? tpl(n.expiryToday, { name })
         : tpl(n.expiryInDays, { name, n: step.lead });
     await schedule(docNotifId(docId, step.lead), n.expiryTitle, body, step.at, "expiry");
+    anyStep = true;
+  }
+  if (anyStep) return;
+
+  /**
+   * Ladder ka ek bhi qadam nahi bacha, par document AAJ HI expire ho raha hai —
+   * thodi der me khud bata do.
+   *
+   * ⚠️ Iske bina dopahar ko daala gaya "aaj expire" wala document poori tarah
+   * chup reh jaata tha: teenon lamhe (subah 9) beet chuke hote hain, aur
+   * `schedule()` beete waqt par kuch nahi lagata. User ne document daala hi is
+   * liye tha ki use bataya jaye, aur usi din kuch nahi aata tha. Poori soch
+   * `expiryCatchUp()` par likhi hai.
+   *
+   * Id `lead 0` wali hi hai — jaan-boojh ke. Ye raasta tabhi khulta hai jab lead
+   * 0 ka apna lamha beet chuka ho, yaani wo id khaali padi hoti hai. Isse
+   * `cancelDocumentExpiry()` bina kisi badlaav ke isse bhi hata deta hai
+   * (renew/delete par ek bhoola hua alarm reh jaana sabse bura hota).
+   */
+  const catchUp = expiryCatchUp(expiry, addedAt ?? undefined);
+  if (catchUp) {
+    await schedule(
+      docNotifId(docId, 0),
+      n.expiryTitle,
+      tpl(n.expiryToday, { name }),
+      catchUp,
+      "expiry",
+    );
   }
 }
 
@@ -580,7 +613,11 @@ async function runSync(): Promise<void> {
       } else await cancelReminder(r.id);
     }
     for (const d of documents) {
-      await scheduleDocumentExpiry(d.id, d.name, d.expiry);
+      // `created_at` bhejna zaroori hai: "aaj hi expire" wale document ka
+      // catch-up alert usi lamhe se ginta hai, "abhi" se nahi — warna app jitni
+      // baar khulti, utni baar ek naya alert lag jaata (wajah `expiryCatchUp()`
+      // par likhi hai).
+      await scheduleDocumentExpiry(d.id, d.name, d.expiry, d.created_at);
     }
   } catch (e) {
     // Sync toota to har reminder ka alarm miss hota hai — sabse mehnga chup

@@ -33,6 +33,18 @@ type AskOpts = {
   locale?: string;
   /** User ka apna data (reminders/documents) — app-scoped jawab ke liye. */
   context?: ChatContext;
+  /**
+   * Recognizer ke BAAKI guess — sirf bol ke bheje gaye message me.
+   *
+   * ⚠️ Poori wajah `parseReminderAI()` par likhi hai: Android ka recognizer ek
+   * hi awaaz ke kai guess deta hai, aur Hinglish me uska pehla guess aksar
+   * galat hota hai jabki sahi shabd doosre/teesre me pada hota hai. Ab chunav
+   * AI karta hai, app nahi.
+   *
+   * Type kiya hua message is raaste se guzarta hi nahi — wahan ye khaali rehta
+   * hai aur prompt bilkul purana.
+   */
+  alts?: string[];
 };
 
 /** Saathi chat se aane wala action — client execute karta hai (limits + notifications reuse). */
@@ -392,6 +404,10 @@ export async function askSaathi(
         locale: opts.locale,
         context: opts.context,
         now: localNowIso(),
+        // Khaali list bhejne ka koi matlab nahi — type kiye hue message me wo
+        // hamesha khaali hoti hai, aur `undefined` server ka prompt chhoota bhi
+        // nahi (wahan purana raasta hi chalta hai).
+        ...(opts.alts?.length ? { alts: opts.alts.slice(0, 4) } : {}),
       },
       CHAT_TIMEOUT_MS,
     );
@@ -441,6 +457,22 @@ export type ReminderParse =
 export async function parseReminderAI(
   text: string,
   locale?: string,
+  /**
+   * Recognizer ke BAAKI guess — sirf bol ke banaye gaye reminder me.
+   *
+   * ⚠️ Ye is parse ka sabse bada sudhaar hai, aur seedha us shikayat par baithta
+   * hai ki "kabhi baat sahi karta hai kabhi nahi". Android ka recognizer ek hi
+   * awaaz ke kai guess banata hai aur unhe apne bharose ke hisaab se lagata hai
+   * — par Hinglish me uska PEHLA guess aksar galat hota hai ("dawai" → "the
+   * way", "baje" → "budget") jabki sahi shabd uske doosre ya teesre guess me
+   * pada hota hai. Pehle sirf pehla guess bheja jaata tha aur baaki gir jaate
+   * the, isliye ek hi baat do baar bolne par do alag nateeje aate the.
+   *
+   * Ab poori list AI ko jaati hai aur wahi tay karta hai ki insaan ne kya kaha.
+   * Likha hua reminder is se poori tarah alag rehta hai — wahan `alts` hota hi
+   * nahi, aur prompt bhi wahi purana rehta hai.
+   */
+  alts?: string[],
 ): Promise<ReminderParse> {
   if (!supabase) return { ok: false, failure: "server" };
   if (!text.trim()) return { ok: false, failure: "server" };
@@ -455,7 +487,16 @@ export async function parseReminderAI(
        * raat me dikhta: 11 baje bola gaya "kal subah 8 baje" AI ke liye abhi
        * 5:30 shaam tha, yaani "kal" ka matlab hi ek din khisak jaata.
        */
-      { task: "reminder", text, locale, now: localNowIso() },
+      {
+        task: "reminder",
+        text,
+        locale,
+        now: localNowIso(),
+        // Khaali list bhejne ka koi matlab nahi — likhe hue reminder me wo
+        // hamesha khaali hi hoti hai, aur `undefined` prompt ko chhoota bhi
+        // nahi (server wahan purana raasta hi chalata hai).
+        ...(alts?.length ? { alts: alts.slice(0, 4) } : {}),
+      },
       TASK_TIMEOUT_MS,
     );
     // Server ne jawab to diya, par usme samajh nahi thi — ye AI ki apni baat

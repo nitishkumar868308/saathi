@@ -8,6 +8,7 @@ import notifee, {
 import { supabase } from "./supabase";
 import { reportError } from "./report-error";
 import { recordPushOpenFrom, routeFromPush } from "./message-track";
+import { signalPlanExpired } from "./plan-expired-signal";
 import { ensureDeviceState } from "./device-approval";
 import { getDeviceId } from "./device";
 
@@ -261,6 +262,22 @@ export function listenPushOpens(): () => void {
    */
   const handle = (data: unknown) => {
     recordPushOpenFrom(data);
+    /**
+     * "Plus khatam" wali notification ka apna poora-screen wala page hai, koi
+     * route nahi — isliye wo `routeFromPush` se nahi nikalta.
+     *
+     * ⚠️ Ye yahan hona ZAROORI hai, sirf notifee ke listener me nahi. App
+     * background me ho ya band, notification OS/Firebase dikhata hai aur notifee
+     * ko wo dikhti hi nahi — yaani sabse aam do soorat wahin chup-chaap gir
+     * jaati. Poori wajah `lib/plan-expired-signal.ts` par likhi hai.
+     */
+    if (
+      data &&
+      typeof data === "object" &&
+      (data as { kind?: string }).kind === "plan_expired"
+    ) {
+      signalPlanExpired();
+    }
     const to = routeFromPush(data);
     if (!to) return;
     try {

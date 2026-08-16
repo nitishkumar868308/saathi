@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { beatCron } from "@/lib/cron-heartbeat";
 import { sendMail, renderEmail, ERROR_ALERT_TO } from "@/lib/email";
 import { getUnmailedErrors, markErrorsMailed } from "@/lib/errors-server";
 
@@ -23,6 +24,10 @@ export async function POST(request: Request) {
   if (!CRON_SECRET || auth !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // Auth paar ho gayi — yaani cron ki call sach me aayi AUR secret bhi sahi
+  // tha. Yahi wo ek nishaan hai jo admin ko "job hi nahi hai" aur "job hai par
+  // secret purana hai" me farq karne deta hai (wajah `lib/cron-heartbeat.ts`).
+  beatCron("error-digest");
 
   const errors = await getUnmailedErrors(50);
   if (!errors.length) return NextResponse.json({ sent: 0 });

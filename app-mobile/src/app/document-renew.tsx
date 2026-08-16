@@ -295,7 +295,17 @@ export default function DocumentRenew() {
        */
       let notifOk = true;
       if (updated.expiry && !expired) notifOk = await ensureNotifPermission();
-      await scheduleDocumentExpiry(updated.id, updated.name, updated.expiry);
+      // `created_at` — `Date.now()` nahi. Wahi lamha `syncNotifications()` bhi
+      // bhejta hai, aur dono ka ek hona zaroori hai: alag hone par renew ka
+      // lagaya hua catch-up agle hi sync me hat jaata (wajah `expiryCatchUp()`
+      // par likhi hai). Renew hamesha AANE WALI date par hota hai, isliye wahan
+      // ladder khud hi zinda rehta hai aur catch-up ki nauobat aati hi nahi.
+      await scheduleDocumentExpiry(
+        updated.id,
+        updated.name,
+        updated.expiry,
+        updated.created_at,
+      );
 
       logEvent("document_renewed", { type: updated.type });
       // Documents tab, Home ka "Dhyan dena hai" — dono khule pade ho sakte hain.

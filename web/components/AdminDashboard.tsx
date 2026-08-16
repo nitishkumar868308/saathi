@@ -28,6 +28,7 @@ import {
   CreditCard,
   LifeBuoy,
   RotateCw,
+  BadgeX,
   UserMinus,
   Shield,
   Send,
@@ -54,6 +55,7 @@ import AdminAnalytics from "@/components/AdminAnalytics";
 import AdminSeo from "@/components/AdminSeo";
 import AdminBlog from "@/components/AdminBlog";
 import AdminRenewals from "@/components/AdminRenewals";
+import AdminPlanExpiry from "@/components/AdminPlanExpiry";
 import AdminDeleteRequests from "@/components/AdminDeleteRequests";
 import AdminSupport from "@/components/AdminSupport";
 import AdminTeam from "@/components/AdminTeam";
@@ -106,6 +108,9 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   // Renew guides documents ke theek neeche — wo unhi documents ka agla sawaal
   // hai ("expire ho raha hai, ab karun kya?").
   { key: "renewals", icon: RotateCw },
+  // "Plus khatam" renewals ke theek neeche — dono ek hi sawaal ke do roop hain
+  // ("kuch khatam ho gaya, ab kya"), aur admin dono ko ek saath dekhta hai.
+  { key: "planExpiry", icon: BadgeX },
   { key: "reviews", icon: Star },
   { key: "logs", icon: Bug },
   { key: "contacts", icon: MessageSquare },
@@ -557,6 +562,7 @@ function Dashboard({
               {section === "seo" && <AdminSeo />}
               {section === "blog" && <AdminBlog />}
               {section === "renewals" && <AdminRenewals />}
+              {section === "planExpiry" && <AdminPlanExpiry />}
               {section === "deleteRequests" && <AdminDeleteRequests />}
               {section === "team" && <AdminTeam meEmail={session.email} />}
               {section === "contacts" && (

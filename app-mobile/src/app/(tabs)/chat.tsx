@@ -169,7 +169,18 @@ function newMsgId(): string {
 }
 
 /** Chat me ek turn ke liye zaroori sab kuch — retry isi se dobara chalta hai. */
-type Pending = { text: string; history: ChatTurn[] };
+type Pending = {
+  text: string;
+  history: ChatTurn[];
+  /**
+   * Recognizer ke baaki guess — sirf bol ke bheje gaye message me.
+   *
+   * `Pending` me isliye hai ki retry bhi isi object ko dobara chalata hai; bina
+   * iske dobara koshish pehli se kamzor ho jaati (wahi jagah jahan retry sabse
+   * zyada chalta hai). Poori wajah `components/voice-button.tsx` ke sar par.
+   */
+  alts?: string[];
+};
 
 /**
  * Bola hua message apne aap jaane me kitni der.
@@ -254,6 +265,21 @@ export default function Chat() {
    * jaata.
    */
   const inputRef = useRef("");
+  /**
+   * Abhi wale transcript ke BAAKI guess — sirf AI ke liye.
+   *
+   * ⚠️ Ye seedha us shikayat par baithta hai ki "kabhi baat sahi karta hai kabhi
+   * nahi". Android ka recognizer ek hi awaaz ke kai guess banata hai, par
+   * Hinglish me uska pehla guess aksar galat hota hai ("dawai" → "the way")
+   * jabki sahi shabd doosre/teesre guess me pada hota hai. Pehle sirf pehla
+   * guess bheja jaata tha; ab poori list AI ko jaati hai aur faisla wo karta
+   * hai. Poori wajah `components/voice-button.tsx` ke sar par likhi hai.
+   *
+   * Ref me isliye hai (state me nahi) ki ise render se koi lena-dena nahi — aur
+   * bhejne wala timer state ki purani copy padhta, bilkul wahi dikkat jo
+   * `inputRef` ke liye upar likhi hai.
+   */
+  const voiceAlts = useRef<{ text: string; alts: string[] } | null>(null);
 
   const cancelVoiceSend = useCallback(() => {
     if (voiceTimer.current) {
@@ -371,6 +397,25 @@ export default function Chat() {
   async function sendText(text: string) {
     const t = text.trim();
     if (!t || sending) return;
+    /**
+     * Guess sirf tab AI tak jaate hain jab bheja ja raha text HUBAHU wahi ho jo
+     * mic ne suna tha.
+     *
+     * ⚠️ User transcript ko theek kar sakta hai (aur aksar karta hai). Uske
+     * badle hue wakya ke saath purane guess bhejna ulta nuksaan hai — model ko
+     * lagta hai ki user ne jo likha wo bhi ek "guess" hai, aur wo use anadekha
+     * kar ke apna chuna hua roop le leta hai. Yaani user ka sudhaar chup-chaap
+     * phink jaata.
+     *
+     * Isliye milaan us TRANSCRIPT se hota hai jisne ye guess banaye the, abhi
+     * ke input se nahi — warna ek badla hua wakya bhi barabar nikal aata (dono
+     * ek hi `inputRef` se aate hain).
+     *
+     * Ek hi baar — `null` yahin kar dete hain, taaki agla message (jo type
+     * karke bheja ja sakta hai) inhe na uthaye.
+     */
+    const alts = voiceAlts.current?.text.trim() === t ? voiceAlts.current.alts : null;
+    voiceAlts.current = null;
     // Manually bheja ja raha ho to kataar wala timer bekaar hai — warna wo
     // thodi der baad khaali input dobara bhejne ki koshish karta.
     cancelVoiceSend();
@@ -386,7 +431,7 @@ export default function Chat() {
     }));
 
     setMessages((m) => [...m, { id: newMsgId(), role: "user", text: t }]);
-    await ask({ text: t, history });
+    await ask({ text: t, history, alts: alts ?? undefined });
   }
 
   /**
@@ -402,6 +447,9 @@ export default function Chat() {
         locale,
         context,
         fallback: ch.stubReply,
+        // Retry par bhi wahi guess jaate hain (`turn` me pade rehte hain) —
+        // warna dobara koshish pehli se kamzor ho jaati.
+        alts: turn.alts,
       });
 
       if (failure) {
@@ -774,7 +822,7 @@ export default function Chat() {
         {/* input */}
         <View style={styles.inputBar}>
           <VoiceButton
-            onText={(t) => {
+            onText={(t, alts) => {
               /**
                * Transcript aa gaya — input me jodo aur ginti shuru.
                *
@@ -786,6 +834,19 @@ export default function Chat() {
               const merged = inputRef.current ? inputRef.current + " " + t : t;
               inputRef.current = merged;
               setInput(merged);
+
+              /**
+               * Recognizer ke baaki guess — sirf tab jab input me BAS yahi ek
+               * transcript ho.
+               *
+               * ⚠️ Wo guess `t` ke hain, `merged` ke nahi. Do transcript jud
+               * chuke hon (ya user ne beech me kuch type kar diya ho) to "yahi
+               * ek baat ke alag roop hain" wali baat sach nahi rehti, aur AI ko
+               * aadhe wakya ke guess dikhana usse bhataka deta hai. Us soorat
+               * me guess chhod dena hi theek hai — jo pehle hota tha.
+               */
+              voiceAlts.current =
+                merged === t && alts?.length ? { text: merged, alts } : null;
 
               // Nayi baat aayi — purani ginti hata ke nayi shuru karo, warna
               // doosra tukda aane par message pehle wali ginti par hi chala

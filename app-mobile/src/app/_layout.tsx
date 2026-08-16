@@ -19,6 +19,7 @@ import { OfflineGate } from "@/components/offline-gate";
 import { AccountGate } from "@/components/account-gate";
 import { LockOffer } from "@/components/lock-offer";
 import { WhatsAppSetupModal } from "@/components/whatsapp-setup-modal";
+import { PlanExpiredAlert } from "@/components/plan-expired-alert";
 import { NetworkBanner } from "@/components/network-banner";
 import { useNetworkStatus } from "@/lib/network";
 import { ThemeFab } from "@/components/theme-fab";
@@ -119,6 +120,11 @@ export default function RootLayout() {
                   verify nahi hai — tab tak wahan koi message ja hi nahi sakta,
                   aur wo baat kahin likhi hi nahi thi. */}
               <WhatsAppSetupModal />
+              {/* Plus khatam ho gaya — poori screen wala samjhane wala page.
+                  ⚠️ Ye LockGate ke ANDAR hai (baaki overlays ki tarah): lock
+                  lage phone par uske documents ki ginti dikha dena wahi darwaza
+                  khol dega jise lock band karta hai. */}
+              <PlanExpiredAlert />
               </LockGate>
             </ToastProvider>
           </AuthProvider>

@@ -1,5 +1,6 @@
 import { adminGet } from "@/lib/support-server";
 import { emailConfigured } from "@/lib/email";
+import { readCronBeats } from "@/lib/cron-heartbeat";
 import { twilioConfigured, waTemplateState, type WaTemplateState } from "@/lib/twilio";
 
 /**
@@ -23,10 +24,18 @@ import { twilioConfigured, waTemplateState, type WaTemplateState } from "@/lib/t
  *      template maujood hai?
  *
  * Vercel ka env sirf (5) hai. (1) aur (2) Supabase me hain — aur wahi sabse
- * zyada toote milte hain, kyunki `supabase/cron-reminders.sql` me
- * `<CRON_SECRET>` ek PLACEHOLDER hai jise haath se badalna padta hai. Bina
- * badle chalane par har call 401 hoti hai aur ek bhi message kabhi nahi jaata —
- * bina kisi error ke, kyunki us 401 ko dekhne wala koi hai hi nahi.
+ * zyada toote milte hain, kyunki purani setup files (`cron-reminders.sql`
+ * waghairah) me `<CRON_SECRET>` ek PLACEHOLDER hai jise CHAAR files me haath se
+ * badalna padta tha. Bina badle chalane par har call 401 hoti hai aur ek bhi
+ * message kabhi nahi jaata — bina kisi error ke, kyunki us 401 ko dekhne wala
+ * koi hai hi nahi.
+ *
+ * Iska ilaaj do nayi files hain, aur admin ko unhi ka naam batana chahiye:
+ *   • `supabase/cron-setup.sql`  — saare jobs, secret sirf EK jagah (wo galti
+ *                                  ab ho hi nahi sakti).
+ *   • `supabase/cron-doctor.sql` — kuch badle bina, chha jawab: extension, job,
+ *                                  placeholder, run history, HTTP status, aur
+ *                                  atke hue reminder.
  *
  * ── Cron chal raha hai ya nahi — ye PAKKA kaise pata chalta hai ─────────
  *
@@ -71,6 +80,21 @@ export type DeliveryHealth = {
      * `null` = aaj tak kabhi nahi (yaani cron kabhi chala hi nahi).
      */
     lastNotifiedAt: string | null;
+    /**
+     * Aakhri baar cron ki call SACH ME kab pahunchi (`cron_health` ki nabz).
+     *
+     * ⚠️ Ye upar wali teen ginti se alag sawaal ka jawab hai, aur wahi sawaal
+     * sabse zyada atkaata hai. Upar wali teen sirf REMINDERS se andaza lagati
+     * hain, isliye wo do halaat me chup ho jaati hain: jab kisi ka koi reminder
+     * due hi na ho (ginti 0 = "sab theek", chahe cron mahine se band ho), aur
+     * jab ye tay karna ho ki job MAUJOOD HI NAHI hai ya job hai par uska secret
+     * purana hai. Nabz auth ke BAAD padti hai — uska hona hi saabit kar deta hai
+     * ki call bhi aayi thi aur secret bhi sahi tha.
+     *
+     * `null` = ya to `supabase/cron-heartbeat.sql` chalaya nahi gaya, ya us
+     * route ki ek bhi call aaj tak nahi pahunchi.
+     */
+    lastBeatAt: string | null;
   };
   /**
    * Ek line ka nateeja — admin ko yahi padhna hai.
@@ -126,7 +150,7 @@ export async function getDeliveryHealth(): Promise<DeliveryHealth> {
     `reminders?is_on=eq.true&is_paused=eq.false&notified_at=is.null` +
     `&remind_at=lte.${cutoff}`;
 
-  const [overdue, oldest, lastDone] = await Promise.all([
+  const [overdue, oldest, lastDone, beats] = await Promise.all([
     countOf(`${base}&select=id`).catch(() => 0),
     adminGet<{ remind_at: string }>(`${base}&select=remind_at&order=remind_at.asc&limit=1`).catch(
       () => [],
@@ -134,6 +158,7 @@ export async function getDeliveryHealth(): Promise<DeliveryHealth> {
     adminGet<{ notified_at: string }>(
       `reminders?notified_at=not.is.null&select=notified_at&order=notified_at.desc&limit=1`,
     ).catch(() => []),
+    readCronBeats(),
   ]);
 
   const config = {
@@ -148,6 +173,7 @@ export async function getDeliveryHealth(): Promise<DeliveryHealth> {
     overdueUntouched: overdue,
     oldestOverdueAt: oldest[0]?.remind_at ?? null,
     lastNotifiedAt: lastDone[0]?.notified_at ?? null,
+    lastBeatAt: beats["send-reminders"] ?? null,
   };
 
   return { config, cron, verdict: verdictFor(config, cron, nowIso) };
@@ -167,14 +193,34 @@ function verdictFor(
     const since = cron.oldestOverdueAt
       ? `${Math.max(1, Math.round((Date.parse(nowIso) - Date.parse(cron.oldestOverdueAt)) / 60000))} min`
       : "kuch der";
+    /**
+     * ⚠️ Nabz do bilkul ulte ilaaj alag kar deti hai, aur bina uske admin ko
+     * andhere me hi dhoondhna padta tha:
+     *
+     *   • **Nabz aa rahi hai, phir bhi reminder atke hain** — matlab call
+     *     pahunch rahi hai aur secret bhi sahi hai. Galti Supabase me nahi,
+     *     ROUTE me hai (Vercel ke logs dekho).
+     *   • **Nabz aayi hi nahi** — call pahunchi hi nahi. Ya job maujood nahi
+     *     hai, ya uska secret purana hai. Dono ka ilaaj ek hi file hai.
+     */
+    const beatAgo = cron.lastBeatAt
+      ? Math.round((Date.parse(nowIso) - Date.parse(cron.lastBeatAt)) / 60000)
+      : null;
+    // Cron har minute chalta hai; 10 minute se nayi nabz ko "aa rahi hai" maano.
+    const beating = beatAgo !== null && beatAgo <= 10;
+
     return {
       level: "down",
       title: `Cron chal hi nahi raha — ${cron.overdueUntouched} reminder ka waqt beet chuka hai par unhe kisi ne chhua nahi`,
-      detail:
-        `Sabse purana ${since} se atka hai. Ye env se nahi judta: cron har reminder ko chhoota hai, ` +
-        `chahe user free ho ya Plus. Supabase > SQL Editor me \`select * from cron.job;\` chala ke dekho ` +
-        `ki job hai ya nahi, aur uske command me \`<CRON_SECRET>\` placeholder ki jagah asli value padi hai ` +
-        `ya nahi — bina badle har call 401 hoti hai aur ek bhi message nahi jaata.`,
+      detail: beating
+        ? `Sabse purana ${since} se atka hai. Par cron ki call ${beatAgo} min pehle POHONCHI thi — ` +
+          `yaani job bhi hai aur CRON_SECRET bhi sahi hai. Galti Supabase me nahi, route me hai: ` +
+          `Vercel > Logs me /api/cron/send-reminders dekho.`
+        : `Sabse purana ${since} se atka hai. Cron ki call yahan tak POHONCHI HI NAHI` +
+          (cron.lastBeatAt ? ` (aakhri baar ${beatAgo} min pehle)` : "") +
+          ` — yaani ya to Supabase me job hai hi nahi, ya uska CRON_SECRET purana ho chuka hai. ` +
+          `Ilaaj ek hi hai: supabase/cron-setup.sql me apna asli CRON_SECRET daal ke Run karo. ` +
+          `Poori jaanch ke liye supabase/cron-doctor.sql chalao.`,
     };
   }
 

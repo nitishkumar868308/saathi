@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { supabase } from "./supabase";
@@ -54,6 +55,104 @@ export async function sendPasswordReset(email: string): Promise<void> {
   // Sirf network/config wali galti upar bhejte hain. "Email nahi mila" wali
   // baat jaan-boojh ke nigal jaate hain (upar dekho).
   if (error && !/not\s*found|invalid/i.test(error.message)) throw error;
+  // Link laut ke aaye (ya toot ke aaye) tab pata hona chahiye ki wo RESET ka
+  // tha — neeche poori wajah likhi hai.
+  await rememberPendingReset(email.trim());
+}
+
+/**
+ * "Is phone se abhi-abhi password reset maanga gaya tha" — ek chhota sa nishaan.
+ *
+ * ⚠️ Ye jugaad nahi hai, iske bina ek asli galti hoti hai. Jab Supabase reset ke
+ * link par MANA karta hai (token ek baar chal ke khatam ho chuka — email ke
+ * scanner ke chhoote hi aisa hota hai), to jawab me sirf itna aata hai:
+ *
+ *     saathi://auth#error=access_denied&error_code=otp_expired
+ *
+ * Usme `type=recovery` HOTA HI NAHI. Yaani us error ko dekh kar ye bataya hi
+ * nahi ja sakta ki ye reset ka link tha ya Google login ka — aur dono ka agla
+ * kadam bilkul ulta hai (reset wale ko reset screen chahiye, Google wale ko
+ * login). Bina is nishaan ke ya to reset wale login par phenke jaate (wahi
+ * purani shikayat), ya Google wale bewajah reset screen par pahunch jaate.
+ *
+ * 24 ghante ki umar jaan-boojh ke: Supabase ka link waise bhi 1 ghante me mar
+ * jaata hai, aur mahine bhar purana nishaan kisi aur din ke Google login ko
+ * galat jagah bhej deta.
+ */
+const RESET_PENDING_KEY = "saathi-reset-pending";
+const RESET_PENDING_MS = 24 * 60 * 60 * 1000;
+
+async function rememberPendingReset(email: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(RESET_PENDING_KEY, JSON.stringify({ email, at: Date.now() }));
+  } catch {
+    /* Nishaan na lag paaye to sirf itna hota hai ki toote hue link par screen
+       login dikhayegi — code wala raasta phir bhi khula rehta hai. */
+  }
+}
+
+/** Us reset ka email jo abhi tak poora nahi hua. Purana/na ho to `null`. */
+export async function pendingPasswordReset(): Promise<string | null> {
+  try {
+    const raw = await AsyncStorage.getItem(RESET_PENDING_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as { email?: string; at?: number };
+    if (!v?.email || !v?.at || Date.now() - v.at > RESET_PENDING_MS) return null;
+    return v.email;
+  } catch {
+    return null;
+  }
+}
+
+/** Password badal gaya — nishaan hata do. */
+export async function clearPendingPasswordReset(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(RESET_PENDING_KEY);
+  } catch {
+    /* best-effort — 24 ghante me khud bhi mar jaata hai */
+  }
+}
+
+/**
+ * Reset ka 6-ank wala CODE — link ka doosra, aur zyada bharosemand, raasta.
+ *
+ * ── Ye kyun chahiye tha ─────────────────────────────────────────────────
+ *
+ * ⚠️ Link wala raasta bahut si aisi jagah tootta hai jahan hamara koi bas nahi
+ * chalta, aur toot-ne par user ko bilkul ek jaisa dikhta hai: "app khul gayi,
+ * par login hi maang rahi hai". Char asli wajah:
+ *
+ *   1. **Email ka scanner link pehle hi kha jaata hai.** Gmail/Outlook har link
+ *      ko surakhsha ke liye khud khol ke dekhte hain. Recovery ka token EK BAAR
+ *      chalne wala hota hai — scanner ke chhoote hi wo khatam. User jab tap
+ *      karta hai to Supabase `#error=access_denied&error_code=otp_expired`
+ *      wapas bhejta hai, yaani token to hai hi nahi.
+ *   2. **Email doosre device par khula.** Log mail aksar laptop par kholte hain.
+ *      Wahan `saathi://` scheme ko koi nahi jaanta — link kuch karta hi nahi.
+ *   3. **Redirect URL allow-list.** `saathi://auth` Supabase ke Authentication >
+ *      URL Configuration me na ho to Supabase use anadekha karke Site URL
+ *      (website) par bhej deta hai — app kabhi khulti hi nahi.
+ *   4. **Link ki umar.** Default 1 ghanta. Raat ko maanga, subah khola — gaya.
+ *
+ * Code in chaaron se poori tarah bacha hua hai: wo email ke TEXT me hota hai,
+ * kisi link par tap karne ki zaroorat hi nahi, aur user use kisi bhi device se
+ * padh ke apne phone me type kar sakta hai.
+ *
+ * ⚠️ Iske chalne ke liye Supabase ke "Reset Password" email template me
+ * `{{ .Token }}` hona ZAROORI hai (Authentication > Emails). Sirf
+ * `{{ .ConfirmationURL }}` wale purane template me code aata hi nahi — aur tab
+ * ye raasta user ko dikhega par kaam nahi karega.
+ *
+ * Kaamyab hone par yahan poora recovery session ban jaata hai — bilkul wahi jo
+ * link se banta — isliye iske turant baad `setNewPassword()` chal sakta hai.
+ */
+export async function verifyPasswordResetCode(email: string, code: string): Promise<void> {
+  const { error } = await client().auth.verifyOtp({
+    email: email.trim(),
+    token: code.replace(/\D/g, ""),
+    type: "recovery",
+  });
+  if (error) throw error;
 }
 
 /**

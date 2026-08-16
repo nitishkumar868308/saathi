@@ -492,6 +492,150 @@ export async function sendDocumentExpiryEmail(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Plus khatam — "aapka data safe hai, bas ab free plan par hai"       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Plus khatam hone par jo bilkul chup tha — aur usi chuppi se support bharta tha.
+ *
+ * ⚠️ Downgrade ab apne aap hota hai (`supabase/cron-plan-expiry.sql`): Plus ki
+ * expiry nikalte hi free hadd se AAGE ke documents lock ho jaate hain aur aage
+ * ke reminders pause. Ye theek hai — par user ko kahin se ye bataya hi nahi
+ * jaata tha.
+ *
+ * Uske liye wo bilkul aisa dikhta hai jaise app kharab ho gayi ho: "mere
+ * documents kahan gaye", "reminder aana band kyun ho gaya". Aur ye sabse bura
+ * kism ka bharosa-todne wala pal hai, kyunki hua kuch galat nahi tha — bas plan
+ * khatam ho gaya, aur wo ek line kisi ne kahi hi nahi.
+ *
+ * ⚠️ Is mail ka poora lehja jaan-boojh ke "sab surakshit hai" wala hai, "aapne
+ * kho diya" wala nahi. Do wajah: pehli, ye SACH hai — kuch delete nahi hota,
+ * sirf lock hota hai, aur Plus wapas lete hi sab khud khul jaata hai
+ * (`grant_plus_days`). Doosri, dara ke bechna is app ke poore mizaaj se ulta
+ * hai. Ginti (kitne lock hue) isliye di jaati hai ki user ko apni haalat SAAF
+ * dikhe — dabaav ke liye nahi.
+ */
+type PlanExpiredCopy = {
+  subject: string;
+  heading: string;
+  preheader: string;
+  intro: string;
+  /** "Abhi aapke paas" wale box ka sar-naam. */
+  statusLabel: string;
+  docsLine: (locked: number, free: number) => string;
+  remindersLine: (paused: number, free: number) => string;
+  /** Kuch lock hi nahi hua (free hadd ke andar tha) — tab ye line. */
+  nothingLocked: string;
+  safe: string;
+  cta: string;
+  outro: string;
+};
+
+const PLAN_EXPIRED: Record<EmailLocale, PlanExpiredCopy> = {
+  hinglish: {
+    subject: "Apka Saathi — aapka Plus khatam ho gaya",
+    heading: "Aapka Plus khatam ho gaya 🤍",
+    preheader: "Kuch delete nahi hua — sab kuch surakshit hai, bas free plan par hai.",
+    intro:
+      "Namaste{name}! Aapka <b>Saathi Plus</b> khatam ho gaya hai, isliye account ab free plan par aa gaya hai. <b>Kuch bhi delete nahi hua</b> — aapka har document aur har reminder waise ka waisa surakshit hai.",
+    statusLabel: "Abhi aapke paas",
+    docsLine: (locked, free) =>
+      `<b>${free} documents</b> khule hain. Baaki <b>${locked}</b> abhi lock hain — dikhte hain, khulte nahi.`,
+    remindersLine: (paused, free) =>
+      `<b>${free} reminders</b> chalu hain. Baaki <b>${paused}</b> abhi pause hain — inka alert nahi aayega.`,
+    nothingLocked: "Aapka saara data free plan ki hadd ke andar hai — kuch bhi lock nahi hua.",
+    safe: "Plus dobara lete hi sab kuch usi pal wapas khul jaata hai — kuch dobara daalna nahi padta.",
+    cta: "Plus wapas lo",
+    outro: "Koi sawaal ho to bas is mail ka reply kar do. Main yahin hoon. 🙂",
+  },
+  hi: {
+    subject: "Apka Saathi — आपका Plus खत्म हो गया",
+    heading: "आपका Plus खत्म हो गया 🤍",
+    preheader: "कुछ डिलीट नहीं हुआ — सब कुछ सुरक्षित है, बस फ्री प्लान पर है।",
+    intro:
+      "नमस्ते{name}! आपका <b>Saathi Plus</b> खत्म हो गया है, इसलिए अकाउंट अब फ्री प्लान पर आ गया है। <b>कुछ भी डिलीट नहीं हुआ</b> — आपका हर डॉक्युमेंट और हर रिमाइंडर वैसे का वैसा सुरक्षित है।",
+    statusLabel: "अभी आपके पास",
+    docsLine: (locked, free) =>
+      `<b>${free} डॉक्युमेंट</b> खुले हैं। बाकी <b>${locked}</b> अभी लॉक हैं — दिखते हैं, खुलते नहीं।`,
+    remindersLine: (paused, free) =>
+      `<b>${free} रिमाइंडर</b> चालू हैं। बाकी <b>${paused}</b> अभी पॉज़ हैं — इनका अलर्ट नहीं आएगा।`,
+    nothingLocked: "आपका सारा डेटा फ्री प्लान की हद के अंदर है — कुछ भी लॉक नहीं हुआ।",
+    safe: "Plus दोबारा लेते ही सब कुछ उसी पल वापस खुल जाता है — कुछ दोबारा डालना नहीं पड़ता।",
+    cta: "Plus वापस लें",
+    outro: "कोई सवाल हो तो बस इस मेल का reply कर दीजिए। मैं यहीं हूँ। 🙂",
+  },
+  en: {
+    subject: "Apka Saathi — your Plus has ended",
+    heading: "Your Plus has ended 🤍",
+    preheader: "Nothing was deleted — everything is safe, just on the free plan now.",
+    intro:
+      "Hello{name}! Your <b>Saathi Plus</b> has ended, so your account is back on the free plan. <b>Nothing has been deleted</b> — every document and every reminder is exactly where you left it.",
+    statusLabel: "Right now you have",
+    docsLine: (locked, free) =>
+      `<b>${free} documents</b> open. The other <b>${locked}</b> are locked for now — you can see them, but not open them.`,
+    remindersLine: (paused, free) =>
+      `<b>${free} reminders</b> active. The other <b>${paused}</b> are paused for now — they won't alert you.`,
+    nothingLocked: "Everything you have fits within the free plan — nothing has been locked.",
+    safe: "The moment you take Plus again, all of it unlocks — you never have to add anything twice.",
+    cta: "Get Plus back",
+    outro: "Any questions, just reply to this email. I'm right here. 🙂",
+  },
+};
+
+export type PlanExpiredCounts = {
+  /** Free plan par kitne documents khule rehte hain (admin ka `app_config`). */
+  freeDocuments: number;
+  freeReminders: number;
+  /** Free hadd se aage kitne lock/pause hue. 0 = kuch bhi nahi. */
+  lockedDocuments: number;
+  pausedReminders: number;
+};
+
+export async function sendPlanExpiredEmail(
+  to: string,
+  name: string,
+  counts: PlanExpiredCounts,
+  locale: EmailLocale = "hinglish",
+  userId?: string | null,
+): Promise<{ sent: boolean; skipped?: boolean }> {
+  const c = PLAN_EXPIRED[locale] ?? PLAN_EXPIRED.hinglish;
+  const nameBit = name.trim() ? ` ${escapeHtml(name.trim().split(" ")[0])}` : "";
+
+  const anyLocked = counts.lockedDocuments > 0 || counts.pausedReminders > 0;
+  const rows = anyLocked
+    ? [
+        counts.lockedDocuments > 0
+          ? `<li style="margin:0 0 8px;">${c.docsLine(counts.lockedDocuments, counts.freeDocuments)}</li>`
+          : "",
+        counts.pausedReminders > 0
+          ? `<li style="margin:0;">${c.remindersLine(counts.pausedReminders, counts.freeReminders)}</li>`
+          : "",
+      ].join("")
+    : `<li style="margin:0;">${c.nothingLocked}</li>`;
+
+  const inner =
+    emailParagraph(c.intro.replace("{name}", nameBit)) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
+       <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${BRAND};border-radius:14px;background:${CREAM};">
+         <div style="font-size:11.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:${SOFT};">${escapeHtml(c.statusLabel)}</div>
+         <ul style="margin:10px 0 0;padding-left:18px;font-size:14.5px;line-height:1.65;color:${INK};">${rows}</ul>
+       </td></tr>
+     </table>` +
+    emailParagraph(c.safe) +
+    emailButton(`${SITE_URL}/#pricing`, c.cta) +
+    emailParagraph(c.outro);
+
+  return sendMail({
+    to,
+    subject: c.subject,
+    html: renderEmail(c.heading, inner, c.preheader, locale),
+    fromName: "Apka Saathi",
+    kind: "plan_expired",
+    userId,
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /*  Welcome email — naye user ko (email + Google dono)                 */
 /* ------------------------------------------------------------------ */
 
