@@ -136,15 +136,41 @@ step5 as (
   select
     5 as n,
     '5. HTTP ' || coalesce(r.status_code::text, 'jawab hi nahi') as step,
-    -- ⚠️ 400 akshar, 120 nahi. 401 ka jawab ab apni wajah SAATH le kar aata hai
-    -- (`expected` + `got` ka len/md5 — dekho `web/lib/cron-auth.ts`), aur wo
-    -- 120 me kat jaata tha — yaani jo ek cheez sabse zyada chahiye thi, wahi
-    -- nahi dikhti thi.
-    coalesce(nullif(left(r.error_msg, 400), ''), left(r.content, 400), '') as kya_mila,
+    /**
+     * ⚠️ Poora JSON mat dikhao — usme se sirf `got` aur `hint` nikaal lo.
+     *
+     * 401 ka jawab ab dono taraf ka naap saath laata hai (`web/lib/cron-auth.ts`),
+     * par table ke column me wo poora dikhta hi nahi — aur `got` hamesha JSON ke
+     * AAKHIR me hota hai, yaani theek wahi hissa kat jaata tha jiske liye ye
+     * poora kaam kiya gaya. `expected` step 7 se pehle hi milaya ja chuka hota
+     * hai; asli sawaal `got` hai.
+     *
+     * Regex me `{` jaan-boojh ke nahi hai — Postgres ke ARE me wo interval
+     * shuru karta hai aur pattern chup-chaap kuch aur matlab le leta hai.
+     * `[^0-9]+` usi kaam ko bina kisi escape ke kar deta hai.
+     */
+    case
+      when r.content like '%"got"%' then
+        'got len ' || coalesce(substring(r.content from '"got":[^0-9]+([0-9]+)'), '?')
+          || '   md5 ' || coalesce(substring(r.content from '"got".*"md5":"([0-9a-f]+)"'), 'null')
+          || '   | ' || coalesce(substring(r.content from '"hint":"([^"]+)"'), '')
+      else coalesce(nullif(left(r.error_msg, 300), ''), left(r.content, 300), '')
+    end as kya_mila,
     to_char(r.created, 'DD Mon HH24:MI') as kab,
     case
       when r.status_code = 200 then 'theek hai — call pahunch gayi'
-      when r.status_code = 401 then 'LAAL: secret match nahi kar raha -> jawab me expected/got ka len+md5 hai; use step 7 se milao'
+      /**
+       * ⚠️ `got len 0` ka matlab secret galat hona NAHI hai — header pahuncha hi
+       * nahi. Aur uski sabse aam wajah domain ka redirect hai: www aur bina-www
+       * me se ek doosre par 308 bhejta hai, pg_net us redirect ko follow karta
+       * hai, par curl doosre HOST par jaate waqt `Authorization` header
+       * JAAN-BOOJH KE gira deta hai (surakhsha ka niyam hai). Route chal jaata
+       * hai, 401 deta hai, aur secret dono jagah bilkul sahi hota hai.
+       */
+      when r.status_code = 401 and r.content like '%"got":[^0-9]*0,%'
+        then 'LAAL: header pahuncha hi nahi -> cron-setup.sql me v_base ka www badlo (redirect Authorization gira deta hai)'
+      when r.status_code = 401
+        then 'LAAL: got ka len+md5 upar hai; 0 = header hi nahi aaya, warna step 7 se milao'
       when r.status_code = 404 then 'LAAL: URL galat hai (www / route ka naam dekho)'
       when r.status_code >= 500 then 'LAAL: route khud fail ho raha hai -> Vercel > Logs dekho'
       when r.status_code is null then 'LAAL: pg_net ka jawab hi nahi aaya -> Settings > General > Restart project'
