@@ -789,8 +789,7 @@ Deno.serve(async (req) => {
         ? `Ye message BOL KE bheja gaya hai. Phone ke speech recognizer ne ek hi awaaz ke kai guess diye hain — pehla uska sabse confident guess hai, par Hinglish me wo aksar galat hota hai:
 
 1. ${userMsg}
-${chatAlts.map((a, i) => `${i + 2}. ${a}`).join("
-")}
+${chatAlts.map((a, i) => `${i + 2}. ${a}`).join("\n")}
 
 Ye SAB ek hi baat hain. Khud tay karo ki insaan ne asal me kya kaha (jo guess Hinglish me sabse zyada matlab rakhta ho) aur USI ka jawab do. Apne reply me in guess ka, ya "aapne shayad ye kaha" jaisa, koi zikr mat karna — user ke liye ye app ka andaruni kaam hai.`
         : userMsg;

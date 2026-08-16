@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { beatCron } from "@/lib/cron-heartbeat";
+import { requireCron } from "@/lib/cron-auth";
 import { sendReminderWhatsApp, twilioConfigured, waTemplateState } from "@/lib/twilio";
 import { emailConfigured } from "@/lib/email";
 import {
@@ -16,7 +16,6 @@ export const dynamic = "force-dynamic";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const CRON_SECRET = process.env.CRON_SECRET;
 
 function sbHeaders(extra?: Record<string, string>) {
   return {
@@ -63,15 +62,17 @@ function whenLabel(r: DueReminder): string {
  * WhatsApp + email bhejta hai, phir notified_at set karta hai.
  */
 export async function POST(request: Request) {
-  // Auth — sirf cron/known caller.
-  const auth = request.headers.get("authorization");
-  if (!CRON_SECRET || auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  // Auth paar ho gayi — yaani cron ki call sach me aayi AUR secret bhi sahi
-  // tha. Yahi wo ek nishaan hai jo admin ko "job hi nahi hai" aur "job hai par
-  // secret purana hai" me farq karne deta hai (wajah `lib/cron-heartbeat.ts`).
-  beatCron("send-reminders");
+  /**
+   * Cron ka pehra — aur ek 401 jo KHUD apni wajah batata hai.
+   *
+   * ⚠️ Pehle yahan ek khaali `{"error":"unauthorized"}` laut-ta tha, aur wo
+   * teen bilkul alag halaat ko ek jaisa dikhata tha: env set hi na hona,
+   * header ka na aana, aur dono taraf alag-alag value hona. Teenon ka ilaaj
+   * alag hai. Poori wajah `lib/cron-auth.ts` par likhi hai — nabz bhi wahi
+   * chhodta hai, isliye yahan alag se `beatCron` ki zaroorat nahi.
+   */
+  const denied = requireCron(request, "send-reminders");
+  if (denied) return denied;
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return NextResponse.json({ error: "supabase not configured" }, { status: 503 });
   }

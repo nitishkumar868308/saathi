@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { beatCron } from "@/lib/cron-heartbeat";
+import { requireCron } from "@/lib/cron-auth";
 import { sendMail, renderEmail, ERROR_ALERT_TO } from "@/lib/email";
 import { getUnmailedErrors, markErrorsMailed } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CRON_SECRET = process.env.CRON_SECRET;
 
 function esc(s: string): string {
   return s
@@ -20,14 +19,17 @@ function esc(s: string): string {
  * Ek error ka email sirf ek baar (mailed_at se dedupe) — inbox spam nahi hota.
  */
 export async function POST(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (!CRON_SECRET || auth !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  // Auth paar ho gayi — yaani cron ki call sach me aayi AUR secret bhi sahi
-  // tha. Yahi wo ek nishaan hai jo admin ko "job hi nahi hai" aur "job hai par
-  // secret purana hai" me farq karne deta hai (wajah `lib/cron-heartbeat.ts`).
-  beatCron("error-digest");
+  /**
+   * Cron ka pehra — aur ek 401 jo KHUD apni wajah batata hai.
+   *
+   * ⚠️ Pehle yahan ek khaali `{"error":"unauthorized"}` laut-ta tha, aur wo
+   * teen bilkul alag halaat ko ek jaisa dikhata tha: env set hi na hona,
+   * header ka na aana, aur dono taraf alag-alag value hona. Teenon ka ilaaj
+   * alag hai. Poori wajah `lib/cron-auth.ts` par likhi hai — nabz bhi wahi
+   * chhodta hai, isliye yahan alag se `beatCron` ki zaroorat nahi.
+   */
+  const denied = requireCron(request, "error-digest");
+  if (denied) return denied;
 
   const errors = await getUnmailedErrors(50);
   if (!errors.length) return NextResponse.json({ sent: 0 });
