@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, Animated, Easing } from "react-native";
+import { View, Text, Pressable, Animated, Easing, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -54,7 +54,26 @@ export default function LanguageSelect() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <View style={styles.content}>
+      {/**
+       * ⚠️ ScrollView, seedha `View` nahi — warna chhoti screen par teesri bhasha
+       * ka option kat jaata hai.
+       *
+       * Neeche ka `footer` (CTA + note) alag bhai hai, isliye button to hamesha
+       * dikhta hai — par upar ka hissa ~510px maangta hai (84 ka logo, do line ka
+       * welcome, tagline, aur teen option). 320×568 wale phone par footer ke baad
+       * itni jagah bachti hi nahi, aur system ka font bada kiya ho to kisi bhi
+       * phone par nahi bachti. Us haalat me user teesri bhasha dekh hi nahi
+       * paata — aur ye app ki SABSE PEHLI screen hai.
+       *
+       * `flexShrink: 1` (na ki `flex: 1`) isliye ki badi screen par
+       * `space-between` ka pehle jaisa faila hua look waisa hi rahe; jagah kam
+       * padne par hi ye sikudta aur scroll hota hai.
+       */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Logo center me — pehle brand, phir baaki sab. */}
         <Animated.View
           style={[
@@ -106,7 +125,7 @@ export default function LanguageSelect() {
             );
           })}
         </View>
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <Pressable
@@ -126,6 +145,7 @@ const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream, justifyContent: "space-between" },
+  scroll: { flexShrink: 1 },
   content: { paddingHorizontal: 26, paddingTop: 30, ...CONTENT },
   hero: { alignItems: "center" },
   logoGlow: {

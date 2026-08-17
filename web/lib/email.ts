@@ -1520,6 +1520,26 @@ const AUTH_SHARED: Record<EmailLocale, { hello: string; expires: string }> = {
  * Supabase ka default 1 ghanta hai. Ginti minute me aati hai isliye minute me
  * hi likh dena aasan tha, par tab padhne wale ko khud hisaab lagana padta hai.
  */
+/**
+ * Code ka naap — lambai ke hisaab se, taaki 320px wale phone par bhi na kate.
+ *
+ * ⚠️ Ye ginti se nikla hai, andaaze se nahi. Sabse chhoti aam screen 320px hai;
+ * wahan code ke liye bachti hai:
+ *   320 − 24 (es-outer) − 40 (es-card) − 40 (code box) = 216px
+ * Monospace me ek ank ≈ 0.6em jagah leta hai, aur uske saath letter-spacing
+ * jud jaati hai. 34px/9px par 6 ank = ~176px (theek hai), par 8 ank = ~235px —
+ * yaani 216 se bahar, aur code do line me toot jaata ya kat jaata.
+ *
+ * Aam taur par code 6 ank ka hi hota hai, par lambai Supabase ke setting se
+ * badal sakti hai (6–10) — aur wahi baat is poore fix ki jaan hai: ek jagah
+ * badalne par doosri jagah tootna nahi chahiye. Isliye naap khud sikud jaata hai.
+ */
+function codeMetrics(len: number): { size: number; spacing: number } {
+  if (len <= 6) return { size: 34, spacing: 9 }; // ~176px
+  if (len <= 8) return { size: 28, spacing: 6 }; // ~182px
+  return { size: 24, spacing: 4 }; //               ~184px
+}
+
 function otpWindow(minutes: number, locale: EmailLocale): string {
   const whole = minutes >= 60 && minutes % 60 === 0;
   const h = minutes / 60;
@@ -1746,10 +1766,12 @@ export async function sendAuthEmail(t: {
         )}</p>`
       : "";
   // Code sabse bada aur sabse saaf — monospace + letter-spacing se ank ek-ek
-  // karke padhe jaate hain (0/O aur 1/l ka bhram bhi kam hota hai).
+  // karke padhe jaate hain (0/O aur 1/l ka bhram bhi kam hota hai). Naap code ki
+  // lambai se aata hai, taaki chhoti screen par kate nahi (`codeMetrics`).
+  const m = codeMetrics(t.code.length);
   const codeBox = t.code
     ? `<div style="margin:6px 0 18px;padding:20px;background:${CREAM};border:1px solid ${LINE};border-radius:16px;text-align:center;">
-         <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:700;letter-spacing:9px;color:${INK};">${escapeHtml(t.code)}</div>
+         <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:${m.size}px;font-weight:700;letter-spacing:${m.spacing}px;color:${INK};white-space:nowrap;">${escapeHtml(t.code)}</div>
          <div style="margin-top:10px;font-size:13px;color:${SOFT};">${escapeHtml(
            s.expires.replace("{t}", otpWindow(t.minutes, locale)),
          )}</div>

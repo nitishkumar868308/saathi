@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -30,8 +30,29 @@ export default function Onboarding() {
        * `KeyboardView` dono platform par ek hi kaam karta hai; `KeyboardAvoidingView`
        * naye Android par chalta hi nahi (poori wajah `lib/use-keyboard.ts` par).
        */}
+      {/**
+       * ⚠️ ScrollView, seedha `View` nahi — chhoti screen par warna sabse neeche
+       * ka hissa kat jaata hai.
+       *
+       * Is screen par gintee hui jagah lagbhag 670px maangti hai (76 ka logo,
+       * 38px ka title jo Hindi me do line ho jaata hai, teen point, naam ka
+       * khaana aur button). 320×568 wale phone par bachte hain ~548px, aur
+       * 360×640 par ~616 — dono kam. Aur system ka font bada kiya ho (bada
+       * text wali accessibility setting, jo hamare bahut se users ke liye
+       * sabse zaroori setting hai) to har phone par kam pad jaate hain.
+       *
+       * `View` me RN ka koi bachaav nahi hai: bachche default me sikudte nahi
+       * (`flexShrink: 0`), isliye "Shuru karo" ka button chup-chaap screen ke
+       * neeche chala jaata — aur is screen se aage badhne ka koi raasta hi nahi
+       * bachta. `flexGrow: 1` isliye ki badi screen par neeche wala spacer
+       * pehle jaisa hi kaam karta rahe.
+       */}
       <KeyboardView>
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.logo}>
             <SaathiLogo size={76} radius={26} />
           </View>
@@ -68,7 +89,7 @@ export default function Onboarding() {
             <Text style={styles.btnText}>{o.start}</Text>
             <Ionicons name="arrow-forward" size={18} color={tc.white} />
           </Pressable>
-        </View>
+        </ScrollView>
       </KeyboardView>
     </SafeAreaView>
   );
@@ -78,7 +99,9 @@ const CONTENT = { width: "100%", maxWidth: 560, alignSelf: "center" } as const;
 
 const useStyles = makeStyles((c) => ({
   safe: { flex: 1, backgroundColor: c.cream },
-  content: { flex: 1, padding: 28, paddingTop: 40, ...CONTENT },
+  // `flexGrow` (na ki `flex`) — ScrollView ke contentContainer par `flex: 1`
+  // uski height ko screen par baandh deta hai, yaani scroll hi khatam.
+  content: { flexGrow: 1, padding: 28, paddingTop: 40, ...CONTENT },
   logo: {
     height: 76,
     width: 76,

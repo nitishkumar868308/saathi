@@ -1,8 +1,13 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 
-import { emailConfigured, sendAuthEmail, type AuthEmailKind } from "@/lib/email";
-import { asLocale, localeForUserOrNull } from "@/lib/user-locale";
+import {
+  emailConfigured,
+  sendAuthEmail,
+  type AuthEmailKind,
+  type EmailLocale,
+} from "@/lib/email";
+import { localeForUserOrNull } from "@/lib/user-locale";
 import { logServerError } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
@@ -118,6 +123,20 @@ function signatureOk(headers: Headers, raw: string, secret: string): boolean {
   });
 }
 
+/**
+ * Do jagah se pehli kaam ki bhasha uthao.
+ *
+ * ⚠️ `asLocale(a ?? b)` se kaam nahi chalta: `a` koi kachhi value ho (purani
+ * app se `"fr"` jaisa kuch) to wo `hinglish` ban jaati hai aur `b` — jo sach me
+ * sahi thi — dekhi hi nahi jaati.
+ */
+function pickLocale(...vals: unknown[]): EmailLocale {
+  for (const v of vals) {
+    if (v === "hi" || v === "en" || v === "hinglish") return v;
+  }
+  return "hinglish";
+}
+
 /** Supabase hook isi shakl me error padhta hai. */
 function hookError(status: number, message: string) {
   return NextResponse.json(
@@ -216,15 +235,29 @@ export async function POST(request: Request) {
         (redirect ? `&redirect_to=${encodeURIComponent(redirect)}` : "");
 
   /**
-   * Bhasha: pehle `profiles.language` (app ka switcher wahin likhta hai).
+   * Bhasha kahan se — aur SIGN-UP par kram ulta kyun hai.
    *
-   * ⚠️ Sign-up par wo row abhi bani hi nahi hoti — us ek email ke liye bhasha
-   * sirf `user_metadata.language` me hoti hai, jo app `signUpEmail()` ke saath
-   * bhejti hai. Isliye yahan `…OrNull` chahiye: "row nahi mili" aur "user ne
-   * Hinglish chuni" do alag baatein hain.
+   * Aam haal me `profiles.language` hi sach hai: app ka language switcher wahin
+   * likhta hai, aur reset/login/email-change sab usi ke bharose chalte hain.
+   *
+   * ⚠️ Par sign-up ka pehla email us niyam ka apwad hai. `profiles` ki row
+   * `on_auth_user_created` trigger se usi pal ban jaati hai jab `auth.users` ki
+   * row banti hai (`supabase/profiles.sql`) — yaani email bhejte waqt row
+   * MAUJOOD hoti hai, bas uska `language` abhi column ka default (`hinglish`)
+   * hota hai, user ki pasand nahi. "Row nahi mili" wala raasta wahan kabhi
+   * chalta hi nahi, isliye us ek pal user ki asli chuni hui bhasha sirf
+   * `user_metadata.language` me milti hai (app `signUpEmail()` ke saath bhejti
+   * hai). Yahi galti pehle chhoot gayi thi: metadata bheja jaa raha tha par
+   * padha kabhi nahi jaata tha, aur Hindi wale naye user ka pehla email hamesha
+   * Hinglish me jaata.
+   *
+   * `supabase/language-column.sql` trigger me bhi ye bhasha utha leta hai, to
+   * dono taraf se pakka ho jaata hai — SQL na chalaya ho to bhi yahan se chalega.
    */
-  const locale =
-    (await localeForUserOrNull(user.id)) ?? asLocale(user.user_metadata?.language);
+  const fromDb = await localeForUserOrNull(user.id);
+  const fromMeta = user.user_metadata?.language;
+  const firstEmail = kind === "signup" || kind === "invite";
+  const locale = firstEmail ? pickLocale(fromMeta, fromDb) : pickLocale(fromDb, fromMeta);
 
   const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
 
