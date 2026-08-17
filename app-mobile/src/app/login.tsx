@@ -20,7 +20,7 @@ import { signInEmail, signUpEmail, signInGoogle } from "@/lib/auth";
 import { useToast } from "@/components/toast";
 import { savePendingReferral } from "@/lib/referral-pending";
 import { useOffers } from "@/lib/use-offers";
-import { useT } from "@/lib/i18n/LanguageProvider";
+import { useLocale, useT } from "@/lib/i18n/LanguageProvider";
 import { tpl } from "@/lib/i18n/dictionaries";
 import { deviceOwner, type DeviceOwner } from "@/lib/device";
 
@@ -195,6 +195,15 @@ export default function Login() {
   const toast = useToast();
   const offers = useOffers();
   const { login: l, deviceOwner: d } = useT();
+  /**
+   * Sign-up ke saath bhasha bhi jaati hai.
+   *
+   * Confirm wala email Supabase usi pal bhej deta hai jab account banta hai —
+   * `profiles` ki row (jahan bhasha rehti hai) tab tak hoti hi nahi. Isliye ye
+   * ek email apni bhasha sirf yahan se paa sakta hai. Poori wajah
+   * `lib/auth.ts` ke `signUpEmail()` par likhi hai.
+   */
+  const { locale } = useLocale();
   const [mode, setMode] = useState<"login" | "signup">("login");
   /**
    * Ye phone pehle se kisi ke naam par set hai kya.
@@ -259,7 +268,12 @@ export default function Login() {
       if (mode === "signup") {
         // Login hone ke baad auth-provider isko apply karega.
         await savePendingReferral(refCode);
-        const { needsConfirm } = await signUpEmail(email.trim(), password, name.trim());
+        const { needsConfirm } = await signUpEmail(
+          email.trim(),
+          password,
+          name.trim(),
+          locale,
+        );
         if (needsConfirm) {
           toast.show(l.confirmSent, "success");
         } else {

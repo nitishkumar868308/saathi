@@ -13,12 +13,27 @@ function client() {
   return supabase;
 }
 
-/** Email + password se naya account (naam ke saath). */
-export async function signUpEmail(email: string, password: string, name: string) {
+/**
+ * Email + password se naya account (naam aur bhasha ke saath).
+ *
+ * ⚠️ `language` ko metadata me bhejna zaroori hai, chahe wo `profiles` me bhi
+ * jaati ho. Wajah waqt ki hai: confirm wala email Supabase usi pal bhej deta hai
+ * jab `auth.users` ki row banti hai — `profiles` ki row (aur uska `language`) us
+ * waqt tak nahi hoti. Bina iske hamara Send Email Hook (`web/app/api/auth-email`)
+ * bhasha kahin se padh hi nahi sakta, aur account banate waqt ka pehla email —
+ * theek wo email jo Hindi wale buzurg ke liye sabse zyada maayne rakhta hai —
+ * hamesha Hinglish me chala jaata.
+ */
+export async function signUpEmail(
+  email: string,
+  password: string,
+  name: string,
+  language?: string,
+) {
   const { data, error } = await client().auth.signUp({
     email,
     password,
-    options: { data: { full_name: name } },
+    options: { data: { full_name: name, ...(language ? { language } : {}) } },
   });
   if (error) throw error;
   return { needsConfirm: !data.session };
@@ -114,7 +129,7 @@ export async function clearPendingPasswordReset(): Promise<void> {
 }
 
 /**
- * Reset ka 6-ank wala CODE — link ka doosra, aur zyada bharosemand, raasta.
+ * Reset ka CODE — link ka doosra, aur zyada bharosemand, raasta.
  *
  * ── Ye kyun chahiye tha ─────────────────────────────────────────────────
  *
@@ -138,10 +153,20 @@ export async function clearPendingPasswordReset(): Promise<void> {
  * kisi link par tap karne ki zaroorat hi nahi, aur user use kisi bhi device se
  * padh ke apne phone me type kar sakta hai.
  *
- * ⚠️ Iske chalne ke liye Supabase ke "Reset Password" email template me
- * `{{ .Token }}` hona ZAROORI hai (Authentication > Emails). Sirf
- * `{{ .ConfirmationURL }}` wale purane template me code aata hi nahi — aur tab
- * ye raasta user ko dikhega par kaam nahi karega.
+ * ⚠️ Code ki LAMBAI yahan tay nahi hoti. Wo Supabase ka setting hai
+ * (Authentication > Sign In / Providers > Email > Email OTP Length, 6 se 10
+ * tak) aur email me jitne ank aate
+ * hain, `verifyOtp` bhi utne hi maangta hai — poora, waisa hi. Ek waqt is par
+ * asli bug tha: dashboard 8 par set tha aur screen 6 ke baad kaat deti thi,
+ * yaani ye raasta user ko dikhta tha par chal kabhi nahi sakta tha. Isliye ab
+ * `forgot-password.tsx` koi ginti nahi maanti (`CODE_MAX`), aur email apni ginti
+ * khud gin ke likhta hai. Kahin bhi 6 likh dena wahi bug wapas le aayega.
+ *
+ * ⚠️ Code email me pahunchta hai `web/app/api/auth-email` se — Supabase ka Send
+ * Email Hook. Wahi mail user ki bhasha me bhejta hai. Hook band ho to Supabase
+ * apne Authentication > Emails wale template par gir jaata hai, aur us template
+ * me `{{ .Token }}` hona ZAROORI hai — sirf `{{ .ConfirmationURL }}` wale
+ * template me code aata hi nahi.
  *
  * Kaamyab hone par yahan poora recovery session ban jaata hai — bilkul wahi jo
  * link se banta — isliye iske turant baad `setNewPassword()` chal sakta hai.

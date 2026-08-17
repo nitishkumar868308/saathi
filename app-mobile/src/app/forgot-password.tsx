@@ -60,7 +60,7 @@ export default function ForgotPassword() {
   const [busy, setBusy] = useState(false);
   /** Link bhej diya — ab screen sirf "inbox dekho" kehti hai. */
   const [sent, setSent] = useState(String(expired ?? "") === "1");
-  /** Email me aaya 6-ank ka code — link ka doosra raasta. */
+  /** Email me aaya code — link ka doosra raasta. */
   const [code, setCode] = useState("");
 
   /**
@@ -82,7 +82,24 @@ export default function ForgotPassword() {
   }, [expired]);
 
   const valid = /\S+@\S+\.\S+/.test(email.trim());
-  const codeReady = code.replace(/\D/g, "").length >= 6;
+  /**
+   * Code kitne ank ka hai — ye HUM tay nahi karte.
+   *
+   * ⚠️ Yahan ek asli bug tha jisme code wala poora raasta chup-chaap bekaar pada
+   * tha. Ye screen 6 ank maanti thi (`maxLength={6}`, aur `slice(0, 6)` baaki
+   * kaat deta tha), jabki Supabase ka Email OTP Length (Authentication > Sign In
+   * / Providers > Email) 8 par set tha — yaani
+   * email me 8 ank aate the, app me sirf pehle 6 ghuste the, aur `verifyOtp`
+   * hamesha "code sahi nahi hai" kehta tha. User ke liye ye sabse bura roop tha:
+   * link bhi toota hua, aur uska bataya hua vikalp bhi kabhi na chalne wala.
+   *
+   * Isliye ab lambai kahin likhi hui nahi hai — 6 se 10 tak jo aaye, chal jaata
+   * hai (GoTrue isi hadd me deta hai). Dashboard ka setting badla to app ko
+   * chhoona nahi padega. Email bhi apni ginti khud gin ke likhta hai
+   * (`web/lib/email.ts` ka `sendAuthEmail`), isliye dono kabhi alag nahi honge.
+   */
+  const CODE_MAX = 10;
+  const codeReady = code.length >= 6;
 
   async function submit() {
     if (busy || !valid) return;
@@ -186,13 +203,13 @@ export default function ForgotPassword() {
                 />
                 <TextInput
                   value={code}
-                  onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
+                  onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, CODE_MAX))}
                   placeholder={l.resetCodePlaceholder}
                   placeholderTextColor={tc.inkSoft}
                   keyboardType="number-pad"
                   autoComplete="one-time-code"
                   textContentType="oneTimeCode"
-                  maxLength={6}
+                  maxLength={CODE_MAX}
                   returnKeyType="done"
                   onSubmitEditing={() => void submitCode()}
                   style={[styles.input, styles.codeInput]}
@@ -342,7 +359,7 @@ const useStyles = makeStyles((c) => ({
     color: c.inkSoft,
   },
   /**
-   * 6 ank — bade, khule hue akshar.
+   * Ank bade aur khule hue.
    *
    * Ye khaana aksar wo log bharte hain jinko email doosre device par dikh raha
    * hai; unhe ank ek-ek karke dekh ke type karne padte hain. Chhote, chipke hue

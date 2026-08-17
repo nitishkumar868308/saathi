@@ -1643,8 +1643,8 @@ const hinglish: Dict = {
       "Wo link ab nahi chalega — reset ke link ek hi baar chalte hain, aur email app khud unhe pehle khol leti hai. Neeche wala code seedha kaam karega.",
     resetCodeTitle: "Ya email me aaya code daalo",
     resetCodeSub:
-      "Usi email me 6 ank ka ek code bhi hai. Link na chale to wahi code yahan daal do — laptop par khula email bhi chalega.",
-    resetCodePlaceholder: "6 ank ka code",
+      "Usi email me ek code bhi hai. Link na chale to wahi code yahan daal do — laptop par khula email bhi chalega.",
+    resetCodePlaceholder: "Email wala code",
     resetCodeSubmit: "Code se aage badho",
     resetCodeNeedsEmail: "Pehle apna email daalo",
     resetCodeBad: "Ye code sahi nahi hai (ya beet chuka hai). Naya bhej ke dobara koshish karo.",
@@ -2581,8 +2581,8 @@ const hi: Dict = {
       "वह लिंक अब नहीं चलेगा — रीसेट के लिंक एक ही बार चलते हैं, और ईमेल ऐप खुद उन्हें पहले खोल लेती है। नीचे वाला कोड सीधे काम करेगा।",
     resetCodeTitle: "या ईमेल में आया कोड डालिए",
     resetCodeSub:
-      "उसी ईमेल में 6 अंकों का एक कोड भी है। लिंक न चले तो वही कोड यहाँ डाल दीजिए — लैपटॉप पर खुला ईमेल भी चलेगा।",
-    resetCodePlaceholder: "6 अंकों का कोड",
+      "उसी ईमेल में एक कोड भी है। लिंक न चले तो वही कोड यहाँ डाल दीजिए — लैपटॉप पर खुला ईमेल भी चलेगा।",
+    resetCodePlaceholder: "ईमेल वाला कोड",
     resetCodeSubmit: "कोड से आगे बढ़िए",
     resetCodeNeedsEmail: "पहले अपना ईमेल डालिए",
     resetCodeBad: "यह कोड सही नहीं है (या बीत चुका है)। नया भेजकर दोबारा कोशिश कीजिए।",
@@ -3500,8 +3500,8 @@ const en: Dict = {
       "That link won't work any more — reset links are single-use, and mail apps often open them before you do. The code below will work instead.",
     resetCodeTitle: "Or enter the code from the email",
     resetCodeSub:
-      "The same email also has a 6-digit code. If the link doesn't work, type that code here — it works even if the email is open on a laptop.",
-    resetCodePlaceholder: "6-digit code",
+      "The same email also has a code. If the link doesn't work, type that code here — it works even if the email is open on a laptop.",
+    resetCodePlaceholder: "Code from the email",
     resetCodeSubmit: "Continue with code",
     resetCodeNeedsEmail: "Enter your email first",
     resetCodeBad: "That code isn't right (or has expired). Send a new one and try again.",

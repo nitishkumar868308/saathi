@@ -22,11 +22,21 @@ export function asLocale(v: unknown): EmailLocale {
 }
 
 /**
- * User id se uski bhasha. Kuch bhi gadbad ho (id nahi, row nahi, network) to
- * Hinglish — bhasha ke chakkar me email/notification rukni nahi chahiye.
+ * Wahi cheez, par "pata nahi" ko chhupata nahi: row hi na mile (ya network
+ * toote) to `null`.
+ *
+ * ⚠️ Ye farq sirf ek jagah maayne rakhta hai, par wahan bahut rakhta hai —
+ * SIGN-UP wala confirm email. Us waqt `profiles` ki row abhi bani hi nahi hoti
+ * (ya default `hinglish` par padi hoti hai), aur user ki asli chuni hui bhasha
+ * sirf `auth.users.user_metadata.language` me hoti hai (app sign-up ke saath
+ * bhejti hai). `localeForUser()` wahan Hinglish lauta deta hai — aur Hinglish
+ * "default" aur Hinglish "user ne chuni" me koi farq nahi bacha rehta, isliye
+ * metadata par girna namumkin ho jaata hai. `null` wo darwaza khula rakhta hai.
  */
-export async function localeForUser(uid: string | null | undefined): Promise<EmailLocale> {
-  if (!uid || !SUPABASE_URL || !SERVICE) return "hinglish";
+export async function localeForUserOrNull(
+  uid: string | null | undefined,
+): Promise<EmailLocale | null> {
+  if (!uid || !SUPABASE_URL || !SERVICE) return null;
   try {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}&select=language&limit=1`,
@@ -35,10 +45,19 @@ export async function localeForUser(uid: string | null | undefined): Promise<Ema
         cache: "no-store",
       },
     );
-    if (!res.ok) return "hinglish";
+    if (!res.ok) return null;
     const rows = (await res.json()) as { language?: string | null }[];
-    return asLocale(rows[0]?.language);
+    const raw = rows[0]?.language;
+    return raw === "hi" || raw === "en" || raw === "hinglish" ? raw : null;
   } catch {
-    return "hinglish";
+    return null;
   }
+}
+
+/**
+ * User id se uski bhasha. Kuch bhi gadbad ho (id nahi, row nahi, network) to
+ * Hinglish — bhasha ke chakkar me email/notification rukni nahi chahiye.
+ */
+export async function localeForUser(uid: string | null | undefined): Promise<EmailLocale> {
+  return (await localeForUserOrNull(uid)) ?? "hinglish";
 }

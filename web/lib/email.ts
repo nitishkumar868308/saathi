@@ -1452,3 +1452,327 @@ export async function sendDeviceApprovalEmail(t: {
     userId: t.userId,
   });
 }
+
+/* ------------------------------------------------------------------ */
+/*  Supabase ke auth emails — ab hamare haath se, user ki bhasha me     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Password reset / signup confirm / magic link — yaani wo emails jo ab tak
+ * Supabase khud bhejta tha.
+ *
+ * ── Ye yahan kyun aaye ──────────────────────────────────────────────────
+ *
+ * ⚠️ Supabase ke Authentication > Emails wale template EK HI hote hain — poore
+ * project ke liye ek subject, ek body. Wahan `{{ .Token }}` aur
+ * `{{ .ConfirmationURL }}` to mil jaate hain, par ye jaanne ka koi zariya nahi
+ * hai ki jise mail ja rahi hai usne app me Hindi chuni thi ya English. Nateeja
+ * ye tha ki baaki har email (reminder, document, welcome, ticket) user ki
+ * bhasha me jaata tha, aur theek wo do — jo password bhool jaane par aur
+ * account banate waqt aate hain, yaani sabse pehle aur sabse zaroori — hamesha
+ * ek hi bhasha me. Jisne Hindi chuni thi uske paas bhi "Password reset karein"
+ * Hinglish me pahunchta tha.
+ *
+ * Iska ek hi saaf hal hai: Supabase ka **Send Email Hook**. Chalu hote hi
+ * GoTrue khud mail bhejna BAND kar deta hai aur har auth email ke liye
+ * `/api/auth-email` par POST karta hai — code, link aur user, sab de kar.
+ * Bhasha wahan `profiles.language` se uthti hai (sign-up par abhi row nahi
+ * hoti, isliye `user_metadata.language` se), aur mail hamare usi SMTP se jaata
+ * hai jisse baaki sab jaate hain — wahi logo, wahi footer, wahi shakl.
+ *
+ * ⚠️ Code ki LAMBAI yahan tay nahi hoti — wo Supabase (Authentication > Sign In
+ * / Providers > Email > Email OTP Length) tay karta hai. Isliye copy me ginti
+ * likhi hui NAHI hai, `{n}` se
+ * bhari jaati hai. Purana Supabase template "6-ank ka code" likhta tha jabki
+ * Supabase 8 ank bhej raha tha, aur app 6 ke baad kaat deti thi — us haal me wo
+ * code kabhi chal hi nahi sakta tha. Ginti do jagah likhi ho to ek din wo alag
+ * ho hi jaati hai.
+ */
+export type AuthEmailKind =
+  | "recovery"
+  | "signup"
+  | "magiclink"
+  | "invite"
+  | "email_change"
+  | "reauthentication";
+
+type AuthCopy = {
+  subject: string;
+  title: string;
+  intro: string;
+  /** Button ka label. Khaali = is mail me link hota hi nahi. */
+  cta: string;
+  /** Code wali line. `{n}` = code me kitne ank hain. */
+  codeLead: string;
+  ignore: string;
+};
+
+/** Har bhasha ke wo tukde jo saare auth mails me ek jaise hain. */
+const AUTH_SHARED: Record<EmailLocale, { hello: string; expires: string }> = {
+  hinglish: { hello: "Namaste", expires: "Ye code aur link {t} me expire ho jaate hain." },
+  hi: { hello: "नमस्ते", expires: "यह कोड और लिंक {t} में एक्सपायर हो जाते हैं।" },
+  en: { hello: "Hi", expires: "This code and link expire in {t}." },
+};
+
+/**
+ * "1 ghanta" — na ki "60 minute".
+ *
+ * Supabase ka default 1 ghanta hai. Ginti minute me aati hai isliye minute me
+ * hi likh dena aasan tha, par tab padhne wale ko khud hisaab lagana padta hai.
+ */
+function otpWindow(minutes: number, locale: EmailLocale): string {
+  const whole = minutes >= 60 && minutes % 60 === 0;
+  const h = minutes / 60;
+  if (locale === "hi") return whole ? `${h} घंटे` : `${minutes} मिनट`;
+  if (locale === "en") return whole ? (h === 1 ? "1 hour" : `${h} hours`) : `${minutes} minutes`;
+  return whole ? `${h} ghante` : `${minutes} minute`;
+}
+
+const AUTH_EMAIL: Record<AuthEmailKind, Record<EmailLocale, AuthCopy>> = {
+  /**
+   * ⚠️ Reset wali copy me code ko link jitni hi jagah di gayi hai, neeche kisi
+   * chhoti line me nahi. Wajah asli hai: reset ka link sabse zyada tootne wala
+   * raasta hai — Gmail ka scanner use user se pehle khol ke ek-baar chalne wala
+   * token kha jaata hai, aur laptop par khule mail me `saathi://` ko koi nahi
+   * jaanta. Code in dono se bacha hua hai. Poori list `app-mobile/src/lib/
+   * auth.ts` ke `verifyPasswordResetCode()` par likhi hai.
+   */
+  recovery: {
+    hinglish: {
+      subject: "Apka Saathi — password reset karo",
+      title: "Password reset karo 🔑",
+      intro: "Aapke Apka Saathi account ka password reset karne ki request aayi hai.",
+      cta: "Naya password banao",
+      codeLead:
+        "Link kaam na kare (ya email kisi doosre device par khula ho) to app me “Code se aage badho” par ye {n} ank ka code daal dijiye:",
+      ignore: "Aapne ye nahi manga tha? Tab kuch mat kariye — aapka password waisa hi rahega.",
+    },
+    hi: {
+      subject: "आपका साथी — पासवर्ड रीसेट करें",
+      title: "पासवर्ड रीसेट करें 🔑",
+      intro: "आपके आपका साथी अकाउंट का पासवर्ड रीसेट करने की रिक्वेस्ट आई है।",
+      cta: "नया पासवर्ड बनाएँ",
+      codeLead:
+        "लिंक काम न करे (या ईमेल किसी दूसरे डिवाइस पर खुला हो) तो ऐप में “कोड से आगे बढ़िए” पर यह {n} अंकों का कोड डाल दीजिए:",
+      ignore: "आपने यह नहीं माँगा था? तब कुछ मत कीजिए — आपका पासवर्ड वैसा ही रहेगा।",
+    },
+    en: {
+      subject: "Apka Saathi — reset your password",
+      title: "Reset your password 🔑",
+      intro: "Someone asked to reset the password for your Apka Saathi account.",
+      cta: "Set a new password",
+      codeLead:
+        "If the link doesn't work (or the email is open on another device), tap “Continue with code” in the app and enter this {n}-digit code:",
+      ignore: "Didn't ask for this? Then do nothing — your password stays as it is.",
+    },
+  },
+
+  signup: {
+    hinglish: {
+      subject: "Apka Saathi — email confirm kar lijiye",
+      title: "Email confirm kar lijiye ✅",
+      intro:
+        "Apka Saathi me aapka swagat hai. Bas ek aakhri kadam — ye email sach me aapka hai, itna confirm kar dijiye.",
+      cta: "Email confirm karo",
+      codeLead: "Link kaam na kare to app me ye {n} ank ka code daal dijiye:",
+      ignore: "Aapne account nahi banaya tha? Tab is email ko chhod dijiye — kuch nahi hoga.",
+    },
+    hi: {
+      subject: "आपका साथी — ईमेल कन्फ़र्म कर लीजिए",
+      title: "ईमेल कन्फ़र्म कर लीजिए ✅",
+      intro:
+        "आपका साथी में आपका स्वागत है। बस एक आख़िरी क़दम — यह ईमेल सच में आपका है, इतना कन्फ़र्म कर दीजिए।",
+      cta: "ईमेल कन्फ़र्म करें",
+      codeLead: "लिंक काम न करे तो ऐप में यह {n} अंकों का कोड डाल दीजिए:",
+      ignore: "आपने अकाउंट नहीं बनाया था? तब इस ईमेल को छोड़ दीजिए — कुछ नहीं होगा।",
+    },
+    en: {
+      subject: "Apka Saathi — confirm your email",
+      title: "Confirm your email ✅",
+      intro:
+        "Welcome to Apka Saathi. One last step — just confirm that this email really is yours.",
+      cta: "Confirm email",
+      codeLead: "If the link doesn't work, enter this {n}-digit code in the app:",
+      ignore: "Didn't create an account? Then ignore this email — nothing will happen.",
+    },
+  },
+
+  magiclink: {
+    hinglish: {
+      subject: "Apka Saathi — login ka link",
+      title: "Login ka link 🔓",
+      intro: "Apka Saathi me login karne ke liye ye raha aapka link.",
+      cta: "Login karo",
+      codeLead: "Link kaam na kare to app me ye {n} ank ka code daal dijiye:",
+      ignore:
+        "Aapne login ki koshish nahi ki thi? Tab kuch mat kariye — bina is link ke koi andar nahi aa sakta.",
+    },
+    hi: {
+      subject: "आपका साथी — लॉगिन का लिंक",
+      title: "लॉगिन का लिंक 🔓",
+      intro: "आपका साथी में लॉगिन करने के लिए यह रहा आपका लिंक।",
+      cta: "लॉगिन करें",
+      codeLead: "लिंक काम न करे तो ऐप में यह {n} अंकों का कोड डाल दीजिए:",
+      ignore:
+        "आपने लॉगिन की कोशिश नहीं की थी? तब कुछ मत कीजिए — बिना इस लिंक के कोई अंदर नहीं आ सकता।",
+    },
+    en: {
+      subject: "Apka Saathi — your sign-in link",
+      title: "Your sign-in link 🔓",
+      intro: "Here's your link to sign in to Apka Saathi.",
+      cta: "Sign in",
+      codeLead: "If the link doesn't work, enter this {n}-digit code in the app:",
+      ignore: "Didn't try to sign in? Then do nothing — nobody gets in without this link.",
+    },
+  },
+
+  invite: {
+    hinglish: {
+      subject: "Apka Saathi — aapko invite kiya gaya hai",
+      title: "Aapko Saathi par bulaya gaya hai 🤍",
+      intro:
+        "Kisi ne aapko Apka Saathi par invite kiya hai. Neeche wale link se apna account bana lijiye.",
+      cta: "Invite kabool karo",
+      codeLead: "Link kaam na kare to app me ye {n} ank ka code daal dijiye:",
+      ignore: "Ye invite aapke liye nahi tha? Tab is email ko chhod dijiye.",
+    },
+    hi: {
+      subject: "आपका साथी — आपको इनवाइट किया गया है",
+      title: "आपको साथी पर बुलाया गया है 🤍",
+      intro:
+        "किसी ने आपको आपका साथी पर इनवाइट किया है। नीचे वाले लिंक से अपना अकाउंट बना लीजिए।",
+      cta: "इनवाइट स्वीकार करें",
+      codeLead: "लिंक काम न करे तो ऐप में यह {n} अंकों का कोड डाल दीजिए:",
+      ignore: "यह इनवाइट आपके लिए नहीं था? तब इस ईमेल को छोड़ दीजिए।",
+    },
+    en: {
+      subject: "Apka Saathi — you've been invited",
+      title: "You've been invited to Saathi 🤍",
+      intro: "Someone invited you to Apka Saathi. Use the link below to set up your account.",
+      cta: "Accept the invite",
+      codeLead: "If the link doesn't work, enter this {n}-digit code in the app:",
+      ignore: "Wasn't this invite meant for you? Then just ignore this email.",
+    },
+  },
+
+  email_change: {
+    hinglish: {
+      subject: "Apka Saathi — naya email confirm kar lijiye",
+      title: "Naya email confirm kar lijiye 📧",
+      intro:
+        "Aapke Apka Saathi account ka email badalne ki request aayi hai. Confirm karne ke baad aapke saare reminder aur alert isi pate par aayenge.",
+      cta: "Naya email confirm karo",
+      codeLead: "Link kaam na kare to app me ye {n} ank ka code daal dijiye:",
+      ignore:
+        "Aapne email badalne ko nahi kaha tha? Tab kuch mat kariye, aur apna password turant badal lijiye.",
+    },
+    hi: {
+      subject: "आपका साथी — नया ईमेल कन्फ़र्म कर लीजिए",
+      title: "नया ईमेल कन्फ़र्म कर लीजिए 📧",
+      intro:
+        "आपके आपका साथी अकाउंट का ईमेल बदलने की रिक्वेस्ट आई है। कन्फ़र्म करने के बाद आपके सारे रिमाइंडर और अलर्ट इसी पते पर आएँगे।",
+      cta: "नया ईमेल कन्फ़र्म करें",
+      codeLead: "लिंक काम न करे तो ऐप में यह {n} अंकों का कोड डाल दीजिए:",
+      ignore:
+        "आपने ईमेल बदलने को नहीं कहा था? तब कुछ मत कीजिए, और अपना पासवर्ड तुरंत बदल लीजिए।",
+    },
+    en: {
+      subject: "Apka Saathi — confirm your new email",
+      title: "Confirm your new email 📧",
+      intro:
+        "Someone asked to change the email on your Apka Saathi account. Once confirmed, all your reminders and alerts will go to this address.",
+      cta: "Confirm new email",
+      codeLead: "If the link doesn't work, enter this {n}-digit code in the app:",
+      ignore:
+        "Didn't ask to change your email? Then do nothing, and change your password right away.",
+    },
+  },
+
+  /** Iska link hota hi nahi — GoTrue sirf code bhejta hai. */
+  reauthentication: {
+    hinglish: {
+      subject: "Apka Saathi — confirm karne ka code",
+      title: "Confirm karne ka code 🔐",
+      intro: "Ye kaam poora karne ke liye Saathi me neeche wala code daal dijiye:",
+      cta: "",
+      codeLead: "",
+      ignore: "Aapne ye nahi manga tha? Tab ye code kisi ko mat bataiye.",
+    },
+    hi: {
+      subject: "आपका साथी — कन्फ़र्म करने का कोड",
+      title: "कन्फ़र्म करने का कोड 🔐",
+      intro: "यह काम पूरा करने के लिए साथी में नीचे वाला कोड डाल दीजिए:",
+      cta: "",
+      codeLead: "",
+      ignore: "आपने यह नहीं माँगा था? तब यह कोड किसी को मत बताइए।",
+    },
+    en: {
+      subject: "Apka Saathi — your confirmation code",
+      title: "Your confirmation code 🔐",
+      intro: "Enter the code below in Saathi to finish what you started:",
+      cta: "",
+      codeLead: "",
+      ignore: "Didn't ask for this? Then don't share this code with anyone.",
+    },
+  },
+};
+
+/**
+ * Send Email Hook se aaya hua auth email — user ki bhasha me bhejo.
+ *
+ * `link` khaali ho to sirf code jaata hai (reauthentication aisa hi hai), aur
+ * `code` khaali ho to sirf button.
+ */
+export async function sendAuthEmail(t: {
+  to: string;
+  kind: AuthEmailKind;
+  name?: string | null;
+  code: string;
+  link: string;
+  minutes: number;
+  locale?: EmailLocale;
+  userId?: string | null;
+}): Promise<{ sent: boolean; skipped?: boolean }> {
+  const locale = t.locale ?? "hinglish";
+  const l = AUTH_EMAIL[t.kind][locale] ?? AUTH_EMAIL[t.kind].hinglish;
+  const s = AUTH_SHARED[locale] ?? AUTH_SHARED.hinglish;
+  const greet = t.name ? `${s.hello} ${escapeHtml(t.name)},` : `${s.hello},`;
+
+  const button = t.link && l.cta ? emailButton(t.link, escapeHtml(l.cta)) : "";
+  const lead =
+    t.code && l.codeLead
+      ? `<p style="margin:22px 0 10px;font-size:15px;line-height:1.65;color:${SOFT};">${escapeHtml(
+          l.codeLead.replace("{n}", String(t.code.length)),
+        )}</p>`
+      : "";
+  // Code sabse bada aur sabse saaf — monospace + letter-spacing se ank ek-ek
+  // karke padhe jaate hain (0/O aur 1/l ka bhram bhi kam hota hai).
+  const codeBox = t.code
+    ? `<div style="margin:6px 0 18px;padding:20px;background:${CREAM};border:1px solid ${LINE};border-radius:16px;text-align:center;">
+         <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:700;letter-spacing:9px;color:${INK};">${escapeHtml(t.code)}</div>
+         <div style="margin-top:10px;font-size:13px;color:${SOFT};">${escapeHtml(
+           s.expires.replace("{t}", otpWindow(t.minutes, locale)),
+         )}</div>
+       </div>`
+    : "";
+
+  const html = renderEmail(
+    l.title,
+    emailParagraph(greet) +
+      emailParagraph(l.intro) +
+      button +
+      lead +
+      codeBox +
+      `<p style="margin:0;font-size:13.5px;line-height:1.6;color:${SOFT};">${escapeHtml(l.ignore)}</p>`,
+    t.code ? `${t.code} — ${l.title}` : l.title,
+    locale,
+  );
+
+  return sendMail({
+    to: t.to,
+    subject: l.subject,
+    html,
+    kind: `auth_${t.kind}`,
+    userId: t.userId,
+  });
+}
