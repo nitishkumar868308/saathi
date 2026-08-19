@@ -69,6 +69,26 @@ export const COLOR_SPACE = "bt709";
 
 export const BUILTIN_EXPORT_PRESETS: readonly ExportPresetEntry[] = [
   {
+    /*
+     * Draft — Phase 11 me juda.
+     *
+     * ⚠️ Ye Section 3A ka apwaad **nahi** hai: CRF 23 quality bar se neeche hai,
+     * isliye iska naam hi "Draft" hai aur UI use saaf batata hai. Wajah asli
+     * hai — 30 second ki reel `high` par kai minute leti hai, aur "text thoda
+     * neeche karna hai" jaisi ek chhoti si baat check karne ke liye utna
+     * intezaar karna kaam rok deta hai. Isse banayi hui file share karne ke
+     * liye nahi hai, aur export dialog me yahi likha rehta hai.
+     */
+    id: "draft",
+    label: "Draft (tez, share ke liye nahi)",
+    hint: "Sirf khud dekhne ke liye — quality kam hai par render kai guna tez.",
+    crf: 23,
+    x264Preset: "veryfast",
+    audioBitrateKbps: 128,
+    scaleTo: null,
+    requiresMinHeight: null,
+  },
+  {
     id: "standard",
     label: "Standard",
     hint: "Instagram / Shorts ke liye kaafi. Sabse tez.",

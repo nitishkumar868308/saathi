@@ -4,7 +4,12 @@ import { resolve } from "node:path";
 import { COLOR_SPACE, GOP_SECONDS, requireExportPreset } from "@reel/core";
 import { requireRepoRoot } from "@reel/storage";
 import { bundle } from "@remotion/bundler";
-import { ensureBrowser, renderMedia, selectComposition } from "@remotion/renderer";
+import {
+  ensureBrowser,
+  makeCancelSignal,
+  renderMedia,
+  selectComposition,
+} from "@remotion/renderer";
 
 import type { RenderEngine, RenderRequest, RenderResult } from "./types";
 
@@ -70,6 +75,21 @@ export class RemotionRenderEngine implements RenderEngine {
 
     const renderStartedAt = Date.now();
 
+    /*
+     * Cancel (11.9) — Remotion ka apna signal.
+     *
+     * `AbortSignal` ko seedha Remotion ko nahi de sakte; uska apna
+     * `makeCancelSignal()` hai. Isliye yahan do sire jode jaate hain: bahar
+     * wala standard `AbortSignal`, andar Remotion wala. Iske bina cancel sirf
+     * DB me status badalta aur render peeche chalta rehta — CPU khaata hua,
+     * aur ant me ek anaath file bana kar.
+     */
+    const cancel = request.abortSignal ? makeCancelSignal() : null;
+    if (cancel && request.abortSignal) {
+      if (request.abortSignal.aborted) cancel.cancel();
+      else request.abortSignal.addEventListener("abort", () => cancel.cancel(), { once: true });
+    }
+
     await renderMedia({
       composition,
       serveUrl,
@@ -103,6 +123,7 @@ export class RemotionRenderEngine implements RenderEngine {
       enforceAudioTrack: true,
 
       ...(request.concurrency ? { concurrency: request.concurrency } : {}),
+      ...(cancel ? { cancelSignal: cancel.cancelSignal } : {}),
 
       onProgress: ({ progress, renderedFrames, encodedFrames, stitchStage }) => {
         request.onProgress?.({

@@ -48,6 +48,19 @@ export interface RenderRequest {
   onProgress?: (progress: RenderProgress) => void;
   /** Kitne frames ek saath — null = engine khud tay kare. */
   concurrency?: number | null;
+  /**
+   * Cancel ka signal (11.9).
+   *
+   * ⚠️ Ye interface me hai, engine ke andar nahi — kyunki cancel ka matlab har
+   * engine me alag hota hai (Remotion ka apna `cancelSignal`, pure-FFmpeg ka
+   * `child.kill()`). Bulane wale ko sirf itna pata hona chahiye ki abort kaise
+   * bhejna hai.
+   *
+   * Iske bina cancel ka matlab sirf "DB me status badal do" reh jaata — aur
+   * render peeche chalta rehta, CPU khaata rehta, aur ant me ek anaath file
+   * bana kar chhod deta.
+   */
+  abortSignal?: AbortSignal;
 }
 
 export interface RenderResult {

@@ -1,9 +1,10 @@
 "use client";
 
-import { FolderOpen, History, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Clapperboard, FolderOpen, History, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
+import { RendersPanel } from "@/components/editor/panels/RendersPanel";
 import { VersionsPanel } from "@/components/editor/panels/VersionsPanel";
 import { MediaPanel } from "@/components/media/MediaPanel";
 
@@ -35,6 +36,12 @@ export const LEFT_PANELS: readonly PanelEntry[] = [
     label: "Project",
     icon: SlidersHorizontal,
     component: ProjectPanel,
+  },
+  {
+    id: "renders",
+    label: "Renders",
+    icon: Clapperboard,
+    component: RendersPanel,
   },
   {
     id: "versions",

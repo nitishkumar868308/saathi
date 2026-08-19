@@ -267,7 +267,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 8 | in progress — core poora + naapa hua (8.4/8.5/8.6/8.9/8.11/8.13/8.14/8.16 verified); UI ka pointer wala hissa baaki | 2026-08-19 |
 | 9 | in progress — panel poora + naapa hua (9.1/9.2/9.3/9.5/9.6/9.6b/9.6c/9.8/9.9/9.11/9.12 verified); browser wala hissa baaki | 2026-08-19 |
 | 10 | in progress — registry+renderer poore aur naape hue (10.1-10.6, 10.8-10.12 verified); 10.7/10.13 browser par | 2026-08-20 |
-| 11 | not started | — |
+| 11 | in progress — pipeline poora likha; quality ke dono bar naape gaye; poora chakkar `studio/.env.local` par ruka | 2026-08-20 |
 | 12 | not started | — |
 | 13 | not started | — |
 | 14 | not started | — |
@@ -281,6 +281,55 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 22 | not started | — |
 | 23 | not started | — |
 | 24 | not started | — |
+
+---
+
+## 7. MILESTONE 1 ka summary (Phase 0-11) — 2026-08-20
+
+Ye section jaan-boojhkar **do hisson** me hai. Pehla wo jo chal chuka hai aur naapa ja
+chuka hai; doosra wo jo likha hua hai par abhi tak sirf compile hua hai. Beech ki koi
+line nahi — "lagbhag kaam kar raha hai" jaisi baat is poore project me sabse mehngi hai.
+
+### Jo sach me chalta hai (naapa gaya hai)
+
+| Cheez | Saboot |
+|---|---|
+| **Asli MP4 banti hai** | `npm run render:sample` → 29/29 checks. h264 High / yuv420p / 1080×1920@30 / aac 48kHz 2ch, faststart, bt709 tags |
+| **Ken Burns sach me chalta hai** | Rendered frames ke pixels se naapa: 312 / 360 / 408 px (expected 312.0 / 360.0 / 408.0 — farak 0px) |
+| **Audio A1 bar par hai** | `@reel/media` check: normalize ke baad LUFS target ke 1.5 ke andar, true peak 0 se neeche |
+| **Double-encode nahi hota** | Loudness pass ke pehle aur baad video ki frame ginti bilkul barabar |
+| **Asset probe asli hai** | ffprobe se: rotated phone video par stored 640×480, dikhne wala 480×640 |
+| **Thumbnail upscale nahi karti** | 120×90 image ka thumbnail 120×90 hi rehta hai |
+| **Timeline ka poora ganit** | 55 test — zoom, ruler (24/25/30/60 fps), virtualization, marquee, snapping, ghost = drop |
+| **Editing ke ops** | 213 assertion groups — cut/keep range, ripple delete, split + keyframes, overlap policy, 30 ops → 30 undo → deep equal |
+| **Panel registry se banta hai** | Ek banawati item type register karke saabit: uske controls, section, `when`, default — sab bina naye code ke |
+| **Naya animation = ek entry** | `grep rotateIn` poore repo me sirf registry entry + 2 test lines dikhata hai |
+
+Kul: **`npm run check`** → studio 8/9/32/55/20, core 213, media 16 — sab 0 fail.
+**`npm run typecheck`** → 6 workspaces, exit 0. **`npm run build:studio`** → pass.
+
+### Jo likha hua hai par abhi chalaya nahi gaya
+
+Ek hi wajah se — **`studio/.env.local` nahi hai**, isliye dev server uth hi nahi sakta:
+
+- poora studio UI (media library, preview player, timeline ka drag/trim, properties panel,
+  export dialog, render history)
+- upload ka chakkar (browser probe → presign → R2/local → server probe → thumbnail)
+- worker ka loop (job claim, render, upload, cancel, retry)
+- preview vs render ka frame comparison (6.13, 9.14, 10.13)
+
+Ye "shayad kaam karega" wali list hai, "kaam karta hai" wali nahi. Har phase ke doc me
+har box ke neeche saaf likha hai ki uska kya saboot hai aur kya baaki hai.
+
+### Milestone 1 ki line paar karne ke liye kya chahiye
+
+1. `cp studio/.env.local.example studio/.env.local` aur asli values (STUDIO_PASSWORD,
+   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, R2 keys ya `REEL_STORAGE_DRIVER=local`)
+2. Supabase SQL editor me do file chalao: `supabase/reel-studio-assets.sql` aur
+   `supabase/reel-studio-render.sql`
+3. `npm run dev:worker` (ek terminal) + `npm run dev:studio` (doosra)
+4. Phir 11.14 ka test: 30s reel banao, `high` par export, aur `ffprobe` + `ebur128` ka
+   output paste karo
 
 **Agent:** phase khatam karte waqt is table me apni row update karna (`complete` /
 `in progress — next 8.4`) aur date daalna.

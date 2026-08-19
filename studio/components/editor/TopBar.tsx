@@ -1,20 +1,22 @@
 "use client";
 
-import { ArrowLeft, Redo2, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, Redo2, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ExportDialog } from "@/components/editor/ExportDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { Button, IconButton } from "@/components/ui/Button";
 import { comboLabel, SHORTCUTS } from "@/lib/shortcuts";
 import { useEditorStore } from "@/lib/store";
 
 /**
- * Upar ki patti: naam, undo/redo, save ka haal, aur do band buttons.
+ * Upar ki patti: naam, undo/redo, save ka haal, aur Export.
  *
- * ⚠️ Preview aur Export **saaf-saaf disabled** hain aur tooltip me likha hai kyun.
- * Inhe chalne jaisa dikhana (ya chhupa dena) dono galat hote: pehla jhooth hai,
- * doosra ye bhula deta hai ki wo aane wale hain.
+ * ⚠️ "Preview" ka button **hata diya gaya** hai, disabled nahi chhoda. Phase 6
+ * se preview beech me hamesha chalta rehta hai — uske liye alag button ab kuch
+ * karta hi nahi, aur jo button kuch nahi karta wo toota hua button hai
+ * (README rule 5).
  */
 
 function shortcutHint(id: string): string {
@@ -32,8 +34,11 @@ export function TopBar() {
   const undoLabel = useEditorStore((state) => state.undoLabel);
   const redoLabel = useEditorStore((state) => state.redoLabel);
 
+  const setLeftPanel = useEditorStore((state) => state.setLeftPanel);
+
   const name = doc.project.name;
   const [draft, setDraft] = useState(name);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Naam bahar se bhi badal sakta hai (undo, version restore) — tab input ko
   // uske saath aana chahiye, warna wo purana naam pakde rehta hai.
@@ -105,19 +110,22 @@ export function TopBar() {
 
       <div className="flex items-center gap-1.5">
         <Button
-          disabled
-          title="Preview player Phase 6 me aayega — abhi ye button sach me kuch nahi karta"
-        >
-          Preview
-        </Button>
-        <Button
-          disabled
           variant="primary"
-          title="Export pipeline Phase 11 me aayega — abhi ye button sach me kuch nahi karta"
+          icon={<Download size={14} />}
+          onClick={() => setExportOpen(true)}
+          title="Asli MP4 banao"
         >
           Export
         </Button>
       </div>
+
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        // Export shuru hote hi Renders panel khol do — warna user ko lagta hai
+        // kuch hua hi nahi, aur wo dobara Export daba deta hai.
+        onStarted={() => setLeftPanel("renders")}
+      />
     </header>
   );
 }

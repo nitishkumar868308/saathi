@@ -35,6 +35,11 @@ import {
   createHistory,
   ANIMATION_PRESETS,
   BUILTIN_FONTS,
+  EXPORT_PRESETS,
+  PREFLIGHT_RULES,
+  estimateExportBytes,
+  preflight,
+  requireExportPreset,
   IDENTITY_ANIMATION,
   addAnimation,
   animationsMaxScale,
@@ -2571,6 +2576,239 @@ test("anjaan transition type par saaf error", () => {
     /nahi mila/,
     "anjaan transition",
   );
+});
+
+// ------------------------------------------------- Phase 11 (export pipeline)
+
+section("export preset (11.1)");
+
+test("draft preset juda par uska naam saaf batata hai ki wo kam quality hai", () => {
+  const draft = requireExportPreset("draft");
+  // Ye Section 3A ka apwaad hai, isliye uska label hi chetavni hona chahiye —
+  // warna koi use share karne wali file bana kar bhej dega.
+  assert.ok(draft.crf > 18, "draft ki CRF quality bar se upar honi chahiye");
+  assert.ok(/draft/i.test(draft.label));
+  assert.ok(/share/i.test(draft.label) || /share/i.test(draft.hint));
+});
+
+test("baaki teeno preset Section 3A ke andar hain", () => {
+  for (const id of ["standard", "high", "uhd"]) {
+    const preset = requireExportPreset(id);
+    assert.ok(preset.crf <= 18, `${id} ki CRF ${preset.crf} — chhat 18 hai`);
+    assert.ok(preset.audioBitrateKbps >= 192, `${id} ka audio ${preset.audioBitrateKbps}k`);
+  }
+});
+
+test("koi bhi preset upscale nahi karta", () => {
+  // "4K" ka label lagakar upscaled 1080p dena mana hai — isliye har preset ka
+  // scaleTo null hai aur uhd sirf tab matlab rakhta hai jab project 4K ho.
+  for (const preset of EXPORT_PRESETS.list()) {
+    assert.equal(preset.scaleTo, null, `${preset.id} resize kar raha hai`);
+  }
+  assert.equal(requireExportPreset("uhd").requiresMinHeight, 2160);
+});
+
+section("preflight — error aur warning ka farak (11.4)");
+
+/** Ek chalne layak doc + uske assets. */
+function exportFixture(): {
+  doc: Doc;
+  assets: Record<string, { width: number | null; height: number | null; durationMs: number | null }>;
+} {
+  const base = createEmptyProject({ name: "Export fixture" });
+  const item = createItem("image", {
+    fps: base.project.fps,
+    trackId: base.tracks[0]!.id,
+    name: "Poster",
+    assetId: "as_ok",
+    startFrame: 0,
+    durationInFrames: 90,
+  });
+  const audio = createItem("audio", {
+    fps: base.project.fps,
+    trackId: base.tracks[1]!.id,
+    name: "VO",
+    assetId: "as_vo",
+    startFrame: 0,
+    durationInFrames: 90,
+  });
+
+  let doc = addItem(base, { item });
+  doc = addItem(doc, { item: audio });
+  doc = recomputeDuration(doc, undefined as never);
+
+  return {
+    doc,
+    assets: {
+      as_ok: { width: 2160, height: 3840, durationMs: null },
+      as_vo: { width: null, height: null, durationMs: 10_000 },
+    },
+  };
+}
+
+test("sahi doc par koi error nahi", () => {
+  const { doc, assets } = exportFixture();
+  const result = preflight({ doc, presetId: "standard", assets });
+  assert.equal(result.canExport, true, result.errors.map((i) => i.message).join(" | "));
+});
+
+test("khaali timeline error hai — export shuru hi nahi hona chahiye", () => {
+  const doc = createEmptyProject({ name: "Khaali" });
+  const result = preflight({ doc, presetId: "standard", assets: {} });
+  assert.equal(result.canExport, false);
+  assert.ok(result.errors.some((issue) => issue.ruleId === "empty-timeline"));
+});
+
+test("gayab asset error hai, warning nahi", () => {
+  const { doc } = exportFixture();
+  // Asset list se hata do — clip ab gulaabi card banegi.
+  const result = preflight({ doc, presetId: "standard", assets: {} });
+  assert.equal(result.canExport, false);
+  assert.ok(result.errors.some((issue) => issue.ruleId === "missing-asset"));
+});
+
+test("blurry image warning hai — rok nahi", () => {
+  const { doc, assets } = exportFixture();
+  // 480p image ko 1080x1920 frame me daalo.
+  const result = preflight({
+    doc,
+    presetId: "standard",
+    assets: { ...assets, as_ok: { width: 640, height: 480, durationMs: null } },
+  });
+  assert.equal(result.canExport, true, "blurry image export rokne layak nahi hai");
+  assert.ok(result.warnings.some((issue) => issue.ruleId === "upscale"));
+});
+
+test("upscale ki warning me animation ka scale bhi ginta hai (10.11 + 11.4)", () => {
+  const { doc, assets } = exportFixture();
+  // Source bilkul theek naap ka hai — bina animation ke koi warning nahi.
+  const okAssets = { ...assets, as_ok: { width: 1080, height: 1920, durationMs: null } };
+  assert.equal(
+    preflight({ doc, presetId: "standard", assets: okAssets }).warnings.some(
+      (issue) => issue.ruleId === "upscale",
+    ),
+    false,
+  );
+
+  // Ab Ken Burns 1 -> 1.5 lagao. Blur clip ke *aakhir* me aayega, isliye
+  // chalte hue wala scale dekhne se ye galti chhoot jaati.
+  const withZoom = addAnimation(doc, { itemIds: [doc.items[0]!.id], typeId: "kenburns" });
+  const zoomed = setAnimationParam(withZoom, {
+    itemId: doc.items[0]!.id,
+    index: 0,
+    path: "to",
+    value: 1.5,
+  });
+
+  assert.ok(
+    preflight({ doc: zoomed, presetId: "standard", assets: okAssets }).warnings.some(
+      (issue) => issue.ruleId === "upscale",
+    ),
+    "Ken Burns ka zoom upscale warning me aana chahiye tha",
+  );
+});
+
+test("chup reel warning hai", () => {
+  const { doc, assets } = exportFixture();
+  const muted = setItemsProperty(doc, {
+    itemIds: doc.items.map((item) => item.id),
+    path: "audio.muted",
+    value: true,
+  });
+  assert.ok(
+    preflight({ doc: muted, presetId: "standard", assets }).warnings.some(
+      (i) => i.ruleId === "silent",
+    ),
+  );
+});
+
+test("volume 1 se upar par clipping ki warning", () => {
+  const { doc, assets } = exportFixture();
+  const loud = setItemsProperty(doc, {
+    itemIds: [doc.items[1]!.id],
+    path: "audio.volume",
+    value: 2,
+  });
+  assert.ok(
+    preflight({ doc: loud, presetId: "standard", assets }).warnings.some(
+      (i) => i.ruleId === "clipping-risk",
+    ),
+  );
+});
+
+test("clip apne source se lambi ho to warning (kaala frame aayega)", () => {
+  const { doc, assets } = exportFixture();
+  // VO ka source 10s hai; clip ko bahut lamba kar do.
+  const longer = trimItemEnd(doc, { itemId: doc.items[1]!.id, deltaFrames: 400 });
+  assert.ok(
+    preflight({ doc: longer, presetId: "standard", assets }).warnings.some(
+      (i) => i.ruleId === "source-shorter",
+    ),
+  );
+});
+
+test("1080p project par 4K preset warning deta hai", () => {
+  const { doc, assets } = exportFixture();
+  const result = preflight({ doc, presetId: "uhd", assets });
+  assert.equal(result.canExport, true, "ye rokne layak nahi hai, sirf batane layak");
+  assert.ok(result.warnings.some((issue) => issue.ruleId === "preset-too-big"));
+});
+
+test("asset chahiye par lagi nahi — error", () => {
+  const base = createEmptyProject({ name: "Bina asset" });
+  const item = createItem("image", {
+    fps: base.project.fps,
+    trackId: base.tracks[0]!.id,
+    name: "Khaali image",
+    startFrame: 0,
+    durationInFrames: 30,
+  });
+  const doc = addItem(base, { item });
+  const result = preflight({ doc, presetId: "standard", assets: {} });
+  assert.equal(result.canExport, false);
+  assert.ok(result.errors.some((issue) => issue.ruleId === "needs-asset"));
+});
+
+test("har rule ka id apna hai (do rule ek naam par nahi)", () => {
+  const seen = new Set<string>();
+  for (const rule of PREFLIGHT_RULES) {
+    assert.equal(seen.has(rule.id), false, `"${rule.id}" do baar hai`);
+    seen.add(rule.id);
+  }
+});
+
+section("file size ka andaaza (11.5)");
+
+test("andaaza lambai ke saath badhta hai", () => {
+  const { doc } = exportFixture();
+  const short = estimateExportBytes(doc, "standard");
+  const longer = estimateExportBytes(
+    { ...doc, project: { ...doc.project, durationInFrames: doc.project.durationInFrames * 2 } },
+    "standard",
+  );
+  assert.ok(Math.abs(longer / short - 2) < 0.05, `${short} -> ${longer}`);
+});
+
+test("behtar preset ka andaaza bada hota hai", () => {
+  const { doc } = exportFixture();
+  assert.ok(estimateExportBytes(doc, "high") > estimateExportBytes(doc, "standard"));
+  assert.ok(estimateExportBytes(doc, "standard") > estimateExportBytes(doc, "draft"));
+});
+
+test("chhote frame ka andaaza chhota hota hai", () => {
+  const { doc } = exportFixture();
+  const small = { ...doc, project: { ...doc.project, width: 540, height: 960 } };
+  assert.ok(estimateExportBytes(small, "standard") < estimateExportBytes(doc, "standard"));
+});
+
+test("30 second ki reel ka andaaza dhang ki range me hai", () => {
+  // Ye ek "sanity" jaanch hai: andaaza asli renders se aaya hai, isliye
+  // 1080x1920@30 ki 30s reel 5-40 MB ke beech honi chahiye. Isse bahar jaana
+  // matlab formula me kahin koi factor ulta lag gaya.
+  const base = createEmptyProject({ name: "30s" });
+  const doc = { ...base, project: { ...base.project, durationInFrames: 30 * 30 } };
+  const bytes = estimateExportBytes(doc, "standard");
+  assert.ok(bytes > 5_000_000 && bytes < 40_000_000, `${bytes} bytes`);
 });
 
 // ------------------------------------------------------------------ sample
