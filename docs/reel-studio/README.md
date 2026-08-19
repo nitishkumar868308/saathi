@@ -256,7 +256,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 
 | Phase | Status | Last updated |
 |---|---|---|
-| 0 | not started | — |
+| 0 | in progress — 0.3-0.14 done, next 0.1/0.2 (FFmpeg install pending) | 2026-08-19 |
 | 1 | not started | — |
 | 2 | not started | — |
 | 3 | not started | — |
