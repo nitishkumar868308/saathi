@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { ConflictBanner } from "@/components/editor/ConflictBanner";
 import { LeftSidebar } from "@/components/editor/LeftSidebar";
 import { PreviewStage } from "@/components/editor/PreviewStage";
+import { SceneCards } from "@/components/editor/scenes/SceneCards";
 import { ResizeHandle } from "@/components/editor/ResizeHandle";
 import { RightSidebar } from "@/components/editor/RightSidebar";
 import { TimelineView } from "@/components/editor/timeline/TimelineView";
@@ -46,6 +47,7 @@ function EditorShell() {
   const store = useEditorStoreApi();
   const opError = useEditorStore((state) => state.opError);
   const clearOpError = useEditorStore((state) => state.clearOpError);
+  const mode = useEditorStore((state) => state.mode);
 
   useShortcuts();
   const { layout, setPanel } = useLayout();
@@ -100,17 +102,37 @@ function EditorShell() {
           onDelta={(delta) => setPanel("left", layout.left + delta)}
         />
 
+        {/*
+          * Beginner aur Advanced ek hi doc par chalte hain — koi conversion nahi
+          * (12.9). Preview dono me rehta hai, isliye beginner ko timeline
+          * kholne ki zaroorat hi nahi padti (12.10).
+          */}
         <div className="flex min-w-0 flex-1 flex-col">
           <PreviewStage />
-          <ResizeHandle
-            orientation="horizontal"
-            label="Timeline resize"
-            // Timeline neeche hai, isliye upar kheenchne (delta negative) par badi hoti hai.
-            onDelta={(delta) => setPanel("timeline", layout.timeline - delta)}
-          />
-          <div style={{ height: layout.timeline }} className="min-h-0 shrink-0">
-            <TimelineView />
-          </div>
+          {mode === "beginner" ? (
+            <>
+              <ResizeHandle
+                orientation="horizontal"
+                label="Scene cards resize"
+                onDelta={(delta) => setPanel("timeline", layout.timeline - delta)}
+              />
+              <div style={{ height: layout.timeline }} className="min-h-0 shrink-0 overflow-auto bg-ink-900">
+                <SceneCards />
+              </div>
+            </>
+          ) : (
+            <>
+              <ResizeHandle
+                orientation="horizontal"
+                label="Timeline resize"
+                // Timeline neeche hai, isliye upar kheenchne (delta negative) par badi hoti hai.
+                onDelta={(delta) => setPanel("timeline", layout.timeline - delta)}
+              />
+              <div style={{ height: layout.timeline }} className="min-h-0 shrink-0">
+                <TimelineView />
+              </div>
+            </>
+          )}
         </div>
 
         <ResizeHandle

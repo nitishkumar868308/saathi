@@ -268,7 +268,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 9 | in progress — panel poora + naapa hua (9.1/9.2/9.3/9.5/9.6/9.6b/9.6c/9.8/9.9/9.11/9.12 verified); browser wala hissa baaki | 2026-08-19 |
 | 10 | in progress — registry+renderer poore aur naape hue (10.1-10.6, 10.8-10.12 verified); 10.7/10.13 browser par | 2026-08-20 |
 | 11 | in progress — pipeline poora likha; quality ke dono bar naape gaye; poora chakkar `studio/.env.local` par ruka | 2026-08-20 |
-| 12 | not started | — |
+| 12 | in progress — scene engine poora aur naapa hua (12.1-12.5, 12.8, 12.14 verified); UI browser par | 2026-08-20 |
 | 13 | not started | — |
 | 14 | not started | — |
 | 15 | not started | — |

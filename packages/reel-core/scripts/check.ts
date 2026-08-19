@@ -35,6 +35,19 @@ import {
   createHistory,
   ANIMATION_PRESETS,
   BUILTIN_FONTS,
+  addScene,
+  deleteScene,
+  duplicateScene,
+  isSceneCustomEdited,
+  itemEndFrame,
+  listSceneTypes,
+  missingRequiredSlots,
+  reorderScenes,
+  repairScenes,
+  requireSceneType,
+  setSceneDuration,
+  setSceneSlot,
+  validateSceneIntegrity,
   EXPORT_PRESETS,
   PREFLIGHT_RULES,
   estimateExportBytes,
@@ -744,7 +757,9 @@ test("deleteItems hata deta hai aur scene se bhi nikaal deta hai", () => {
   const { doc } = buildFixture();
   const withScene: Doc = {
     ...doc,
-    scenes: [{ id: "sc_1", name: "Intro", order: 0, itemIds: [doc.items[0]!.id] }],
+    scenes: [
+      { id: "sc_1", name: "Intro", order: 0, itemIds: [doc.items[0]!.id], type: "custom", slots: {} },
+    ],
     items: [{ ...doc.items[0]!, sceneId: "sc_1" }, ...doc.items.slice(1)],
   };
   assert.equal(safeParseDoc(withScene).success, true);
@@ -2810,6 +2825,410 @@ test("30 second ki reel ka andaaza dhang ki range me hai", () => {
   const bytes = estimateExportBytes(doc, "standard");
   assert.ok(bytes > 5_000_000 && bytes < 40_000_000, `${bytes} bytes`);
 });
+
+// ------------------------------------------------------- Phase 12 (scenes)
+
+section("scene types registry (12.1 / 12.2)");
+
+test("har scene type ke required slots ke bina build khaali lauta ta hai", () => {
+  // Ye jaanch isliye hai ki `addScene` khaali scene par saaf error de sake —
+  // aur wo tabhi ho sakta hai jab build() imaandaari se khaali laut aaye.
+  for (const entry of listSceneTypes()) {
+    if (entry.slots.every((slot) => !slot.required)) continue;
+    const items = entry.build({ slots: {}, fps: 30, sceneId: "sc_test" });
+    assert.equal(items.length, 0, `${entry.id} ne bina slot ke bhi item bana diya`);
+  }
+});
+
+test("har build() apne saare items par sceneId lagata hai", () => {
+  // Ek bhi item bina sceneId ke reh jaaye to wo card se gayab ho jaata hai aur
+  // timeline me anaath padha rehta — aur wo galti dikhti bahut baad me hai.
+  for (const entry of listSceneTypes()) {
+    const slots: Record<string, unknown> = {};
+    for (const slot of entry.slots) {
+      slots[slot.id] = slot.kind === "text" ? "Test text" : "as_test";
+    }
+    const items = entry.build({ slots, fps: 30, sceneId: "sc_x" });
+    for (const item of items) {
+      assert.equal(item.sceneId, "sc_x", `${entry.id} ka "${item.name}" bina sceneId ke hai`);
+    }
+  }
+});
+
+test("music scene ka volume apne aap kam hota hai", () => {
+  const items = requireSceneType("music").build({
+    slots: { audio: "as_music" },
+    fps: 30,
+    sceneId: "sc_m",
+  });
+  assert.ok(items[0]);
+  assert.ok(items[0].audio.volume < 0.5, "poore volume par music voiceover ko dabaa deta hai");
+});
+
+test("screen recording contain + blurred background par aati hai", () => {
+  const items = requireSceneType("screen_recording").build({
+    slots: { video: "as_rec" },
+    fps: 30,
+    sceneId: "sc_r",
+  });
+  const video = items.find((item) => item.type === "video");
+  assert.equal(video?.fit.mode, "contain", "cover par app ka aadha screen kat jaata hai");
+  assert.equal(video?.fit.background.kind, "blurred-asset");
+});
+
+test("required slot ki ginti sahi milti hai", () => {
+  assert.deepEqual(
+    missingRequiredSlots("image_audio", {}).map((slot) => slot.id),
+    ["image"],
+    "sirf image required hai; audio aur caption optional",
+  );
+  assert.deepEqual(missingRequiredSlots("image_audio", { image: "as_1" }), []);
+  // Khaali string bhi "nahi bhara" hai — warna khaali text scene ban jaata.
+  assert.equal(missingRequiredSlots("text", { text: "   " }).length, 1);
+});
+
+section("addScene (12.3)");
+
+test("scene jodne par items bante hain aur track apne aap milta hai", () => {
+  const base = createEmptyProject({ name: "Scenes" });
+  const doc = addScene(base, {
+    typeId: "image_audio",
+    slots: { image: "as_img", audio: "as_vo", caption: "Namaste" },
+  });
+
+  assert.equal(doc.scenes.length, 1);
+  // image + audio + caption = teen items.
+  assert.equal(doc.items.length, 3);
+  for (const item of doc.items) {
+    assert.ok(item.trackId, `${item.name} ko koi track nahi mila`);
+    assert.equal(item.sceneId, doc.scenes[0]!.id);
+  }
+});
+
+test("track na ho to naya ban jaata hai (beginner ko track ka pata hi nahi hota)", () => {
+  const base = createEmptyProject({ name: "Sirf do track" });
+  // Khaali project me video + audio track hote hain; text ka nahi.
+  assert.equal(base.tracks.some((track) => track.type === "text"), false);
+
+  const doc = addScene(base, { typeId: "text", slots: { text: "Hook line" } });
+  assert.ok(doc.tracks.length > base.tracks.length, "text ke liye naya track banna chahiye tha");
+  assert.equal(doc.items.length, 1);
+});
+
+test("zaroori slot bina bhare scene jodne par saaf error", () => {
+  const base = createEmptyProject({ name: "Khaali scene" });
+  throws(() => addScene(base, { typeId: "image", slots: {} }), /koi item nahi bana/, "khaali scene");
+});
+
+test("naye scene aage jud'te hain, ek doosre ke upar nahi", () => {
+  let doc = createEmptyProject({ name: "Teen scene" });
+  doc = addScene(doc, { typeId: "text", slots: { text: "Ek" } });
+  doc = addScene(doc, { typeId: "text", slots: { text: "Do" } });
+  doc = addScene(doc, { typeId: "text", slots: { text: "Teen" } });
+
+  const spans = sceneSpans(doc);
+  assert.equal(spans.length, 3);
+  // Ek ke baad ek — koi overlap nahi, koi gaddha nahi.
+  assert.equal(spans[0]![0], 0);
+  assert.equal(spans[1]![0], spans[0]![1]);
+  assert.equal(spans[2]![0], spans[1]![1]);
+});
+
+/** Har scene ka [start, end], order me. */
+function sceneSpans(doc: Doc): [number, number][] {
+  return [...doc.scenes]
+    .sort((a, b) => a.order - b.order)
+    .map((scene) => {
+      const items = doc.items.filter((item) => item.sceneId === scene.id);
+      return [
+        Math.min(...items.map((item) => item.startFrame)),
+        Math.max(...items.map(itemEndFrame)),
+      ] as [number, number];
+    });
+}
+
+function sceneNames(doc: Doc): string[] {
+  return [...doc.scenes].sort((a, b) => a.order - b.order).map((scene) => scene.name);
+}
+
+section("scene reorder ka ripple (12.5 — spec ka apna example)");
+
+/** `[Rahul][Papa][Problem][App][CTA]` — spec me likha hua doc. */
+function fiveScenes(): Doc {
+  let doc = createEmptyProject({ name: "Paanch scene" });
+  for (const name of ["Rahul", "Papa", "Problem", "App", "CTA"]) {
+    doc = addScene(doc, { typeId: "text", slots: { text: name }, name });
+  }
+  return doc;
+}
+
+test("shuruaat me paanchon scene bina gaddhe ke lage hain", () => {
+  const doc = fiveScenes();
+  assert.deepEqual(sceneNames(doc), ["Rahul", "Papa", "Problem", "App", "CTA"]);
+
+  const spans = sceneSpans(doc);
+  for (let i = 1; i < spans.length; i += 1) {
+    assert.equal(spans[i]![0], spans[i - 1]![1], `scene ${i} aur ${i - 1} ke beech gaddha`);
+  }
+});
+
+test("Papa aur Problem swap karne par frames dobara ginn jaate hain", () => {
+  const doc = fiveScenes();
+  const before = sceneSpans(doc);
+  const papa = [...doc.scenes].sort((a, b) => a.order - b.order)[1]!;
+
+  // Papa (index 1) ko Problem (index 2) ki jagah bhejo.
+  const next = reorderScenes(doc, { sceneId: papa.id, toIndex: 2 });
+
+  assert.deepEqual(sceneNames(next), ["Rahul", "Problem", "Papa", "App", "CTA"]);
+
+  const after = sceneSpans(next);
+  // Koi gaddha nahi, koi overlap nahi — yahi is op ka poora kaam hai.
+  assert.equal(after[0]![0], 0);
+  for (let i = 1; i < after.length; i += 1) {
+    assert.equal(after[i]![0], after[i - 1]![1], `swap ke baad scene ${i} par gaddha/overlap`);
+  }
+  // Kul lambai badalni nahi chahiye — sirf kram badla hai.
+  assert.equal(after[after.length - 1]![1], before[before.length - 1]![1]);
+});
+
+test("pehle scene ko aakhir me bhejna bhi saaf chalta hai", () => {
+  const doc = fiveScenes();
+  const first = [...doc.scenes].sort((a, b) => a.order - b.order)[0]!;
+  const next = reorderScenes(doc, { sceneId: first.id, toIndex: 4 });
+
+  assert.deepEqual(sceneNames(next), ["Papa", "Problem", "App", "CTA", "Rahul"]);
+  const spans = sceneSpans(next);
+  assert.equal(spans[0]![0], 0, "naya pehla scene 0 se shuru hona chahiye");
+});
+
+test("reorder ke baad project ki lambai wahi rehti hai", () => {
+  const doc = fiveScenes();
+  const scene = [...doc.scenes].sort((a, b) => a.order - b.order)[3]!;
+  const next = reorderScenes(doc, { sceneId: scene.id, toIndex: 0 });
+  assert.equal(next.project.durationInFrames, doc.project.durationInFrames);
+});
+
+section("baaki scene ops (12.4)");
+
+test("duplicate scene turant baad me lagta hai", () => {
+  const doc = fiveScenes();
+  const papa = [...doc.scenes].sort((a, b) => a.order - b.order)[1]!;
+  const next = duplicateScene(doc, { sceneId: papa.id });
+
+  assert.deepEqual(sceneNames(next), ["Rahul", "Papa", "Papa (copy)", "Problem", "App", "CTA"]);
+  // Copy ke items ke naye id hone chahiye.
+  const copy = [...next.scenes].sort((a, b) => a.order - b.order)[2]!;
+  for (const id of copy.itemIds) assert.equal(papa.itemIds.includes(id), false);
+});
+
+test("scene delete uske items ke saath hota hai aur gaddha nahi chhodta", () => {
+  const doc = fiveScenes();
+  const problem = [...doc.scenes].sort((a, b) => a.order - b.order)[2]!;
+  const next = deleteScene(doc, { sceneId: problem.id });
+
+  assert.deepEqual(sceneNames(next), ["Rahul", "Papa", "App", "CTA"]);
+  assert.equal(next.items.some((item) => item.sceneId === problem.id), false);
+
+  const spans = sceneSpans(next);
+  for (let i = 1; i < spans.length; i += 1) {
+    assert.equal(spans[i]![0], spans[i - 1]![1], "delete ke baad gaddha reh gaya");
+  }
+});
+
+test("setSceneDuration default me sirf sabse lambi item badalta hai", () => {
+  const base = createEmptyProject({ name: "Duration" });
+  const doc = addScene(base, {
+    typeId: "image_audio",
+    slots: { image: "as_img", audio: "as_vo" },
+  });
+  const scene = doc.scenes[0]!;
+  const audioBefore = doc.items.find((item) => item.type === "audio")!.durationInFrames;
+
+  const next = setSceneDuration(doc, {
+    sceneId: scene.id,
+    durationInFrames: audioBefore + 60,
+  });
+
+  // Ek item lambi hui, doosri waisi ki waisi — recording ko kheenchna use bigad
+  // deta hai, isliye default yahi hai.
+  const changed = next.items.filter((item) => item.durationInFrames !== audioBefore);
+  assert.equal(changed.length, 1, "sirf ek item badalni chahiye thi");
+});
+
+test("proportional par saare items anupaat me badalte hain", () => {
+  const base = createEmptyProject({ name: "Proportional" });
+  const doc = addScene(base, {
+    typeId: "image_audio",
+    slots: { image: "as_img", audio: "as_vo", caption: "Hi" },
+  });
+  const scene = doc.scenes[0]!;
+  const before = doc.items.map((item) => item.durationInFrames);
+
+  const next = setSceneDuration(doc, {
+    sceneId: scene.id,
+    durationInFrames: before[0]! * 2,
+    proportional: true,
+  });
+
+  const after = next.items.map((item) => item.durationInFrames);
+  for (let i = 0; i < before.length; i += 1) {
+    assert.equal(after[i], before[i]! * 2, `item ${i} anupaat me nahi badla`);
+  }
+});
+
+test("slot badalne se sirf uska item badalta hai, scene dobara nahi banta", () => {
+  const base = createEmptyProject({ name: "Slot" });
+  const doc = addScene(base, {
+    typeId: "image_audio",
+    slots: { image: "as_old", audio: "as_vo", caption: "Purana" },
+  });
+  const scene = doc.scenes[0]!;
+  const idsBefore = doc.items.map((item) => item.id).sort();
+
+  let next = setSceneSlot(doc, { sceneId: scene.id, slotId: "image", value: "as_new" });
+  next = setSceneSlot(next, { sceneId: scene.id, slotId: "caption", value: "Naya" });
+
+  // ⚠️ Sabse zaroori: item ke ids wahi rehne chahiye. Rebuild karne par naye id
+  // bante aur user ki har manual edit (jagah, scale, keyframes) mit jaati.
+  assert.deepEqual(next.items.map((item) => item.id).sort(), idsBefore, "scene dobara ban gaya");
+
+  assert.equal(next.items.find((item) => item.type === "image")?.assetId, "as_new");
+  assert.equal(next.items.find((item) => item.text !== null)?.text?.content, "Naya");
+  // Scene ke slots me bhi nayi value dikhni chahiye (card wahi padhta hai).
+  assert.equal(next.scenes[0]?.slots.image, "as_new");
+});
+
+test("anjaan slot par saaf error", () => {
+  const base = createEmptyProject({ name: "Anjaan slot" });
+  const doc = addScene(base, { typeId: "text", slots: { text: "Hi" } });
+  throws(
+    () => setSceneSlot(doc, { sceneId: doc.scenes[0]!.id, slotId: "kuch-bhi", value: "x" }),
+    /slot nahi hai/,
+    "anjaan slot",
+  );
+});
+
+section("scene ki sehat (12.8 / 12.12)");
+
+test("saaf doc me koi shikayat nahi", () => {
+  assert.deepEqual(validateSceneIntegrity(fiveScenes()), []);
+  const doc = fiveScenes();
+  for (const scene of doc.scenes) {
+    assert.equal(isSceneCustomEdited(doc, scene.id), false);
+  }
+});
+
+test("timeline se clip delete karne par scene ki list galat ho jaati hai", () => {
+  const doc = fiveScenes();
+  const scene = doc.scenes[0]!;
+  const broken = deleteItems(doc, { itemIds: [scene.itemIds[0]!] });
+
+  // `deleteItems` scene ki list se id nikaal deta hai, par scene khud khaali
+  // reh jaata hai — repair usko hata deta hai.
+  const repaired = repairScenes(broken, undefined as never);
+  assert.equal(repaired.scenes.length, 4, "khaali scene hat jaana chahiye");
+  assert.deepEqual(validateSceneIntegrity(repaired), []);
+});
+
+test("anaath item ka sceneId saaf hota hai, item delete nahi hota", () => {
+  const doc = fiveScenes();
+  const orphaned: Doc = {
+    ...doc,
+    // Scene hata do par item ka sceneId chhod do — bilkul wahi halat jo ek
+    // aadhe-adhoore AI patch se banti hai.
+    scenes: doc.scenes.slice(1),
+  };
+  assert.ok(validateSceneIntegrity(orphaned).some((issue) => issue.kind === "orphan-item"));
+
+  const repaired = repairScenes(orphaned, undefined as never);
+  // ⚠️ Item bacha rehna chahiye — kisi ki clip mita dena "repair" nahi hota.
+  assert.equal(repaired.items.length, doc.items.length);
+  assert.deepEqual(validateSceneIntegrity(repaired), []);
+});
+
+test("clip sarkane se scene 'custom edited' ho jaata hai", () => {
+  const doc = fiveScenes();
+  const scene = [...doc.scenes].sort((a, b) => a.order - b.order)[0]!;
+
+  assert.equal(isSceneCustomEdited(doc, scene.id), false);
+
+  /*
+   * Pehle scene ki clip ko sabse aage sarka do.
+   *
+   * ⚠️ Ye bhi "custom edited" hai, aur ye baat maine test likhte waqt seekhi.
+   * Pehle mera rule sirf overlap aur gaddha dekhta tha, isliye ye halat chhoot
+   * rahi thi: card #1 ab timeline ke aakhir me baitha hai. Video me wo scene
+   * sabse baad me aayega par card list me sabse upar dikhega — do alag sach.
+   */
+  const moved = moveItems(doc, { itemIds: [scene.itemIds[0]!], deltaFrames: 500 });
+  assert.equal(
+    isSceneCustomEdited(moved, scene.id),
+    true,
+    "card ka kram aur timeline ka kram alag ho gaye — badge dikhna chahiye",
+  );
+
+  /*
+   * Doosre scene ki clip beech me ghusa do — ab card ki simple duniya sach nahi
+   * rahi.
+   *
+   * ⚠️ Yahan `push` policy zaroori hai, aur ye baat maine test likhte waqt hi
+   * seekhi: default `overwrite` par ghusne wali clip neeche wali ko **kha jaati
+   * hai**, isliye scene 0 khaali reh jaata hai aur "custom edited" ka sawaal hi
+   * nahi uthta. Wo apni jagah sahi vyavhaar hai (neeche wala test) — par is
+   * baat ki jaanch nahi hai.
+   */
+  const other = [...doc.scenes].sort((a, b) => a.order - b.order)[3]!;
+  const intruded = moveItems(doc, {
+    itemIds: [other.itemIds[0]!],
+    deltaFrames: -1000,
+    policy: "push",
+  });
+  assert.equal(isSceneCustomEdited(intruded, scene.id), true);
+});
+
+test("overwrite policy doosre scene ki clip kha sakti hai — aur repair use saaf karta hai", () => {
+  /*
+   * Ye ek asli, jaayaz halat hai: user timeline me ek clip uthakar doosre scene
+   * ke upar rakh deta hai. Overwrite policy neeche wali clip mita deti hai, aur
+   * uska scene khaali reh jaata hai — card me ek aisa scene jisme kuch hai hi
+   * nahi.
+   *
+   * Isko rokna galat hoga (user ne jaan kar kiya), par chup rehna bhi galat hai.
+   * `repairScenes` khaali scene hata deta hai, aur baaki scenes ka kram seedha
+   * kar deta hai.
+   */
+  const doc = fiveScenes();
+  const first = [...doc.scenes].sort((a, b) => a.order - b.order)[0]!;
+  const fourth = [...doc.scenes].sort((a, b) => a.order - b.order)[3]!;
+
+  const overwritten = moveItems(doc, {
+    itemIds: [fourth.itemIds[0]!],
+    deltaFrames: -1000,
+    policy: "overwrite",
+  });
+  assert.equal(
+    overwritten.items.some((item) => item.sceneId === first.id),
+    false,
+    "pehle scene ki clip kat jaani chahiye thi",
+  );
+
+  const repaired = repairScenes(overwritten, undefined as never);
+  assert.equal(repaired.scenes.length, 4, "khaali scene hat jaana chahiye");
+  assert.deepEqual(validateSceneIntegrity(repaired), []);
+});
+
+test("anjaan scene type par shikayat aati hai", () => {
+  const doc = fiveScenes();
+  const broken: Doc = {
+    ...doc,
+    scenes: doc.scenes.map((scene, index) =>
+      index === 0 ? { ...scene, type: "koi-purana-type" } : scene,
+    ),
+  };
+  assert.ok(validateSceneIntegrity(broken).some((issue) => issue.kind === "unknown-type"));
+});
+
 
 // ------------------------------------------------------------------ sample
 

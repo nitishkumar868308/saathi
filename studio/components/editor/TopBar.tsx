@@ -35,6 +35,8 @@ export function TopBar() {
   const redoLabel = useEditorStore((state) => state.redoLabel);
 
   const setLeftPanel = useEditorStore((state) => state.setLeftPanel);
+  const mode = useEditorStore((state) => state.mode);
+  const setMode = useEditorStore((state) => state.setMode);
 
   const name = doc.project.name;
   const [draft, setDraft] = useState(name);
@@ -107,6 +109,33 @@ export function TopBar() {
       </div>
 
       <SaveStatus />
+
+      {/*
+        * Mode toggle (12.9) — ek hi project, ek hi doc, koi conversion nahi.
+        * Isliye yahan sirf ek flag badalta hai; neeche kaunsa view dikhega bas
+        * wahi tay hota hai.
+        */}
+      <div className="flex items-center rounded-md border border-ink-600">
+        {(["beginner", "advanced"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setMode(value)}
+            title={
+              value === "beginner"
+                ? "Scene Cards — bina timeline chhue poori reel"
+                : "Timeline — poora control"
+            }
+            className={
+              value === mode
+                ? "bg-terracotta/20 px-2 py-1 text-[11px] text-chalk-100 first:rounded-l-md last:rounded-r-md"
+                : "px-2 py-1 text-[11px] text-chalk-500 transition-colors hover:bg-ink-700 first:rounded-l-md last:rounded-r-md"
+            }
+          >
+            {value === "beginner" ? "Scenes" : "Timeline"}
+          </button>
+        ))}
+      </div>
 
       <div className="flex items-center gap-1.5">
         <Button

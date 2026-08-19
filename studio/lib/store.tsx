@@ -317,7 +317,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       inFrame: null,
       outFrame: null,
       overlapPolicy: DEFAULT_OVERLAP_POLICY,
-      mode: "advanced",
+      mode: readMode(project.id),
       leftPanelId: "media",
 
       saveStatus: "saved",
@@ -457,6 +457,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
       setMode(mode) {
         set({ mode });
+        rememberMode(get().projectId, mode);
       },
       setLeftPanel(leftPanelId) {
         set({ leftPanelId });
@@ -546,6 +547,48 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
     };
   });
+}
+
+/* --------------------------------------------------------------- mode yaad */
+
+/**
+ * Beginner/Advanced ka chunaav **per project** yaad rehta hai (12.9).
+ *
+ * ⚠️ Ye doc me **nahi** jaata, aur ye soch kar hai: mode is machine par kaam
+ * karne ka tarika hai, project ka data nahi. Doc me daalne par teen cheezein
+ * kharaab hoti — Ctrl+Z mode badal deta, mode badalna autosave chalata, aur
+ * ek hi project do machine par khole to dono ek doosre ka view badalte rehte.
+ *
+ * ⚠️ `typeof window` ki jaanch zaroori hai: store SSR ke dauraan bhi banta hai
+ * (dekho upar wala ⚠️), aur wahan `localStorage` hai hi nahi.
+ */
+const MODE_STORAGE_KEY = "reel-studio.mode.v1";
+
+type EditorMode = "beginner" | "advanced";
+
+function readMode(projectId: string): EditorMode {
+  if (typeof window === "undefined") return "advanced";
+  try {
+    const raw = window.localStorage.getItem(MODE_STORAGE_KEY);
+    if (!raw) return "advanced";
+    const map = JSON.parse(raw) as Record<string, EditorMode>;
+    return map[projectId] === "beginner" ? "beginner" : "advanced";
+  } catch {
+    return "advanced";
+  }
+}
+
+function rememberMode(projectId: string, mode: EditorMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(MODE_STORAGE_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, EditorMode>) : {};
+    map[projectId] = mode;
+    window.localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // localStorage bhara ho ya band ho — mode yaad na rehna kaam rokne layak
+    // galti nahi hai.
+  }
 }
 
 /* ------------------------------------------------------------------ context */

@@ -11,7 +11,6 @@ import {
 } from "../config/presets";
 import { createId } from "../id";
 import {
-  registerBuiltins,
   requireItemType,
   requireTrackType,
 } from "../registry/index";
@@ -31,9 +30,18 @@ import {
  * Defaults **registry** se aate hain, yahan hardcode nahi. Isliye naya item type
  * banane par usko "create" karna apne aap kaam karne lagta hai — is file me kuch
  * badalna nahi padta.
+ *
+ * ⚠️ Pehle yahan top-level par `registerBuiltins()` bulaya jaata tha. Wo Phase 12
+ * me tootа: `SCENE_TYPES` ke `build()` ko `createItem` chahiye, isliye
+ * `registry/index` -> `sceneTypes` -> `schema/factory` -> `registry/index` ka
+ * chakkar ban gaya, aur factory ka call registry ke aadhe bane hue module par
+ * chal padta ("Cannot access 'registered' before initialization").
+ *
+ * Ab wo call sirf `registry/index.ts` ke ant me hai — jo waise bhi sahi jagah
+ * hai, kyunki registry ko bharne ka kaam registry ka hai, factory ka nahi. Ye
+ * file `requireItemType` bulate hi registry ko import kar leti hai, isliye
+ * registration tab tak ho chuka hota hai.
  */
-
-registerBuiltins();
 
 type PlainObject = Record<string, unknown>;
 

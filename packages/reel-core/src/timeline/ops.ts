@@ -5,9 +5,13 @@ import { DEFAULT_OVERLAP_POLICY, type OverlapPolicy } from "../config/overlap";
 import { createId } from "../id";
 import { getByPath, setByPath } from "../path";
 import {
+  assetKindForSlot,
   clampTransitionFrames,
   createAnimation,
+  getItemType,
+  getSceneType,
   requireItemType,
+  requireSceneType,
   requireTransition,
   trackAccepts,
 } from "../registry/index";
@@ -1474,7 +1478,485 @@ export const setTransition = defineOp<SetTransitionArgs>("setTransition", (draft
   }
 });
 
+/* ==========================================================================
+ * Phase 12 — scenes
+ * ========================================================================== */
+
+/**
+ * Scene ke items ke liye track dhoondo, na mile to naya banao (12.3).
+ *
+ * ⚠️ Naya track **banane** ki ijaazat isliye hai ki beginner mode me user ne
+ * track ka naam bhi nahi suna hota. Wo "Image + awaaz" wala scene jodta hai aur
+ * usse yahi umeed hoti hai ki dono cheezein apni jagah baith jaayein. Agar track
+ * na hone par error aata, to Scene Cards mode adhoora reh jaata — aur beginner
+ * ko timeline kholna padta, jo iska poora matlab hi khatam kar deta.
+ */
+function trackForItem(draft: DocDraft, itemType: string): string {
+  const ordered = [...draft.tracks].sort((a, b) => a.order - b.order);
+  const existing = ordered.find((track) => trackAccepts(track.type, itemType));
+  if (existing) return existing.id;
+
+  const entry = requireItemType(itemType);
+  const maxOrder = draft.tracks.reduce((max, track) => Math.max(max, track.order), -1);
+  const track = createTrack(entry.defaultTrackType, { order: maxOrder + 1 });
+
+  draft.tracks.push(clone(track) as Draft<Track>);
+  return track.id;
+}
+
+/** Scene ke items kis frame range me hain. */
+function sceneSpan(draft: DocDraft, sceneId: string): { start: number; end: number } | null {
+  const items = draft.items.filter((item) => item.sceneId === sceneId);
+  if (items.length === 0) return null;
+  return {
+    start: Math.min(...items.map((item) => item.startFrame)),
+    end: Math.max(...items.map(itemEndFrame)),
+  };
+}
+
+/**
+ * Saare scenes ko unke `order` ke hisaab se ek ke baad ek laga do (12.5).
+ *
+ * ⚠️ **Ye is poore phase ka sabse nazuk hissa hai.** Scene 2 aur 3 swap karne
+ * par unke items ke `startFrame` dobara ginne padte hain — warna do cheezon me
+ * se ek hoti hai: ya to scenes ek doosre ke upar chadh jaate hain, ya beech me
+ * gaddha reh jaata hai aur video me kaali khaamoshi aati hai. Dono ek baar
+ * dekhne par pakde nahi jaate; sirf export ke baad dikhte hain.
+ *
+ * Har scene ke andar ki aapas ki doori bani rehti hai (items apne scene ke start
+ * se jitne door the, utne hi rehte hain) — sirf poora scene khiskta hai.
+ */
+function relayoutScenes(draft: DocDraft): void {
+  const ordered = [...draft.scenes].sort((a, b) => a.order - b.order);
+  let cursor = 0;
+
+  for (const scene of ordered) {
+    const items = draft.items.filter((item) => item.sceneId === scene.id);
+    if (items.length === 0) continue;
+
+    const start = Math.min(...items.map((item) => item.startFrame));
+    const end = Math.max(...items.map(itemEndFrame));
+    const shift = cursor - start;
+
+    if (shift !== 0) {
+      for (const item of items) item.startFrame = Math.max(0, item.startFrame + shift);
+    }
+    cursor += end - start;
+  }
+
+  // Order ki ginti bhi seedhi kar do — 0, 1, 2… taaki agla reorder saaf rahe.
+  ordered.forEach((scene, index) => {
+    scene.order = index;
+  });
+}
+
+export interface AddSceneArgs {
+  /** SCENE_TYPES registry ka id. */
+  typeId: string;
+  slots?: Record<string, unknown>;
+  name?: string;
+  durationInFrames?: number;
+  /** Kahan lagana hai. Default: sabse aakhir me. */
+  atIndex?: number;
+}
+
+/**
+ * Naya scene jodo (12.3).
+ *
+ * Items `SceneTypeEntry.build()` se bante hain — **wahi function jo Phase 21 ka
+ * AI bhi bulayega**. Do raaste rakhne par do editor ban jaate hain aur unme se
+ * ek hamesha thoda peeche reh jaata hai.
+ */
+export const addScene = defineOp<AddSceneArgs>("addScene", (draft, args) => {
+  const entry = requireSceneType(args.typeId);
+  const sceneId = createId("sc");
+
+  const built = entry.build({
+    slots: args.slots ?? {},
+    fps: draft.project.fps,
+    sceneId,
+    ...(args.durationInFrames === undefined ? {} : { durationInFrames: args.durationInFrames }),
+  });
+
+  if (built.length === 0) {
+    throw new TimelineOpError(
+      `"${entry.label}" scene se koi item nahi bana — zaroori slot bhare hain?`,
+    );
+  }
+
+  // Naya scene sabse aakhir me lagta hai; `relayoutScenes` uski asli jagah tay
+  // karta hai, isliye yahan sirf order chahiye.
+  const maxOrder = draft.scenes.reduce((max, scene) => Math.max(max, scene.order), -1);
+  const order = args.atIndex ?? maxOrder + 1;
+
+  // Beech me daalna ho to baaki ko aage khiskao.
+  for (const scene of draft.scenes) {
+    if (scene.order >= order) scene.order += 1;
+  }
+
+  draft.scenes.push({
+    id: sceneId,
+    name: args.name ?? entry.label,
+    order,
+    itemIds: built.map((item) => item.id),
+    type: entry.id,
+    slots: clone(args.slots ?? {}),
+  } as Draft<Doc>["scenes"][number]);
+
+  for (const item of built) {
+    const copy = clone(item);
+    copy.trackId = trackForItem(draft, copy.type);
+    draft.items.push(copy as Draft<Item>);
+  }
+
+  relayoutScenes(draft);
+  growDuration(draft);
+});
+
+export interface ReorderScenesArgs {
+  sceneId: string;
+  /** Nayi jagah (0 = sabse upar). */
+  toIndex: number;
+}
+
+export const reorderScenes = defineOp<ReorderScenesArgs>("reorderScenes", (draft, args) => {
+  const ordered = [...draft.scenes].sort((a, b) => a.order - b.order);
+  const from = ordered.findIndex((scene) => scene.id === args.sceneId);
+  if (from === -1) throw new TimelineOpError(`Scene "${args.sceneId}" nahi mila`);
+
+  const to = Math.min(ordered.length - 1, Math.max(0, Math.round(args.toIndex)));
+  if (to === from) return;
+
+  const [moved] = ordered.splice(from, 1);
+  if (moved) ordered.splice(to, 0, moved);
+  ordered.forEach((scene, index) => {
+    scene.order = index;
+  });
+
+  relayoutScenes(draft);
+  recomputeDuration.recipe(draft, undefined as never);
+});
+
+export interface SceneIdArgs {
+  sceneId: string;
+}
+
+export const duplicateScene = defineOp<SceneIdArgs>("duplicateScene", (draft, args) => {
+  const source = draft.scenes.find((scene) => scene.id === args.sceneId);
+  if (!source) throw new TimelineOpError(`Scene "${args.sceneId}" nahi mila`);
+
+  const newId = createId("sc");
+  const items = draft.items.filter((item) => item.sceneId === args.sceneId);
+
+  const copies = items.map((item) => {
+    const copy = clone(item) as Item;
+    copy.id = createId("it");
+    copy.sceneId = newId;
+    copy.locked = false;
+    return copy;
+  });
+
+  for (const scene of draft.scenes) {
+    if (scene.order > source.order) scene.order += 1;
+  }
+
+  draft.scenes.push({
+    id: newId,
+    name: `${source.name} (copy)`,
+    order: source.order + 1,
+    itemIds: copies.map((item) => item.id),
+    type: source.type,
+    slots: clone(source.slots),
+  } as Draft<Doc>["scenes"][number]);
+
+  for (const copy of copies) draft.items.push(copy as Draft<Item>);
+
+  relayoutScenes(draft);
+  growDuration(draft);
+});
+
+export const deleteScene = defineOp<SceneIdArgs>("deleteScene", (draft, args) => {
+  const scene = draft.scenes.find((entry) => entry.id === args.sceneId);
+  if (!scene) throw new TimelineOpError(`Scene "${args.sceneId}" nahi mila`);
+
+  const locked = draft.items.filter((item) => item.sceneId === args.sceneId && item.locked);
+  if (locked.length > 0) {
+    throw new TimelineOpError(
+      `Is scene me locked clips hain: ${locked.map((item) => item.name).join(", ")}`,
+    );
+  }
+
+  draft.items = draft.items.filter((item) => item.sceneId !== args.sceneId);
+  draft.scenes = draft.scenes.filter((entry) => entry.id !== args.sceneId);
+
+  relayoutScenes(draft);
+  recomputeDuration.recipe(draft, undefined as never);
+});
+
+export interface SetSceneDurationArgs {
+  sceneId: string;
+  durationInFrames: number;
+  /**
+   * `true` = scene ke saare items anupaat me badlein.
+   * `false` (default) = sirf sabse lambi (primary) item badle.
+   *
+   * ⚠️ Dono ka apna matlab hai aur isi liye ye ek chunaav hai, default nahi.
+   * "Image + awaaz" wale scene me aksar sirf tasveer lambi karni hoti hai aur
+   * awaaz waisi hi rehni chahiye (wo ek recording hai, use kheenchna use bigad
+   * dega). Par ek pure-visual scene me sab kuch saath badalna hi theek lagta hai.
+   */
+  proportional?: boolean;
+}
+
+export const setSceneDuration = defineOp<SetSceneDurationArgs>(
+  "setSceneDuration",
+  (draft, args) => {
+    const span = sceneSpan(draft, args.sceneId);
+    if (!span) throw new TimelineOpError(`Scene "${args.sceneId}" me koi item nahi hai`);
+
+    const next = Math.max(1, Math.round(args.durationInFrames));
+    const current = span.end - span.start;
+    if (next === current) return;
+
+    const items = draft.items.filter((item) => item.sceneId === args.sceneId && !item.locked);
+    if (items.length === 0) return;
+
+    if (args.proportional) {
+      const ratio = next / current;
+      for (const item of items) {
+        const offset = item.startFrame - span.start;
+        item.startFrame = span.start + Math.round(offset * ratio);
+        item.durationInFrames = Math.max(1, Math.round(item.durationInFrames * ratio));
+      }
+    } else {
+      // Sirf sabse lambi item — wahi scene ki lambai tay karti hai.
+      let primary = items[0] as Draft<Item>;
+      for (const item of items) {
+        if (item.durationInFrames > primary.durationInFrames) primary = item;
+      }
+      primary.durationInFrames = Math.max(1, primary.durationInFrames + (next - current));
+    }
+
+    relayoutScenes(draft);
+    recomputeDuration.recipe(draft, undefined as never);
+  },
+);
+
+export interface SetSceneSlotArgs {
+  sceneId: string;
+  slotId: string;
+  value: unknown;
+}
+
+/**
+ * Scene ka koi slot badlo — asset replace ya text edit (12.4).
+ *
+ * ⚠️ Ye scene ko **dobara nahi banata**. Rebuild karna aasan lagta hai (build()
+ * to hai hi), par wo user ki har manual edit mita deta — jo tasveer usne timeline
+ * me sarka kar theek ki thi wo wapas apni jagah chali jaati. Isliye yahan sirf
+ * usi item ka wo field badalta hai jo is slot se juda hai.
+ */
+export const setSceneSlot = defineOp<SetSceneSlotArgs>("setSceneSlot", (draft, args) => {
+  const scene = draft.scenes.find((entry) => entry.id === args.sceneId);
+  if (!scene) throw new TimelineOpError(`Scene "${args.sceneId}" nahi mila`);
+
+  const type = requireSceneType(scene.type);
+  const slot = type.slots.find((entry) => entry.id === args.slotId);
+  if (!slot) throw new TimelineOpError(`"${scene.type}" scene me "${args.slotId}" slot nahi hai`);
+
+  scene.slots[args.slotId] = args.value as never;
+
+  const items = draft.items.filter((item) => item.sceneId === args.sceneId && !item.locked);
+
+  if (slot.kind === "text") {
+    /*
+     * Text slot us item par lagta hai jispar pehle se text hai. Naya text item
+     * banana yahan galat hoga: scene me pehle se ek text item hai, aur doosra
+     * bana dene par dono ek doosre ke upar dikhte hain.
+     */
+    const target = items.find((item) => item.text !== null);
+    if (target?.text) {
+      const value = typeof args.value === "string" ? args.value : "";
+      target.text.content = value;
+      if (value.trim()) target.name = value.slice(0, 40);
+    }
+    return;
+  }
+
+  const wanted = assetKindForSlot(slot);
+  const target = items.find((item) => {
+    const entry = getItemType(item.type);
+    if (!entry?.needsAsset) return false;
+    if (!wanted) return true;
+    // Slot `asset:image` maangta hai to item bhi image hi hona chahiye.
+    return item.type === wanted;
+  });
+
+  if (target) target.assetId = typeof args.value === "string" ? args.value : null;
+});
+
+/* --------------------------------------------------- scene ki sehat (12.12) */
+
+export interface SceneIntegrityIssue {
+  kind: "orphan-item" | "missing-item" | "duplicate-order" | "unknown-type";
+  message: string;
+  sceneId?: string;
+  itemId?: string;
+}
+
+/**
+ * Scenes aur items ka rishta theek hai? (12.12)
+ *
+ * Ye toot'ta kaise hai: user timeline me ek clip delete kar deta hai, ya use
+ * doosre scene ke beech me sarka deta hai. Dono bilkul jaayaz kaam hain — par
+ * uske baad scene ki list aur items ki sachai alag ho jaati hain, aur Scene
+ * Cards chup-chaap galat dikhane lagte hain.
+ *
+ * ⚠️ Ye **sirf batata hai**, theek nahi karta. Repair ek alag op hai
+ * (`repairScenes`) taaki wo undo ho sake — aur taaki UI pehle dikha sake ki kya
+ * badlega.
+ */
+export function validateSceneIntegrity(doc: Doc): SceneIntegrityIssue[] {
+  const issues: SceneIntegrityIssue[] = [];
+  const sceneIds = new Set(doc.scenes.map((scene) => scene.id));
+  const itemIds = new Set(doc.items.map((item) => item.id));
+
+  for (const item of doc.items) {
+    if (item.sceneId && !sceneIds.has(item.sceneId)) {
+      issues.push({
+        kind: "orphan-item",
+        itemId: item.id,
+        message: `"${item.name}" ek aise scene se juda hai jo hai hi nahi (${item.sceneId}).`,
+      });
+    }
+  }
+
+  for (const scene of doc.scenes) {
+    if (!getSceneType(scene.type)) {
+      issues.push({
+        kind: "unknown-type",
+        sceneId: scene.id,
+        message: `Scene "${scene.name}" ka type "${scene.type}" ab registry me nahi hai.`,
+      });
+    }
+    for (const id of scene.itemIds) {
+      if (itemIds.has(id)) continue;
+      issues.push({
+        kind: "missing-item",
+        sceneId: scene.id,
+        itemId: id,
+        message: `Scene "${scene.name}" ek aisi clip gin raha hai jo delete ho chuki hai.`,
+      });
+    }
+  }
+
+  const seenOrder = new Set<number>();
+  for (const scene of doc.scenes) {
+    if (seenOrder.has(scene.order)) {
+      issues.push({
+        kind: "duplicate-order",
+        sceneId: scene.id,
+        message: `Do scenes ek hi jagah (order ${scene.order}) par hain.`,
+      });
+    }
+    seenOrder.add(scene.order);
+  }
+
+  return issues;
+}
+
+/**
+ * Upar wali sab gadbadiyan theek karo (12.12 ka "Fix" button).
+ *
+ * ⚠️ Ye **kuch delete nahi karta**. Orphan item ka `sceneId` khaali kar diya
+ * jaata hai (wo timeline par apni jagah rehta hai), aur gayab id list se hat
+ * jaati hai. Kisi ki clip mita dena "repair" nahi hota — wo ek aur nuksaan hota.
+ */
+export const repairScenes = defineOp<void>("repairScenes", (draft) => {
+  const sceneIds = new Set(draft.scenes.map((scene) => scene.id));
+  const itemIds = new Set(draft.items.map((item) => item.id));
+
+  for (const item of draft.items) {
+    if (item.sceneId && !sceneIds.has(item.sceneId)) item.sceneId = null;
+  }
+
+  for (const scene of draft.scenes) {
+    scene.itemIds = scene.itemIds.filter((id) => itemIds.has(id));
+    // Jo items khud ko is scene ka kehte hain par list me nahi hain, unhe jodo.
+    for (const item of draft.items) {
+      if (item.sceneId === scene.id && !scene.itemIds.includes(item.id)) {
+        scene.itemIds.push(item.id);
+      }
+    }
+  }
+
+  // Khaali scenes — inka koi matlab nahi bachta, aur card bhi khaali dikhta hai.
+  draft.scenes = draft.scenes.filter((scene) => scene.itemIds.length > 0);
+
+  const ordered = [...draft.scenes].sort((a, b) => a.order - b.order);
+  ordered.forEach((scene, index) => {
+    scene.order = index;
+  });
+});
+
+/**
+ * Scene ki shape "custom edited" ho chuki hai? (12.8)
+ *
+ * Scene Cards par ye badge dikhta hai. Wajah: user timeline me kuch bhi kar
+ * sakta hai — clip sarka sakta hai, trim kar sakta hai, ek aur clip jod sakta
+ * hai. Uske baad card ki simple duniya (ek scene = ek lagataar block) sach nahi
+ * rehti. Chupchaap sync tootne dena sabse bura hota; badge dikhana imaandaar hai.
+ */
+export function isSceneCustomEdited(doc: Doc, sceneId: string): boolean {
+  const items = doc.items.filter((item) => item.sceneId === sceneId);
+  if (items.length === 0) return false;
+
+  const start = Math.min(...items.map((item) => item.startFrame));
+  const end = Math.max(...items.map(itemEndFrame));
+
+  // Scene ke beech me koi aisi clip ghusi hai jo is scene ki nahi hai?
+  const intruder = doc.items.some(
+    (item) => item.sceneId !== sceneId && item.startFrame < end && itemEndFrame(item) > start,
+  );
+  if (intruder) return true;
+
+  // Scene ke andar gaddha — items lagatar nahi hain.
+  const sorted = [...items].sort((a, b) => a.startFrame - b.startFrame);
+  let reach = start;
+  for (const item of sorted) {
+    if (item.startFrame > reach) return true;
+    reach = Math.max(reach, itemEndFrame(item));
+  }
+
+  /*
+   * Scene ka kram timeline par badal chuka hai?
+   *
+   * ⚠️ Ye jaanch test likhte waqt judi. Pehle sirf overlap aur gaddha dekha
+   * jaata tha, aur ek asli halat chhoot rahi thi: `push` policy ke saath ek clip
+   * ko peeche sarkane par koi overlap banta hi nahi (baaki sab aage khisak jaate
+   * hain) — par card #1 ab timeline ke #4 par baitha hota hai. Card ki list aur
+   * video ka kram alag ho jaate hain, aur user ko kuch dikhta hi nahi.
+   */
+  const starts = doc.scenes
+    .map((entry) => {
+      const own = doc.items.filter((item) => item.sceneId === entry.id);
+      return own.length === 0
+        ? null
+        : { order: entry.order, start: Math.min(...own.map((item) => item.startFrame)) };
+    })
+    .filter((entry): entry is { order: number; start: number } => entry !== null);
+
+  const byOrder = [...starts].sort((a, b) => a.order - b.order);
+  for (let i = 1; i < byOrder.length; i += 1) {
+    if ((byOrder[i] as { start: number }).start < (byOrder[i - 1] as { start: number }).start) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface ReplaceDocArgs {
+
 
 
   /** Poora naya doc — caller ise `parseDoc`/`migrateDoc` se guzaar kar de. */
@@ -1536,6 +2018,13 @@ export const OPS = {
   applyAutoFit,
   setProjectSize,
   setProjectFps,
+  addScene,
+  reorderScenes,
+  duplicateScene,
+  deleteScene,
+  setSceneDuration,
+  setSceneSlot,
+  repairScenes,
   addTrack,
   removeTrack,
   reorderTracks,
@@ -1573,6 +2062,11 @@ export const STRUCTURAL_OPS: readonly OpName[] = [
   "cutRange",
   "keepRange",
   "pasteItems",
+  "addScene",
+  "reorderScenes",
+  "duplicateScene",
+  "deleteScene",
+  "setSceneDuration",
   "setProjectFps",
   "removeTrack",
 ];

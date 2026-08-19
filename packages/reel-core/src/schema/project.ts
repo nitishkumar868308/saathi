@@ -256,6 +256,26 @@ export const SceneSchema = z.object({
   name: z.string().min(1),
   order: z.number().int().min(0),
   itemIds: z.array(IdSchema),
+
+  /**
+   * SCENE_TYPES registry ka id (Phase 12).
+   *
+   * `.default("custom")` isliye hai ki Phase 1-11 ke docs me scenes ke paas
+   * type tha hi nahi. Unhe migration se guzarna padta to har purana project
+   * ek baar rewrite hota — aur wo ek aisa kaam hai jo kabhi-kabhi aadha hokar
+   * chhoot jaata hai. Default se purana doc bina chhue chalta rehta hai, aur
+   * "custom" ka matlab saaf hai: ye scene kisi registry type se nahi bana.
+   */
+  type: z.string().min(1).default("custom"),
+
+  /**
+   * Scene ke slots ki abhi ki value — `{ image: "as_123", caption: "Namaste" }`.
+   *
+   * Khula record isliye hai ki har scene type ke apne slots hote hain aur wo
+   * uski registry entry me likhe hain. Yahan unhe ginana matlab poori list
+   * dobara likhna, aur naya scene type jodna do jagah ka kaam ban jaata.
+   */
+  slots: z.record(z.unknown()).default({}),
 });
 
 export const BrandSchema = z.object({
