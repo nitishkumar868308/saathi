@@ -13,7 +13,8 @@
     "dev:worker": "npm run dev --workspace @reel/worker",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build:studio": "npm run build --workspace @reel/studio",
-    "check": "npm run check --workspaces --if-present"
+    "check": "npm run check --workspaces --if-present",
+    "storage-smoke": "npm run storage-smoke --workspace @reel/worker --"
   },
   "devDependencies": {
     "typescript": "^5.5.4"

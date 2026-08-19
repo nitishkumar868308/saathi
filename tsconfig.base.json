@@ -20,7 +20,8 @@
     "baseUrl": ".",
     "paths": {
       "@reel/core/*": ["packages/reel-core/src/*"],
-      "@reel/remotion/*": ["packages/reel-remotion/src/*"]
+      "@reel/remotion/*": ["packages/reel-remotion/src/*"],
+      "@reel/storage/*": ["packages/reel-storage/src/*"]
     }
   },
   "exclude": ["node_modules"]

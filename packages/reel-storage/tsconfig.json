@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node ka crypto/fs yahin chalta hai — @reel/core jaan-boojhkar iske bina hai.
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

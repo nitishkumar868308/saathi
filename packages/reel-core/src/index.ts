@@ -24,6 +24,10 @@ export * from "./schema/project";
 export * from "./schema/migrate";
 export * from "./schema/factory";
 
+// Storage — sirf contract aur key layout (asli drivers @reel/storage me)
+export * from "./storage/types";
+export * from "./storage/keys";
+
 // Timeline
 export * from "./timeline/ops";
 export * from "./timeline/history";

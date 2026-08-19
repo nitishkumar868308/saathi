@@ -4,5 +4,5 @@
     // Plain Node process hai — fs/path/process ke types chahiye.
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

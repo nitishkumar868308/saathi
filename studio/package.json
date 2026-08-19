@@ -2,7 +2,7 @@
   "name": "@reel/studio",
   "version": "0.0.0",
   "private": true,
-  "description": "AI Reel Studio ka editor — localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
+  "description": "AI Reel Studio ka editor \u2014 localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@reel/core": "*",
+    "@reel/storage": "*",
     "next": "^14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1"
