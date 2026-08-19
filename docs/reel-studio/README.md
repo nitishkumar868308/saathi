@@ -270,7 +270,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 11 | in progress — pipeline poora likha; quality ke dono bar naape gaye; poora chakkar `studio/.env.local` par ruka | 2026-08-20 |
 | 12 | in progress — scene engine poora aur naapa hua (12.1-12.5, 12.8, 12.14 verified); UI browser par | 2026-08-20 |
 | 13 | in progress — engine poora aur asli MP4 se naapa hua (13.1-13.6, 13.10-13.15 verified; do bug pakde gaye aur theek hue); 13.7 Phase 15 par, UI browser par | 2026-08-20 |
-| 14 | not started | — |
+| 14 | in progress — effects registry poori aur asli MP4 se naapi hui (14.1-14.14 verified; do bug pakde gaye); mask/blend ka browser wala hissa baaki | 2026-08-20 |
 | 15 | not started | — |
 | 16 | not started | — |
 | 17 | not started | — |

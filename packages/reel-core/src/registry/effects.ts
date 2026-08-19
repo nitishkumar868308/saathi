@@ -256,6 +256,19 @@ export const BUILTIN_EFFECTS: readonly EffectEntry[] = [
     step: 0.01,
   }),
 
+  filterEffect({
+    id: "invert",
+    label: "Invert",
+    icon: "CircleHalf",
+    kind: "color",
+    hint: "Rang ulte — negative jaisa",
+    cssName: "invert",
+    neutral: 0,
+    min: 0,
+    max: 1,
+    step: 0.01,
+  }),
+
   {
     id: "vignette",
     label: "Vignette",
