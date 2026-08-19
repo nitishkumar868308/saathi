@@ -45,6 +45,19 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
     { zoomId: playback.zoomId, draft: playback.draft },
   );
 
+  /**
+   * Player abhi DOM me hai ya nahi.
+   *
+   * ⚠️ Ye flag zaroori hai aur iski wajah ek asli bug thi: pehle render par
+   * `size` null hoti hai (ResizeObserver abhi bola hi nahi), isliye `<Player>`
+   * render hota hi nahi aur neeche wale saare effect `playerRef.current === null`
+   * dekh kar chup-chaap laut jaate the. Naap aane par Player mount to ho jaata,
+   * par effects ki dependency nahi badalti thi — matlab **listeners kabhi lagte
+   * hi nahi**. Screen par sab theek dikhta: preview bhi chalti, par playhead
+   * kahin update nahi hota. Isliye ab har effect ise bhi dekhta hai.
+   */
+  const playerMounted = layout.width > 0;
+
   /*
    * Player ko naya `inputProps` object har render par milta hai — aur milna bhi
    * chahiye, warna doc badalne par preview purani hi dikhti. `component` sthir
@@ -83,6 +96,14 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
    * playback har frame par apne aap ko seek karta rehta hai aur audio tootti hai.
    */
   const fromPlayer = useRef<number | null>(null);
+
+  /*
+   * Player mount hote waqt kis frame par khule. Ye **jamaaya hua** hai: har
+   * frameupdate par badalta hua `initialFrame` dena matlab Player ko har frame
+   * par ye batana ki uski shuruaat kahin aur thi — aur wo cheez sirf kabhi-kabhi,
+   * kisi ek build par phatti hai. Seek ka kaam neeche wala effect karta hai.
+   */
+  const initialFrame = useRef(playheadFrame);
 
   useEffect(() => {
     const player = playback.playerRef.current;
@@ -127,7 +148,7 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
     // usse baandhna matlab har play/pause par unhe utaarna-chadhana. Isliye
     // sirf fps par — baaki sab ref/callback se taaza padha jaata hai.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fps, store]);
+  }, [fps, store, playerMounted]);
 
   /* --------------------------------------------------- playhead -> player */
 
@@ -153,7 +174,7 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
     if (fromPlayer.current === playheadFrame) return;
     if (player.getCurrentFrame() === playheadFrame) return;
     throttle.current?.request(playheadFrame);
-  }, [playheadFrame, playback.playerRef]);
+  }, [playheadFrame, playback.playerRef, playerMounted]);
 
   /* ------------------------------------------------------- volume / mute */
 
@@ -163,7 +184,7 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
     player.setVolume(playback.volume);
     if (playback.muted) player.mute();
     else player.unmute();
-  }, [playback.volume, playback.muted, playback.playerRef]);
+  }, [playback.volume, playback.muted, playback.playerRef, playerMounted]);
 
   return (
     <div ref={boxRef} className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-4">
@@ -171,7 +192,7 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
         className="relative shrink-0 border border-ink-600"
         style={{ width: layout.width, height: layout.height }}
       >
-        {layout.width > 0 ? (
+        {playerMounted ? (
           <Player
             ref={playback.playerRef}
             component={ReelComposition}
@@ -189,7 +210,7 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
             // na hone par bhi kaam kare.
             spaceKeyToPlayOrPause={false}
             numberOfSharedAudioTags={audioTags}
-            initialFrame={playheadFrame}
+            initialFrame={initialFrame.current}
             /*
              * ⚠️ `imageSmoothing` / `image-rendering` yahan jaan-boojhkar chhua
              * nahi gaya (checklist 6.9). Browser ka default smooth scaling hi

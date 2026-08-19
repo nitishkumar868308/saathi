@@ -51,11 +51,18 @@ export function TimelineStrip() {
          * Playhead ki lakeer tracks ke upar — sirf dikhane ke liye, isliye
          * `pointer-events-none`. Iske bina ye lakeer hi har click kha jaati aur
          * neeche ke track select karna namumkin ho jaata.
+         *
+         * ⚠️ Wrapper par wahi `px-3` hai jo upar ScrubBar par hai. Iske bina
+         * lakeer poori chaudai par ginti hai aur bar se chhah pixel khisak kar
+         * chalti hai — bahut chhota farak, par timeline me wahi sabse pehle
+         * aankh me chubhta hai. Phase 7 ka asli ruler isi jagah aayega.
          */}
-        <div
-          className="pointer-events-none absolute inset-y-0 z-10 w-px bg-terracotta"
-          style={{ left: `calc(${(Math.min(playheadFrame, last) / last) * 100}% )` }}
-        />
+        <div className="pointer-events-none absolute inset-0 z-10 px-3">
+          <div
+            className="absolute inset-y-0 w-px bg-terracotta"
+            style={{ left: `${(Math.min(playheadFrame, last) / last) * 100}%` }}
+          />
+        </div>
 
         <ul className="divide-y divide-ink-800">
           {tracks.map((track) => {

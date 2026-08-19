@@ -22,7 +22,13 @@ export function GuidesOverlay({ guideId }: { guideId: string }) {
   );
 
   return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden>
+    /*
+     * `overflow-hidden` ke bina neeche wala `boxShadow: 0 0 0 9999px` frame ke
+     * bahar nikal kar poore editor par kaali chaadar daal deta hai. Shadow hi
+     * safe area ke bahar ka hissa dhundhla karta hai, isliye use hataya nahi ja
+     * sakta — usko yahin kaatna padta hai.
+     */
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {/* Safe area — andar ka hissa saaf, bahar ka halka dhundhla. */}
       <div
         className="absolute border border-dashed border-terracotta/70"

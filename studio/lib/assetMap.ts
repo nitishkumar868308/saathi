@@ -95,17 +95,13 @@ export function useAssetMap(doc: Doc): ResolvedAssets {
   }, []);
 
   useEffect(() => {
-    let alive = true;
     setState((previous) => ({ ...previous, loading: true }));
-    void resolve().finally(() => {
-      if (!alive) return;
-    });
+    // Purana jawab beech me aa jaaye to `resolve()` khud usko gira deta hai
+    // (wahan ids dobara milaayi jaati hain), isliye yahan koi `alive` flag nahi.
+    void resolve();
 
     const timer = setInterval(() => void resolve(), REFRESH_INTERVAL_MS);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
+    return () => clearInterval(timer);
   }, [key, resolve]);
 
   return state;

@@ -27,6 +27,23 @@ likhe gaye hain, taaki agla chat bina dhokha khaye aage badh sake:
 isliye studio dev server uth hi nahi sakta. Dono aate hi 5.4, 5.5 aur 5.12 turant verify ho
 jaayenge — command neeche "Verify" me hain.
 
+**⚠️ Remotion ka bundled ffmpeg iska vikalp NAHI hai.** `node_modules/@remotion/
+compositor-win32-x64-msvc/` me `ffmpeg.exe` aur `ffprobe.exe` dono padte hain (n7.1), aur
+pehli nazar me lagta hai ki system ka ffmpeg install karne ki zaroorat hi nahi. Chala kar
+dekha gaya — wo **chhanta hua build** hai:
+
+```
+$ .../compositor-win32-x64-msvc/ffmpeg.exe -filters | grep showwavespic
+(kuch nahi)
+$ .../ffmpeg.exe -f lavfi -i "testsrc2=size=64x64:rate=1:duration=1" ...
+No such filter: 'testsrc2'
+```
+
+Yaani audio ki waveform thumbnail (5.5) ban hi nahi sakti, aur `@reel/media` ka check bhi
+nahi chal sakta (uski test files `testsrc2`/`sine` se banti hain). Isliye `REEL_FFMPEG_PATH`
+ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — asli
+`Gyan.FFmpeg` hi chahiye.
+
 ---
 
 ## Checklist
