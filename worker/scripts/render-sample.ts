@@ -21,7 +21,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 import {
   addItem,
@@ -87,8 +87,10 @@ function parseArgs(argv: readonly string[]): Args {
 }
 
 function loadEnv(explicit: string | null): void {
+  // Repo root se — `npm run render:sample` cwd `worker/` deta hai.
+  const root = requireRepoRoot();
   for (const candidate of explicit ? [explicit] : ["worker/.env", ".env"]) {
-    const path = resolve(process.cwd(), candidate);
+    const path = isAbsolute(candidate) ? candidate : resolve(root, candidate);
     if (existsSync(path)) {
       process.loadEnvFile(path);
       return;

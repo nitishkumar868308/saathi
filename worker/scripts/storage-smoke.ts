@@ -19,7 +19,7 @@
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
 import {
   assertValidKey,
@@ -32,6 +32,7 @@ import {
   LocalStorageDriver,
   r2Configured,
   readStorageConfig,
+  requireRepoRoot,
   type StorageConfig,
 } from "@reel/storage";
 
@@ -42,12 +43,16 @@ import {
  * nahi). File na ho to koi baat nahi: shell ki env se bhi chal jaata hai.
  */
 function loadEnvFile(explicit: string | null): string | null {
+  // ⚠️ Repo root se dhoondho, cwd se nahi. `npm run db-verify` cwd `worker/` deta
+  // hai par `npx tsx worker/scripts/...` repo root — cwd par bharosa karne se
+  // ek tarika chalta hai aur doosra chupchaap galat file utha leta hai.
+  const root = requireRepoRoot();
   const candidates = explicit ? [explicit] : ["worker/.env", ".env"];
   for (const candidate of candidates) {
-    const path = resolve(process.cwd(), candidate);
+    const path = isAbsolute(candidate) ? candidate : resolve(root, candidate);
     if (!existsSync(path)) continue;
     process.loadEnvFile(path);
-    return candidate;
+    return path;
   }
   if (explicit) throw new Error(`--env-file="${explicit}" mila nahi`);
   return null;

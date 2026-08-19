@@ -18,7 +18,9 @@
  */
 
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
+
+import { requireRepoRoot } from "@reel/storage";
 
 // ------------------------------------------------------------------- setup
 
@@ -32,12 +34,16 @@ function parseArgs(argv: readonly string[]): { envFile: string | null } {
 }
 
 function loadEnvFile(explicit: string | null): string | null {
-  const candidates = explicit ? [explicit] : ["worker/.env", ".env", "web/.env.local"];
+  // ⚠️ Repo root se dhoondho, cwd se nahi. `npm run db-verify` cwd `worker/` deta
+  // hai par `npx tsx worker/scripts/...` repo root — cwd par bharosa karne se
+  // ek tarika chalta hai aur doosra chupchaap galat file utha leta hai.
+  const root = requireRepoRoot();
+  const candidates = explicit ? [explicit] : ["worker/.env", ".env"];
   for (const candidate of candidates) {
-    const path = resolve(process.cwd(), candidate);
+    const path = isAbsolute(candidate) ? candidate : resolve(root, candidate);
     if (!existsSync(path)) continue;
     process.loadEnvFile(path);
-    return candidate;
+    return path;
   }
   if (explicit) throw new Error(`--env-file="${explicit}" mila nahi`);
   return null;
