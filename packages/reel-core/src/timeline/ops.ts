@@ -7,6 +7,7 @@ import {
 } from "../config/audio";
 import { getAnimationPreset } from "../config/animationPresets";
 import { findEffectPreset } from "../config/effectPresets";
+import { zoomPanKeyframes, type ZoomStep } from "../mockup/zoomPan";
 import { DEFAULT_EASING } from "../config/easing";
 import { splitEasing } from "../keyframes/easing";
 import { sampleKeyframes } from "../keyframes/interpolate";
@@ -33,6 +34,7 @@ import {
   type Keyframe,
   type Marker,
   type Mask,
+  type Mockup,
   type Track,
 } from "../schema/project";
 import { assertFps, clampFrame } from "../time";
@@ -1795,6 +1797,80 @@ export const setMask = defineOp<SetMaskArgs>("setMask", (draft, args) => {
   }
 });
 
+// ------------------------------------------------------------------ mockup
+
+export interface SetMockupArgs {
+  itemIds: readonly string[];
+  /** `null` = frame hata do (raw recording). */
+  mockup: Mockup;
+}
+
+export const setMockup = defineOp<SetMockupArgs>("setMockup", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    item.mockup = args.mockup === null ? null : (clone(args.mockup) as Draft<Item>["mockup"]);
+  }
+});
+
+export interface ApplyZoomPanArgs {
+  itemId: string;
+  steps: readonly ZoomStep[];
+  /** Purane zoom keyframes hata kar naye lagao? Default `true`. */
+  replace?: boolean;
+}
+
+/**
+ * Zoom-pan ko **keyframes me** badal do (18.6).
+ *
+ * ⚠️ Yahan koi naya "zoom" field nahi banta. Chaukor se `transform.scale` aur
+ * `transform.x/y` ke wahi keyframes bante hain jo user haath se laga sakta tha.
+ *
+ * Iska seedha faayda ye hai ki zoom par **sab kuch apne aap chalta hai**: undo,
+ * curve editor, keyframe lane, copy-paste, aur AI ka patch. Zoom ko apna field
+ * banane par har ek ke liye alag code likhna padta, aur har naya feature ek din
+ * zoom wala case bhool jaata.
+ *
+ * `replace` default `true` hai: dobara zoom lagane par purane keyframes hat
+ * jaate hain. Bina iske do zoom milkar ek ajeeb teesri harkat bana dete hain
+ * jise samjhana namumkin hota.
+ */
+export const applyZoomPan = defineOp<ApplyZoomPanArgs>("applyZoomPan", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  if (args.steps.length === 0) throw new TimelineOpError("Zoom ke liye kam se kam ek step chahiye");
+
+  const patches = zoomPanKeyframes({
+    steps: args.steps,
+    frame: { width: draft.project.width, height: draft.project.height },
+    // Item ka apna scale base hai — uske upar zoom lagti hai, use mitakar nahi.
+    baseScale: item.transform.scale,
+  });
+
+  if (args.replace !== false) {
+    for (const path of ["transform.scale", "transform.x", "transform.y"]) {
+      delete (item.keyframes as Record<string, unknown>)[path];
+    }
+  }
+
+  for (const patch of patches) {
+    const list = ((item.keyframes as Record<string, Keyframe[]>)[patch.path] ??= []);
+    // Ek hi frame par do keyframes nahi — naya purane ko badal deta hai.
+    const at = list.findIndex((keyframe) => keyframe.frame === patch.frame);
+    const keyframe: Keyframe = {
+      frame: patch.frame,
+      value: patch.value,
+      easing: patch.easing,
+      bezier: null,
+    };
+    if (at >= 0) list[at] = keyframe;
+    else list.push(keyframe);
+    list.sort((a, b) => a.frame - b.frame);
+  }
+});
+
 // ------------------------------------------------------------------- brand
 
 export interface SetBrandPresetArgs {
@@ -3220,6 +3296,8 @@ export const OPS = {
   copyKeyframes,
   scaleKeyframes,
   setTransition,
+  setMockup,
+  applyZoomPan,
   setBrandPreset,
   setBrandToken,
   setWatermark,

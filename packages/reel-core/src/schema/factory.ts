@@ -138,6 +138,7 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
     effects: [],
     mask: null,
     blendMode: "normal" as const,
+    mockup: null,
     audio: {
       volume: 1,
       muted: false,

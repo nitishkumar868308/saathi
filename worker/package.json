@@ -12,7 +12,8 @@
     "storage-smoke": "tsx scripts/storage-smoke.ts",
     "db-verify": "tsx scripts/db-verify.ts",
     "render:sample": "tsx scripts/render-sample.ts",
-    "render:template": "tsx scripts/render-template.ts"
+    "render:template": "tsx scripts/render-template.ts",
+    "render:mockup": "tsx scripts/render-mockup.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

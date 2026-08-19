@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { createItem } from "../schema/factory";
 import type { Item } from "../schema/project";
+import { DEFAULT_DEVICE_ID } from "../config/devices";
 import { durationFromSeconds } from "../time";
 import { createRegistry, type Registry } from "./types";
 
@@ -235,11 +236,26 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     id: "screen_recording",
     label: "Screen recording",
     icon: "MonitorPlay",
-    hint: "App ka screen — mockup Phase 18 me judega",
+    hint: "App ka screen — phone frame ke saath (18.5)",
     group: "media",
     slots: [
       { id: "video", label: "Recording", kind: "asset:video", required: true },
       CAPTION_SLOT,
+      /*
+       * Phone frame **default ON** (18.5).
+       *
+       * `"raw"` bharne par frame nahi lagta. Default on isliye hai ki is scene
+       * ka poora matlab hi "app dikhana" hai, aur bina frame ke recording ek
+       * chipka hua rectangle lagti hai. Jise raw chahiye wo ek shabd likh kar
+       * hata sakta hai — par default wahi hona chahiye jo 90% baar chahiye.
+       */
+      {
+        id: "frame",
+        label: "Phone frame",
+        kind: "text",
+        required: false,
+        hint: '"raw" likho to frame nahi lagega',
+      },
     ],
     defaultDurationSeconds: 8,
     build: (input) => {
@@ -261,9 +277,30 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
          * `contain` + blurred background. `cover` par app ka aadha screen kat
          * jaata hai, jo is scene ka poora matlab hi khatam kar deta hai.
          */
+        const raw = slotString(input.slots, "frame") === "raw";
+
         items.push({
           ...item,
-          fit: { mode: "contain", background: { kind: "blurred-asset", value: null } },
+          /*
+           * Frame ke andar `cover` sahi hai (screen poori bhare), aur bina frame
+           * ke `contain` — kyunki tab recording ko poora dikhna hota hai aur
+           * uske kinare kat nahi sakte.
+           */
+          fit: raw
+            ? { mode: "contain", background: { kind: "blurred-asset", value: null } }
+            : { mode: "cover", background: { kind: "blurred-asset", value: null } },
+          mockup: raw
+            ? null
+            : {
+                deviceId: DEFAULT_DEVICE_ID,
+                colorId: "graphite",
+                widthPercent: 58,
+                shadow: true,
+                glare: false,
+                tiltX: 0,
+                tiltY: 0,
+                screenFit: "cover" as const,
+              },
         });
       }
       items.push(...captionItem(input, duration));

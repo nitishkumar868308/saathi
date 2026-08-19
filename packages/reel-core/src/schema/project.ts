@@ -377,6 +377,38 @@ export const ShapeSpecSchema = z.object({
   radius: z.number().min(0),
 });
 
+/**
+ * Phone mockup (18.1) — item ke andar ka media ek phone frame me baithta hai.
+ *
+ * `null` = koi frame nahi (raw recording). Ye default hai aur jaan-boojhkar hai:
+ * har video par phone frame chadha dena galat hoga — frame sirf **screen
+ * recording** par kaam ka hai, camera footage par nahi.
+ */
+export const MockupSchema = z
+  .object({
+    /** `BUILTIN_DEVICES` ka id. */
+    deviceId: z.string().min(1).default("phone-tall"),
+    /** Device ki apni color list ka id. */
+    colorId: z.string().min(1).default("graphite"),
+    /** Frame ki chaudai — project frame ki chaudai ka percent. */
+    widthPercent: z.number().min(10).max(200).default(58),
+    shadow: z.boolean().default(true),
+    /** Screen par halki chamak — kabhi accha lagta hai, kabhi nakli. */
+    glare: z.boolean().default(false),
+    /**
+     * 3D tilt (18.4) — degrees.
+     *
+     * Ye `transform.rotation` se **alag** hai: wo poore item ko ghumata hai
+     * (2D), ye perspective ke saath ghumata hai. Dono ek hi field me daalne par
+     * user ka seedha rotate chup-chaap 3D ho jaata.
+     */
+    tiltX: z.number().min(-45).max(45).default(0),
+    tiltY: z.number().min(-45).max(45).default(0),
+    /** Screen ke andar media kaise baithe. */
+    screenFit: z.enum(["cover", "contain"]).default("cover"),
+  })
+  .nullable();
+
 export const ItemSchema = z.object({
   id: IdSchema,
   trackId: IdSchema,
@@ -418,6 +450,7 @@ export const ItemSchema = z.object({
   effects: z.array(EffectSchema),
   mask: MaskSchema,
   blendMode: BlendModeSchema,
+  mockup: MockupSchema.default(null),
   audio: AudioSettingsSchema,
 
   transitionIn: TransitionSchema,
@@ -619,6 +652,7 @@ export type Effect = z.infer<typeof EffectSchema>;
 export type Mask = z.infer<typeof MaskSchema>;
 export type Marker = z.infer<typeof MarkerSchema>;
 export type Watermark = z.infer<typeof WatermarkSchema>;
+export type Mockup = z.infer<typeof MockupSchema>;
 export type Ducking = z.infer<typeof DuckingSchema>;
 export type MasterAudio = z.infer<typeof MasterAudioSchema>;
 export type BlendMode = (typeof BLEND_MODES)[number];

@@ -5,6 +5,7 @@ import { ReelComposition, type AssetMap } from "@reel/remotion";
 import { Player, type CallbackListener } from "@remotion/player";
 import { useEffect, useMemo, useRef } from "react";
 
+import { ZoomTool } from "@/components/editor/preview/ZoomTool";
 import { GuidesOverlay } from "@/components/editor/preview/GuidesOverlay";
 import { useFonts } from "@/lib/fonts";
 import { usePlayback } from "@/lib/playback";
@@ -33,6 +34,16 @@ import { useElementSize } from "@/lib/useElementSize";
 export function PreviewPlayer({ assets }: { assets: AssetMap }) {
   const store = useEditorStoreApi();
   const doc = useEditorStore((state) => state.doc);
+  const zoomToolOn = useEditorStore((state) => state.zoomToolOn);
+  const selectedIds = useEditorStore((state) => state.selection.itemIds);
+
+  /*
+   * Zoom tool ek hi clip par chalta hai. Kai clips chuni ho to kaunsi par zoom
+   * lage — iska koi sahi jawab nahi hai, aur galat jawab dena (pehli wali) us
+   * clip par chup-chaap keyframes daal deta jise user dekh bhi nahi raha tha.
+   */
+  const zoomTarget =
+    selectedIds.length === 1 ? (doc.items.find((item) => item.id === selectedIds[0]) ?? null) : null;
   const playheadFrame = useEditorStore((state) => state.playheadFrame);
   const playback = usePlayback();
 
@@ -225,6 +236,9 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
         ) : null}
 
         {playback.guidesOn && guideId ? <GuidesOverlay guideId={guideId} /> : null}
+
+        {/* Zoom tool guides ke upar — wo chaukor kheenchne me rukavat na bane. */}
+        <ZoomTool item={zoomTarget} active={zoomToolOn} />
       </div>
     </div>
   );

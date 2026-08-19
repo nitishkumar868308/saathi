@@ -19,6 +19,7 @@ export * from "./config/effectPresets";
 export * from "./config/mask";
 export * from "./audio/mix";
 export * from "./config/brand";
+export * from "./config/devices";
 export * from "./config/easing";
 export * from "./config/fit";
 export * from "./config/fonts";
@@ -60,6 +61,7 @@ export * from "./timeline/select";
  * aata hai. Ye galti build me nahi, sirf chalane par dikhti hai.
  */
 export * from "./brand/overrides";
+export * from "./mockup/zoomPan";
 export * from "./templates/schema";
 export * from "./templates/apply";
 export * from "./templates/builtins";

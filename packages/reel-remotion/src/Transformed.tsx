@@ -10,6 +10,8 @@ import {
 import type React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 
+import { PhoneFrame } from "./mockups/PhoneFrame";
+
 /**
  * Transform aur effects lagane ki **ekmatra** jagah.
  *
@@ -157,8 +159,23 @@ export const Transformed: React.FC<{
          * transform nahi lag sakte.
          */}
         <AbsoluteFill style={crop}>
+          {/*
+           * Phone mockup (18.1) — media frame ke **andar** jaata hai.
+           *
+           * ⚠️ Mockup yahan hai, item components me nahi: wahan hota to har
+           * component ko alag se ye pata hona padta ki mockup kya hai, aur ek
+           * din koi component wo bhool jaata. Yahan hone se har item type par
+           * apne aap chalta hai — video, image, kuch bhi.
+           *
+           * `background` (contain wala blur) mockup se **bahar** rehta hai:
+           * blur phone ke peeche hona chahiye, uski screen ke andar nahi.
+           */}
           {background}
-          {children}
+          {item.mockup ? (
+            <PhoneFrame mockup={item.mockup}>{children}</PhoneFrame>
+          ) : (
+            children
+          )}
         </AbsoluteFill>
       </AbsoluteFill>
 

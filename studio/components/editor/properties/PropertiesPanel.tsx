@@ -18,6 +18,7 @@ import { useState } from "react";
 import { AnimationSection } from "@/components/editor/properties/AnimationSection";
 import { AudioSection } from "@/components/editor/properties/AudioSection";
 import { ClipSection } from "@/components/editor/properties/ClipSection";
+import { MockupSection } from "@/components/editor/properties/MockupSection";
 import { EffectsSection } from "@/components/editor/properties/EffectsSection";
 import { controlComponent } from "@/components/controls";
 import { KeyframeButton } from "@/components/controls/KeyframeButton";
@@ -91,6 +92,7 @@ export function PropertiesPanel() {
       <TimingSection items={items} />
       <FitSection items={items} />
       <ClipSection items={items} />
+      <MockupSection items={items} />
       <AudioSection items={items} localFrame={playheadFrame - first.startFrame} />
       <AnimationSection items={items} />
       <EffectsSection items={items} localFrame={playheadFrame - first.startFrame} />

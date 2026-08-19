@@ -148,6 +148,14 @@ export interface EditorState {
    * hota, jabki uski zaroorat sirf ek button dabane par hai.
    */
   fitZoomRequest: number;
+  /**
+   * Preview par zoom-chaukor kheenchne wala tool chalu hai? (18.6)
+   *
+   * Ye ek **mode** hai, isliye store me hai: chalu hone par preview par click
+   * karne ka matlab badal jaata hai (clip chunna nahi, chaukor kheenchna). Us
+   * baat ka pata toolbar ko bhi hona chahiye taaki button roshan dikhe.
+   */
+  zoomToolOn: boolean;
   mode: "beginner" | "advanced";
   leftPanelId: string;
 
@@ -181,6 +189,7 @@ export interface EditorState {
   setSnapOptions(patch: Partial<SnapOptions>): void;
   setShortcutsOpen(open: boolean): void;
   requestFitZoom(): void;
+  setZoomToolOn(on: boolean): void;
   setMode(mode: "beginner" | "advanced"): void;
   setLeftPanel(id: string): void;
   clearOpError(): void;
@@ -383,6 +392,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       snapOptions: DEFAULT_SNAP_OPTIONS,
       shortcutsOpen: false,
       fitZoomRequest: 0,
+      zoomToolOn: false,
       mode: readMode(project.id),
       leftPanelId: "media",
 
@@ -538,6 +548,9 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
       requestFitZoom() {
         set({ fitZoomRequest: get().fitZoomRequest + 1 });
+      },
+      setZoomToolOn(zoomToolOn) {
+        set({ zoomToolOn });
       },
       setMode(mode) {
         set({ mode });

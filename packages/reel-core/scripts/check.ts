@@ -42,6 +42,16 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  BUILTIN_DEVICES,
+  ZOOM_PRESETS,
+  applyZoomPan,
+  checkZoomUpscale,
+  deviceForAspect,
+  frameGeometry,
+  requireDevice,
+  setMockup,
+  zoomPanKeyframes,
+  DEFAULT_DEVICE_ID,
   BUILTIN_TEMPLATES,
   DEFAULT_BRAND_TOKENS,
   applyTemplate,
@@ -2954,14 +2964,33 @@ test("music scene ka volume apne aap kam hota hai", () => {
   assert.ok(items[0].audio.volume < 0.5, "poore volume par music voiceover ko dabaa deta hai");
 });
 
-test("screen recording contain + blurred background par aati hai", () => {
+test("screen recording default me phone frame ke saath aati hai (18.5)", () => {
+  /*
+   * Phase 18 me ye badla: pehle default `contain` tha (bina frame ke recording
+   * poori dikhni chahiye). Ab default me phone frame lagta hai, aur frame ke
+   * **andar** `cover` sahi hai — screen poori bharni chahiye, warna bezel ke
+   * andar kaali pattiyan aati hain jo bilkul nakli lagti hain.
+   */
   const items = requireSceneType("screen_recording").build({
     slots: { video: "as_rec" },
     fps: 30,
     sceneId: "sc_r",
   });
   const video = items.find((item) => item.type === "video");
-  assert.equal(video?.fit.mode, "contain", "cover par app ka aadha screen kat jaata hai");
+  assert.ok(video?.mockup, "default me frame lagna chahiye");
+  assert.equal(video?.mockup?.deviceId, DEFAULT_DEVICE_ID);
+  assert.equal(video?.fit.mode, "cover", "frame ke andar screen poori bharni chahiye");
+});
+
+test('"raw" likhne par frame nahi lagta, aur fit contain par wapas aa jaata hai', () => {
+  const items = requireSceneType("screen_recording").build({
+    slots: { video: "as_rec", frame: "raw" },
+    fps: 30,
+    sceneId: "sc_r",
+  });
+  const video = items.find((item) => item.type === "video");
+  assert.equal(video?.mockup, null);
+  assert.equal(video?.fit.mode, "contain", "bina frame ke recording poori dikhni chahiye");
   assert.equal(video?.fit.background.kind, "blurred-asset");
 });
 
@@ -5196,6 +5225,291 @@ test("naye project me watermark band hota hai", () => {
   const { doc } = buildFixture();
   assert.equal(doc.brand.watermark.enabled, false);
   assert.equal(doc.brand.endScreen.enabled, false);
+});
+
+
+// ------------------------------------------------------------- Phase 18
+
+section("devices — sirf data (18.1)");
+
+test("har device ke naap frame ke hisaab se hain, pixels me nahi", () => {
+  /*
+   * Ye poore mockup system ki neenv hai. Ek bhi pixel wala number aa jaaye to
+   * wo device ek hi size par sahi dikhta hai aur baaki sab par toota hua.
+   */
+  for (const device of BUILTIN_DEVICES) {
+    assert.ok(device.screenAspect > 0 && device.screenAspect < 2, `${device.id}: aspect galat`);
+    assert.ok(device.bezelRatio > 0 && device.bezelRatio < 0.2, `${device.id}: bezel galat`);
+    assert.ok(device.colors.length > 0, `${device.id}: koi rang nahi`);
+  }
+});
+
+test("geometry screen ki chaudai se poora frame nikaalti hai", () => {
+  const device = requireDevice("phone-tall");
+  const geometry = frameGeometry(device, 1000);
+
+  assert.equal(geometry.screenWidth, 1000);
+  assert.equal(geometry.bezel, 1000 * device.bezelRatio);
+  assert.equal(geometry.outerWidth, 1000 + geometry.bezel * 2);
+  assert.ok(
+    Math.abs(geometry.screenHeight - 1000 / device.screenAspect) < 1e-9,
+    "oonchai aspect se aani chahiye",
+  );
+});
+
+test("geometry har size par ek jaisi (sirf naap badalti hai)", () => {
+  // Ek hi device ka frame 500 aur 1000 par bilkul ek jaisa dikhna chahiye —
+  // sirf do guna bada. Ratio hone se ye apne aap sach hai; test use jamata hai.
+  const device = requireDevice("phone-tall");
+  const small = frameGeometry(device, 500);
+  const big = frameGeometry(device, 1000);
+
+  assert.ok(Math.abs(big.outerWidth / small.outerWidth - 2) < 1e-9);
+  assert.ok(Math.abs(big.outerRadius / small.outerRadius - 2) < 1e-9);
+  assert.ok(Math.abs(big.bezel / small.bezel - 2) < 1e-9);
+});
+
+test("aspect se sabse paas wala device milta hai (18.9)", () => {
+  /*
+   * "Bilkul barabar" maangna galat hota: 1080x2400 ka aspect kisi bhi list me
+   * theek nahi milta, aur tab har recording par "koi device nahi mila" aata.
+   */
+  assert.equal(deviceForAspect(1080, 2400).id, "phone-tall");
+  assert.equal(deviceForAspect(1080, 1920).id, "phone-classic");
+  assert.equal(deviceForAspect(1536, 2048).id, "tablet");
+
+  // Bekaar input par bhi kuch to milna chahiye — crash nahi.
+  assert.equal(deviceForAspect(0, 0).id, DEFAULT_DEVICE_ID);
+});
+
+section("zoom-pan keyframes banata hai, naya feature nahi (18.6)");
+
+test("poore frame wale chaukor par scale 1 aur position 0", () => {
+  const patches = zoomPanKeyframes({
+    steps: [{ frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } }],
+    frame: { width: 1080, height: 1920 },
+  });
+
+  const byPath = Object.fromEntries(patches.map((patch) => [patch.path, patch.value]));
+  assert.ok(Math.abs(byPath["transform.scale"]! - 1) < 1e-9);
+  assert.ok(Math.abs(byPath["transform.x"]!) < 1e-9);
+  assert.ok(Math.abs(byPath["transform.y"]!) < 1e-9);
+});
+
+test("aadhe chaukor par scale 2 hoti hai", () => {
+  const patches = zoomPanKeyframes({
+    steps: [{ frame: 0, rect: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } }],
+    frame: { width: 1080, height: 1920 },
+  });
+  const scale = patches.find((patch) => patch.path === "transform.scale")?.value;
+  assert.ok(Math.abs((scale as number) - 2) < 1e-9, String(scale));
+});
+
+test("chaukor ka beech frame ke beech par aata hai", () => {
+  /*
+   * Upar-baayan chauthai chuno: use beech me laane ke liye item ko daayein aur
+   * neeche khiskana padta hai (positive x aur y).
+   */
+  const patches = zoomPanKeyframes({
+    steps: [{ frame: 0, rect: { x: 0, y: 0, width: 0.5, height: 0.5 } }],
+    frame: { width: 1080, height: 1920 },
+  });
+  const x = patches.find((patch) => patch.path === "transform.x")?.value as number;
+  const y = patches.find((patch) => patch.path === "transform.y")?.value as number;
+
+  assert.ok(x > 0, `x ${x} positive hona chahiye`);
+  assert.ok(y > 0, `y ${y} positive hona chahiye`);
+  // Chauthai ka beech (0.25, 0.25) hai; scale 2 par shift = 0.25 * size * 2.
+  assert.ok(Math.abs(x - 0.25 * 1080 * 2) < 1e-9);
+  assert.ok(Math.abs(y - 0.25 * 1920 * 2) < 1e-9);
+});
+
+test("chaudi chaukor par chhoti scale chunti hai (poora hissa dikhe)", () => {
+  // 80% chaudi par 20% oonchi: chaudai 1.25x maangti hai, oonchai 5x. Chhoti
+  // (1.25x) leni chahiye — badi lene par chuna hua hissa frame se bahar nikal
+  // jaata aur user ka chunav poora dikhta hi nahi.
+  const patches = zoomPanKeyframes({
+    steps: [{ frame: 0, rect: { x: 0.1, y: 0.4, width: 0.8, height: 0.2 } }],
+    frame: { width: 1080, height: 1920 },
+  });
+  const scale = patches.find((patch) => patch.path === "transform.scale")?.value as number;
+  assert.ok(Math.abs(scale - 1.25) < 1e-9, String(scale));
+});
+
+test("applyZoomPan doc me asli keyframes daalta hai", () => {
+  /*
+   * Yahi is poore tool ka point hai: zoom apna field nahi banta, wo **wahi
+   * keyframes** banata hai jo user haath se laga sakta tha. Isliye uspar undo,
+   * curve editor aur copy-paste apne aap chalte hain.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+
+  const next = applyZoomPan(doc, {
+    itemId: id,
+    steps: [
+      { frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } },
+      { frame: 45, rect: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } },
+    ],
+  });
+
+  const item = itemById(next, id);
+  assert.equal(item.keyframes["transform.scale"]?.length, 2);
+  assert.equal(item.keyframes["transform.x"]?.length, 2);
+  assert.equal(item.keyframes["transform.y"]?.length, 2);
+  assert.ok(safeParseDoc(next).success);
+
+  // Aur wo asli keyframes hain — engine unhe padh leta hai.
+  assert.ok(Math.abs(resolveItemValue<number>(item, "transform.scale", 45) - 2) < 1e-9);
+});
+
+test("dobara zoom lagane par purane keyframes hat jaate hain", () => {
+  // Bina iske do zoom milkar ek ajeeb teesri harkat bana dete hain jise
+  // samjhana namumkin hota.
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+
+  let next = applyZoomPan(doc, {
+    itemId: id,
+    steps: [
+      { frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } },
+      { frame: 45, rect: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } },
+      { frame: 90, rect: { x: 0, y: 0, width: 1, height: 1 } },
+    ],
+  });
+  assert.equal(itemById(next, id).keyframes["transform.scale"]?.length, 3);
+
+  next = applyZoomPan(next, {
+    itemId: id,
+    steps: [{ frame: 0, rect: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } }],
+  });
+  assert.equal(itemById(next, id).keyframes["transform.scale"]?.length, 1);
+});
+
+test("khaali steps par saaf error", () => {
+  const { doc } = buildFixture();
+  assert.throws(
+    () => applyZoomPan(doc, { itemId: doc.items[0]!.id, steps: [] }),
+    /kam se kam ek step/,
+  );
+});
+
+test("har zoom preset ke steps sahi hadd me hain", () => {
+  for (const preset of ZOOM_PRESETS) {
+    assert.ok(preset.steps.length >= 2, `${preset.id}: ek hi step ka koi matlab nahi`);
+    for (const step of preset.steps) {
+      const { x, y, width, height } = step.rect;
+      assert.ok(x >= 0 && y >= 0, `${preset.id}: chaukor frame se bahar`);
+      assert.ok(x + width <= 1.0001, `${preset.id}: chaukor daayein se bahar`);
+      assert.ok(y + height <= 1.0001, `${preset.id}: chaukor neeche se bahar`);
+    }
+  }
+});
+
+section("upscale ki chetavni (18.8)");
+
+test("bina zoom ke 1080p source 1080p frame par theek hai", () => {
+  const check = checkZoomUpscale({
+    steps: [{ frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } }],
+    source: { width: 1080, height: 2400 },
+    frame: { width: 1080, height: 1920 },
+  });
+  assert.equal(check.level, "ok");
+  assert.equal(check.advice, null);
+});
+
+test("2.5x zoom par saaf galti aur exact numbers milte hain", () => {
+  /*
+   * Sirf "blurry lagega" likhna bekaar hota — usse user kuch nahi kar sakta.
+   * Yahan exact number aata hai aur uske saath ek seedha kaam.
+   */
+  const check = checkZoomUpscale({
+    steps: [
+      { frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } },
+      { frame: 60, rect: { x: 0.3, y: 0.3, width: 0.4, height: 0.4 } },
+    ],
+    source: { width: 1080, height: 2400 },
+    frame: { width: 1080, height: 1920 },
+  });
+
+  assert.ok(Math.abs(check.maxScale - 2.5) < 1e-9, String(check.maxScale));
+  assert.equal(check.level, "error");
+  assert.ok(check.advice, "salah honi chahiye");
+  assert.ok(check.advice?.includes("px"), `salah me exact number hona chahiye: ${check.advice}`);
+  assert.ok(check.upscale.requiredSource.width > 1080);
+});
+
+test("halka zoom sirf chetavni deta hai, galti nahi", () => {
+  // 1.15x tak upscale aankh ko lagbhag nahi dikhta — use "error" batana jhooth
+  // hoga, aur do-teen jhoothe error ke baad user har chetavni ko anदेखा kar deta.
+  const check = checkZoomUpscale({
+    steps: [{ frame: 0, rect: { x: 0.05, y: 0.05, width: 0.92, height: 0.92 } }],
+    source: { width: 1080, height: 2400 },
+    frame: { width: 1080, height: 1920 },
+  });
+  assert.notEqual(check.level, "error", `${check.level}: ${check.advice}`);
+});
+
+test("bada source zoom par bhi theek rehta hai", () => {
+  const check = checkZoomUpscale({
+    steps: [{ frame: 0, rect: { x: 0.3, y: 0.3, width: 0.4, height: 0.4 } }],
+    source: { width: 3840, height: 8533 },
+    frame: { width: 1080, height: 1920 },
+  });
+  assert.equal(check.level, "ok", check.advice ?? "");
+});
+
+section("mockup (18.1 / 18.5)");
+
+test("setMockup lagata aur hataata dono hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+
+  const on = setMockup(doc, {
+    itemIds: [id],
+    mockup: {
+      deviceId: "phone-tall",
+      colorId: "graphite",
+      widthPercent: 60,
+      shadow: true,
+      glare: false,
+      tiltX: 0,
+      tiltY: 0,
+      screenFit: "cover",
+    },
+  });
+  assert.equal(itemById(on, id).mockup?.deviceId, "phone-tall");
+  assert.ok(safeParseDoc(on).success);
+
+  const off = setMockup(on, { itemIds: [id], mockup: null });
+  assert.equal(itemById(off, id).mockup, null);
+});
+
+test("naye item par koi mockup nahi hota", () => {
+  // Har video par phone frame chadha dena galat hoga — frame sirf screen
+  // recording par kaam ka hai, camera footage par nahi.
+  const { doc } = buildFixture();
+  for (const item of doc.items) assert.equal(item.mockup, null);
+});
+
+test("mockup ka tilt hadd me rehta hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const bad = setMockup(doc, {
+    itemIds: [id],
+    mockup: {
+      deviceId: "phone-tall",
+      colorId: "graphite",
+      widthPercent: 60,
+      shadow: true,
+      glare: false,
+      tiltX: 90,
+      tiltY: 0,
+      screenFit: "cover",
+    },
+  });
+  // Schema hadd lagati hai — 90 degree par phone bilkul patla dikhta hai.
+  assert.ok(!safeParseDoc(bad).success, "45 se zyada tilt ruk jaana chahiye");
 });
 
 
