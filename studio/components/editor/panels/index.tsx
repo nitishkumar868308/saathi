@@ -5,11 +5,15 @@ import {
   FolderOpen,
   History,
   SlidersHorizontal,
+  LayoutTemplate,
+  Palette,
   Volume2,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
+import { TemplatePanel } from "@/components/editor/panels/TemplatePanel";
+import { BrandPanel } from "@/components/editor/panels/BrandPanel";
 import { MasterAudioPanel } from "@/components/editor/panels/MasterAudioPanel";
 import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
 import { RendersPanel } from "@/components/editor/panels/RendersPanel";
@@ -50,6 +54,18 @@ export const LEFT_PANELS: readonly PanelEntry[] = [
     label: "Audio",
     icon: Volume2,
     component: MasterAudioPanel,
+  },
+  {
+    id: "templates",
+    label: "Templates",
+    icon: LayoutTemplate,
+    component: TemplatePanel,
+  },
+  {
+    id: "brand",
+    label: "Brand",
+    icon: Palette,
+    component: BrandPanel,
   },
   {
     id: "renders",

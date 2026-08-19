@@ -4,12 +4,12 @@ import {
   isBrandToken,
   mergeFonts,
   resolveItemValue,
-  resolveToken,
-} from "@reel/core";
+  } from "@reel/core";
 import type React from "react";
 import { AbsoluteFill } from "remotion";
 
 import type { ItemComponentProps } from "../components";
+import { useToken } from "../brand";
 import { Transformed } from "../Transformed";
 
 /**
@@ -24,6 +24,7 @@ import { Transformed } from "../Transformed";
  * par bani hai, isliye "72px" har size me utna hi bada dikhta hai jitna editor me.
  */
 export const TextItem: React.FC<ItemComponentProps> = ({ item, localFrame, fonts }) => {
+  const resolveToken = useToken();
   const text = item.text;
   if (!text) return null;
 

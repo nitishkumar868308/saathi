@@ -1795,6 +1795,94 @@ export const setMask = defineOp<SetMaskArgs>("setMask", (draft, args) => {
   }
 });
 
+// ------------------------------------------------------------------- brand
+
+export interface SetBrandPresetArgs {
+  presetId: string | null;
+}
+
+/**
+ * Brand preset badlo (17.11).
+ *
+ * ⚠️ Yahan **items ko haath nahi lagta**, aur yahi is poore system ka point hai.
+ * Rang doc me `"brand.primary"` jaise token ke roop me pade hain; preset badalte
+ * hi wo apne aap naye rang par resolve hone lagte hain. Jahan user ne pakka rang
+ * likha hai (`"#C25A37"`) wo waisa ka waisa rehta hai — bachane ke liye kuch
+ * karna hi nahi padta.
+ *
+ * Items ghumakar rang badalne wala tarika bahut aasan lagta hai par wo ek hi baar
+ * chalta hai: uske baad pata hi nahi chalta ki kaun sa rang brand se aaya tha aur
+ * kaun sa user ne chuna tha.
+ */
+export const setBrandPreset = defineOp<SetBrandPresetArgs>("setBrandPreset", (draft, args) => {
+  draft.brand.presetId = args.presetId;
+});
+
+export interface SetBrandTokenArgs {
+  token: string;
+  /** `null` = is project ka apna badlav hata do (preset wala rang wapas). */
+  value: string | null;
+}
+
+export const setBrandToken = defineOp<SetBrandTokenArgs>("setBrandToken", (draft, args) => {
+  if (!args.token.startsWith("brand.")) {
+    throw new TimelineOpError(`"${args.token}" brand token nahi hai (brand. se shuru hona chahiye)`);
+  }
+  if (args.value === null) {
+    delete (draft.brand.tokens as Record<string, string>)[args.token];
+    return;
+  }
+  (draft.brand.tokens as Record<string, string>)[args.token] = args.value;
+});
+
+export interface SetWatermarkArgs {
+  enabled?: boolean;
+  assetId?: string | null;
+  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  sizePercent?: number;
+  opacity?: number;
+  marginPercent?: number;
+}
+
+export const setWatermark = defineOp<SetWatermarkArgs>("setWatermark", (draft, args) => {
+  const watermark = draft.brand.watermark;
+  if (args.enabled !== undefined) watermark.enabled = args.enabled;
+  if (args.assetId !== undefined) watermark.assetId = args.assetId;
+  if (args.position !== undefined) watermark.position = args.position;
+  if (args.sizePercent !== undefined) {
+    watermark.sizePercent = Math.max(1, Math.min(50, args.sizePercent));
+  }
+  if (args.opacity !== undefined) watermark.opacity = Math.max(0, Math.min(1, args.opacity));
+  if (args.marginPercent !== undefined) {
+    watermark.marginPercent = Math.max(0, Math.min(20, args.marginPercent));
+  }
+});
+
+export interface SetEndScreenArgs {
+  enabled?: boolean;
+  text?: string;
+  durationSeconds?: number;
+}
+
+export const setEndScreen = defineOp<SetEndScreenArgs>("setEndScreen", (draft, args) => {
+  const endScreen = draft.brand.endScreen;
+  if (args.enabled !== undefined) endScreen.enabled = args.enabled;
+  if (args.text !== undefined) endScreen.text = args.text;
+  if (args.durationSeconds !== undefined) {
+    endScreen.durationSeconds = Math.max(0.5, Math.min(10, args.durationSeconds));
+  }
+});
+
+export interface SetBrandCtaArgs {
+  text?: string;
+  link?: string;
+}
+
+export const setBrandCta = defineOp<SetBrandCtaArgs>("setBrandCta", (draft, args) => {
+  if (args.text !== undefined) draft.brand.cta.text = args.text;
+  if (args.link !== undefined) draft.brand.cta.link = args.link;
+});
+
 // ----------------------------------------------------------------- markers
 
 export interface AddMarkerArgs {
@@ -3132,6 +3220,11 @@ export const OPS = {
   copyKeyframes,
   scaleKeyframes,
   setTransition,
+  setBrandPreset,
+  setBrandToken,
+  setWatermark,
+  setEndScreen,
+  setBrandCta,
   addMarker,
   deleteMarker,
   setMarker,

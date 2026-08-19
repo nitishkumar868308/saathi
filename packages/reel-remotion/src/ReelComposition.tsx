@@ -3,6 +3,7 @@ import {
   fontFaceCss,
   itemEndFrame,
   mergeFonts,
+  brandTokensFor,
   resolveToken,
   type Doc,
   type FontEntry,
@@ -11,6 +12,8 @@ import type React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 
 import type { AssetMap } from "./assets";
+import { BrandProvider } from "./brand";
+import { WatermarkLayer } from "./Watermark";
 import { ItemRenderer } from "./ItemRenderer";
 import { registerBuiltinItemComponents } from "./register";
 
@@ -69,12 +72,19 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, f
    * sakta.
    */
   const soloActive = doc.tracks.some((track) => track.solo && !track.hidden);
+  const tokens = brandTokensFor(doc.brand);
   const tracks = [...doc.tracks]
     .filter((track) => !track.hidden && (!soloActive || track.solo))
     .sort((a, b) => a.order - b.order);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: resolveToken(doc.project.background) }}>
+    /*
+     * Brand tokens poore renderer ke upar (17.10). Iske bina har item apne aap
+     * **default** brand par atak jaata tha — yaani preset badalna preview aur
+     * MP4 dono me bekaar tha.
+     */
+    <BrandProvider brand={doc.brand}>
+      <AbsoluteFill style={{ backgroundColor: resolveToken(doc.project.background, tokens) }}>
       {/*
        * Font ka CSS composition ke **andar** hai, bahar nahi. Render ke waqt
        * Remotion is component ko apne page me chadhata hai; bahar rakha hua CSS
@@ -112,8 +122,12 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, f
             ))}
           </AbsoluteFill>
         );
-      })}
-    </AbsoluteFill>
+        })}
+
+        {/* Watermark sabse upar (17.12) — har parat ke upar. */}
+        <WatermarkLayer brand={doc.brand} assets={assets} />
+      </AbsoluteFill>
+    </BrandProvider>
   );
 };
 

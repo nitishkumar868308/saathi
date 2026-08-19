@@ -469,8 +469,54 @@ export const SceneSchema = z.object({
   slots: z.record(z.unknown()).default({}),
 });
 
+/**
+ * Watermark / logo (17.9 / 17.12).
+ *
+ * `assetId` `null` par kuch nahi dikhta — chahe `enabled` sach ho. Ye jaan-
+ * boojhkar hai: "watermark on hai par logo nahi chuna" ek aisi haalat hai
+ * jisme user ko lagta hai ki watermark toota hua hai, jabki wo sirf khaali hai.
+ */
+export const WatermarkSchema = z.object({
+  enabled: z.boolean().default(false),
+  assetId: IdSchema.nullable().default(null),
+  position: z
+    .enum(["top-left", "top-right", "bottom-left", "bottom-right"])
+    .default("bottom-right"),
+  /** Frame ki chaudai ka percent. */
+  sizePercent: z.number().min(1).max(50).default(12),
+  opacity: z.number().min(0).max(1).default(0.8),
+  /** Safe-area se kitna andar — frame ke chhote kinare ka percent. */
+  marginPercent: z.number().min(0).max(20).default(4),
+});
+
+/** End screen (17.9 / 17.12) — reel ke ant me CTA. */
+export const EndScreenSchema = z.object({
+  enabled: z.boolean().default(false),
+  text: z.string().default(""),
+  durationSeconds: z.number().min(0.5).max(10).default(3),
+});
+
+/**
+ * Brand — preset ka id **aur** uske upar ke apne badlav (17.9 / 17.11).
+ *
+ * ⚠️ `tokens` yahan isliye hai ki project apne aap me poora rehna chahiye. Sirf
+ * `presetId` rakhne par project kholne ke liye DB se preset laana zaroori ho
+ * jaata — aur preset delete ho jaaye to purani reel ka rang chup-chaap badal
+ * jaata. Yahan ki copy use jama deti hai.
+ */
 export const BrandSchema = z.object({
   presetId: z.string().min(1).nullable(),
+  /** Preset ke upar is project ke apne token. Khaali = preset jaisa hi. */
+  tokens: z.record(z.string()).default({}),
+  logoAssetId: IdSchema.nullable().default(null),
+  watermark: WatermarkSchema.default({}),
+  cta: z
+    .object({
+      text: z.string().default(""),
+      link: z.string().default(""),
+    })
+    .default({}),
+  endScreen: EndScreenSchema.default({}),
 });
 
 export const MetaSchema = z.object({
@@ -572,6 +618,7 @@ export type Animation = z.infer<typeof AnimationSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
 export type Mask = z.infer<typeof MaskSchema>;
 export type Marker = z.infer<typeof MarkerSchema>;
+export type Watermark = z.infer<typeof WatermarkSchema>;
 export type Ducking = z.infer<typeof DuckingSchema>;
 export type MasterAudio = z.infer<typeof MasterAudioSchema>;
 export type BlendMode = (typeof BLEND_MODES)[number];

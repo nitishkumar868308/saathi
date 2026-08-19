@@ -42,6 +42,25 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  BUILTIN_TEMPLATES,
+  DEFAULT_BRAND_TOKENS,
+  applyTemplate,
+  brandOverrides,
+  brandTokensFor,
+  findBrandPreset,
+  findTemplate,
+  listSceneTypes,
+  overridesToTokens,
+  safeParseTemplate,
+  setBrandCta,
+  setBrandPreset,
+  setBrandToken,
+  setEndScreen,
+  setWatermark,
+  templateFromDoc,
+  tokenByColor,
+  validateTemplate,
+  type Template,
   addMarker,
   deleteMarker,
   duplicateTrack,
@@ -95,7 +114,6 @@ import {
   duplicateScene,
   isSceneCustomEdited,
   itemEndFrame,
-  listSceneTypes,
   missingRequiredSlots,
   reorderScenes,
   repairScenes,
@@ -4790,6 +4808,394 @@ test("locked clip par replace nahi chalta", () => {
   const id = doc.items[0]!.id;
   const locked = setItemProperty(doc, { itemId: id, path: "locked", value: true });
   assert.throws(() => replaceAsset(locked, { itemIds: [id], assetId: "as_naya" }));
+});
+
+
+// ------------------------------------------------------------- Phase 17
+
+section("templates ka format (17.1 / 17.2)");
+
+test("har built-in template schema se guzarta hai", () => {
+  for (const template of BUILTIN_TEMPLATES) {
+    const parsed = safeParseTemplate(template);
+    assert.ok(parsed.success, `${template.id}: ${parsed.success ? "" : parsed.error.message}`);
+  }
+});
+
+test("har built-in template me koi galti nahi hai", () => {
+  /*
+   * `validateTemplate` teen cheezein dekhta hai: anjaan scene type, aisa
+   * `@slot` jo hai hi nahi, aur aisa slot jise koi scene use nahi karta. Teeno
+   * apply karne par ek aadha-adhoora project banate hain jise user ne banaya hi
+   * nahi — isliye ye check har template par chalta hai.
+   */
+  const known = listSceneTypes().map((entry) => entry.id);
+  for (const template of BUILTIN_TEMPLATES) {
+    assert.deepEqual(validateTemplate(template, known), [], `${template.id} me galti`);
+  }
+});
+
+test("galat template pakda jaata hai", () => {
+  const known = listSceneTypes().map((entry) => entry.id);
+
+  const badType = validateTemplate(
+    {
+      ...(BUILTIN_TEMPLATES[0] as Template),
+      scenes: [{ type: "koi-nahi", name: "", durationSeconds: null, slots: {} }],
+      slots: [],
+    },
+    known,
+  );
+  assert.ok(badType.some((problem) => problem.includes("koi-nahi")));
+
+  const danglingSlot = validateTemplate(
+    {
+      id: "t",
+      name: "t",
+      description: "",
+      thumbnail: null,
+      targetPreset: "reel",
+      slots: [],
+      scenes: [{ type: "text", name: "", durationSeconds: null, slots: { text: "@nahiHai" } }],
+    },
+    known,
+  );
+  assert.ok(danglingSlot.some((problem) => problem.includes("@nahiHai")));
+
+  const unusedSlot = validateTemplate(
+    {
+      id: "t",
+      name: "t",
+      description: "",
+      thumbnail: null,
+      targetPreset: "reel",
+      slots: [
+        { key: "bekaar", label: "Bekaar", kind: "text", required: true, hint: "", multiline: false, defaultValue: null },
+      ],
+      scenes: [{ type: "text", name: "", durationSeconds: null, slots: { text: "fixed" } }],
+    },
+    known,
+  );
+  assert.ok(unusedSlot.some((problem) => problem.includes("bekaar")));
+});
+
+section("applyTemplate (17.3)");
+
+/** Rahul+Papa ke saare slots bhare hue. */
+function filledRahulPapa(): Record<string, string> {
+  return {
+    rahulLine: "Papa, pension ka kaam hua?",
+    papaLine: "Teen baar gaya, har baar naya kagaz.",
+    problemLine: "Process kisi ko poora pata hi nahi hota.",
+    appRecording: "as_recording",
+    characterImage: "as_face",
+    ctaLine: "Apka Saathi par dekho",
+    music: "as_music",
+  };
+}
+
+test("bhare hue template se poora editable doc banta hai", () => {
+  const template = findTemplate("rahul-papa") as Template;
+  const { doc, missing, skipped } = applyTemplate({ template, slots: filledRahulPapa() });
+
+  assert.deepEqual(missing, [], "sab bhara hua tha");
+  assert.deepEqual(skipped, [], "koi scene chhootna nahi chahiye");
+  assert.equal(doc.scenes.length, template.scenes.length);
+  assert.ok(doc.items.length >= template.scenes.length, "har scene se kam se kam ek item");
+  assert.ok(safeParseDoc(doc).success);
+  assert.equal(doc.meta.createdBy, "template");
+});
+
+test("template se bane items wahi hain jo haath se ban sakte the", () => {
+  /*
+   * Ye is poore phase ka sabse zaroori test hai. Template ko ek pehle se bani
+   * video ya kisi khaas renderer par chhod dena aasan hota — par tab wo reel
+   * "template wali reel" ban jaati jise user chhoo bhi nahi sakta.
+   *
+   * Saboot: template se bane doc par ek aam op (`moveItems`) waise ka waisa
+   * chalta hai.
+   */
+  const template = findTemplate("app-demo") as Template;
+  const { doc } = applyTemplate({
+    template,
+    slots: { hook: "Dekho", recording: "as_rec", caption: "Bas itna", ctaLine: "Try karo" },
+  });
+
+  const first = doc.items[0] as Item;
+  const moved = moveItems(doc, { itemIds: [first.id], deltaFrames: 15 });
+  assert.equal(itemById(moved, first.id).startFrame, first.startFrame + 15);
+});
+
+test("khaali text slot par placeholder aata hai, khaali nahi chhodta", () => {
+  /*
+   * Chupchaap khaali chhod dena sabse bura hota: scene khaali dikhta hai aur
+   * user ko lagta hai template hi toota hua hai. Ek saaf likhi line turant
+   * batati hai ki kya karna hai.
+   */
+  const template = findTemplate("app-demo") as Template;
+  const { doc, missing } = applyTemplate({
+    template,
+    slots: { recording: "as_rec", ctaLine: "Try karo" },
+  });
+
+  assert.ok(missing.some((slot) => slot.key === "hook"), "hook missing me aana chahiye");
+  const texts = doc.items.map((item) => item.text?.content ?? "").join(" | ");
+  assert.ok(texts.includes("["), `placeholder dikhna chahiye tha: ${texts}`);
+});
+
+test("zaroori asset na ho to scene chhoot jaata hai aur wajah milti hai", () => {
+  // Asset id banayi nahi ja sakti — isliye placeholder mumkin hi nahi. Aisa
+  // scene chhodna padta hai, par **chupchaap nahi**.
+  const template = findTemplate("app-demo") as Template;
+  const { doc, skipped } = applyTemplate({ template, slots: { hook: "Dekho", ctaLine: "Try" } });
+
+  assert.equal(skipped.length, 1, JSON.stringify(skipped));
+  assert.equal(skipped[0]?.type, "screen_recording");
+  assert.ok(skipped[0]?.reason.includes("Screen recording"));
+  assert.equal(doc.scenes.length, 2, "baaki do scene phir bhi banne chahiye");
+});
+
+test("optional slot khaali ho to scene chup-chaap chhoot jaata hai (aur wo theek hai)", () => {
+  const template = findTemplate("rahul-papa") as Template;
+  const slots = filledRahulPapa();
+  delete slots.characterImage;
+
+  const { doc, skipped } = applyTemplate({ template, slots });
+  assert.equal(doc.scenes.length, template.scenes.length - 1);
+  assert.ok(skipped.some((entry) => entry.type === "image"));
+});
+
+section("aspect adapt (17.4)");
+
+test("ek hi template teeno size par lagta hai aur layout frame ke andar rehta hai", () => {
+  /*
+   * ⚠️ Iske liye koi "re-fit" wala code nahi likha gaya, aur wahi is test ka
+   * point hai. Scene types sab kuch frame ke **percent** me banate hain, isliye
+   * 9:16 ka template 1:1 par apne aap sahi baithta hai. Agar kabhi ye test fail
+   * ho, uska matlab hoga ki kisi scene type me pixel ghus gaya hai.
+   */
+  const template = findTemplate("rahul-papa") as Template;
+
+  for (const presetId of ["reel", "square", "landscape"]) {
+    const { doc } = applyTemplate({ template, slots: filledRahulPapa(), presetId });
+    const { width, height } = doc.project;
+
+    assert.ok(safeParseDoc(doc).success, `${presetId}: schema fail`);
+    assert.equal(doc.scenes.length, template.scenes.length, `${presetId}: scene chhoot gaya`);
+
+    for (const item of doc.items) {
+      // Position frame ke center se offset hai — item frame ke bahar nahi jaana
+      // chahiye. Aadhi chaudai ki chhoot hai (item khud chauda ho sakta hai).
+      assert.ok(
+        Math.abs(item.transform.x) <= width,
+        `${presetId}: "${item.name}" x=${item.transform.x} frame se bahar`,
+      );
+      assert.ok(
+        Math.abs(item.transform.y) <= height,
+        `${presetId}: "${item.name}" y=${item.transform.y} frame se bahar`,
+      );
+    }
+  }
+});
+
+test("alag size par bhi scene ka kram wahi rehta hai", () => {
+  const template = findTemplate("rahul-papa") as Template;
+  const reel = applyTemplate({ template, slots: filledRahulPapa(), presetId: "reel" }).doc;
+  const square = applyTemplate({ template, slots: filledRahulPapa(), presetId: "square" }).doc;
+
+  assert.deepEqual(
+    [...reel.scenes].sort((a, b) => a.order - b.order).map((scene) => scene.type),
+    [...square.scenes].sort((a, b) => a.order - b.order).map((scene) => scene.type),
+  );
+});
+
+section("save as template (17.5)");
+
+test("project se template banta hai aur wo dobara lag jaata hai", () => {
+  const template = findTemplate("app-demo") as Template;
+  const { doc } = applyTemplate({
+    template,
+    slots: { hook: "Dekho", recording: "as_rec", caption: "Bas itna", ctaLine: "Try karo" },
+  });
+
+  const { template: made, dropped } = templateFromDoc(doc, { id: "mera", name: "Mera template" });
+  assert.equal(dropped, 0);
+  assert.deepEqual(validateTemplate(made, listSceneTypes().map((entry) => entry.id)), []);
+
+  // Round-trip: naye template ko dobara lagao.
+  const back = applyTemplate({
+    template: made,
+    slots: Object.fromEntries(made.slots.map((slot) => [slot.key, slot.defaultValue ?? "as_x"])),
+  });
+  assert.equal(back.doc.scenes.length, doc.scenes.length);
+});
+
+test("assetSlots false par asset id waisa ka waisa rehta hai", () => {
+  const template = findTemplate("app-demo") as Template;
+  const { doc } = applyTemplate({
+    template,
+    slots: { hook: "Dekho", recording: "as_rec", caption: "Bas", ctaLine: "Try" },
+  });
+
+  const fixed = templateFromDoc(doc, { id: "m", name: "M", assetSlots: false }).template;
+  const values = fixed.scenes.flatMap((scene) => Object.values(scene.slots));
+  assert.ok(values.includes("as_rec"), "asset id template me hi rehni chahiye thi");
+});
+
+section("brand tokens (17.10 / 17.11)");
+
+test("preset badalne se tokens badalte hain, doc ke items nahi", () => {
+  const template = findTemplate("app-demo") as Template;
+  const { doc } = applyTemplate({
+    template,
+    slots: { hook: "Dekho", recording: "as_rec", caption: "Bas", ctaLine: "Try" },
+  });
+
+  const before = JSON.stringify(doc.items);
+  const next = setBrandPreset(doc, { presetId: "sunrise" });
+
+  assert.equal(JSON.stringify(next.items), before, "items ko haath nahi lagna chahiye");
+  assert.notEqual(
+    brandTokensFor(next.brand)["brand.primary"],
+    brandTokensFor(doc.brand)["brand.primary"],
+    "rang to badalna hi chahiye",
+  );
+});
+
+test("project ka apna token preset ke upar chalta hai", () => {
+  const { doc } = buildFixture();
+  let next = setBrandPreset(doc, { presetId: "sunrise" });
+  next = setBrandToken(next, { token: "brand.primary", value: "#123456" });
+
+  assert.equal(brandTokensFor(next.brand)["brand.primary"], "#123456");
+
+  // Hataane par preset wala rang wapas.
+  const cleared = setBrandToken(next, { token: "brand.primary", value: null });
+  assert.equal(
+    brandTokensFor(cleared.brand)["brand.primary"],
+    findBrandPreset("sunrise")?.tokens["brand.primary"],
+  );
+});
+
+test("brand. se shuru na hone wala token ruk jaata hai", () => {
+  const { doc } = buildFixture();
+  assert.throws(() => setBrandToken(doc, { token: "primary", value: "#fff" }), /brand token nahi/);
+});
+
+test("manual override apne aap pehchana jaata hai — koi flag nahi", () => {
+  /*
+   * Doc me rang do hi tarah ke ho sakte hain: token (`brand.primary`) ya pakka
+   * rang (`#C25A37`). Isliye override apne aap pata chal jaata hai, aur brand
+   * badalne par wo apne aap bach bhi jaata hai.
+   */
+  // Text apni hi kism ki track par hi baithta hai (Dynamic rule: track types
+  // batate hain kaun kahan ja sakta hai), isliye ek text track jodni padti hai.
+  const { doc: base } = buildFixture();
+  const withTrack = addTrack(base, { typeId: "text" });
+  const textTrackId = withTrack.tracks[withTrack.tracks.length - 1]!.id;
+  const doc = addItem(withTrack, {
+    item: createItem("text", {
+      fps: base.project.fps,
+      trackId: textTrackId,
+      name: "Caption",
+      startFrame: 0,
+      durationInFrames: 90,
+    }),
+  });
+  const textItem = doc.items.find((item) => item.text !== null);
+  assert.ok(textItem, "fixture me text item hona chahiye");
+
+  const before = brandOverrides(doc);
+  assert.equal(before.overrides.length, 0, "shuru me sab token hone chahiye");
+  assert.ok(before.tokenSites.length > 0);
+
+  const overridden = setItemProperty(doc, {
+    itemId: (textItem as Item).id,
+    path: "text.color",
+    value: "#FF0000",
+  });
+  const after = brandOverrides(overridden);
+  assert.equal(after.overrides.length, 1);
+  assert.equal(after.overrides[0]?.path, "text.color");
+});
+
+test("brand badalne par override waisa ka waisa rehta hai", () => {
+  // Text apni hi kism ki track par hi baithta hai (Dynamic rule: track types
+  // batate hain kaun kahan ja sakta hai), isliye ek text track jodni padti hai.
+  const { doc: base } = buildFixture();
+  const withTrack = addTrack(base, { typeId: "text" });
+  const textTrackId = withTrack.tracks[withTrack.tracks.length - 1]!.id;
+  const doc = addItem(withTrack, {
+    item: createItem("text", {
+      fps: base.project.fps,
+      trackId: textTrackId,
+      name: "Caption",
+      startFrame: 0,
+      durationInFrames: 90,
+    }),
+  });
+  const textItem = doc.items.find((item) => item.text !== null) as Item;
+  let next = setItemProperty(doc, { itemId: textItem.id, path: "text.color", value: "#FF0000" });
+  next = setBrandPreset(next, { presetId: "mono-dark" });
+
+  assert.equal(itemById(next, textItem.id).text?.color, "#FF0000");
+});
+
+test("override ko token banane ke liye patch milte hain", () => {
+  // Text apni hi kism ki track par hi baithta hai (Dynamic rule: track types
+  // batate hain kaun kahan ja sakta hai), isliye ek text track jodni padti hai.
+  const { doc: base } = buildFixture();
+  const withTrack = addTrack(base, { typeId: "text" });
+  const textTrackId = withTrack.tracks[withTrack.tracks.length - 1]!.id;
+  const doc = addItem(withTrack, {
+    item: createItem("text", {
+      fps: base.project.fps,
+      trackId: textTrackId,
+      name: "Caption",
+      startFrame: 0,
+      durationInFrames: 90,
+    }),
+  });
+  const textItem = doc.items.find((item) => item.text !== null) as Item;
+  const primary = DEFAULT_BRAND_TOKENS["brand.primary"] as string;
+
+  const next = setItemProperty(doc, { itemId: textItem.id, path: "text.color", value: primary });
+  const patches = overridesToTokens(next, tokenByColor(DEFAULT_BRAND_TOKENS));
+
+  assert.equal(patches.length, 1);
+  assert.equal(patches[0]?.to, "brand.primary");
+  assert.equal(patches[0]?.path, "text.color");
+});
+
+section("watermark aur end screen (17.12)");
+
+test("watermark ke sab settings op se badalte hain aur hadd me rehte hain", () => {
+  const { doc } = buildFixture();
+  let next = setWatermark(doc, { enabled: true, assetId: "as_logo", sizePercent: 200 });
+  assert.equal(next.brand.watermark.enabled, true);
+  assert.equal(next.brand.watermark.sizePercent, 50, "hadd op me lagti hai, UI me nahi");
+
+  next = setWatermark(next, { opacity: -1 });
+  assert.equal(next.brand.watermark.opacity, 0);
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("end screen aur CTA doc me save hote hain", () => {
+  const { doc } = buildFixture();
+  let next = setEndScreen(doc, { enabled: true, text: "Aaj try karo", durationSeconds: 99 });
+  next = setBrandCta(next, { text: "Download", link: "https://example.com" });
+
+  assert.equal(next.brand.endScreen.enabled, true);
+  assert.equal(next.brand.endScreen.durationSeconds, 10, "hadd op me");
+  assert.equal(next.brand.cta.link, "https://example.com");
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("naye project me watermark band hota hai", () => {
+  // On rakhna galat hota: har nayi reel par bina maange ek logo aa jaata.
+  const { doc } = buildFixture();
+  assert.equal(doc.brand.watermark.enabled, false);
+  assert.equal(doc.brand.endScreen.enabled, false);
 });
 
 

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Render worker — tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
+  "description": "Render worker \u2014 tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
   "main": "./src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "storage-smoke": "tsx scripts/storage-smoke.ts",
     "db-verify": "tsx scripts/db-verify.ts",
-    "render:sample": "tsx scripts/render-sample.ts"
+    "render:sample": "tsx scripts/render-sample.ts",
+    "render:template": "tsx scripts/render-template.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

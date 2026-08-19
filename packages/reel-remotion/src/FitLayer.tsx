@@ -1,5 +1,7 @@
-import { getFitMode, resolveToken, type Item } from "@reel/core";
+import { getFitMode, type Item } from "@reel/core";
 import type React from "react";
+
+import { useToken } from "./brand";
 import { AbsoluteFill } from "remotion";
 
 /**
@@ -69,6 +71,7 @@ export const FitBackground: React.FC<{
   /** Jise blur karke peeche rakhna hai (already styled with BLUR_LAYER_STYLE). */
   blurLayer?: React.ReactNode;
 }> = ({ item, blurLayer }) => {
+  const resolveToken = useToken();
   const mode = getFitMode(item.fit.mode);
   if (!mode?.needsBackground) return null;
 

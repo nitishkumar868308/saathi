@@ -1,8 +1,9 @@
-import { resolveItemValue, resolveToken } from "@reel/core";
+import { resolveItemValue, } from "@reel/core";
 import type React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 
 import type { ItemComponentProps } from "../components";
+import { useToken } from "../brand";
 import { Transformed } from "../Transformed";
 
 /**
@@ -13,6 +14,7 @@ import { Transformed } from "../Transformed";
  * size badalne pe shapes ya to gayab ho jaate ya frame se bahar nikal jaate.
  */
 export const ShapeItem: React.FC<ItemComponentProps> = ({ item, localFrame }) => {
+  const resolveToken = useToken();
   const shape = item.shape;
   const { width, height } = useVideoConfig();
   if (!shape) return null;

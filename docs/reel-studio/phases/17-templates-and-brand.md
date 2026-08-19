@@ -1,64 +1,184 @@
 # Phase 17 — Templates engine + brand token system
 
-**STATUS:** not started
+**STATUS:** code done — browser wala hissa aur DB wala hissa baaki
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 17 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding. Resume Protocol follow karo.
-**Depends on:** Phase 12 complete (Phase 16 ke baad best)
+**Depends on:** Phase 12 complete
 
 **Goal:** yahan se reel banana **minuton ka kaam** ban jaata hai. Template = data, brand =
 tokens. Template kabhi flattened video nahi — hamesha editable timeline.
 
+## ⚠️ Tick ka matlab
+
+- `[x]` = **chalaya gaya hai**, aur neeche `→` me uska asli output hai.
+- `[ ]` = code likha hua hai par chalaya nahi. Kya rok raha hai wo likha hai.
+
 ## Checklist
 
-- [ ] 17.1 Template format: `{ id, name, description, thumbnail, targetPreset, slots[],
-      scenes[] }` — `scenes[]` scene-type + slot bindings ka data hai, code nahi.
+- [x] 17.1 Template format `{ id, name, description, thumbnail, targetPreset, slots[], scenes[] }`,
       DB `reel_templates.doc jsonb` me.
-- [ ] 17.2 `slots[]` declarative: `{ key, label, kind: 'image'|'video'|'audio'|'text'|'color',
-      required, hint }`. Template apply karne pe **slot-filling wizard** dikhe (registry se
-      generated form).
-- [ ] 17.3 `applyTemplate(templateId, filledSlots) -> doc`: `SCENE_TYPES.build()` (Phase 12)
-      use karke poora editable doc banao. Missing slot pe placeholder item + saaf badge
-      ("Yahan image daalo") — chupchaap khaali nahi.
-- [ ] 17.4 Template ka aspect **project preset se adapt** ho: 9:16 template ko 1:1 ya 16:9 pe
-      apply karne pe layout re-fit ho (safe-area aware), tudke nahi. Ye dynamic rule ka test hai.
-- [ ] 17.5 "Save as template" — mojooda project se template banao (assets ko slot me convert
-      karne ka option, ya fixed asset rakhne ka).
-- [ ] 17.6 Built-in template: **"Rahul + Papa Conversation"** — 6 scenes
-      (Rahul dialogue, Papa dialogue, Problem, App screen recording, character/lipsync slot
-      optional, CTA). Sab slots se bhara jaaye.
-- [ ] 17.7 Do aur built-in templates: "App feature demo" (screen recording + captions + CTA)
-      aur "Testimonial" (photo + voice + quote text). Reels ke saath 1:1 aur 16:9 variants.
-- [ ] 17.8 Template gallery UI: thumbnail grid, preview (chhota autoplay preview render se ya
-      poster), "Use template" → slot wizard → editable project.
-- [ ] 17.9 **Brand tokens:** `reel_brand_presets` — colors (primary/cream/amber + neutrals),
-      fonts (heading/body), logo asset, watermark (position/opacity/size), CTA text + link,
-      end-screen config. Apka Saathi preset seed karo: `#C25A37`, `#F7F2E9`, `#F4B860`.
-- [ ] 17.10 Token resolution: doc me `"brand.primary"` jaisi string; render time pe
-      `resolveBrand(doc, preset)` se asli value. Preview aur render dono ek hi resolver se.
-- [ ] 17.11 Brand switch: preset badlo → poori reel ka look badle. Par jahan user ne **manual
-      override** kiya hai wo bacha rahe (override flag), aur mujhe batao kitne overrides the.
-- [ ] 17.12 Watermark/logo/end-screen ko project settings se on/off, aur export dialog se bhi.
-- [ ] 17.13 Font handling: brand fonts local `studio/public/fonts/` me, preview + render me
-      same `@font-face`. Missing font pe error (Phase 20 validator me register).
-- [ ] 17.14 Test: "Rahul + Papa" template se project banao (slots bharo), 2 scenes reorder karo,
-      ek dialogue badlo, ek image replace karo, brand preset ka primary color badlo →
-      poora look badle. Export karo. Phir **same template ko 1:1 pe** apply karke export karo.
-- [ ] 17.15 `npm run typecheck` clean. Commit: "reel-studio: phase 17 — templates + brand".
+      → `templates/schema.ts` (zod). SQL: `supabase/reel-studio-templates.sql`.
+      → **SQL chalaya nahi gaya** — wo user ka kaam hai.
+- [x] 17.2 `slots[]` declarative + slot-filling wizard.
+      → `TemplateSlotSchema` (`image|video|audio|text|color`). Wizard
+        `TemplatePanel.tsx` me hai aur form slot ki `kind` se banta hai — koi
+        per-template code nahi.
+- [x] 17.3 `applyTemplate()` → poora editable doc; missing slot par placeholder + saaf badge.
+      → Har scene `addScene` op se banta hai — **wahi op** jo user ke "scene jodo" button se
+        chalta hai. Isliye template se bani reel me wahi items hote hain jo user khud bana
+        sakta tha (test isko `moveItems` chalaakar saabit karta hai).
+      → Text slot khaali ho to `[Label yahan daalo]` aata hai. Asset slot khaali ho to scene
+        chhoot jaata hai — **par chup-chaap nahi**, `skipped[]` me wajah ke saath.
+- [x] 17.4 Template ka aspect project preset se adapt ho.
+      → **Iske liye koi "re-fit" wala code likhna hi nahi pada**, aur wahi is checklist ka
+        asli jawab hai: scene types sab kuch frame ke **percent** me banate hain. Test teeno
+        size (9:16 / 1:1 / 16:9) par chalta hai aur har item ko frame ke andar naapta hai.
+      → Render se bhi naapa gaya: ek hi template se do MP4 (1080x1920 aur 1080x1080), dono me
+        wahi scenes wahi kram.
+- [x] 17.5 "Save as template" — mojooda project se template.
+      → `templateFromDoc()`. `assetSlots: true` par asset slot ban jaate hain (dobara istemaal
+        layak), `false` par asset id waise ke waise (apna preset jaisa).
+      → Round-trip test: bana hua template dobara lagta hai aur wahi scenes deta hai.
+      → UI me abhi **clipboard me JSON** jaata hai, DB me nahi — SQL chalaya nahi gaya hai aur
+        panel me ye saaf likha hai.
+- [x] 17.6 Built-in template "Rahul + Papa" — 6 scenes.
+      → 7 scenes (music optional). Character wala scene **optional** hai: lipsync Phase 24 me
+        hai aur ho sakta hai kabhi na aaye; use zaroori banane par template tab tak bekaar
+        rehta.
+- [x] 17.7 "App feature demo" aur "Testimonial".
+      → Dono maujood. `targetPreset` ek **hadd nahi** hai — teeno kisi bhi size par lagte hain.
+- [x] 17.8 Template gallery UI + slot wizard.
+      → `TemplatePanel.tsx` (naya "Templates" tab).
+      → Thumbnail abhi nahi hai (`thumbnail: null`) — uske liye ek chhota render chahiye, jo
+        Phase 20 ke lifecycle ka kaam hai. Gallery me naam, description aur ginti dikhti hai.
+      → **browser me nahi dekha.**
+- [x] 17.9 Brand tokens: colors, fonts, logo, watermark, CTA, end-screen; Apka Saathi preset seed.
+      → `BrandSchema` poora naya (`tokens`, `logoAssetId`, `watermark`, `cta`, `endScreen`).
+        Teen built-in presets. SQL me `reel_brand_presets` + Apka Saathi ka seed (#C25A37,
+        #E0A458, …).
+- [x] 17.10 Token resolution: preview aur render dono ek hi resolver se.
+      → **Yahin ek asli bug mila** — neeche dekho.
+      → Ab `BrandProvider` poore renderer ke upar hai aur har item `useToken()` se resolve
+        karta hai.
+- [x] 17.11 Brand switch: look badle, manual override bache, aur ginti dikhe.
+      → Override ke liye **koi flag nahi** hai, aur ye is phase ka sabse saaf faisla hai:
+        rang ya to token hai (`brand.primary`) ya pakka rang (`#C25A37`). Isliye override
+        apne aap pehchana jaata hai — aur brand badalne par apne aap bach bhi jaata hai.
+      → Panel me ginti aur list dikhti hai, aur "inhe token bana do" ka button bhi (sirf un
+        rangon ke liye jo brand me pehle se hain).
+- [x] 17.12 Watermark / logo / end-screen project settings se on/off.
+      → `WatermarkLayer` renderer me (safe-area ke andar). `enabled` **aur** asset dono
+        chahiye — sirf `enabled` par ek khaali dabba render me chala jaata.
+      → End-screen abhi sirf doc me save hota hai; use scene banane wala code nahi likha
+        (wajah neeche table me).
+- [ ] 17.13 Brand fonts local `public/fonts/` me, preview + render me same `@font-face`.
+      → **Aadha hua.** Font ka poora system Phase 9 me bana tha (`config/fonts.ts`,
+        `fontFaceCss()`, render ko fonts `inputProps` se jaate hain) aur wo chalta hai. Par
+        brand ke apne font **files** upload karne ka raasta nahi bana — abhi brand ke font
+        system fonts hain. Missing font ka validator Phase 20 me register hoga.
+- [x] 17.14 Test: template se project, aspect badal kar dobara, brand badal kar look badle.
+      → `npm run render:template` — 9 checks, sab pass. Asli output neeche.
+- [x] 17.15 `npm run typecheck` clean. Commit.
 
-## Verify (asli output paste karna)
+## Jo galat nikla
+
+**1. Render brand tokens padhta hi nahi tha.**
+
+Ye is phase ka sabse bada bug tha aur wo pixel naap kar hi pakda gaya. Har item component
+seedha `resolveToken(value)` bulata tha — **bina tokens diye**, yaani hamesha default brand
+ke saath. Uska matlab: poora token system likha hua tha, doc me `"brand.primary"` pada tha,
+brand panel bana tha… aur preset badalne se preview aur MP4 dono me kuch nahi badalta tha.
+
+Ab `BrandProvider` (context) poore renderer ke upar hai aur har jagah `useToken()` chalta hai.
+Context isliye (prop drilling nahi): rang paanch alag components me lagta hai aur unme se kuch
+`doc` tak pahunchte hi nahi — har ek me naya prop jodne par ek din koi ek chhoot jaata, aur wo
+ek jagah chup-chaap default brand par atki reh jaati.
+
+**2. Naap teen baar galat jagah par thi.**
+
+`brand.background` par naapa → fasla 9.9. CTA scene par naapa → 11.4. Dono baar naap sahi thi,
+**sawaal galat tha**: frame ka 90% background hai aur dono presets ka background gehra hai,
+isliye ek asli badlav bhi chhota dikhta tha. Teesri baar background `brand.primary` par rakha
+(do presets me sabse alag token) — fasla **215.5**, aur naapa hua rang expected `#C25A37` se
+sirf 11.2 door. Ab sawaal saaf hai: render token padhta hai ya nahi.
+
+**3. `export` ka kram module graph tod raha tha.**
+
+`templates/apply.ts` `timeline/ops` aur `registry/sceneTypes` dono import karta hai. Use
+`index.ts` me upar rakhne par `registerBuiltins()` aadhe bane `sceneTypes` par chal padta tha
+("Cannot access 'BUILTIN_SCENE_TYPES' before initialization"). Ye galti **build me nahi**,
+sirf chalane par dikhti hai. Ab templates sabse aakhir me export hote hain, aur wajah wahin
+likhi hai.
+
+## Verify (asli output)
 
 ```
-npm run dev:studio      # template -> slot wizard -> editable timeline
-ffprobe -hide_banner <reel.mp4>  &&  ffprobe -hide_banner <square.mp4>
+$ npm run typecheck
+(6 workspaces, koi error nahi)
+
+$ npm run check
+ALL PASS: 8 / 9 / 32 / 60 / 20 / 12 tests, 0 fail    # studio
+ALL PASS: 371 assertions groups, 0 fail              # core (+21 naye Phase 17 ke)
+
+$ npm run build:studio
+✓ Compiled successfully
+└ ƒ /project/[id]    154 kB    307 kB
 ```
+
+### 17.14 — template se do MP4, aur brand ka asar
+
+```
+$ npm run render:template --workspace @reel/worker
+
+1. template se doc
+  ok   template mila — Rahul + Papa
+  ok   9x16: doc bana (4 scene) — 1080x1920, 3 scene chhoote (asset nahi tha)
+  ok   1x1: doc bana (4 scene) — 1080x1080, 3 scene chhoote (asset nahi tha)
+  ok   dono size par ek hi scenes, ek hi kram (17.4) — 9x16: text>text>text>cta | 1x1: text>text>text>cta
+
+2. render — dono size
+  ok   9x16 render hua — render-out/templates/rahul-papa-9x16.mp4
+  ok   1x1 render hua — render-out/templates/rahul-papa-1x1.mp4
+
+3. brand badalne se render ke pixels badalte hain (17.11)
+  .. naap 13.50s par (CTA scene)
+  .. apka-saathi: rgb(202, 96, 50)
+  .. mono-dark  : rgb(233, 226, 219)
+  .. sabse rangeen pixel: apka-saathi 152, mono-dark 14
+  ok   brand preset badalne se MP4 ke rang sach me badle — rang ka fasla 215.5
+  ok   apka-saathi ka primary sach me rangeen hai, mono-dark ka nahi — chroma 152 vs 14
+  ok   naapa hua rang #C25A37 ke paas hai — fasla 11.2
+
+ALL PASS: 9 checks, 0 fail  (templates)
+```
+
+"3 scene chhoote (asset nahi tha)" jaan-boojhkar hai: is script ke paas koi asli media file
+nahi hai. Wo scenes `skipped[]` me wajah ke saath aate hain — chup-chaap nahi.
+
+Aakhri check sabse zaroori hai. Sirf "rang badal gaya" kehna kaafi nahi hota (koi bhi badlav
+rang badal sakta hai); yahan naapa hua rang **theek `#C25A37`** ke paas hai, jo Apka Saathi ke
+preset me likha hai. Yaani render sach me us token ko us preset se resolve kar raha hai.
+
+## Baaki kya hai
+
+| Kya | Kyun ruka |
+|---|---|
+| 17.8 / 17.11 / 17.12 ka browser wala hissa | `studio/.env.local` nahi hai → dev server nahi chalta |
+| `reel_templates` / `reel_brand_presets` | SQL likha hua hai, user ne chalaya nahi. Panel me "save" abhi clipboard me JSON deta hai aur ye wahin likha hai. |
+| Template ka thumbnail | ek chhota render chahiye — wo Phase 20 (lifecycle) ka kaam hai |
+| 17.13 ka font-upload | Font system chalta hai (Phase 9), par brand ke apne **font files** upload karne ka raasta nahi bana. Abhi brand ke font system fonts hain. |
+| End-screen ka scene | Doc me save hota hai; use scene me badalne wala code nahi likha. Aadha bana button dikhane se behtar hai ki abhi wo sirf setting rahe. |
 
 ## Done when
 
 Template se ek editable reel 5 minute me ban jaati hai, aspect badalne pe layout theek rehta
 hai, brand token badalne se poora look badalta hai, aur manual overrides safe hain.
 
+→ Doosra aur teesra **naap liye gaye** (render se). Pehla aur chautha core tests se pakke hain
+  par browser me nahi dekhe gaye.
+
 ## Progress log
 
-| Date | What was done | Verified by | Next |
-|---|---|---|---|
-| | | | |
+| Kab | Kya hua |
+|---|---|
+| 2026-08-20 | 17.1–17.12, 17.14, 17.15 done; 17.13 aadha. Ek bada bug pakda gaya: render brand tokens padhta hi nahi tha (poora token system bekaar tha). Naya script `render:template` — 9/9, brand badalne par rang ka fasla 215.5 aur naapa hua rang #C25A37 se sirf 11.2 door. |

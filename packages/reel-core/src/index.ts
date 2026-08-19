@@ -49,3 +49,17 @@ export * from "./storage/keys";
 export * from "./timeline/ops";
 export * from "./timeline/history";
 export * from "./timeline/select";
+
+/*
+ * Brand aur templates sabse aakhir me — aur ye kram maayne rakhta hai.
+ *
+ * ⚠️ `templates/apply.ts` `timeline/ops` aur `registry/sceneTypes` dono ko
+ * import karta hai. Ise upar rakhne par module graph ulta chalta hai:
+ * `sceneTypes` aadha bana hota hai jab `registry/index` apna `registerBuiltins()`
+ * chalata hai, aur "Cannot access 'BUILTIN_SCENE_TYPES' before initialization"
+ * aata hai. Ye galti build me nahi, sirf chalane par dikhti hai.
+ */
+export * from "./brand/overrides";
+export * from "./templates/schema";
+export * from "./templates/apply";
+export * from "./templates/builtins";

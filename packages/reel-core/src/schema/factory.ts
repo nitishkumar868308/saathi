@@ -247,7 +247,21 @@ export function createEmptyProject(input: CreateEmptyProjectInput = {}): Doc {
     items: [],
     scenes: [],
     markers: [],
-    brand: { presetId: null },
+    brand: {
+      presetId: null,
+      tokens: {},
+      logoAssetId: null,
+      watermark: {
+        enabled: false,
+        assetId: null,
+        position: "bottom-right" as const,
+        sizePercent: 12,
+        opacity: 0.8,
+        marginPercent: 4,
+      },
+      cta: { text: "", link: "" },
+      endScreen: { enabled: false, text: "", durationSeconds: 3 },
+    },
     meta: { createdBy: "manual", sourceStory: null },
   };
 
