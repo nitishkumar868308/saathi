@@ -462,6 +462,16 @@ export const SubtitleSchema = z
                 text: z.string(),
                 startFrame: FrameSchema,
                 endFrame: FrameSchema,
+                /**
+                 * Machine kitni pakki thi (0..1). `null` = bataya hi nahi (23.9).
+                 *
+                 * ⚠️ Ye shape `captions/cues.ts` ke `CaptionWordSchema` ki nakal
+                 * hai, aur wo jaan-boojhkar hai: `captions/*` is file ko import
+                 * karta hai (FrameSchema ke liye), isliye ulta import circular
+                 * ho jaata. Dono ko saath badalna padta hai — aur wahi keemat
+                 * hai jo yahan likh kar chukayi ja rahi hai.
+                 */
+                confidence: z.number().min(0).max(1).nullable().default(null),
               }),
             )
             .default([]),

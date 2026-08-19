@@ -98,6 +98,23 @@ export function rows(value: unknown): Record<string, unknown>[] {
 export interface RenderJobRow {
   id: string;
   project_id: string;
+
+  /**
+   * Job kis tarah ki hai (23.10).
+   *
+   * ⚠️ Purane rows me ye column nahi hoga jab tak `supabase/reel-studio-jobs.sql`
+   * na chale — isliye padhte waqt `?? "render"` lagta hai. Yahan `render` maan
+   * lena surakshit hai: us waqt queue me sirf render hi ho sakti thi.
+   */
+  kind?: "render" | "transcribe";
+
+  /** Transcribe job ka saamaan — asset id, bhasha, model. Render me khaali. */
+  input?: Record<string, unknown>;
+
+  /** Transcribe ka nateeja — shabd. Doc me daalna UI ka kaam hai, worker ka nahi. */
+  result?: Record<string, unknown>;
+
+  /** ⚠️ Transcribe job me `null` hota hai — usse doc ka koi kaam nahi. */
   doc: unknown;
   preset: string;
   status: "queued" | "processing" | "completed" | "failed" | "cancelled";

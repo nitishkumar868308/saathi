@@ -22,24 +22,31 @@ import { hostname } from "node:os";
 import { readFile } from "node:fs/promises";
 
 import {
+  alignWords,
   requireExportPreset,
   parseDoc,
   storageKey,
   type Doc,
+  type TranscriptWord,
   validateExportSettings,
 } from "@reel/core";
 import {
   audioStream,
+  detectSpeechSegments,
   finalizeMp4,
   makeThumbnail,
   measureEbur128,
   probe,
+  transcribe,
   videoStream,
+  whisperAvailable,
+  type WhisperModel,
 } from "@reel/media";
 import {
   createStorageDriver,
   readStorageConfig,
   resolveAssets,
+  withLocalFile,
   type StoredAsset,
 } from "@reel/storage";
 
@@ -80,6 +87,11 @@ const MAX_CONCURRENT = Math.max(1, Number(process.env.REEL_WORKER_CONCURRENCY ??
 const WORKER_ID = process.env.REEL_WORKER_ID ?? `${hostname()}-${process.pid}`;
 
 /* ----------------------------------------------------------------- helpers */
+
+/** Lambi galti ki sirf pehli line — baaki stack UI me kaam ka nahi hota. */
+function firstLine(text: string): string {
+  return (text.split(/\r?\n/)[0] ?? text).trim();
+}
 
 function log(message: string): void {
   console.log(`[reel-worker ${WORKER_ID}] ${message}`);
@@ -337,6 +349,117 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
   }
 }
 
+/* ------------------------------------------------- transcribe job (23.10) */
+
+/**
+ * Awaaz se shabd — ek normal job, usi queue me (23.10).
+ *
+ * ⚠️ Ye job **doc ko haath nahi lagati**. Shabd `result` column me rakh kar
+ * chhod deti hai; cues doc me studio daalti hai, usi `setCues` op se jo haath ki
+ * editing bhi chalati hai.
+ *
+ * Kyun: job chalte waqt user editing kar raha hota hai. Worker seedha doc likhe
+ * to user ka abhi kiya hua kaam chup-chaap mit jaata hai — aur undo bhi nahi
+ * chalta, kyunki undo studio ke andar hai, DB me nahi.
+ */
+async function runTranscribeJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
+  const input = (job.input ?? {}) as {
+    assetId?: string;
+    language?: string;
+    model?: string;
+    /** Text pata ho to whisper ki zaroorat hi nahi (23.5). */
+    text?: string;
+  };
+
+  const assetId = input.assetId;
+  if (!assetId) return { status: "failed", error: "transcribe job me assetId nahi hai" };
+
+  const storage = createStorageDriver();
+  const scratchDir = resolve(scratchRoot(), job.id);
+
+  try {
+    await mkdir(scratchDir, { recursive: true });
+
+    const list = rows(await select(conn, `/reel_assets?id=eq.${assetId}&select=id,key,filename`));
+    const row = list[0];
+    if (!row) return { status: "failed", error: `asset ${assetId} nahi mili` };
+
+    const key = String(row.key);
+    const extension = key.includes(".") ? (key.split(".").pop() as string) : "wav";
+
+    await updateJob(conn, job.id, { progress: 5 });
+
+    const outcome = await withLocalFile(storage, key, { extension, scratchDir }, async (path) => {
+      const knownText = (input.text ?? "").trim();
+
+      /*
+       * ⚠️ Text pehle se pata ho (TTS se bani awaaz) to whisper chalana bekaar
+       * hai — apni hi likhi line ko machine se dobara padhwana. CPU bhi jaata
+       * hai aur galti aane ka mauka bhi banta hai (23.5).
+       */
+      if (knownText.length > 0) {
+        await updateJob(conn, job.id, { progress: 30 });
+        const detected = await detectSpeechSegments(path);
+        const words: TranscriptWord[] = alignWords({
+          text: knownText,
+          durationSeconds: detected.durationSeconds,
+          segments: detected.segments,
+        });
+        return {
+          words,
+          language: input.language ?? null,
+          durationSeconds: detected.durationSeconds,
+          source: "aligned" as const,
+          model: null as string | null,
+          elapsedMs: 0,
+        };
+      }
+
+      const available = await whisperAvailable();
+      if (!available.ok) {
+        // Saaf wajah — "transcribe fail" jaisa kuch nahi, jisse pata hi na chale
+        // ki sirf ek pip install baaki hai.
+        throw new Error(
+          `faster-whisper is machine par nahi hai. ` +
+            `Install: pip install faster-whisper (${firstLine(available.detail)})`,
+        );
+      }
+
+      await updateJob(conn, job.id, { progress: 20 });
+      const result = await transcribe({
+        audioPath: path,
+        ...(input.language ? { language: input.language } : {}),
+        ...(input.model ? { model: input.model as WhisperModel } : {}),
+        scratchDir,
+      });
+      return {
+        words: result.words as TranscriptWord[],
+        language: result.language,
+        durationSeconds: result.durationSeconds,
+        source: "whisper" as const,
+        model: result.model as string | null,
+        elapsedMs: result.elapsedMs,
+      };
+    });
+
+    await updateJob(conn, job.id, {
+      status: "completed",
+      progress: 100,
+      finished_at: new Date().toISOString(),
+      error: null,
+      result: outcome,
+      meta: { ...job.meta, stage: "done", source: outcome.source, words: outcome.words.length },
+    });
+
+    log(`transcribe ${job.id} poori — ${outcome.words.length} shabd (${outcome.source})`);
+    return { status: "completed" };
+  } catch (error) {
+    return { status: "failed", error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 /* --------------------------------------------------------------- main loop */
 
 async function main(): Promise<void> {
@@ -387,10 +510,13 @@ async function main(): Promise<void> {
       }
 
       running += 1;
-      log(`job ${job.id} uthayi (preset ${job.preset}, koshish ${job.attempts})`);
+      log(`job ${job.id} uthayi (${job.kind ?? "render"}, preset ${job.preset}, koshish ${job.attempts})`);
       void heartbeat(conn, job.id);
 
-      void runJob(conn, job)
+      // Kaun sa kaam — `kind` se. Purane rows me column nahi hoga, wahan render.
+      const work = (job.kind ?? "render") === "transcribe" ? runTranscribeJob : runJob;
+
+      void work(conn, job)
         .then(async (outcome) => {
           if (outcome.status === "completed") return;
 

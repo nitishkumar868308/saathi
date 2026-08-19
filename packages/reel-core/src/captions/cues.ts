@@ -17,6 +17,15 @@ export const CaptionWordSchema = z.object({
   text: z.string(),
   startFrame: FrameSchema,
   endFrame: FrameSchema,
+  /**
+   * Machine kitni pakki thi (0..1). `null` = usne bataya hi nahi (23.9).
+   *
+   * ⚠️ Ye doc me isliye rehti hai ki editor kam bharose wale shabd highlight
+   * kar sake. Bina iske transcript "sab kuch pakka" jaisa dikhta hai, jabki
+   * do-teen shabd hamesha aise hote hain jo haath se theek karne hote hain —
+   * aur unhe dhoondhne me poori caption dobara sunni padti hai.
+   */
+  confidence: z.number().min(0).max(1).nullable().default(null),
 });
 
 export const CaptionCueSchema = z.object({
@@ -99,7 +108,8 @@ export function estimateWords(cue: {
     // rounding ki galti wahin sudhar jaati hai.
     const end =
       index === words.length - 1 ? cue.endFrame : Math.round(at + total * share);
-    out.push({ text: word, startFrame: at, endFrame: Math.max(at + 1, end) });
+    // `null` — ye andaaza hai, isme "kitna pakka" jaisi koi cheez hai hi nahi.
+    out.push({ text: word, startFrame: at, endFrame: Math.max(at + 1, end), confidence: null });
     at = Math.max(at + 1, end);
   });
 

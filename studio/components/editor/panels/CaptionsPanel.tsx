@@ -2,6 +2,7 @@
 
 import {
   cueProblems,
+  isLowConfidence,
   cuesFromParsed,
   cuesToSeconds,
   formatSubtitles,
@@ -13,6 +14,7 @@ import clsx from "clsx";
 import { Captions, Download, Plus, Scissors, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { AutoCaptionsSection } from "@/components/editor/panels/AutoCaptionsSection";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -141,9 +143,12 @@ export function CaptionsPanel() {
         subtitle.cues.every((cue) => cue.words.length === 0) ? (
           <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1 text-amber">
             Is style ko har shabd ka waqt chahiye. Abhi wo <strong>andaaze se</strong> nikal raha
-            hai (shabd ki lambai ke hisaab se) — asli timing Phase 23 ki auto-captions se aayegi.
+            hai (shabd ki lambai ke hisaab se). Neeche "Auto captions" se asli, naapi hui timing
+            aa jaayegi.
           </p>
         ) : null}
+
+        <AutoCaptionsSection subtitleItem={item} />
       </section>
 
       <section className="flex flex-wrap gap-1 border-t border-ink-800 pt-2">
@@ -290,6 +295,22 @@ export function CaptionsPanel() {
                * Lambai ki salah — **rukavat nahi**. Kabhi-kabhi lambi line hi
                * sahi hoti hai; user ko rokna galat hoga, batana zaroori hai.
                */}
+              {/*
+               * ⚠️ 23.9 — kam bharose wale shabd. Machine ne inhe andaaze se
+               * likha hai, aur yahi wo do-teen shabd hote hain jo haath se
+               * theek karne hote hain. Bina highlight ke unhe dhoondhne ke liye
+               * poori caption dobara sunni padti hai.
+               */}
+              {cue.words.some(isLowConfidence) ? (
+                <p className="text-[10px] text-amber">
+                  Shak wale shabd:{" "}
+                  {cue.words
+                    .filter(isLowConfidence)
+                    .map((word) => word.text)
+                    .join(", ")}
+                </p>
+              ) : null}
+
               {problems.map((problem) => (
                 <p key={problem} className="text-[10px] text-amber">
                   {problem}

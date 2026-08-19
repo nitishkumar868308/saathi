@@ -77,6 +77,16 @@ import {
   cuesToSeconds,
   deleteCue,
   estimateWords,
+  alignTranscript,
+  alignWords,
+  applyCaptionScript,
+  buildCues,
+  devanagariToLatin,
+  hasDevanagari,
+  isLowConfidence,
+  removeFillers,
+  syllableWeight,
+  wrapLines,
   formatSubtitles,
   listCaptionStyles,
   mergeCuesOp as mergeCuesInItem,
@@ -5923,8 +5933,8 @@ test("text badalne par purana word timing hat jaata hai", () => {
         endFrame: 60,
         text: "ek do",
         words: [
-          { text: "ek", startFrame: 0, endFrame: 30 },
-          { text: "do", startFrame: 30, endFrame: 60 },
+          { text: "ek", startFrame: 0, endFrame: 30, confidence: null },
+          { text: "do", startFrame: 30, endFrame: 60, confidence: null },
         ],
       },
     ],
@@ -7034,6 +7044,193 @@ const { doc: sample } = buildFixture();
 const sampleParsed = safeParseDoc(sample);
 test("sample doc schema pass karta hai", () => {
   assert.equal(sampleParsed.success, true);
+});
+
+// ------------------------------------------------------------- Phase 23
+
+section("transcript se cues (23.6 / 23.7)");
+
+const sampleWords = [
+  { text: "Papa", startSeconds: 0.0, endSeconds: 0.4, confidence: 0.95 },
+  { text: "ke", startSeconds: 0.4, endSeconds: 0.55, confidence: 0.9 },
+  { text: "documents.", startSeconds: 0.55, endSeconds: 1.2, confidence: 0.88 },
+  { text: "Ab", startSeconds: 2.0, endSeconds: 2.3, confidence: 0.4 },
+  { text: "ek", startSeconds: 2.3, endSeconds: 2.5, confidence: 0.92 },
+  { text: "jagah", startSeconds: 2.5, endSeconds: 3.0, confidence: 0.91 },
+];
+
+test("chuppi par nayi cue shuru hoti hai", () => {
+  const cues = buildCues(sampleWords, { fps: 30, makeId: (index) => `c${index}` });
+  assert.equal(cues.length, 2, cues.map((cue) => cue.text).join(" / "));
+  assert.ok(cues[0]!.text.startsWith("Papa"));
+  assert.ok(cues[1]!.text.startsWith("Ab"));
+});
+
+test("poornviraam par bhi cue tootti hai", () => {
+  /*
+   * Bina iske ek vaakya ka ant aur agle ka shuru ek hi cue me aa jaate hain, aur
+   * padhne wale ko do alag baatein ek saath dikhti hain.
+   */
+  const cues = buildCues(
+    [
+      { text: "Namaste.", startSeconds: 0, endSeconds: 0.5, confidence: 1 },
+      { text: "Aaj", startSeconds: 0.5, endSeconds: 0.8, confidence: 1 },
+    ],
+    { fps: 30, makeId: (index) => `c${index}` },
+  );
+  assert.equal(cues.length, 2);
+});
+
+test("cue ke shabd asli timing rakhte hain (andaaza nahi)", () => {
+  const cues = buildCues(sampleWords, { fps: 30, makeId: (index) => `c${index}` });
+  const first = cues[0]!;
+  assert.equal(first.words.length, 3);
+  // 0.4s * 30fps = 12 — seedha naapa hua, `estimateWords` ke bhaar se nahi.
+  assert.equal(first.words[0]!.endFrame, 12);
+});
+
+test("shabd hamesha apni cue ke andar rehte hain", () => {
+  const cues = buildCues(sampleWords, { fps: 30, makeId: (index) => `c${index}` });
+  for (const cue of cues) {
+    for (const word of cue.words) {
+      assert.ok(word.startFrame >= cue.startFrame && word.endFrame <= cue.endFrame, word.text);
+    }
+  }
+});
+
+test("item-local frames — offset ghata kar", () => {
+  /*
+   * ⚠️ Phase 19 ka niyam: cue ke frames item-local hote hain. Doc ke frames
+   * rakhne par subtitle item ko khiskane se captions video se alag ho jaate.
+   */
+  const cues = buildCues(sampleWords, { fps: 30, offsetSeconds: 2, makeId: (index) => `c${index}` });
+  assert.equal(cues[cues.length - 1]!.startFrame, 0);
+});
+
+test("lambi line maxChars par tootti hai", () => {
+  const wrapped = wrapLines("ek do teen chaar paanch chhe saat aath", 12);
+  for (const line of wrapped.split("\n")) assert.ok(line.length <= 12, line);
+});
+
+test("filler default me nahi hatte", () => {
+  const withUm = [
+    { text: "um", startSeconds: 0, endSeconds: 0.2, confidence: 0.3 },
+    { text: "Papa", startSeconds: 0.2, endSeconds: 0.6, confidence: 0.9 },
+  ];
+  const kept = buildCues(withUm, { fps: 30, makeId: () => "c" });
+  assert.ok(kept[0]!.text.includes("um"), kept[0]!.text);
+
+  const dropped = buildCues(withUm, { fps: 30, dropFillers: true, makeId: () => "c" });
+  assert.ok(!dropped[0]!.text.includes("um"), dropped[0]!.text);
+});
+
+test("dohraya hua shabd jud jaata hai, gayab nahi hota", () => {
+  const merged = removeFillers([
+    { text: "Papa", startSeconds: 0, endSeconds: 0.4, confidence: 0.9 },
+    { text: "Papa", startSeconds: 0.4, endSeconds: 0.8, confidence: 0.9 },
+  ]);
+  assert.equal(merged.length, 1);
+  // Waqt kahin nahi gaya — karaoke me highlight beech me atak jaata warna.
+  assert.equal(merged[0]!.endSeconds, 0.8);
+});
+
+test("kam bharose wale shabd pakde jaate hain (23.9)", () => {
+  assert.equal(isLowConfidence({ confidence: 0.4 }), true);
+  assert.equal(isLowConfidence({ confidence: 0.9 }), false);
+  // `null` = machine ne bataya hi nahi — use "kharab" maan lena jhooth hoga.
+  assert.equal(isLowConfidence({ confidence: null }), false);
+});
+
+section("alignment — text pata ho to whisper ki zaroorat nahi (23.5)");
+
+test("bina segments ke bhi shabd badhte kram me rehte hain", () => {
+  const words = alignWords({ text: "ek do teen chaar", durationSeconds: 4 });
+  assert.equal(words.length, 4);
+  for (let index = 1; index < words.length; index += 1) {
+    assert.ok(words[index]!.startSeconds >= words[index - 1]!.endSeconds - 1e-9);
+  }
+  assert.equal(Math.round(words[words.length - 1]!.endSeconds), 4);
+});
+
+test("chuppi me koi shabd nahi girta", () => {
+  /*
+   * ⚠️ Yahi is poore function ki jaan hai. Seedhi baant me shuruaati khaamoshi
+   * bhi baant di jaati hai aur saare shabd aage khisak jaate hain.
+   */
+  const segments = [
+    { startSeconds: 1, endSeconds: 1.5 },
+    { startSeconds: 2, endSeconds: 2.5 },
+  ];
+  const words = alignWords({ text: "ek do", durationSeconds: 3, segments });
+  assert.equal(words[0]!.startSeconds, 1);
+  assert.equal(words[1]!.startSeconds, 2);
+});
+
+test("ek shabd do segment me nahi bantta", () => {
+  const segments = [
+    { startSeconds: 0, endSeconds: 1 },
+    { startSeconds: 2, endSeconds: 3 },
+  ];
+  const words = alignWords({ text: "ek do teen", durationSeconds: 3, segments });
+  for (const word of words) {
+    const inside = segments.some(
+      (segment) =>
+        word.startSeconds >= segment.startSeconds - 1e-9 && word.endSeconds <= segment.endSeconds + 1e-9,
+    );
+    assert.ok(inside, `${word.text} ${word.startSeconds}-${word.endSeconds}`);
+  }
+});
+
+test("lamba shabd zyada waqt leta hai", () => {
+  const words = alignWords({ text: "ek vyavastha", durationSeconds: 3 });
+  const first = words[0]!.endSeconds - words[0]!.startSeconds;
+  const second = words[1]!.endSeconds - words[1]!.startSeconds;
+  assert.ok(second > first, `${first} vs ${second}`);
+});
+
+test("syllable se bhaar milta hai, akshar se nahi", () => {
+  // "through" 7 akshar ka par ek hi syllable; "kamal" 5 akshar ka aur do.
+  assert.ok(syllableWeight("kamal") > syllableWeight("through"));
+});
+
+test("aligned transcript apne aap ko 'aligned' hi kehta hai", () => {
+  /*
+   * ⚠️ Ise "whisper" batana sabse bura hota: user ise naapi hui timing maan kar
+   * karaoke laga deta aur highlight hamesha thoda aage-peeche chalta rehta.
+   */
+  const result = alignTranscript({ text: "ek do", durationSeconds: 2 });
+  assert.equal(result.source, "aligned");
+  assert.ok(result.words.every((word) => word.confidence === null));
+});
+
+section("Hinglish likhawat (23.4)");
+
+test("Devanagari se Latin ke namoone", () => {
+  assert.equal(devanagariToLatin("नमस्ते"), "namaste");
+  assert.equal(devanagariToLatin("कमल"), "kamal");
+  assert.equal(devanagariToLatin("आज"), "aaj");
+  assert.equal(devanagariToLatin("क्या"), "kya");
+});
+
+test("aakhir wala 'aa' chhota hota hai, beech wala nahi", () => {
+  // Reels ka chalan: "raha", "rahaa" nahi. Par "kaam" me beech ka "aa" rehta hai.
+  assert.equal(devanagariToLatin("रहा"), "raha");
+  assert.equal(devanagariToLatin("काम"), "kaam");
+});
+
+test("English shabd jaise ke waise rehte hain", () => {
+  assert.equal(devanagariToLatin("मैं ghar जा रहा हूँ"), "main ghar ja raha hoon");
+});
+
+test("script auto/deva par text ko haath nahi lagta", () => {
+  assert.equal(applyCaptionScript("नमस्ते", "auto"), "नमस्ते");
+  assert.equal(applyCaptionScript("नमस्ते", "deva"), "नमस्ते");
+  assert.equal(applyCaptionScript("नमस्ते", "latin"), "namaste");
+});
+
+test("Devanagari hai ya nahi — pehchana jaata hai", () => {
+  assert.equal(hasDevanagari("नमस्ते"), true);
+  assert.equal(hasDevanagari("namaste"), false);
 });
 
 console.log(JSON.stringify(sample, null, 2));
