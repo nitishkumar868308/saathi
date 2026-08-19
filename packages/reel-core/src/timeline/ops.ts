@@ -473,6 +473,40 @@ export const setProjectProperty = defineOp<SetProjectPropertyArgs>(
   },
 );
 
+/** Track ki wo properties jo path se set nahi hoti — inke apne op hain. */
+const PROTECTED_TRACK_PATHS = new Set(["id", "type", "order"]);
+
+export interface SetTrackPropertyArgs {
+  trackId: string;
+  /** `"muted"`, `"hidden"`, `"locked"`, `"name"`. */
+  path: string;
+  value: unknown;
+}
+
+/**
+ * Track ki koi property path se set karo — mute / hide / lock / rename.
+ *
+ * Ye op isliye chahiye ki UI seedha `track.muted = true` na likhe (Dynamic rule
+ * 12). Mute ek chhoti si cheez lagti hai, par uska undo bhi utna hi chahiye
+ * jitna kisi clip ko sarkane ka — aur bina op ke wo Ctrl+Z se wapas nahi aata.
+ *
+ * `order` yahan se nahi badalta: tracks ka kram ek dusre par nirbhar hai, isliye
+ * uska apna `reorderTracks` hai jo poori list ek saath theek karta hai.
+ */
+export const setTrackProperty = defineOp<SetTrackPropertyArgs>(
+  "setTrackProperty",
+  (draft, args) => {
+    const root = args.path.split(".")[0] as string;
+    if (PROTECTED_TRACK_PATHS.has(args.path) || PROTECTED_TRACK_PATHS.has(root)) {
+      throw new TimelineOpError(
+        `track.${args.path} seedhe set nahi hota — iske liye apna op hai`,
+      );
+    }
+    const track = findTrack(draft, args.trackId);
+    setByPath(track, args.path, args.value);
+  },
+);
+
 export interface ReplaceDocArgs {
   /** Poora naya doc — caller ise `parseDoc`/`migrateDoc` se guzaar kar de. */
   doc: Doc;
@@ -520,6 +554,7 @@ export const OPS = {
   addTrack,
   removeTrack,
   reorderTracks,
+  setTrackProperty,
   recomputeDuration,
   setProjectProperty,
   replaceDoc,

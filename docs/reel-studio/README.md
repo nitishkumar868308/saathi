@@ -263,7 +263,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 4 | complete | 2026-08-19 |
 | 5 | in progress — 5.1/5.4-5.9 verified; 5.2/5.3/5.10/5.11/5.12 sirf `studio/.env.local` par ruke hain | 2026-08-19 |
 | 6 | in progress — 6.1/6.3/6.10/6.12 verified; baaki browser par (6.13 ka render aadha ho chuka) | 2026-08-19 |
-| 7 | not started | — |
+| 7 | in progress — 7.1/7.2/7.5/7.7/7.9 verified; baaki browser par (38 test pass) | 2026-08-19 |
 | 8 | not started | — |
 | 9 | not started | — |
 | 10 | not started | — |

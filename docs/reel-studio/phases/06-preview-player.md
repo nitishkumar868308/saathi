@@ -89,9 +89,12 @@ unticked hain.
 
 - [ ] 6.7 Scrub: player par drag + timeline par drag, dono same frame set karein.
       Scrub ke dauraan seek throttle (60fps se zyada nahi).
-      → code maujood hai, browser me chalaya nahi. Dono jagah **wahi ek**
-      [`<ScrubBar>`](../../../studio/components/editor/preview/ScrubBar.tsx) hai (transport
-      me aur timeline me), isliye dono ka frame alag ho hi nahi sakta.
+      → code maujood hai, browser me chalaya nahi. Transport me
+      [`<ScrubBar>`](../../../studio/components/editor/preview/ScrubBar.tsx) hai; timeline
+      wali taraf **Phase 7 ne asli ruler de diya** (`TimelineView`), aur us waqt ki chhoti
+      `TimelineStrip` hata di gayi — do jagah do alag scrub rakhna sirf uljhan hoti.
+      Dono `store.setPlayhead()` hi likhte hain, isliye "dono jagah ek hi frame" abhi bhi
+      structure se sach hai, sanyog se nahi.
       Throttle ka ganit test se saabit hai — "seek throttle (6.7)" ke 4 test nakli ghadi
       par: pehla seek turant, ek window me sirf **aakhri** frame, 1000ms me 200
       pointermove par bhi 61 se zyada seek nahi, aur `flush()` pending ko turant bhejta hai.

@@ -17,6 +17,13 @@ import { createStore, useStore, type StoreApi } from "zustand";
 
 import { createSaveScheduler, type SaveScheduler, type SaveStatus } from "@/lib/autosave";
 import { HISTORY_LIMIT, SNAPSHOT_EVERY_SAVES, SNAPSHOT_MAX_INTERVAL_MS } from "@/lib/config";
+import {
+  DEFAULT_PX_PER_FRAME,
+  clampPxPerFrame,
+  clampTrackHeight,
+  setInPoint,
+  setOutPoint,
+} from "@/lib/timeline";
 
 /**
  * Editor ka poora state — do slice, ek store.
@@ -78,8 +85,27 @@ export interface EditorState {
   /* ---------------- ui slice ----------------- */
   selection: Selection;
   playheadFrame: number;
-  /** Timeline ka zoom (px per frame) — Phase 7 me kaam me aayega. */
+  /**
+   * Timeline ka zoom — **px per frame**, koi "level" nahi.
+   *
+   * Level rakhne se Ctrl+wheel jhatke se chalta aur "Fit project" kisi bhi level
+   * par theek nahi baithta. Hadd `clampPxPerFrame()` lagata hai.
+   */
   zoom: number;
+  /** Playback ke dauraan timeline playhead ke peeche chale (7.4). */
+  followPlayhead: boolean;
+  /**
+   * Track ki oonchai jo user ne kheench kar badli (px), trackId se.
+   *
+   * ⚠️ Ye jaan-boojhkar **doc me nahi** hai: oonchai dekhne ka tarika hai, project
+   * ka data nahi — doc me daalne par ek track kheenchna hi autosave aur ek naya
+   * version bana deta. Isi wajah se ye reload par reset ho jaati hai; asli track
+   * manager Phase 16 me hai, wahi iska sahi ghar hoga.
+   */
+  trackHeights: Record<string, number>;
+  /** In/Out markers (7.11) — abhi sirf dikhte hain, kaam Phase 8 me. */
+  inFrame: number | null;
+  outFrame: number | null;
   mode: "beginner" | "advanced";
   leftPanelId: string;
 
@@ -103,6 +129,11 @@ export interface EditorState {
   setSelection(selection: Selection): void;
   setPlayhead(frame: number): void;
   setZoom(zoom: number): void;
+  setFollowPlayhead(value: boolean): void;
+  setTrackHeight(trackId: string, height: number): void;
+  markIn(frame: number): void;
+  markOut(frame: number): void;
+  clearInOut(): void;
   setMode(mode: "beginner" | "advanced"): void;
   setLeftPanel(id: string): void;
   clearOpError(): void;
@@ -267,7 +298,11 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
 
       selection: EMPTY_SELECTION,
       playheadFrame: 0,
-      zoom: 1,
+      zoom: DEFAULT_PX_PER_FRAME,
+      followPlayhead: true,
+      trackHeights: {},
+      inFrame: null,
+      outFrame: null,
       mode: "advanced",
       leftPanelId: "media",
 
@@ -302,6 +337,9 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
           redoLabel: null,
           selection: EMPTY_SELECTION,
           playheadFrame: 0,
+          trackHeights: {},
+          inFrame: null,
+          outFrame: null,
           saveStatus: "saved",
           saveMessage: null,
           conflict: null,
@@ -357,7 +395,26 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
         set({ playheadFrame: Math.max(0, Math.round(frame)) });
       },
       setZoom(zoom) {
-        set({ zoom });
+        set({ zoom: clampPxPerFrame(zoom) });
+      },
+      setFollowPlayhead(followPlayhead) {
+        set({ followPlayhead });
+      },
+      setTrackHeight(trackId, height) {
+        set({
+          trackHeights: { ...get().trackHeights, [trackId]: clampTrackHeight(height) },
+        });
+      },
+      markIn(frame) {
+        const last = Math.max(0, get().doc.project.durationInFrames - 1);
+        set(setInPoint({ inFrame: get().inFrame, outFrame: get().outFrame }, frame, last));
+      },
+      markOut(frame) {
+        const last = Math.max(0, get().doc.project.durationInFrames - 1);
+        set(setOutPoint({ inFrame: get().inFrame, outFrame: get().outFrame }, frame, last));
+      },
+      clearInOut() {
+        set({ inFrame: null, outFrame: null });
       },
       setMode(mode) {
         set({ mode });

@@ -7,7 +7,7 @@ import { LeftSidebar } from "@/components/editor/LeftSidebar";
 import { PreviewStage } from "@/components/editor/PreviewStage";
 import { ResizeHandle } from "@/components/editor/ResizeHandle";
 import { RightSidebar } from "@/components/editor/RightSidebar";
-import { TimelineStrip } from "@/components/editor/TimelineStrip";
+import { TimelineView } from "@/components/editor/timeline/TimelineView";
 import { TopBar } from "@/components/editor/TopBar";
 import { useLayout } from "@/lib/layout";
 import { PlaybackProvider } from "@/lib/playback";
@@ -109,7 +109,7 @@ function EditorShell() {
             onDelta={(delta) => setPanel("timeline", layout.timeline - delta)}
           />
           <div style={{ height: layout.timeline }} className="min-h-0 shrink-0">
-            <TimelineStrip />
+            <TimelineView />
           </div>
         </div>
 

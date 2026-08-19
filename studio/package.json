@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts && tsx scripts/check-preview.ts"
+    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts && tsx scripts/check-preview.ts && tsx scripts/check-timeline.ts"
   },
   "dependencies": {
     "@reel/core": "*",
