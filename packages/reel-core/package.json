@@ -1,0 +1,16 @@
+{
+  "name": "@reel/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure TypeScript core — schema, timeline ops, keyframes, validation. Isme React ya DOM ka koi import nahi aata (studio aur worker dono ise chalate hain).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

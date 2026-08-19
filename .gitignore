@@ -2,3 +2,26 @@
 # Ye machine-specific hai aur `supabase link` par apne aap banta hai —
 # repo me rakhne ki koi wajah nahi.
 supabase/.temp/
+
+# --- AI Reel Studio (Phase 0) ---
+
+# Har workspace ka apna node_modules hota hai, isliye pattern recursive hai.
+**/node_modules/
+
+# Next.js ka build cache aur TypeScript ka incremental cache.
+studio/.next/
+studio/out/
+**/*.tsbuildinfo
+
+# Worker ka compiled output.
+worker/out/
+
+# Render ka output — bade MP4 kabhi repo me nahi jaate (REEL_OUTPUT_DIR).
+render-out/
+
+# Asli keys. Sirf .example files commit hoti hain.
+.env
+.env.local
+*.local.env
+studio/.env.local
+worker/.env

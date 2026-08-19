@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Editor ek dark, chrome-less surface hai — video ka rang sahi dikhe isliye
+   background neutral rakha hai, koi tint nahi. */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #0b0b0d;
+  color: #e8e6e3;
+}

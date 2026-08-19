@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Path alias source files par seedhe point karte hain — packages ka koi
+    // build step nahi hai, isliye studio/worker inhe wahin se padh lete hain.
+    // baseUrl is file ke folder (repo root) se resolve hota hai, isliye har
+    // extend karne wale package me ye alias waise ke waise kaam karte hain.
+    "baseUrl": ".",
+    "paths": {
+      "@reel/core/*": ["packages/reel-core/src/*"],
+      "@reel/remotion/*": ["packages/reel-remotion/src/*"]
+    }
+  },
+  "exclude": ["node_modules"]
+}

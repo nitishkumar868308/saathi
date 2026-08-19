@@ -1,0 +1,21 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+
+    // `paths` extend nahi hota, replace hota hai — isliye base wale do alias
+    // yahan dobara likhe hain, studio folder se relative.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@reel/core/*": ["../packages/reel-core/src/*"],
+      "@reel/remotion/*": ["../packages/reel-remotion/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
