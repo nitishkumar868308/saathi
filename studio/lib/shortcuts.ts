@@ -3,12 +3,22 @@
 import {
   EMPTY_SELECTION,
   copyItems,
+  nextMarkerFrame,
   selectAll,
   selectSingle,
   timelineOrder,
   type Item,
 } from "@reel/core";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+import {
+  REMAP_EVENT,
+  eventCombo,
+  isTypingTarget,
+  nativeHandlesKey,
+  readRemap,
+  resolvedKeys,
+} from "@/lib/shortcutKeys";
 
 import { readClips, writeClips } from "@/lib/clipboard";
 import { usePlayback, type PlaybackApi } from "@/lib/playback";
@@ -224,7 +234,122 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     run: ({ editor }) => stepClip(editor, -1),
   },
 
+  {
+    /*
+     * J / K / L — har asli editor ka shuttle. J peeche, L aage, K rok do.
+     * Baar-baar dabane par raftaar badhti hai (2x, 4x), jo footage me ek jagah
+     * dhoondhne ka sabse tez tarika hai.
+     */
+    id: "shuttle-back",
+    keys: "j",
+    label: "Peeche shuttle (J K L)",
+    group: "transport",
+    run: ({ playback }) => playback.shuttle(-1),
+  },
+  {
+    id: "shuttle-stop",
+    keys: "k",
+    label: "Roko",
+    group: "transport",
+    run: ({ playback }) => playback.shuttle(0),
+  },
+  {
+    id: "shuttle-forward",
+    keys: "l",
+    label: "Aage shuttle",
+    group: "transport",
+    run: ({ playback }) => playback.shuttle(1),
+  },
+  {
+    id: "zoom-fit",
+    keys: "shift+z",
+    label: "Poori timeline dikhao",
+    group: "timeline",
+    run: ({ editor }) => editor.requestFitZoom(),
+  },
+  {
+    id: "marker-add",
+    keys: "m",
+    label: "Marker lagao",
+    group: "timeline",
+    run: ({ editor }) =>
+      editor.applyOp("addMarker", { frame: editor.playheadFrame }, { label: "Marker" }),
+  },
+  {
+    id: "marker-next",
+    keys: "shift+m",
+    label: "Agle marker par",
+    group: "timeline",
+    run: ({ editor }) => {
+      const frame = nextMarkerFrame(editor.doc, editor.playheadFrame, 1);
+      if (frame !== null) editor.setPlayhead(frame);
+    },
+  },
+  {
+    id: "marker-prev",
+    keys: "alt+m",
+    label: "Pichhle marker par",
+    group: "timeline",
+    run: ({ editor }) => {
+      const frame = nextMarkerFrame(editor.doc, editor.playheadFrame, -1);
+      if (frame !== null) editor.setPlayhead(frame);
+    },
+  },
+  {
+    id: "shortcuts-help",
+    keys: "shift+/",
+    label: "Ye list dikhao",
+    group: "edit",
+    run: ({ editor }) => editor.setShortcutsOpen(!editor.shortcutsOpen),
+  },
+
   /* --------------------------------------------------------------- editing */
+
+  {
+    /*
+     * `[` aur `]` — playhead tak trim. Ye NLE ka sabse purana shortcut jodi hai
+     * aur rozana ka kaam hai: clip ka bekaar shuru ya ant kaatna.
+     *
+     * `trimItemStart`/`trimItemEnd` **delta** lete hain, absolute frame nahi —
+     * isliye hisaab yahan hota hai. Kai clips chuni ho to har ek ka apna delta
+     * banta hai, par undo ek hi hota hai.
+     */
+    id: "trim-start-to-playhead",
+    keys: "[",
+    label: "Shuruaat playhead tak kaato",
+    group: "editing",
+    run: ({ editor }) => trimToPlayhead(editor, "start"),
+  },
+  {
+    id: "trim-end-to-playhead",
+    keys: "]",
+    label: "Ant playhead tak kaato",
+    group: "editing",
+    run: ({ editor }) => trimToPlayhead(editor, "end"),
+  },
+  {
+    id: "group",
+    keys: "mod+g",
+    label: "Group",
+    group: "editing",
+    run: ({ editor }) => {
+      const itemIds = [...editor.selection.itemIds];
+      if (itemIds.length < 2) return;
+      editor.applyOp("groupItems", { itemIds }, { label: "Group" });
+    },
+  },
+  {
+    id: "ungroup",
+    keys: "mod+shift+g",
+    label: "Ungroup",
+    group: "editing",
+    run: ({ editor }) => {
+      const itemIds = [...editor.selection.itemIds];
+      if (itemIds.length === 0) return;
+      editor.applyOp("ungroupItems", { itemIds }, { label: "Ungroup" });
+    },
+  },
+
 
   {
     id: "split",
@@ -328,6 +453,44 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
   },
 ];
 
+/**
+ * Chuni hui clips ka ek kinara playhead tak kaato (16.5).
+ *
+ * Playhead clip ke bahar ho to us clip ko chhod dete hain — kaatne ko kuch hai
+ * hi nahi. Chup-chaap poori clip mita dena ya use playhead tak khinch dena dono
+ * "maine to sirf ek kinara kaata tha" wali hairaani paida karte hain.
+ */
+function trimToPlayhead(editor: EditorState, side: "start" | "end"): void {
+  const frame = editor.playheadFrame;
+  const items = editor.doc.items.filter(
+    (item) =>
+      editor.selection.itemIds.includes(item.id) &&
+      frame > item.startFrame &&
+      frame < item.startFrame + item.durationInFrames,
+  );
+  if (items.length === 0) return;
+
+  for (const item of items) {
+    if (side === "start") {
+      editor.applyOp(
+        "trimItemStart",
+        { itemId: item.id, deltaFrames: frame - item.startFrame },
+        { label: "Trim shuruaat", coalesceKey: `trim-pl:${frame}` },
+      );
+    } else {
+      editor.applyOp(
+        "trimItemEnd",
+        {
+          itemId: item.id,
+          deltaFrames: frame - (item.startFrame + item.durationInFrames),
+          sourceDurationFrames: item.sourceDurationFrames,
+        },
+        { label: "Trim ant", coalesceKey: `trim-pl:${frame}` },
+      );
+    }
+  }
+}
+
 /** Delete / ripple delete — dono ka ek hi raasta. */
 function deleteSelected(editor: EditorState, ripple: boolean): void {
   const itemIds = [...editor.selection.itemIds];
@@ -411,51 +574,19 @@ function nearestIndex(ordered: readonly Item[], frame: number): number {
 }
 
 
-/**
- * Event ko `"mod+shift+z"` jaisi string me badlo.
- *
- * Space ko `" "` ki jagah `"space"` likha jaata hai — `"mod+ "` jaisi string
- * padhne aur likhne dono me galti karwati hai.
- */
-export function eventCombo(event: KeyboardEvent): string {
-  const parts: string[] = [];
-  if (event.ctrlKey || event.metaKey) parts.push("mod");
-  if (event.altKey) parts.push("alt");
-  if (event.shiftKey) parts.push("shift");
-
-  const key = event.key.toLowerCase();
-  // `Shift` khud ko key ki tarah bhi bhejta hai — usko combo me mat ginno.
-  if (!["control", "meta", "alt", "shift"].includes(key)) {
-    parts.push(key === " " ? "space" : key);
-  }
-  return parts.join("+");
-}
-
-export function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  return ["input", "textarea", "select"].includes(target.tagName.toLowerCase());
-}
-
-/**
- * Ye element khud is key ko sambhalta hai kya?
- *
- * Button par focus hote hue Space dabana usi button ko dabata hai. Uske upar se
- * apna play/pause bhi chala dene par ek hi dabane me do cheezein hoti hain —
- * jaise "Loop" dabao aur video bhi chalne lage. Isliye aise mauke par browser
- * ko jeetne dete hain.
- */
-export function nativeHandlesKey(target: EventTarget | null, combo: string): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (combo !== "space") return false;
-  const tag = target.tagName.toLowerCase();
-  return tag === "button" || tag === "a" || target.getAttribute("role") === "button";
-}
-
 /** Shortcuts ko window par chipka do. Editor shell ek hi baar bulata hai. */
 export function useShortcuts(): void {
   const store = useEditorStoreApi();
   const playback = usePlayback();
+  const [remap, setRemap] = useState<Record<string, string>>({});
+
+  // Remap localStorage me hai, isliye pehla render (SSR) use padh nahi sakta.
+  useEffect(() => {
+    const load = () => setRemap(readRemap());
+    load();
+    window.addEventListener(REMAP_EVENT, load);
+    return () => window.removeEventListener(REMAP_EVENT, load);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -463,7 +594,7 @@ export function useShortcuts(): void {
       const typing = isTypingTarget(event.target);
 
       for (const shortcut of SHORTCUTS) {
-        if (shortcut.keys !== combo) continue;
+        if (resolvedKeys(shortcut, remap) !== combo) continue;
         if (typing && !shortcut.allowInInput) continue;
         if (nativeHandlesKey(event.target, combo)) continue;
 
@@ -475,33 +606,24 @@ export function useShortcuts(): void {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [store, playback]);
+  }, [store, playback, remap]);
 }
 
-/** UI me dikhane layak: `mod+shift+z` -> `Ctrl+Shift+Z` (Mac par `⌘`). */
-export function comboLabel(keys: string, isMac = false): string {
-  const NAMES: Record<string, string> = {
-    space: "Space",
-    tab: "Tab",
-    escape: "Esc",
-    alt: "Alt",
-    arrowleft: "←",
-    arrowright: "→",
-    arrowup: "↑",
-    arrowdown: "↓",
-    home: "Home",
-    end: "End",
-    delete: "Del",
-    backspace: "Backspace",
-  };
 
-  return keys
-    .split("+")
-    .map((part) => {
-      if (part === "mod") return isMac ? "⌘" : "Ctrl";
-      if (NAMES[part]) return NAMES[part] as string;
-      if (part.length === 1) return part.toUpperCase();
-      return part.charAt(0).toUpperCase() + part.slice(1);
-    })
-    .join(isMac ? "" : "+");
-}
+/*
+ * Keys ka ganit `shortcutKeys.ts` me hai (wahan browser ka kuch nahi hai, isliye
+ * wo test se guzarta hai). Yahan se aage bhej dete hain taaki import karne walon
+ * ke liye ek hi jagah rahe.
+ */
+export {
+  REMAP_EVENT,
+  comboLabel,
+  conflictingIds,
+  eventCombo,
+  isTypingTarget,
+  nativeHandlesKey,
+  readRemap,
+  resolvedKeys,
+  writeRemap,
+  type ShortcutMeta,
+} from "@/lib/shortcutKeys";

@@ -43,6 +43,7 @@ export function Clip({
   dragging,
   onBeginDrag,
   onKeyboardSelect,
+  onContextMenu,
 }: {
   item: Item;
   track: Track;
@@ -53,6 +54,7 @@ export function Clip({
   dragging: boolean;
   onBeginDrag(event: React.PointerEvent, item: Item, mode: DragMode): void;
   onKeyboardSelect(item: Item): void;
+  onContextMenu(event: React.MouseEvent, item: Item): void;
 }) {
   const type = requireTrackType(track.type);
   const itemType = getItemType(item.type);
@@ -125,6 +127,7 @@ export function Clip({
         aria-label={clipLabel(item)}
         aria-pressed={selected}
         onPointerDown={(event) => onBeginDrag(event, item, "move")}
+        onContextMenu={(event) => onContextMenu(event, item)}
         /*
          * Clip ek asli `<button>` hai, isliye browser ka apna Tab ek clip se
          * doosri par le jaata hai (7.13) — iske liye kisi shortcut ki zaroorat

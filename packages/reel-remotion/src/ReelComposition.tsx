@@ -56,7 +56,22 @@ export type ReelCompositionProps = {
  */
 export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, fonts }) => {
   const fontList = mergeFonts(fonts ?? BUILTIN_FONTS);
-  const tracks = [...doc.tracks].filter((track) => !track.hidden).sort((a, b) => a.order - b.order);
+  /*
+   * Track ke toggles **render me bhi** lagte hain (16.2) — sirf editor me nahi.
+   *
+   * ⚠️ Yahi is checklist ka asli imtihan hai. Hide/solo ko sirf preview me lagana
+   * bahut aasan hai aur ek din user hidden track ke saath export karta hai, video
+   * dekhta hai, aur wo layer wahan hoti hai. Us galti ka pata hamesha bahut der se
+   * chalta hai, isliye chhaanti yahin hoti hai — poore renderer me ek hi jagah.
+   *
+   * Solo lagne par baaki sab jaate hain. Hidden track solo hone par bhi nahi
+   * aata: user ne use jaan-boojhkar chhupaya hai, aur solo uska ulta nahi kar
+   * sakta.
+   */
+  const soloActive = doc.tracks.some((track) => track.solo && !track.hidden);
+  const tracks = [...doc.tracks]
+    .filter((track) => !track.hidden && (!soloActive || track.solo))
+    .sort((a, b) => a.order - b.order);
 
   return (
     <AbsoluteFill style={{ backgroundColor: resolveToken(doc.project.background) }}>
@@ -73,7 +88,12 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, f
           .sort((a, b) => a.startFrame - b.startFrame);
 
         return (
-          <AbsoluteFill key={track.id}>
+          <AbsoluteFill
+            key={track.id}
+            // Track ki opacity poori parat par (16.2). 1 par kuch likhte hi nahi —
+            // har opacity browser se ek naya layer bulwati hai.
+            style={track.opacity < 1 ? { opacity: track.opacity } : undefined}
+          >
             {items.map((item) => (
               <Sequence
                 key={item.id}

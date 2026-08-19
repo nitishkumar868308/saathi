@@ -276,22 +276,29 @@ export function clampTrackHeight(value: number): number {
   return Math.min(MAX_TRACK_HEIGHT, Math.max(MIN_TRACK_HEIGHT, Math.round(value)));
 }
 
-export function trackHeight(track: Track, heights: Readonly<Record<string, number>>): number {
-  const custom = heights[track.id];
-  if (custom !== undefined) return clampTrackHeight(custom);
+/**
+ * Track kitna ooncha dikhega.
+ *
+ * ⚠️ Ye ab **doc** se aata hai (`track.heightPx`), kisi UI state se nahi (16.2).
+ * Pehle ye ek alag `trackHeights` map me tha aur wo do jagah ek hi sach wali
+ * galti thi: video track ko ooncha karke thumbnails dekhna project ka hissa hai,
+ * machine ka nahi. Doosri machine par (ya reload ke baad) project kholne par
+ * layout apne aap badal jaata tha, aur uski wajah kabhi samajh nahi aati thi.
+ *
+ * `null` par registry ka apna default — audio track chhota, video ooncha.
+ */
+export function trackHeight(track: Track): number {
+  if (track.heightPx !== null) return clampTrackHeight(track.heightPx);
   const entry = requireTrackType(track.type);
   return clampTrackHeight(entry.defaultHeight ?? FALLBACK_TRACK_HEIGHT);
 }
 
-export function trackRows(
-  tracks: readonly Track[],
-  heights: Readonly<Record<string, number>> = {},
-): TrackRow[] {
+export function trackRows(tracks: readonly Track[]): TrackRow[] {
   const ordered = [...tracks].sort((a, b) => a.order - b.order);
   const rows: TrackRow[] = [];
   let top = 0;
   for (const track of ordered) {
-    const height = trackHeight(track, heights);
+    const height = trackHeight(track);
     rows.push({ track, height, top });
     top += height;
   }

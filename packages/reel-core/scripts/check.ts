@@ -42,6 +42,17 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  addMarker,
+  deleteMarker,
+  duplicateTrack,
+  expandSelectionToGroups,
+  groupItems,
+  nextMarkerFrame,
+  removeTrack,
+  replaceAsset,
+  setMarker,
+  setTrackProperty,
+  ungroupItems,
   DEFAULT_LOUDNESS_LUFS,
   FADE_SHAPES,
   MIN_VOLUME_DB,
@@ -147,7 +158,6 @@ import {
   normalizeDimension,
   pruneSelection,
   recomputeDuration,
-  removeTrack,
   replaceDoc,
   reorderTracks,
   resolutionName,
@@ -163,7 +173,6 @@ import {
   setIdFactory,
   setItemProperty,
   setProjectProperty,
-  setTrackProperty,
   snapFrame,
   splitItemAtFrame,
   suggestFit,
@@ -883,7 +892,9 @@ test("addTrack / removeTrack / reorderTracks", () => {
 
 test("removeTrack items wale track par chupchaap kuch nahi mitata", () => {
   const { doc, videoTrackId } = buildFixture();
-  throws(() => removeTrack(doc, { trackId: videoTrackId }), /withItems: true/, "bina permission");
+  // Error ka text Phase 16 me badla (ab do raaste hain: "delete" aur "move"),
+  // par shart wahi hai — bina bataye kuch nahi mitata.
+  throws(() => removeTrack(doc, { trackId: videoTrackId }), /delete/, "bina permission");
 
   const removed = removeTrack(doc, { trackId: videoTrackId, withItems: true });
   assert.equal(removed.tracks.length, 1);
@@ -4498,6 +4509,287 @@ test("naye project ka default -14 LUFS hai (Section 3A)", () => {
   const { doc } = duckFixture();
   assert.equal(doc.project.audio.loudnessLufs, DEFAULT_LOUDNESS_LUFS);
   assert.equal(doc.project.audio.limiter, true);
+});
+
+
+// ------------------------------------------------------------- Phase 16
+
+section("markers (16.8)");
+
+test("marker doc me jaata hai aur frame ke kram me rehta hai", () => {
+  const { doc } = buildFixture();
+  let next = addMarker(doc, { frame: 120, name: "beat" });
+  next = addMarker(next, { frame: 30 });
+  next = addMarker(next, { frame: 75, name: "cut" });
+
+  assert.deepEqual(
+    next.markers.map((marker) => marker.frame),
+    [30, 75, 120],
+    "markers hamesha frame ke kram me rehne chahiye",
+  );
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("ek hi frame par doosra marker nahi banta", () => {
+  /*
+   * Do markers ek frame par timeline me ek doosre ke upar baith jaate hain aur
+   * user ko lagta hai ki uska click kaam hi nahi kiya. Isliye dobara dabane par
+   * kuch nahi banta.
+   */
+  const { doc } = buildFixture();
+  const one = addMarker(doc, { frame: 60, name: "pehla" });
+  const two = addMarker(one, { frame: 60, name: "doosra" });
+
+  assert.equal(two.markers.length, 1);
+  assert.equal(two.markers[0]?.name, "pehla", "purana marker bachna chahiye");
+});
+
+test("marker ka naam aur jagah badalti hai, aur kram bana rehta hai", () => {
+  const { doc } = buildFixture();
+  let next = addMarker(doc, { frame: 30 });
+  next = addMarker(next, { frame: 90 });
+  const first = next.markers[0]!.id;
+
+  next = setMarker(next, { markerId: first, frame: 150, name: "aage" });
+  assert.deepEqual(
+    next.markers.map((marker) => marker.frame),
+    [90, 150],
+    "khiskane ke baad bhi kram sahi rehna chahiye",
+  );
+  assert.equal(next.markers[1]?.name, "aage");
+});
+
+test("marker hataya ja sakta hai, aur anjaan id par saaf error", () => {
+  const { doc } = buildFixture();
+  const next = addMarker(doc, { frame: 45 });
+  const id = next.markers[0]!.id;
+
+  assert.equal(deleteMarker(next, { markerId: id }).markers.length, 0);
+  assert.throws(() => deleteMarker(next, { markerId: "mk_nahi" }), /nahi mila/);
+});
+
+test("agla/pichhla marker dhoondhna", () => {
+  const { doc } = buildFixture();
+  let next = addMarker(doc, { frame: 30 });
+  next = addMarker(next, { frame: 90 });
+
+  assert.equal(nextMarkerFrame(next, 0, 1), 30);
+  assert.equal(nextMarkerFrame(next, 30, 1), 90, "usi frame par khade ho to agla wala");
+  assert.equal(nextMarkerFrame(next, 90, 1), null, "aage kuch nahi");
+  assert.equal(nextMarkerFrame(next, 90, -1), 30);
+  assert.equal(nextMarkerFrame(next, 0, -1), null);
+});
+
+section("groups (16.10)");
+
+test("group ek field hai, naya item nahi", () => {
+  const { doc, ids } = chainFixture();
+  const before = doc.items.length;
+  const next = groupItems(doc, { itemIds: [ids[0]!, ids[1]!] });
+
+  assert.equal(next.items.length, before, "group banane se koi naya item nahi banta");
+  assert.equal(itemById(next, ids[0]!).groupId, itemById(next, ids[1]!).groupId);
+  assert.ok(itemById(next, ids[0]!).groupId, "groupId lagna chahiye");
+});
+
+test("ek item ka group nahi banta", () => {
+  const { doc, ids } = chainFixture();
+  assert.throws(() => groupItems(doc, { itemIds: [ids[0]!] }), /do items/);
+});
+
+test("selection group ke saathiyon tak faili jaati hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = groupItems(doc, { itemIds: [ids[0]!, ids[2]!] });
+
+  const expanded = expandSelectionToGroups(next, [ids[0]!]);
+  assert.equal(expanded.length, 2, "ek chunne par doosra bhi aana chahiye");
+  assert.ok(expanded.includes(ids[2]!));
+
+  // Bina group wale item par kuch nahi badalta.
+  assert.deepEqual(expandSelectionToGroups(next, [ids[1]!]), [ids[1]!]);
+});
+
+test("ungroup poora group todta hai, aadha nahi", () => {
+  /*
+   * Aadha group todna ek aisi haalat banata hai jise UI dikha hi nahi sakti:
+   * kuch items saath chalte hain aur kuch nahi, par dono bilkul ek jaise dikhte
+   * hain.
+   */
+  const { doc, ids } = chainFixture();
+  let next = groupItems(doc, { itemIds: [ids[0]!, ids[1]!, ids[2]!] });
+  next = ungroupItems(next, { itemIds: [ids[1]!] });
+
+  for (const id of ids) {
+    assert.equal(itemById(next, id).groupId, null, `${id} ka group toota nahi`);
+  }
+});
+
+section("track ke toggles (16.2)");
+
+test("track ka solo doosri tracks ki awaaz band kar deta hai", () => {
+  const { doc, voiceTrack, musicTrack, musicItem } = duckFixture();
+  const soloed = setTrackProperty(doc, { trackId: voiceTrack, path: "solo", value: true });
+
+  const track = soloed.tracks.find((entry) => entry.id === musicTrack)!;
+  assert.equal(
+    itemGainAt({ doc: soloed, item: itemById(soloed, musicItem), track, localFrame: 0 }),
+    0,
+    "solo ke bahar ka track chup hona chahiye",
+  );
+});
+
+test("chhupi hui track ki awaaz bhi nahi aati", () => {
+  /*
+   * Ye chhoot jaana bahut aasan hai: hide ko sirf dikhne ki cheez maan lena. Par
+   * user ke liye "chhupa diya" ka matlab "ab ye video me nahi hai" hota hai —
+   * aur agar uski awaaz aati rahe to MP4 dekh kar hairaani hoti hai.
+   */
+  const { doc, musicTrack, musicItem } = duckFixture();
+  const hidden = setTrackProperty(doc, { trackId: musicTrack, path: "hidden", value: true });
+  const track = hidden.tracks.find((entry) => entry.id === musicTrack)!;
+
+  assert.equal(
+    itemGainAt({ doc: hidden, item: itemById(hidden, musicItem), track, localFrame: 0 }),
+    0,
+  );
+});
+
+test("track ka solo item ke solo ke upar chalta hai", () => {
+  const { doc, voiceTrack, musicTrack, musicItem } = duckFixture();
+  let next = setTrackProperty(doc, { trackId: voiceTrack, path: "solo", value: true });
+  // Music clip par apna solo — phir bhi track ke solo ke bahar hai.
+  next = setItemAudio(next, { itemIds: [musicItem], field: "solo", value: true });
+
+  const track = next.tracks.find((entry) => entry.id === musicTrack)!;
+  assert.equal(itemGainAt({ doc: next, item: itemById(next, musicItem), track, localFrame: 0 }), 0);
+});
+
+test("naye track ki oonchai doc me null hoti hai (registry ka default)", () => {
+  const { doc } = buildFixture();
+  for (const track of doc.tracks) {
+    assert.equal(track.heightPx, null);
+    assert.equal(track.solo, false);
+    assert.equal(track.opacity, 1);
+  }
+});
+
+test("track ki oonchai aur opacity op se badalti hai aur schema pass karti hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.tracks[0]!.id;
+  let next = setTrackProperty(doc, { trackId: id, path: "heightPx", value: 120 });
+  next = setTrackProperty(next, { trackId: id, path: "opacity", value: 0.4 });
+
+  assert.equal(next.tracks[0]?.heightPx, 120);
+  assert.equal(next.tracks[0]?.opacity, 0.4);
+  assert.ok(safeParseDoc(next).success);
+});
+
+section("track hataana (16.1)");
+
+test("bina bataye track nahi hat'ti jab uspar clips hain", () => {
+  const { doc } = buildFixture();
+  const trackId = doc.items[0]!.trackId;
+  assert.throws(() => removeTrack(doc, { trackId }), /items: "delete" ya "move"/);
+});
+
+test('items: "move" par clips maanne wali doosri track par chale jaate hain', () => {
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  // Ek aur track jo isi kism ke item leti ho.
+  const withSpare = addTrack(doc, { typeId: doc.tracks.find((t) => t.id === item.trackId)!.type });
+  const spareId = withSpare.tracks[withSpare.tracks.length - 1]!.id;
+
+  const next = removeTrack(withSpare, { trackId: item.trackId, items: "move" });
+  assert.equal(next.tracks.find((track) => track.id === item.trackId), undefined);
+  assert.equal(itemById(next, item.id).trackId, spareId, "clip bachni chahiye thi");
+});
+
+test('items: "move" par lene wali track na ho to saaf error', () => {
+  // Chup-chaap clip ko kisi bhi track par daal dena schema to pass kar jaata hai
+  // par render me wo item kabhi dikhta hi nahi — user ko lagta hai mit gaya.
+  const { doc } = buildFixture();
+  const trackId = doc.items[0]!.trackId;
+  assert.throws(() => removeTrack(doc, { trackId, items: "move" }), /lene wali koi doosri track/);
+});
+
+test("track ki copy uske clips bhi le aati hai, par group nahi", () => {
+  const { doc } = buildFixture();
+  const trackId = doc.items[0]!.trackId;
+  const onTrack = doc.items.filter((item) => item.trackId === trackId).length;
+
+  const next = duplicateTrack(doc, { trackId });
+  const copy = next.tracks.find((track) => track.name.endsWith("copy"))!;
+
+  assert.equal(next.items.filter((item) => item.trackId === copy.id).length, onTrack);
+  assert.ok(
+    next.items.filter((item) => item.trackId === copy.id).every((item) => item.groupId === null),
+    "copy ke items asli items ke saath nahi hilne chahiye",
+  );
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("track ki copy ke baad do tracks ek hi order par nahi hoti", () => {
+  const { doc } = buildFixture();
+  const next = duplicateTrack(doc, { trackId: doc.tracks[0]!.id });
+  const orders = next.tracks.map((track) => track.order);
+  assert.equal(new Set(orders).size, orders.length, `order dohra gaya: ${orders.join(", ")}`);
+});
+
+section("replace asset (16.13)");
+
+test("asset badalta hai par timing, keyframes aur effects wahi rehte hain", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = addKeyframe(doc, { itemId: id, path: "transform.scale", frame: 0, value: 1 });
+  next = addEffect(next, { itemIds: [id], typeId: "blur" });
+
+  const before = itemById(next, id);
+  const after = itemById(replaceAsset(next, { itemIds: [id], assetId: "as_naya" }), id);
+
+  assert.equal(after.assetId, "as_naya");
+  assert.equal(after.startFrame, before.startFrame);
+  assert.equal(after.durationInFrames, before.durationInFrames);
+  assert.deepEqual(after.keyframes, before.keyframes, "keyframes bachne chahiye");
+  assert.equal(after.effects.length, before.effects.length, "effects bachne chahiye");
+});
+
+test("naya source chhota ho to trim uske andar aa jaata hai", () => {
+  /*
+   * Warna clip poori kaali dikhti hai, aur wo "asset replace karne ke baad clip
+   * khaali ho gayi" jaisi shikayat bankar aati hai jiski wajah kabhi samajh nahi
+   * aati.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const trimmed = trimItemStart(doc, { itemId: id, deltaFrames: 20 });
+  assert.ok(itemById(trimmed, id).trimStartFrame >= 20);
+
+  const next = replaceAsset(trimmed, {
+    itemIds: [id],
+    assetId: "as_chhota",
+    sourceDurationFrames: 10,
+  });
+  assert.equal(itemById(next, id).trimStartFrame, 0);
+});
+
+test('duration: "fit" par clip naye source jitni ho jaati hai', () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const next = replaceAsset(doc, {
+    itemIds: [id],
+    assetId: "as_chhota",
+    sourceDurationFrames: 25,
+    duration: "fit",
+  });
+  assert.equal(itemById(next, id).durationInFrames, 25);
+  assert.equal(itemById(next, id).sourceDurationFrames, 25);
+});
+
+test("locked clip par replace nahi chalta", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const locked = setItemProperty(doc, { itemId: id, path: "locked", value: true });
+  assert.throws(() => replaceAsset(locked, { itemIds: [id], assetId: "as_naya" }));
 });
 
 

@@ -18,8 +18,10 @@ import {
 } from "@reel/core";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { createStore, useStore, type StoreApi } from "zustand";
+import { DEFAULT_SNAP_OPTIONS, type SnapOptions } from "@/lib/clipEdit";
 
 import { createSaveScheduler, type SaveScheduler, type SaveStatus } from "@/lib/autosave";
+import { clearLocalDraft, saveLocalDraft } from "@/lib/localDraft";
 import { HISTORY_LIMIT, SNAPSHOT_EVERY_SAVES, SNAPSHOT_MAX_INTERVAL_MS } from "@/lib/config";
 import {
   DEFAULT_PX_PER_FRAME,
@@ -54,7 +56,7 @@ import {
  * badalti aur `useEffect` ka jaal ban jaata.
  */
 
-type OpArgsOf<K extends OpName> = (typeof OPS)[K] extends Op<infer A> ? A : never;
+export type OpArgsOf<K extends OpName> = (typeof OPS)[K] extends Op<infer A> ? A : never;
 
 export interface ApplyOpOptions {
   /** Undo tooltip me dikhne wala naam. */
@@ -106,7 +108,6 @@ export interface EditorState {
    * version bana deta. Isi wajah se ye reload par reset ho jaati hai; asli track
    * manager Phase 16 me hai, wahi iska sahi ghar hoga.
    */
-  trackHeights: Record<string, number>;
   /** In/Out markers (7.11) — inka asli kaam 8.5 me (`cutRange` / `keepRange`). */
   inFrame: number | null;
   outFrame: number | null;
@@ -128,6 +129,25 @@ export interface EditorState {
    * saaf karna keyframe lagane se zyada mehnat ka kaam hai.
    */
   autoKeyframe: boolean;
+  /**
+   * Snapping ke toggles (16.11).
+   *
+   * Doc me nahi hai — ye editing preference hai. Doc me daalne par Ctrl+Z ise
+   * bhi ulta deta, jo bilkul galat lagta (wahi wajah jo `overlapPolicy` ki hai).
+   */
+  snapOptions: SnapOptions;
+  /** Cheat-sheet khula hai? (16.6) */
+  shortcutsOpen: boolean;
+  /**
+   * "Poori timeline dikhao" ki farmaaish — ek ginti (16.5).
+   *
+   * ⚠️ Zoom ki value yahan nahi ban sakti: fit karne ke liye timeline ki asli
+   * chaudai chahiye, aur wo sirf `TimelineView` ko pata hoti hai. Isliye store
+   * sirf ginti badhata hai aur view usi par apna hisaab lagata hai. Store me
+   * width rakhne par wo har resize par badalti aur poora editor dobara render
+   * hota, jabki uski zaroorat sirf ek button dabane par hai.
+   */
+  fitZoomRequest: number;
   mode: "beginner" | "advanced";
   leftPanelId: string;
 
@@ -158,6 +178,9 @@ export interface EditorState {
   clearInOut(): void;
   setOverlapPolicy(policy: OverlapPolicy): void;
   setAutoKeyframe(value: boolean): void;
+  setSnapOptions(patch: Partial<SnapOptions>): void;
+  setShortcutsOpen(open: boolean): void;
+  requestFitZoom(): void;
   setMode(mode: "beginner" | "advanced"): void;
   setLeftPanel(id: string): void;
   clearOpError(): void;
@@ -255,6 +278,16 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
         conflict: null,
         savesSinceSnapshot: get().savesSinceSnapshot + 1,
       });
+      /*
+       * Server par pahunch gaya — ab local draft ka koi kaam nahi (16.14).
+       *
+       * Ise saaf karna zaroori hai: chhoda hua draft agli baar "recover karein?"
+       * poochhta rehta hai jabki bachane ko kuch hai hi nahi. Do-teen baar aisa
+       * hone ke baad user us sawaal ko padhna hi band kar deta hai — aur jis din
+       * sach me kuch bacha hoga us din bhi wo "nahi" daba dega.
+       */
+      void clearLocalDraft(get().projectId);
+
       void maybeSnapshot();
       return { kind: "saved" as const };
     }
@@ -290,6 +323,25 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
     function requestSave(): void {
       if (!scheduler || scheduler.isDisposed()) startScheduler();
       scheduler?.schedule();
+
+      /*
+       * Local draft (16.14) — server par bhejne se **pehle**, aur uske natije
+       * ki parwah kiye bina.
+       *
+       * ⚠️ Yahi is jaal ka poora point hai. Server wala save fail ho sakta hai
+       * (net gaya, token expire hua) aur tab tak user kaam karta rehta hai. Draft
+       * yahin, isi pal likh dene se wo kaam browser me bacha rehta hai — chahe
+       * agle hi second tab crash ho jaaye.
+       *
+       * `void` isliye ki ye chal kar khatam hone ka intezaar nahi karna — draft
+       * likhne me 2ms lagein ya 20, edit turant dikhni chahiye.
+       */
+      void saveLocalDraft({
+        projectId: get().projectId,
+        doc: get().doc,
+        at: Date.now(),
+        baseUpdatedAt: get().savedAt || null,
+      });
     }
 
     function startScheduler(): void {
@@ -324,11 +376,13 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       playheadFrame: 0,
       zoom: DEFAULT_PX_PER_FRAME,
       followPlayhead: true,
-      trackHeights: {},
       inFrame: null,
       outFrame: null,
       overlapPolicy: DEFAULT_OVERLAP_POLICY,
       autoKeyframe: false,
+      snapOptions: DEFAULT_SNAP_OPTIONS,
+      shortcutsOpen: false,
+      fitZoomRequest: 0,
       mode: readMode(project.id),
       leftPanelId: "media",
 
@@ -363,7 +417,6 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
           redoLabel: null,
           selection: EMPTY_SELECTION,
           playheadFrame: 0,
-          trackHeights: {},
           inFrame: null,
           outFrame: null,
           saveStatus: "saved",
@@ -449,9 +502,16 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
         set({ followPlayhead });
       },
       setTrackHeight(trackId, height) {
-        set({
-          trackHeights: { ...get().trackHeights, [trackId]: clampTrackHeight(height) },
-        });
+        /*
+         * Oonchai ab doc me hai, isliye ye ek op hai — aur uska Ctrl+Z bhi
+         * chalta hai. `coalesceKey` se poora drag ek hi undo entry banta hai,
+         * warna ek baar oonchai badalne par bees baar Ctrl+Z dabana padta.
+         */
+        get().applyOp(
+          "setTrackProperty",
+          { trackId, path: "heightPx", value: clampTrackHeight(height) },
+          { label: "Track ki oonchai", coalesceKey: `track-height:${trackId}` },
+        );
       },
       markIn(frame) {
         const last = Math.max(0, get().doc.project.durationInFrames - 1);
@@ -469,6 +529,15 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
       setAutoKeyframe(autoKeyframe) {
         set({ autoKeyframe });
+      },
+      setSnapOptions(patch) {
+        set({ snapOptions: { ...get().snapOptions, ...patch } });
+      },
+      setShortcutsOpen(shortcutsOpen) {
+        set({ shortcutsOpen });
+      },
+      requestFitZoom() {
+        set({ fitZoomRequest: get().fitZoomRequest + 1 });
       },
       setMode(mode) {
         set({ mode });

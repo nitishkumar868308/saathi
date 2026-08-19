@@ -112,10 +112,24 @@ export interface GainContext {
 export function itemGainAt(context: GainContext): number {
   const { doc, item, track, localFrame } = context;
 
-  if (item.audio.muted || track.muted || item.hidden) return 0;
+  if (item.audio.muted || track.muted || item.hidden || track.hidden) return 0;
+
+  /*
+   * Do tarah ke solo hain aur dono ka matlab alag hai (16.2):
+   *  - **track ka solo** — "abhi sirf is parat par kaam kar raha hoon"
+   *  - **item ka solo**  — "abhi sirf ye ek clip sunna hai"
+   *
+   * Track wala solo pehle lagta hai: uske bahar ka kuch bhi nahi bajta, chahe
+   * us clip par apna solo laga ho. Ulta karne par ek item ka solo poore track
+   * ke solo ko bekaar kar deta, aur wo "solo laga hai par doosri track bhi baj
+   * rahi hai" jaisi haalat banata jise samjhana namumkin hai.
+   */
+  if (doc.tracks.some((entry) => entry.solo && !entry.hidden) && !track.solo) return 0;
 
   const soloActive = context.soloActive ?? hasSolo(doc);
   if (soloActive && !item.audio.solo) return 0;
+
+  // Track ki opacity awaaz par nahi lagti — wo sirf dikhne ki cheez hai.
 
   // 1. Apna volume — keyframe laga ho to wahi (Phase 13 ka engine).
   let gain = resolveItemValue<number>(item, "audio.volume", localFrame);

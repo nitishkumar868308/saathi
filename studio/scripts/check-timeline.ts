@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 
 import {
   addItem,
+  addMarker,
   addTrack,
   createEmptyProject,
   createItem,
@@ -34,6 +35,7 @@ import {
 } from "@reel/core";
 
 import {
+  DEFAULT_SNAP_OPTIONS,
   SNAP_THRESHOLD_PX,
   clampTrimEnd,
   clampTrimStart,
@@ -298,12 +300,27 @@ test("rows order se bante hain aur ek dusre ke neeche baithte hain", () => {
 });
 
 test("user ki badli hui oonchai registry ke default par jeetati hai", () => {
-  const { doc, tracks } = fixture(30);
-  const first = tracks[0] as Track;
-  const rows = trackRows(doc.tracks, { [first.id]: 120 });
+  /*
+   * Oonchai ab **doc** me hai (`track.heightPx`), kisi UI map me nahi (16.2).
+   * Pehle ye ek alag map se aati thi aur reload par ud jaati thi — ab wo project
+   * ke saath save hoti hai.
+   */
+  const { doc } = fixture(30);
+  const tracks = doc.tracks.map((track, index) =>
+    index === 0 ? { ...track, heightPx: 120 } : track,
+  );
+  const rows = trackRows(tracks);
   assert.equal(rows[0]?.height, 120);
   // …aur uske neeche wala row utna hi neeche khisak jaata hai.
   assert.equal(rows[1]?.top, 120);
+});
+
+test("heightPx null par registry ka default lagta hai", () => {
+  const { doc } = fixture(30);
+  const rows = trackRows(doc.tracks);
+  for (const row of rows) {
+    assert.equal(row.height, requireTrackType(row.track.type).defaultHeight);
+  }
 });
 
 test("oonchai hadd me rehti hai", () => {
@@ -767,6 +784,86 @@ test("trim-end clip ko 1 frame se chhota nahi hone deta", () => {
   const { doc } = fixture(30);
   const item = doc.items[0] as Item;
   assert.equal(item.durationInFrames + clampTrimEnd(item, -99999, null), 1);
+});
+
+
+/* ------------------------------------------------- snapping ke toggles (16.11) */
+
+section("snapping ke toggles (16.11)");
+
+test("band ki hui kism ke bindu candidates me nahi aate", () => {
+  const { doc } = fixture(30);
+  const withMarker = addMarker(doc, { frame: 42 });
+  const first = withMarker.items[0] as Item;
+
+  const all = snapCandidates({
+    doc: withMarker,
+    excludeIds: new Set([first.id]),
+    playheadFrame: 7,
+    inFrame: null,
+    outFrame: null,
+  });
+  assert.ok(all.includes(42), "default me markers par snap lagna chahiye");
+  assert.ok(all.includes(7), "default me playhead par bhi");
+
+  const noMarkers = snapCandidates({
+    doc: withMarker,
+    excludeIds: new Set([first.id]),
+    playheadFrame: 7,
+    inFrame: null,
+    outFrame: null,
+    options: { ...DEFAULT_SNAP_OPTIONS, markers: false, playhead: false },
+  });
+  assert.ok(!noMarkers.includes(42), "marker band hone par uska bindu nahi aana chahiye");
+  assert.ok(!noMarkers.includes(7), "playhead band hone par uska bindu nahi aana chahiye");
+});
+
+test("0 aur project ka ant hamesha rehte hain, chahe sab toggle band hon", () => {
+  /*
+   * In do par snap na lagne ka koi faayda nahi aur nuksaan asli hai: clip 0 se
+   * ek frame pehle rakh dene par uska pehla frame render me hi nahi aata.
+   */
+  const { doc } = fixture(30);
+  const none = snapCandidates({
+    doc,
+    excludeIds: new Set(),
+    playheadFrame: 7,
+    inFrame: null,
+    outFrame: null,
+    options: { playhead: false, clips: false, markers: false, scenes: false, seconds: false },
+  });
+  assert.deepEqual(none, [0, doc.project.durationInFrames].sort((a, b) => a - b));
+});
+
+test("seconds wala toggle har poore second par bindu deta hai", () => {
+  const { doc } = fixture(30);
+  const fps = doc.project.fps;
+  const points = snapCandidates({
+    doc,
+    excludeIds: new Set(),
+    playheadFrame: 0,
+    inFrame: null,
+    outFrame: null,
+    options: { playhead: false, clips: false, markers: false, scenes: false, seconds: true },
+  });
+  assert.ok(points.includes(fps), "1 second par bindu hona chahiye");
+  assert.ok(points.includes(fps * 2), "2 second par bhi");
+});
+
+test("clips band karne par doosri clips ke kinare nahi aate", () => {
+  const { doc } = fixture(30);
+  const first = doc.items[0] as Item;
+  const second = doc.items[1] as Item;
+
+  const points = snapCandidates({
+    doc,
+    excludeIds: new Set([first.id]),
+    playheadFrame: 0,
+    inFrame: null,
+    outFrame: null,
+    options: { ...DEFAULT_SNAP_OPTIONS, clips: false },
+  });
+  assert.ok(!points.includes(second.startFrame) || second.startFrame === 0);
 });
 
 /* ------------------------------------------------------------------ end */

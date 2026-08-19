@@ -17,9 +17,16 @@ import { Crosshair, Maximize2, Scissors, SquareDashedBottom, ZoomIn, ZoomOut } f
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Clip } from "@/components/editor/timeline/Clip";
+import {
+  ClipContextMenu,
+  type ClipMenuState,
+} from "@/components/editor/timeline/ClipContextMenu";
+import { MarkerLane } from "@/components/editor/timeline/MarkerLane";
 import { Ruler } from "@/components/editor/timeline/Ruler";
+import { SnapMenu } from "@/components/editor/timeline/SnapMenu";
 import { KeyframeLanes } from "@/components/editor/timeline/KeyframeLane";
 import { TrackHeader } from "@/components/editor/timeline/TrackHeader";
+import { AddTrackButton } from "@/components/editor/timeline/TrackMenu";
 import { useClipDrag } from "@/components/editor/timeline/useClipDrag";
 import { Button, IconButton } from "@/components/ui/Button";
 import { type DragMode } from "@/lib/clipEdit";
@@ -72,7 +79,6 @@ export function TimelineView() {
   const setZoom = useEditorStore((state) => state.setZoom);
   const followPlayhead = useEditorStore((state) => state.followPlayhead);
   const setFollowPlayhead = useEditorStore((state) => state.setFollowPlayhead);
-  const trackHeights = useEditorStore((state) => state.trackHeights);
   const inFrame = useEditorStore((state) => state.inFrame);
   const outFrame = useEditorStore((state) => state.outFrame);
   const overlapPolicy = useEditorStore((state) => state.overlapPolicy);
@@ -83,7 +89,7 @@ export function TimelineView() {
   const playback = usePlayback();
 
   const { fps, durationInFrames } = doc.project;
-  const rows = trackRows(doc.tracks, trackHeights);
+  const rows = trackRows(doc.tracks);
   const lanesHeight = totalTracksHeight(rows);
   const width = contentWidth(durationInFrames, pxPerFrame);
 
@@ -169,6 +175,22 @@ export function TimelineView() {
   }, [viewportWidth, durationInFrames, setZoom]);
 
   /*
+   * Shift+Z (16.5). Store sirf ek ginti badhata hai; asli hisaab yahin hota hai
+   * kyunki chaudai sirf yahan pata hoti hai.
+   *
+   * ⚠️ Pehla render **chhoda** jaata hai (`fitRequestSeen`), warna editor
+   * khulte hi zoom apne aap fit ho jaata aur user ka apna zoom (jo project ke
+   * saath yaad rakha gaya tha) chup-chaap ud jaata.
+   */
+  const fitRequest = useEditorStore((state) => state.fitZoomRequest);
+  const fitRequestSeen = useRef(fitRequest);
+  useEffect(() => {
+    if (fitRequest === fitRequestSeen.current) return;
+    fitRequestSeen.current = fitRequest;
+    fitProject();
+  }, [fitRequest, fitProject]);
+
+  /*
    * `wheel` DOM par khud lagana padta hai, JSX ke `onWheel` se nahi.
    *
    * React ka wheel listener passive hota hai, aur passive listener me
@@ -228,7 +250,8 @@ export function TimelineView() {
     [contentX, pxPerFrame, setPlayhead, durationInFrames],
   );
 
-  const { drag, ghosts, beginDrag } = useClipDrag({ rows, pxPerFrame, contentX });
+  // `scroller` isliye ki drag kinare tak pahunche to timeline khud chale (16.12).
+  const { drag, ghosts, beginDrag } = useClipDrag({ rows, pxPerFrame, contentX, scroller });
   const draggingIds = new Set(drag?.itemIds ?? []);
 
   /**
@@ -238,6 +261,24 @@ export function TimelineView() {
    * hui hai. Ulta karne par Ctrl+click se chuni gayi doosri clip pehle drag me
    * shaamil nahi hoti, aur pehla drag hamesha ek clip peeche chalta hai.
    */
+  /*
+   * Right-click ka menu (16.9). Jagah viewport ke hisaab se rakhi jaati hai
+   * (`fixed`), timeline ke scroll ke hisaab se nahi — warna scroll karte hi menu
+   * apni jagah se hat jaata.
+   */
+  const [clipMenu, setClipMenu] = useState<ClipMenuState | null>(null);
+  const openClipMenu = useCallback(
+    (event: React.MouseEvent, item: Item) => {
+      event.preventDefault();
+      event.stopPropagation();
+      // Menu us clip par chalta hai jispar right-click hua. Wo selection me na
+      // ho to use hi chun lete hain — warna menu ek aur clip par kaam karta.
+      if (!selection.itemIds.includes(item.id)) setSelection(selectSingle(item.id));
+      setClipMenu({ item, x: event.clientX, y: event.clientY });
+    },
+    [selection.itemIds, setSelection],
+  );
+
   const onClipPointerDown = useCallback(
     (event: React.PointerEvent, item: Item, mode: DragMode) => {
       event.stopPropagation();
@@ -387,8 +428,12 @@ export function TimelineView() {
             {rows.map((row) => (
               <TrackHeader key={row.track.id} track={row.track} height={row.height} />
             ))}
+            {/* Naya track — list ke ant me, wahin jahan user dekh raha hota hai. */}
+            <AddTrackButton doc={doc} />
           </div>
         </div>
+
+        <ClipContextMenu state={clipMenu} onClose={() => setClipMenu(null)} />
 
         <div
           ref={scroller}
@@ -398,6 +443,8 @@ export function TimelineView() {
           <div className="relative" style={{ width: Math.max(width, 1), minHeight: "100%" }}>
             <div className="sticky top-0 z-20">
               <Ruler range={range} pxPerFrame={pxPerFrame} fps={fps} onScrub={scrubTo} />
+              {/* Markers ruler ke theek neeche — wahin jahan waqt padha jaata hai. */}
+              <MarkerLane pxPerFrame={pxPerFrame} width={width} />
             </div>
 
             <div
@@ -440,6 +487,7 @@ export function TimelineView() {
                         selected={selection.itemIds.includes(item.id)}
                         dragging={draggingIds.has(item.id)}
                         onBeginDrag={onClipPointerDown}
+                        onContextMenu={openClipMenu}
                         onKeyboardSelect={onKeyboardSelect}
                       />
                     ))}
@@ -627,6 +675,8 @@ function Toolbar(props: {
           </option>
         ))}
       </select>
+
+      <SnapMenu />
 
       <span className="flex-1" />
 

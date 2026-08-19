@@ -39,6 +39,7 @@ import {
   type Item,
   resolveItemValue,
   setDucking,
+  setTrackProperty,
 } from "@reel/core";
 import {
   createStorageDriver,
@@ -257,10 +258,14 @@ function buildSampleDoc(
     // Tracks apni zaroorat ke hisaab se — fixed 7 nahi (Dynamic rule 5).
     // Do audio tracks — ek music, ek voice. Ducking ka poora matlab hi do
     // tracks ke beech ka rishta hai (15.3).
-    initialTrackTypes: ["video", "overlay", "text", "audio", "audio"],
+    /*
+     * Chhah tracks (16.15): video, ek **chhupi hui** overlay, ek dikhne wali
+     * overlay (probe/band), text, aur do audio (music + voice).
+     */
+    initialTrackTypes: ["video", "overlay", "overlay", "text", "audio", "audio"],
   });
 
-  const [videoTrack, overlayTrack, textTrack, musicTrack, voiceTrack] = doc.tracks;
+  const [videoTrack, overlayTrack, probeTrack, textTrack, musicTrack, voiceTrack] = doc.tracks;
   const { fps, width, height } = doc.project;
 
   const imageSeconds = 5;
@@ -337,7 +342,7 @@ function buildSampleDoc(
   // --- 3. Shape band (text ke peeche) ---
   const bandItem = createItem("shape", {
     fps,
-    trackId: overlayTrack!.id,
+    trackId: probeTrack!.id,
     name: "Caption band",
     startFrame: durationFromSeconds(1, fps),
     durationInFrames: durationFromSeconds(totalSeconds - 2, fps),
@@ -389,7 +394,7 @@ function buildSampleDoc(
   const probeY = -Math.round(height * 0.3);
   const probeBackdrop = createItem("shape", {
     fps,
-    trackId: overlayTrack!.id,
+    trackId: probeTrack!.id,
     name: "FX probe backdrop",
     startFrame: 0,
     durationInFrames: durationFromSeconds(totalSeconds, fps),
@@ -400,7 +405,7 @@ function buildSampleDoc(
 
   const probe = createItem("shape", {
     fps,
-    trackId: overlayTrack!.id,
+    trackId: probeTrack!.id,
     name: "FX probe",
     startFrame: 0,
     durationInFrames: durationFromSeconds(totalSeconds, fps),
@@ -434,6 +439,26 @@ function buildSampleDoc(
   });
   doc = addItem(doc, { item: audioItem });
 
+  /*
+   * --- 5b. Chhupi hui track ka saboot (16.15) ---
+   *
+   * ⚠️ Ye do items sirf naap ke liye hain, aur unka hona zaroori hai. "Hide render
+   * me bhi lagta hai" ek aisa daawa hai jise sirf **na dikhne** se saabit kiya ja
+   * sakta hai — aur uske liye pehle wo cheez honi chahiye jo dikhti.
+   *
+   * Ek poora-safed aayat, jo agar dikhti to poora frame safed kar deti. Wo track
+   * chhupi hui hai, isliye MP4 me uska ek pixel bhi nahi aana chahiye.
+   */
+  const hiddenProof = createItem("shape", {
+    fps,
+    trackId: overlayTrack!.id,
+    name: "HIDDEN PROOF (dikhna nahi chahiye)",
+    startFrame: 0,
+    durationInFrames: durationFromSeconds(totalSeconds, fps),
+    shape: { kind: "rect", fill: "#ffffff", widthPercent: 100, heightPercent: 100, radius: 0 },
+  });
+  doc = addItem(doc, { item: hiddenProof });
+
   // --- 6. Voice + ducking (15.3 / 15.12) ---
   const voiceItem = createItem("audio", {
     fps,
@@ -465,6 +490,9 @@ function buildSampleDoc(
     attackFrames: durationFromSeconds(0.2, fps),
     releaseFrames: durationFromSeconds(0.5, fps),
   });
+
+  // Overlay track chhupa do — uska safed aayat MP4 me nahi aana chahiye (16.15).
+  doc = setTrackProperty(doc, { trackId: overlayTrack!.id, path: "hidden", value: true });
 
   // Project ki lambai items ke hisaab se exact — trailing khaali jagah nahi.
   doc = recomputeDuration(doc, undefined);
@@ -1353,6 +1381,37 @@ async function main(): Promise<void> {
     "loudness project ke target ke paas hai (15.6)",
     loudness.integratedLufs !== null && Math.abs(loudness.integratedLufs - target) <= 1.5,
     `${loudness.integratedLufs?.toFixed(2)} LUFS vs target ${target}`,
+  );
+
+  section("11d. tracks — hide render me bhi lagta hai (16.15)");
+  /*
+   * Doc me ek **poora-safed** aayat hai jo poora frame dhak leta. Uski track
+   * chhupi hui hai.
+   *
+   * ⚠️ Ye check "kuch nahi hua" ko naapta hai, aur aisi cheez naapne ka ek hi
+   * imaandaar tarika hai: pehle wo cheez rakho jo hoti to saaf dikhti. Agar hide
+   * sirf editor me lagta hota, to poora frame safed hota aur upar ke saare
+   * naap (chaukor ki chaudai, vignette ke kone, blur ka kinara) ek saath fail
+   * ho jaate — isliye ye check unke saath milkar do baar saabit karta hai.
+   */
+  const trackProof = await measureColor(finalOut, imageAt, width, height, scratchDir);
+  check(
+    "chhupi hui track ka safed aayat MP4 me nahi aaya",
+    trackProof.cornerLuma < 60,
+    `kone ki roshni ${trackProof.cornerLuma.toFixed(1)} (safed aayat dikhta to ~255 hoti)`,
+  );
+  check(
+    "chhupi hui track ke neeche wali image ab bhi dikh rahi hai",
+    trackProof.centerLuma > 200,
+    `beech ki roshni ${trackProof.centerLuma.toFixed(1)}`,
+  );
+
+  const trackCount = sample.doc.tracks.length;
+  const hiddenCount = sample.doc.tracks.filter((track) => track.hidden).length;
+  check(
+    "sample me chhah tracks hain (ek chhupi hui)",
+    trackCount === 6 && hiddenCount === 1,
+    `${trackCount} tracks, ${hiddenCount} chhupi hui`,
   );
 
   section("12. waqt");

@@ -26,7 +26,15 @@ import {
   trackAccepts,
 } from "../registry/index";
 import { createTrack } from "../schema/factory";
-import { itemEndFrame, type Doc, type Item, type Keyframe, type Mask, type Track } from "../schema/project";
+import {
+  itemEndFrame,
+  type Doc,
+  type Item,
+  type Keyframe,
+  type Marker,
+  type Mask,
+  type Track,
+} from "../schema/project";
 import { assertFps, clampFrame } from "../time";
 
 /**
@@ -823,24 +831,59 @@ export const addTrack = defineOp<AddTrackArgs>("addTrack", (draft, args) => {
 export interface RemoveTrackArgs {
   trackId: string;
   /**
-   * Track par items hain to kya karein. `false` (default) par saaf error milta hai —
+   * Track par items hain to kya karein. Kuch na do to saaf error milta hai —
    * chupchaap kisi ka kaam mita dena sabse buri baat hai.
+   *
+   *  - `"delete"` — items bhi jaayenge
+   *  - `"move"`   — items kisi doosri **maanne wali** track par chale jaayenge
+   *
+   * `withItems: true` purane callers ke liye hai aur `"delete"` jaisa hi hai.
    */
+  items?: "delete" | "move";
   withItems?: boolean;
 }
 
 export const removeTrack = defineOp<RemoveTrackArgs>("removeTrack", (draft, args) => {
-  findTrack(draft, args.trackId);
+  const track = findTrack(draft, args.trackId);
   const onTrack = draft.items.filter((item) => item.trackId === args.trackId);
 
-  if (onTrack.length > 0 && !args.withItems) {
+  const mode = args.items ?? (args.withItems ? "delete" : undefined);
+
+  if (onTrack.length > 0 && !mode) {
     throw new TimelineOpError(
-      `Track par ${onTrack.length} item hain. Hataana hi hai to withItems: true do.`,
+      `Track par ${onTrack.length} item hain. Hataana hi hai to items: "delete" ya "move" do.`,
     );
   }
+
+  if (mode === "move" && onTrack.length > 0) {
+    /*
+     * Items ko kis track par bhejein — **koi bhi** nahi, sirf wo jo unhe leti ho.
+     * Text ko audio track par daal dena schema to pass kar jaata hai par render
+     * me wo item kabhi dikhta hi nahi, aur user ko lagta hai ki wo mit gaya.
+     *
+     * Sabse paas wali maanne wali track chunte hain (upar-neeche dono taraf
+     * dekh kar), taaki layer ka kram kam se kam hile.
+     */
+    const others = draft.tracks
+      .filter((entry) => entry.id !== track.id)
+      .sort((a, b) => Math.abs(a.order - track.order) - Math.abs(b.order - track.order));
+
+    for (const item of onTrack) {
+      const target = others.find((entry) => trackAccepts(entry.type, item.type));
+      if (!target) {
+        throw new TimelineOpError(
+          `"${item.name}" ko lene wali koi doosri track nahi hai. Pehle ek ${item.type} track banao.`,
+        );
+      }
+      item.trackId = target.id;
+    }
+    draft.tracks = draft.tracks.filter((entry) => entry.id !== args.trackId);
+    return;
+  }
+
   for (const item of onTrack) detachFromScenes(draft, item.id);
   draft.items = draft.items.filter((item) => item.trackId !== args.trackId);
-  draft.tracks = draft.tracks.filter((track) => track.id !== args.trackId);
+  draft.tracks = draft.tracks.filter((entry) => entry.id !== args.trackId);
 });
 
 export interface ReorderTracksArgs {
@@ -1750,6 +1793,213 @@ export const setMask = defineOp<SetMaskArgs>("setMask", (draft, args) => {
     if (item.locked) continue;
     item.mask = args.mask === null ? null : (clone(args.mask) as Draft<Item>["mask"]);
   }
+});
+
+// ----------------------------------------------------------------- markers
+
+export interface AddMarkerArgs {
+  frame: number;
+  name?: string;
+  color?: string;
+}
+
+/**
+ * Marker daalo (16.8).
+ *
+ * ⚠️ Ek hi frame par do markers nahi bante. Wo timeline par ek doosre ke upar
+ * baith jaate hain aur user ko lagta hai ki uska click kaam hi nahi kiya —
+ * isliye usi frame ka purana marker lauta diya jaata hai (naya nahi banta).
+ */
+export const addMarker = defineOp<AddMarkerArgs>("addMarker", (draft, args) => {
+  const frame = Math.max(0, Math.round(args.frame));
+  if (draft.markers.some((marker) => marker.frame === frame)) return;
+
+  draft.markers.push({
+    id: createId("mk"),
+    frame,
+    name: args.name ?? "",
+    color: args.color ?? "#e8a33d",
+  });
+  draft.markers.sort((a, b) => a.frame - b.frame);
+});
+
+export interface MarkerRefArgs {
+  markerId: string;
+}
+
+export const deleteMarker = defineOp<MarkerRefArgs>("deleteMarker", (draft, args) => {
+  const index = draft.markers.findIndex((marker) => marker.id === args.markerId);
+  if (index < 0) throw new TimelineOpError(`Marker ${args.markerId} nahi mila`);
+  draft.markers.splice(index, 1);
+});
+
+export interface SetMarkerArgs extends MarkerRefArgs {
+  frame?: number;
+  name?: string;
+  color?: string;
+}
+
+export const setMarker = defineOp<SetMarkerArgs>("setMarker", (draft, args) => {
+  const marker = draft.markers.find((entry) => entry.id === args.markerId);
+  if (!marker) throw new TimelineOpError(`Marker ${args.markerId} nahi mila`);
+
+  if (args.frame !== undefined) marker.frame = Math.max(0, Math.round(args.frame));
+  if (args.name !== undefined) marker.name = args.name;
+  if (args.color !== undefined) marker.color = args.color;
+  draft.markers.sort((a, b) => a.frame - b.frame);
+});
+
+/** Playhead se agla/pichla marker — `null` matlab us taraf koi marker nahi. */
+export function nextMarkerFrame(doc: Doc, frame: number, direction: 1 | -1): number | null {
+  const sorted = [...doc.markers].sort((a, b) => a.frame - b.frame);
+  if (direction === 1) {
+    return sorted.find((marker) => marker.frame > frame)?.frame ?? null;
+  }
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const marker = sorted[index] as Marker;
+    if (marker.frame < frame) return marker.frame;
+  }
+  return null;
+}
+
+// ------------------------------------------------------------------ groups
+
+export interface GroupItemsArgs {
+  itemIds: readonly string[];
+}
+
+/**
+ * Items ko ek group me baandho (16.10).
+ *
+ * ⚠️ Group ek **field** hai, ek naya "group item" nahi. Group ko apna item
+ * banane par har op ko do tarah ke item sambhalne padte, aur har naya op ek din
+ * group wala case bhool jaata. Field hone se group sirf selection ko badalta hai
+ * aur baaki poora system waisa ka waisa rehta hai.
+ */
+export const groupItems = defineOp<GroupItemsArgs>("groupItems", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  if (ids.size < 2) throw new TimelineOpError("Group ke liye kam se kam do items chahiye");
+
+  const groupId = createId("gr");
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    item.groupId = groupId;
+  }
+});
+
+export const ungroupItems = defineOp<GroupItemsArgs>("ungroupItems", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  /*
+   * Selection me se ek item chuna ho to bhi **poora** group toota hai. Aadha
+   * group todna ek aisi haalat banata hai jise UI dikha hi nahi sakti: kuch
+   * items saath chalte hain aur kuch nahi, par dono ek jaise dikhte hain.
+   */
+  const groups = new Set(
+    draft.items.filter((item) => ids.has(item.id) && item.groupId).map((item) => item.groupId),
+  );
+  for (const item of draft.items) {
+    if (item.groupId && groups.has(item.groupId)) item.groupId = null;
+  }
+});
+
+/** Selection ko group ke saathi items tak faila do — har edit isse guzarta hai. */
+export function expandSelectionToGroups(doc: Doc, itemIds: readonly string[]): string[] {
+  const groups = new Set(
+    doc.items.filter((item) => itemIds.includes(item.id) && item.groupId).map((item) => item.groupId),
+  );
+  if (groups.size === 0) return [...itemIds];
+
+  const expanded = new Set(itemIds);
+  for (const item of doc.items) {
+    if (item.groupId && groups.has(item.groupId)) expanded.add(item.id);
+  }
+  return [...expanded];
+}
+
+// ------------------------------------------------------------- track extras
+
+export interface DuplicateTrackArgs {
+  trackId: string;
+  /** Items bhi copy hon? Sirf khaali track chahiye to `false`. */
+  withItems?: boolean;
+}
+
+export const duplicateTrack = defineOp<DuplicateTrackArgs>("duplicateTrack", (draft, args) => {
+  const track = draft.tracks.find((entry) => entry.id === args.trackId);
+  if (!track) throw new TimelineOpError(`Track ${args.trackId} nahi mila`);
+
+  const copy = clone(track) as Draft<Track>;
+  copy.id = createId("tr");
+  copy.name = `${track.name} copy`;
+  copy.order = track.order + 1;
+
+  // Neeche wali saari tracks ek kadam aage — warna do tracks ek hi order par
+  // baith jaati hain aur unka aapsi kram har render me badalta rehta hai.
+  for (const other of draft.tracks) {
+    if (other.order > track.order) other.order += 1;
+  }
+  draft.tracks.push(copy);
+
+  if (args.withItems === false) return;
+
+  const originals = draft.items.filter((item) => item.trackId === track.id);
+  for (const item of originals) {
+    const itemCopy = clone(item) as Draft<Item>;
+    itemCopy.id = createId("it");
+    itemCopy.trackId = copy.id;
+    // Group ki copy nahi — warna copy ke items asli items ke saath hilte rehte.
+    itemCopy.groupId = null;
+    draft.items.push(itemCopy);
+  }
+});
+
+export interface ReplaceAssetArgs {
+  itemIds: readonly string[];
+  assetId: string;
+  /** Naye source ki lambai, project fps me. Pata na ho to `null`. */
+  sourceDurationFrames?: number | null;
+  /**
+   * Lambai ka kya karein jab naya source chhota ho:
+   *  - `"keep"`  — clip ki lambai waisi hi (default)
+   *  - `"fit"`   — clip ko source jitna chhota kar do
+   */
+  duration?: "keep" | "fit";
+}
+
+/**
+ * Clip ka asset badlo, baaki sab waisa ka waisa (16.13).
+ *
+ * ⚠️ Yahi is op ka poora point hai: timing, keyframes, effects, transitions,
+ * transform — kuch nahi badalta, sirf `assetId`. Item delete karke naya banane
+ * se ye sab chala jaata hai, aur user ko dobara poora kaam karna padta hai.
+ *
+ * `trimStartFrame` ko naye source ke andar rakhna padta hai. Naya source chhota
+ * ho aur trim uske bahar reh jaaye to clip poori kaali dikhti hai — aur wo galti
+ * "asset replace karne ke baad clip khaali ho gayi" jaisi shikayat bankar aati
+ * hai, jiski wajah kabhi samajh nahi aati.
+ */
+export const replaceAsset = defineOp<ReplaceAssetArgs>("replaceAsset", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  const source = args.sourceDurationFrames ?? null;
+
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    assertUnlocked(item);
+
+    item.assetId = args.assetId;
+    item.sourceDurationFrames = source;
+
+    if (source === null) continue;
+
+    if (item.trimStartFrame >= source) item.trimStartFrame = 0;
+
+    if (args.duration === "fit") {
+      const usable = Math.max(1, Math.floor((source - item.trimStartFrame) / item.playbackRate));
+      item.durationInFrames = usable;
+    }
+  }
+  growDuration(draft);
 });
 
 // ------------------------------------------------------- speed / freeze / crop
@@ -2882,6 +3132,13 @@ export const OPS = {
   copyKeyframes,
   scaleKeyframes,
   setTransition,
+  addMarker,
+  deleteMarker,
+  setMarker,
+  groupItems,
+  ungroupItems,
+  duplicateTrack,
+  replaceAsset,
   setPlaybackRate,
   freezeFrame,
   setCrop,

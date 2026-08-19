@@ -1,6 +1,6 @@
 "use client";
 
-import { itemEndFrame, type Item } from "@reel/core";
+import { expandSelectionToGroups, itemEndFrame, type Item } from "@reel/core";
 import { useCallback, useRef, useState } from "react";
 
 import { useAssetDurations } from "@/lib/assetMeta";
@@ -33,11 +33,40 @@ import { xToFrame, type TrackRow } from "@/lib/timeline";
  * par pointer clip se bahar nikal hi jaata hai, aur element par lage listener
  * wahin chhoot jaate — clip beech raaste me atki reh jaati.
  */
+/**
+ * Kinare se itne pixel andar aate hi timeline khud chalne lagti hai (16.12).
+ *
+ * 48px isliye ki ek clip ka trim handle 8px ka hota hai — usse bahut chhota
+ * rakhne par auto-scroll tabhi chalta jab ungli lagbhag bahar ho, aur tab tak
+ * user pehle hi haar maan kar drag chhod chuka hota hai.
+ */
+const AUTO_SCROLL_EDGE_PX = 48;
+
+/** Sabse tez raftaar (px per frame-tick). Isse zyada par timeline bhaag jaati hai. */
+const AUTO_SCROLL_MAX_PX = 18;
+
+/**
+ * Kinare se kitna aage nikle ho -> kitni tez chalna hai.
+ *
+ * Seedha (linear) rakha hai, exponential nahi: sirf 48px ka daayra hai aur utne
+ * me exponential ka farak dikhta nahi, par use samjhana aur naapna mushkil ho
+ * jaata hai.
+ */
+function edgeSpeed(depthPx: number): number {
+  const t = Math.min(1, Math.max(0, depthPx / AUTO_SCROLL_EDGE_PX));
+  return Math.round(t * AUTO_SCROLL_MAX_PX);
+}
+
 export function useClipDrag(args: {
   rows: readonly TrackRow[];
   pxPerFrame: number;
   /** Client x -> timeline ke andar ka x (scroll ke saath). */
   contentX(clientX: number): number;
+  /**
+   * Scroll wala dabba — drag kinare tak pahunchne par khud chalane ke liye
+   * (16.12). Na do to auto-scroll band rehta hai.
+   */
+  scroller?: { current: HTMLElement | null };
 }): {
   drag: DragState | null;
   ghosts: GhostRect[];
@@ -69,7 +98,16 @@ export function useClipDrag(args: {
       const selected = state.selection.itemIds.includes(item.id)
         ? state.selection.itemIds
         : [item.id];
-      const itemIds = mode === "move" ? [...selected] : [item.id];
+      /*
+       * Group ke saathi bhi saath chalte hain (16.10) — sirf move par.
+       *
+       * Trim par nahi, aur ye jaan-boojhkar hai: group ka matlab "ek saath ek
+       * jagah rehte hain" hai, "ek jaisi lambai" nahi. Trim ko bhi group me
+       * baandhne par ek clip ka kinara kheenchne se doosri clip ke andar ka
+       * bilkul alag hissa kat jaata, jo kabhi koi nahi chahta.
+       */
+      const itemIds =
+        mode === "move" ? expandSelectionToGroups(state.doc, selected) : [item.id];
 
       const moving = state.doc.items.filter((entry) => itemIds.includes(entry.id));
       const groupStart = Math.min(...moving.map((entry) => entry.startFrame));
@@ -81,6 +119,8 @@ export function useClipDrag(args: {
         playheadFrame: state.playheadFrame,
         inFrame: state.inFrame,
         outFrame: state.outFrame,
+        // Kis-kis cheez par snap lage — user ke apne toggles (16.11).
+        options: state.snapOptions,
       });
       const threshold = snapThresholdFrames(args.pxPerFrame);
 
@@ -88,6 +128,32 @@ export function useClipDrag(args: {
       const originY = event.clientY;
       const startRow = rows.findIndex((row) => row.track.id === item.trackId);
       const sourceFrames = durations.sourceFrames(item.assetId);
+
+      /*
+       * Auto-scroll (16.12).
+       *
+       * ⚠️ Ye ek rAF loop hai, `onMove` ke andar ka hisaab nahi — aur ye zaroori
+       * hai. Kinare par ungli **rok** kar rakhne par `pointermove` aana band ho
+       * jaata hai (pointer hila hi nahi), aur tab scroll bhi ruk jaata. Har asli
+       * editor me kinare par ruke rehne se timeline chalti rehti hai, aur wo
+       * tabhi ho sakta hai jab loop apne aap chal raha ho.
+       */
+      let autoScrollPx = 0;
+      let autoScrollRaf = 0;
+
+      function autoScrollTick() {
+        const element = args.scroller?.current;
+        if (element && autoScrollPx !== 0) {
+          const before = element.scrollLeft;
+          element.scrollLeft = before + autoScrollPx;
+          // Kinare par pahunch gaye — aage scroll karne ko kuch bacha hi nahi.
+          if (element.scrollLeft !== before) lastMove && onMove(lastMove);
+        }
+        autoScrollRaf = requestAnimationFrame(autoScrollTick);
+      }
+
+      let lastMove: PointerEvent | null = null;
+      autoScrollRaf = requestAnimationFrame(autoScrollTick);
 
       let moved = false;
       let current: DragState = {
@@ -99,6 +165,22 @@ export function useClipDrag(args: {
       };
 
       function onMove(move: PointerEvent) {
+        lastMove = move;
+
+        // Kitni tezi se chalna hai — kinare se jitna aage, utni tez.
+        const element = args.scroller?.current;
+        if (element) {
+          const box = element.getBoundingClientRect();
+          const fromLeft = move.clientX - box.left;
+          const fromRight = box.right - move.clientX;
+          autoScrollPx =
+            fromLeft < AUTO_SCROLL_EDGE_PX
+              ? -edgeSpeed(AUTO_SCROLL_EDGE_PX - fromLeft)
+              : fromRight < AUTO_SCROLL_EDGE_PX
+                ? edgeSpeed(AUTO_SCROLL_EDGE_PX - fromRight)
+                : 0;
+        }
+
         const dx = move.clientX - originX;
         const dy = move.clientY - originY;
         if (!moved && Math.abs(dx) < DRAG_THRESHOLD_PX && Math.abs(dy) < DRAG_THRESHOLD_PX) {
@@ -166,6 +248,7 @@ export function useClipDrag(args: {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         window.removeEventListener("pointercancel", onUp);
+        cancelAnimationFrame(autoScrollRaf);
         active.current = false;
         setDrag(null);
 

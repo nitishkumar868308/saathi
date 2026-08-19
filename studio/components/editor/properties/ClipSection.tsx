@@ -9,6 +9,8 @@ import {
 import clsx from "clsx";
 import { Snowflake } from "lucide-react";
 
+import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
+import { useAssetDurations } from "@/lib/assetMeta";
 import { useEditorStore } from "@/lib/store";
 
 /** Aksar chahiye jaane wali speeds — poora slider ghumane se tez. */
@@ -29,6 +31,7 @@ export function ClipSection({ items }: { items: readonly Item[] }) {
   const applyOp = useEditorStore((state) => state.applyOp);
   const fps = useEditorStore((state) => state.doc.project.fps);
   const playheadFrame = useEditorStore((state) => state.playheadFrame);
+  const meta = useAssetDurations(fps);
 
   // Speed sirf un cheezon par jinme waqt hota hai. Image/shape/text par speed ka
   // koi matlab nahi — wahan slider dikhana ek jhooth hai.
@@ -133,6 +136,46 @@ export function ClipSection({ items }: { items: readonly Item[] }) {
             <Snowflake size={12} />
             Freeze frame ({FREEZE_SECONDS}s)
           </button>
+        </div>
+      ) : null}
+
+      {/*
+       * Asset replace (16.13) — timing, keyframes, effects sab wahi rehte hain.
+       *
+       * ⚠️ Clip delete karke naya banane se ye sab chala jaata hai, aur user ko
+       * dobara poora kaam karna padta hai. Isi liye ye ek alag op hai, ek
+       * "delete + add" ka shortcut nahi.
+       */}
+      {single && single.assetId !== null ? (
+        <div className="space-y-1 px-3 pb-2">
+          <div className="flex items-center gap-2 text-[11px] text-chalk-500">
+            <span className="w-20 shrink-0">Asset</span>
+            <AssetPickerButton
+              kind={null}
+              assetId={single.assetId}
+              onPick={(assetId) => {
+                const source = meta.sourceFrames(assetId);
+                applyOp(
+                  "replaceAsset",
+                  {
+                    itemIds: [single.id],
+                    assetId,
+                    sourceDurationFrames: source,
+                    /*
+                     * Naya source chhota ho to clip ki lambai bhi chhoti kar dete
+                     * hain. Lambai waisi chhod dene par clip ka aakhri hissa kaala
+                     * aata hai, aur wo galti render ke baad hi dikhti hai.
+                     */
+                    duration: source !== null && source < single.durationInFrames ? "fit" : "keep",
+                  },
+                  { label: "Asset badla" },
+                );
+              }}
+            />
+          </div>
+          <p className="text-[11px] text-chalk-500">
+            Timing, keyframes aur effects waise ke waise rahenge.
+          </p>
         </div>
       ) : null}
 

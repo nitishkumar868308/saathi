@@ -37,6 +37,35 @@ export function snapThresholdFrames(pxPerFrame: number): number {
   return SNAP_THRESHOLD_PX / pxPerFrame;
 }
 
+/**
+ * Kis kis cheez par snap lage (16.11).
+ *
+ * ⚠️ Ye ek **object** hai, ek `snapping: boolean` nahi — aur ye faisla naapa
+ * hua hai. Ek switch par sab kuch band karne ka matlab hai ki jise sirf "seconds
+ * grid par mat chipko" chahiye tha, use clips par snap bhi chhodna padta. Aur
+ * tab wo snapping poori tarah band kar deta hai aur clips ke beech ek-ek frame
+ * ke gaddhe reh jaate hain, jo render me kaale flash bankar dikhte hain.
+ */
+export interface SnapOptions {
+  playhead: boolean;
+  clips: boolean;
+  markers: boolean;
+  scenes: boolean;
+  /** Har poore second par. Zoom-out par ye sabse kaam ka snap hota hai. */
+  seconds: boolean;
+}
+
+export const DEFAULT_SNAP_OPTIONS: SnapOptions = {
+  playhead: true,
+  clips: true,
+  markers: true,
+  scenes: true,
+  // Seconds default me band hai: clips ke kinare aur playhead lagbhag hamesha
+  // chahiye hote hain, par har second par chipakna tab tak pareshan karta hai
+  // jab tak user jaan-boojhkar music ke beat par kaam na kar raha ho.
+  seconds: false,
+};
+
 export interface SnapContext {
   doc: Doc;
   /** Ye items khud hil rahe hain — inke apne kinare candidate nahi ban sakte. */
@@ -44,6 +73,8 @@ export interface SnapContext {
   playheadFrame: number;
   inFrame: number | null;
   outFrame: number | null;
+  /** Na do to sab chalu (`DEFAULT_SNAP_OPTIONS`). */
+  options?: SnapOptions;
 }
 
 /**
@@ -54,25 +85,47 @@ export interface SnapContext {
  * function me ek line hai, drag wale code me nahi.
  */
 export function snapCandidates(context: SnapContext): number[] {
+  const options = context.options ?? DEFAULT_SNAP_OPTIONS;
   const points = new Set<number>();
 
+  /*
+   * 0 aur project ka ant hamesha rehte hain, chahe saare toggle band hon.
+   * In do par snap na lagne ka koi faayda nahi hai aur nuksaan asli hai: clip
+   * 0 se ek frame pehle rakh dene par uska pehla frame render me hi nahi aata.
+   */
   points.add(0);
-  points.add(context.playheadFrame);
   points.add(context.doc.project.durationInFrames);
-  if (context.inFrame !== null) points.add(context.inFrame);
-  if (context.outFrame !== null) points.add(context.outFrame);
 
-  for (const item of context.doc.items) {
-    if (context.excludeIds.has(item.id)) continue;
-    points.add(item.startFrame);
-    points.add(itemEndFrame(item));
+  if (options.playhead) {
+    points.add(context.playheadFrame);
+    if (context.inFrame !== null) points.add(context.inFrame);
+    if (context.outFrame !== null) points.add(context.outFrame);
   }
 
-  for (const scene of context.doc.scenes) {
-    const items = context.doc.items.filter((item) => scene.itemIds.includes(item.id));
-    if (items.length === 0) continue;
-    points.add(Math.min(...items.map((item) => item.startFrame)));
-    points.add(Math.max(...items.map(itemEndFrame)));
+  if (options.clips) {
+    for (const item of context.doc.items) {
+      if (context.excludeIds.has(item.id)) continue;
+      points.add(item.startFrame);
+      points.add(itemEndFrame(item));
+    }
+  }
+
+  if (options.markers) {
+    for (const marker of context.doc.markers) points.add(marker.frame);
+  }
+
+  if (options.scenes) {
+    for (const scene of context.doc.scenes) {
+      const items = context.doc.items.filter((item) => scene.itemIds.includes(item.id));
+      if (items.length === 0) continue;
+      points.add(Math.min(...items.map((item) => item.startFrame)));
+      points.add(Math.max(...items.map(itemEndFrame)));
+    }
+  }
+
+  if (options.seconds) {
+    const { fps, durationInFrames } = context.doc.project;
+    for (let frame = 0; frame <= durationInFrames; frame += fps) points.add(frame);
   }
 
   return [...points].sort((a, b) => a - b);

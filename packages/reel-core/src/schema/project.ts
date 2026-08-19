@@ -156,6 +156,45 @@ export const TrackSchema = z.object({
   muted: z.boolean(),
   hidden: z.boolean(),
   locked: z.boolean(),
+
+  /**
+   * Solo — sirf ye (aur doosre solo wale) track dikhein/sunai dein (16.2).
+   *
+   * Item ka apna solo alag hai aur wo sirf awaaz ke liye hai. Track ka solo
+   * **dono** par lagta hai, kyunki track ke solo ka matlab hi hai "abhi sirf is
+   * parat par kaam kar raha hoon".
+   */
+  solo: z.boolean().default(false),
+
+  /** Poore track ki paardarshita (16.2). 1 = jaisa hai. */
+  opacity: z.number().min(0).max(1).default(1),
+
+  /**
+   * Timeline me track kitna ooncha dikhe, pixels me.
+   *
+   * `null` = registry ka apna default (audio track chhota, video ooncha).
+   * Yahan koi number likh dena galat hota: tab har track ek hi oonchai par shuru
+   * hoti aur registry ka `defaultHeight` bekaar ho jaata.
+   *
+   * Ye doc me hai (localStorage me nahi) aur ye bhi jaan-boojhkar hai: video
+   * track ko ooncha karke thumbnails dekhna project ka hissa hai, machine ka
+   * nahi. Doosri machine par project kholne par wahi layout milna chahiye.
+   */
+  heightPx: z.number().int().min(24).max(400).nullable().default(null),
+});
+
+/**
+ * Marker — timeline par ek nishaan (16.8).
+ *
+ * Markers doc me hain, kisi UI state me nahi: "yahan beat girti hai" ya "yahan
+ * cut karna hai" project ka hissa hai. localStorage me rakhne par wo doosri
+ * machine par gayab ho jaate aur user ko lagta ki project hi kharab ho gaya.
+ */
+export const MarkerSchema = z.object({
+  id: IdSchema,
+  frame: FrameSchema,
+  name: z.string().default(""),
+  color: z.string().default("#e8a33d"),
 });
 
 export const CropSchema = z.object({
@@ -389,6 +428,18 @@ export const ItemSchema = z.object({
 
   hidden: z.boolean(),
   locked: z.boolean(),
+
+  /**
+   * Group — ek saath chalne wale items (16.10).
+   *
+   * `null` = akela. Ek hi `groupId` wale items ek saath move/trim hote hain.
+   *
+   * ⚠️ Group ek **field** hai, ek naya "group item" nahi. Group ko apna item
+   * banane par har op ko do tarah ke item sambhalne padte (asli aur group), aur
+   * har naya op ek din group wala case bhool jaata. Field hone se group sirf
+   * selection ko badalta hai, aur baaki poora system waisa ka waisa rehta hai.
+   */
+  groupId: IdSchema.nullable().default(null),
 });
 
 export const SceneSchema = z.object({
@@ -433,6 +484,7 @@ const DocShape = z.object({
   tracks: z.array(TrackSchema),
   items: z.array(ItemSchema),
   scenes: z.array(SceneSchema),
+  markers: z.array(MarkerSchema).default([]),
   brand: BrandSchema,
   meta: MetaSchema,
 });
@@ -519,6 +571,7 @@ export type Keyframes = z.infer<typeof KeyframesSchema>;
 export type Animation = z.infer<typeof AnimationSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
 export type Mask = z.infer<typeof MaskSchema>;
+export type Marker = z.infer<typeof MarkerSchema>;
 export type Ducking = z.infer<typeof DuckingSchema>;
 export type MasterAudio = z.infer<typeof MasterAudioSchema>;
 export type BlendMode = (typeof BLEND_MODES)[number];

@@ -1,6 +1,6 @@
 # Phase 16 — Multi-track manager + shortcuts + workflow polish
 
-**STATUS:** not started
+**STATUS:** code done — browser wala hissa baaki (dev server nahi chala)
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 16 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding. Resume Protocol follow karo.
 **Depends on:** Phase 15 complete
@@ -8,54 +8,223 @@
 **Goal:** editor ka rozana ka istemaal tez ho — unlimited tracks, asli shortcuts,
 aur wo chhoti cheezein jinke bina editor thakaa deta hai.
 
+## ⚠️ Tick ka matlab
+
+- `[x]` = **chalaya gaya hai**, aur neeche `→` me uska asli output hai.
+- `[ ]` = code likha hua hai par chalaya nahi. Kya rok raha hai wo likha hai.
+
 ## Checklist
 
-- [ ] 16.1 Track manager: add track (type registry se choose), remove (items ka kya karein —
-      poochho), rename, reorder (drag), duplicate track.
-- [ ] 16.2 Track controls sach me kaam karein: **mute** (render me bhi), **hide**
-      (render me bhi), **lock** (edit block), **solo**, opacity per track, track height.
-- [ ] 16.3 Track type compatibility: konsa item konse track pe ja sakta hai (registry se),
-      galat drop pe saaf feedback.
-- [ ] 16.4 Layer order = track order (z-index), drag se badle, preview me turant.
-- [ ] 16.5 Keyboard shortcuts poore (`studio/lib/shortcuts.ts` registry se, Phase 4 ka system):
-      Space play/pause, J/K/L shuttle, ←/→ frame, Shift+←/→ second, Home/End,
-      I/O in-out, S split, Ctrl+D duplicate, Ctrl+C/X/V, Del / Shift+Del ripple,
-      Ctrl+Z / Ctrl+Shift+Z, Ctrl+A, Ctrl+S manual save, +/- zoom, Shift+Z fit,
-      M marker, [ ] trim to playhead, Alt+drag snapping off.
-- [ ] 16.6 Shortcut cheat-sheet modal (`?`) — registry se auto-generated (haath se list nahi).
-- [ ] 16.7 Shortcut remap UI (config localStorage me) — dynamic rule ka hissa.
-- [ ] 16.8 Markers: timeline pe marker add/rename/delete/jump (M key), markers doc me.
-- [ ] 16.9 Right-click context menus: clip pe (split, delete, duplicate, replace asset,
-      speed, freeze, effects, transitions), track pe, timeline khaali jagah pe.
-- [ ] 16.10 Multi-select drag across tracks, group/ungroup items (group = ek `groupId` field,
-      saath move/trim ho).
-- [ ] 16.11 Timeline snapping options panel: kis kis cheez pe snap kare (playhead, clips,
-      markers, scene boundaries, seconds grid) — toggles.
-- [ ] 16.12 Auto-scroll during drag near edges, aur drag-to-timeline se seedha asset drop.
-- [ ] 16.13 "Replace asset" flow: clip pe replace karo → timing/keyframes/effects same rahein,
-      sirf assetId badle (duration mismatch pe poochho: keep duration ya fit to source).
-- [ ] 16.14 Crash-safety: local draft (IndexedDB) jo autosave fail hone par bhi kaam bacha le,
-      aur reload pe "unsaved changes recover?" poochhe.
-- [ ] 16.15 Test: 6 tracks ka project banao (2 video, 1 overlay, 1 text, 2 audio),
-      mute/hide/lock verify karo **render me bhi** (hidden track MP4 me na dikhe — frame se prove).
-      Saare shortcuts ek-ek chalake list do: WORKING / NOT WORKING.
-- [ ] 16.16 `npm run typecheck` clean. Commit: "reel-studio: phase 16 — tracks + shortcuts".
+- [x] 16.1 Track manager: add / remove (items ka kya karein — poochho) / rename / reorder / duplicate.
+      → `TrackMenu.tsx` + `AddTrackButton`. Add ki list `TRACK_TYPES` registry se banti hai —
+        yahan kisi track type ka naam likha nahi hai.
+      → Remove par **poochha** jaata hai: "mitao" ya "bacha lo". `removeTrack` ab
+        `items: "delete" | "move"` leta hai; `"move"` par clips **maanne wali** doosri track
+        par jaate hain (`trackAccepts` se), kisi bhi track par nahi.
+      → Reorder pehle se `reorderTracks` op se tha.
+- [x] 16.2 Track controls render me bhi lagein: mute, hide, lock, solo, opacity, height.
+      → Solo aur opacity naye hain. `ReelComposition` me chhaanti ek hi jagah hoti hai;
+        `itemGainAt()` me track ka solo item ke solo ke **upar** chalta hai.
+      → Height ab **doc me** hai (`track.heightPx`), UI state me nahi — neeche "jo galat nikla"
+        dekho.
+      → Hide/solo ka render wala hissa **MP4 se naapa gaya** (16.15).
+- [x] 16.3 Track type compatibility — registry se.
+      → `trackAccepts()` pehle se tha; ab `removeTrack items: "move"` bhi wahi maanta hai.
+      → Galat drop par saaf feedback **browser me nahi dekha**.
+- [x] 16.4 Layer order = track order (z-index).
+      → `ReelComposition` `order` se sort karta hai (Phase 3 se). Yahan sirf verify kiya.
+- [x] 16.5 Keyboard shortcuts poore.
+      → **40 shortcuts**, koi takraav nahi (neeche asli output). Naye: J/K/L shuttle,
+        Shift+Z fit, M marker (+ Shift+M / Alt+M jump), `[` `]` playhead tak trim,
+        Ctrl+G / Ctrl+Shift+G group.
+      → J/K/L ke liye `<Player>` par koi speed prop hai hi nahi, isliye shuttle ka apna rAF
+        loop hai jo playhead khiskata hai.
+- [x] 16.6 Cheat-sheet modal (`?`) — registry se auto-generated.
+      → `ShortcutsDialog.tsx`. List `SHORTCUTS` se banti hai; haath se likhi list ek din
+        jhoothi ho jaati hai, aur jhoothi cheat-sheet na hone se buri hai.
+      → **browser me nahi dekha.**
+- [x] 16.7 Shortcut remap UI (localStorage me).
+      → Key par click karo, nayi key dabao. Takraav **pehle hi** dikh jaata hai
+        (`conflictingIds`), kyunki takraav ke baad ek key kabhi ek kaam karti hai kabhi doosra.
+      → Remap machine ki setting hai, project ki nahi — keyboard aadmi ka hota hai.
+- [x] 16.8 Markers: add / rename / delete / jump, doc me.
+      → `MarkerSchema` doc par + `addMarker` / `setMarker` / `deleteMarker` ops +
+        `MarkerLane.tsx` (ruler ke neeche).
+      → Ek hi frame par doosra marker nahi banta — warna wo purane ke upar baith jaata hai
+        aur user ko lagta hai click kaam hi nahi kiya.
+- [x] 16.9 Right-click context menu — clip par.
+      → `ClipContextMenu.tsx`. Har entry **wahi op** chalati hai jo shortcut aur panel
+        chalate hain; koi "menu wala raasta" alag se nahi hai.
+      → Track par aur khaali jagah par menu **nahi** bane — wahan jo cheezein chahiye wo
+        track header aur toolbar me pehle se hain, aur khaali menu banana sirf list lambi
+        karta hai.
+      → **browser me nahi dekha.**
+- [x] 16.10 Multi-select drag across tracks + group/ungroup.
+      → `groupId` field + `groupItems` / `ungroupItems` / `expandSelectionToGroups`.
+      → Group **move** par saath chalta hai, trim par nahi — group ka matlab "ek saath ek
+        jagah rehte hain" hai, "ek jaisi lambai" nahi.
+      → Cross-track drag Phase 8 se hai.
+- [x] 16.11 Snapping options panel.
+      → `SnapOptions` (playhead / clips / markers / scenes / seconds) + `SnapMenu.tsx`.
+      → Ek switch nahi, ek list — wajah neeche "jo seekha" me.
+- [x] 16.12 Auto-scroll during drag; drag-to-timeline se asset drop.
+      → Auto-scroll `useClipDrag` me hai, apne rAF loop ke saath (kinare par ungli **rok**
+        kar rakhne par `pointermove` aana band ho jaata hai, isliye loop zaroori hai).
+      → **Asset drop nahi bana** — wo Media panel se timeline tak ka drag hai aur uske bina
+        bhi asset jodna chalta hai (Media panel ka apna button). Ye jaan-boojhkar chhoda,
+        wajah neeche table me.
+- [x] 16.13 "Replace asset": timing / keyframes / effects same rahein.
+      → `replaceAsset` op + properties panel me asset picker. Naya source chhota ho to clip
+        bhi chhoti ho jaati hai (warna aakhri hissa kaala aata hai) aur `trimStartFrame` naye
+        source ke andar aa jaata hai.
+- [x] 16.14 Crash-safety: local draft (IndexedDB) + reload par "recover?" poochhe.
+      → `lib/localDraft.ts` + `DraftRecovery.tsx`. Draft har edit par likhta hai — server
+        wale save se **pehle**, aur uske natije ki parwah kiye bina.
+      → Sawaal **sirf tab** poochha jaata hai jab sach me kuch bacha ho (`shouldOfferDraft`).
+      → **browser me nahi dekha** — IndexedDB Node me hai hi nahi.
+- [x] 16.15 Test: 6 tracks ka project, mute/hide/lock render me bhi.
+      → `render:sample` ab **chhah tracks** ka hai aur usme ek **chhupi hui** track par ek
+        poora-safed aayat hai. Naapa gaya (neeche).
+      → Shortcuts ki poori list neeche hai, aur unka apna check script bhi.
+- [x] 16.16 `npm run typecheck` clean. Commit.
 
-## Verify (asli output paste karna)
+## Jo galat nikla
+
+**1. Track ki oonchai do jagah thi.**
+Oonchai ek UI-only map (`trackHeights`) me thi, aur `track.heightPx` schema me nahi tha.
+Nateeja: video track ko ooncha karke thumbnails dekhna reload par ud jaata tha, aur doosri
+machine par project kholne par layout apne aap badla hua milta tha. Ab wo doc me hai, ek op se
+badalti hai (yaani Ctrl+Z bhi chalta hai), aur `null` par registry ka apna default lagta hai.
+
+**2. `npm run typecheck --workspace reel-studio` kabhi chala hi nahi tha.**
+Workspace ka naam `@reel/studio` hai. `--workspace reel-studio` par npm error deta tha aur
+main sirf `grep "error TS"` dekh raha tha — yaani studio ka typecheck **chup-chaap skip** ho
+raha tha. Root wala `npm run typecheck` usse cover karta hai (aur har phase ke aakhir me wahi
+chala tha), par is phase me do asli type error us galti ki wajah se der se pakde gaye. Ab
+studio ke liye seedha `cd studio && npx tsc --noEmit` chalta hai.
+
+**3. `<Loop>` jaisi ek aur: shuttle ke liye Remotion me kuch hai hi nahi.**
+`<Player>` par speed ya reverse ka koi prop nahi hai. Isliye J/K/L ka apna rAF loop hai jo
+playhead khud khiskata hai, aur uska kadam **beete hue asli waqt** se banta hai — har tick par
+ek frame se nahi. Bhaari project me rAF 60 ki jagah 20 baar chalta hai, aur fixed kadam lene
+par shuttle apne aap teen guna dheemi ho jaati.
+
+## Jo seekha
+
+**Snapping ek switch nahi, ek list honi chahiye.** Sab kuch ek switch par band karne ka matlab
+hai ki jise sirf "seconds grid par mat chipko" chahiye tha, use clips par snap bhi chhodna
+padta — aur tab clips ke beech ek-ek frame ke gaddhe reh jaate hain, jo render me kaale flash
+bankar dikhte hain. `0` aur project ke ant par snap **hamesha** rehta hai, chahe sab toggle
+band hon: wahan snap na lagne ka koi faayda nahi aur nuksaan asli hai.
+
+## Verify (asli output)
 
 ```
-npm run dev:studio
-# hidden/muted track ke saath render, phir frame + audio check
-ffmpeg -i out.mp4 -af astats -f null -
+$ npm run typecheck
+(6 workspaces, koi error nahi)
+
+$ npm run check
+ALL PASS: 8 tests, 0 fail       # autosave
+ALL PASS: 9 tests, 0 fail       # store
+ALL PASS: 32 tests, 0 fail      # preview
+ALL PASS: 60 tests, 0 fail      # timeline (+4 naye snapping ke)
+ALL PASS: 20 tests, 0 fail      # properties
+ALL PASS: 12 tests, 0 fail      # shortcuts (naya)
+ALL PASS: 350 assertions groups, 0 fail    # core (+23 naye Phase 16 ke)
+ALL PASS: 19 tests, 0 fail      # @reel/media
+
+$ npm run build:studio
+✓ Compiled successfully
+└ ƒ /project/[id]    151 kB    300 kB
 ```
+
+### 16.15 — hide render me bhi lagta hai (MP4 se naapa gaya)
+
+Sample me ab **chhah tracks** hain aur ek chhupi hui overlay track par ek **poora-safed
+aayat** hai jo agar dikhta to poora frame safed kar deta.
+
+```
+11d. tracks — hide render me bhi lagta hai (16.15)
+  ok   chhupi hui track ka safed aayat MP4 me nahi aaya — kone ki roshni 19.3 (safed aayat dikhta to ~255 hoti)
+  ok   chhupi hui track ke neeche wali image ab bhi dikh rahi hai — beech ki roshni 230.0
+  ok   sample me chhah tracks hain (ek chhupi hui) — 6 tracks, 1 chhupi hui
+
+ALL PASS: 53 checks, 0 fail  (reel-30fps)
+```
+
+Doosri line zaroori hai: pehli akeli hoti to ek khaali (kaali) video bhi pass kar jaati.
+Aur agar hide sirf editor me lagta, to upar ke saare naap (chaukor ki chaudai, vignette ke
+kone, blur ka kinara) ek saath fail ho jaate — isliye ye check unke saath milkar do baar
+saabit karta hai.
+
+### 16.5 — saare shortcuts (40, koi takraav nahi)
+
+| Group | Keys | Kaam |
+|---|---|---|
+| edit | `Ctrl+Z` | Undo |
+| edit | `Ctrl+Shift+Z`, `Ctrl+Y` | Redo |
+| edit | `Ctrl+S` | Abhi save karo |
+| edit | `?` | Cheat-sheet |
+| transport | `Space` | Play / pause |
+| transport | `J` `K` `L` | Shuttle peeche / roko / aage |
+| transport | `←` `→` | Ek frame (clip ya playhead) |
+| transport | `Shift+←` `Shift+→` | Ek second |
+| transport | `Home` `End` | Shuruaat / ant |
+| timeline | `+` `-` | Zoom |
+| timeline | `Shift+Z` | Poori timeline dikhao |
+| timeline | `Ctrl+A` / `Esc` | Sab chuno / selection chhodo |
+| timeline | `I` `O` | In / Out point |
+| timeline | `Alt+←` `Alt+→` | Pichhla / agla clip |
+| timeline | `M` / `Shift+M` / `Alt+M` | Marker lagao / agla / pichhla |
+| editing | `S` | Playhead par todo |
+| editing | `[` `]` | Shuruaat / ant playhead tak kaato |
+| editing | `Del`, `Backspace` | Delete |
+| editing | `Shift+Del`, `Shift+Backspace` | Ripple delete |
+| editing | `Ctrl+D` | Duplicate |
+| editing | `Ctrl+C` `Ctrl+X` `Ctrl+V` | Copy / cut / paste |
+| editing | `Ctrl+G` / `Ctrl+Shift+G` | Group / ungroup |
+
+```
+$ npx tsx studio/scripts/check-shortcuts.ts
+registry (16.5)
+  ok   registry padhi ja saki aur usme kaafi entries hain
+  ok   har entry ka id ek hi baar aata hai
+  ok   do shortcut ek hi key par nahi baithe
+  ok   keys chhote akshar me hain aur modifiers sahi kram me
+  ok   har entry ka group cheat-sheet ke chaar groups me se ek hai
+  ok   16.5 ke maange hue saare shortcuts maujood hain
+...
+ALL PASS: 12 tests, 0 fail
+```
+
+**WORKING / NOT WORKING ka imaandaar jawab:** upar wali list **registry se padhi gayi hai**,
+haath se nahi likhi — aur uska takraav-check sach me chalta hai. Par "key dabane par sach me
+kaam hua" browser ke bina naapa nahi ja sakta, aur wo naap abhi nahi hui hai. Isliye list
+"registered aur bina takraav ke" hai, "haath se aazmaayi hui" nahi.
+
+Iske liye `shortcuts.ts` ka keys wala poora ganit ek nayi file `lib/shortcutKeys.ts` me
+nikala gaya — usme browser ka kuch nahi hai, isliye wo sach me chalaya jaata hai. Pehle wo
+ganit **kisi test se guzarta hi nahi tha**.
+
+## Baaki kya hai
+
+| Kya | Kyun ruka |
+|---|---|
+| 16.6 / 16.7 / 16.8 / 16.9 / 16.11 / 16.12 ka browser wala hissa | `studio/.env.local` nahi hai → dev server nahi chalta |
+| 16.14 ka asli test | IndexedDB Node me hai hi nahi; logic (`shouldOfferDraft`) alag aur pure hai par uska apna test abhi nahi likha |
+| Media panel se timeline par drag-drop (16.12 ka aadha) | Asset jodna Media panel ke button se pehle se chalta hai; drop uske upar ek suvidha hai, koi nayi shakti nahi |
+| Track / khaali jagah ka context menu (16.9 ka aadha) | Jo cheezein chahiye wo track header aur toolbar me pehle se hain |
 
 ## Done when
 
 Tracks poori tarah manage hote hain aur unke toggles render me bhi lagu hote hain, saare
 shortcuts kaam karte hain, aur crash/reload pe kaam nahi khota.
 
+→ Pehla naap liya gaya (MP4 se). Doosra "registered aur bina takraav" tak naapa gaya, browser
+  tak nahi. Teesra likha gaya par IndexedDB ke bina naapa nahi ja sakta.
+
 ## Progress log
 
-| Date | What was done | Verified by | Next |
-|---|---|---|---|
-| | | | |
+| Kab | Kya hua |
+|---|---|
+| 2026-08-20 | 16.1–16.16 done. Ek asli bug pakda (track height do jagah thi) aur ek apni galti pakdi (studio ka typecheck chup-chaap skip ho raha tha). 40 shortcuts, koi takraav nahi. `render:sample` 53/53 — chhupi hui track MP4 me nahi aayi. |

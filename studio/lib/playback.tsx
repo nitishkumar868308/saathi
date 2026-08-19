@@ -7,6 +7,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useEffect,
   useRef,
   useState,
   type ReactNode,
@@ -34,6 +35,9 @@ import { useEditorStoreApi } from "@/lib/store";
  * pata nahi hona chahiye — wo bas `playback.toggle()` bulata hai.
  */
 
+/** Shuttle isse tez nahi hoti — usse aage frame dikhte hi nahi, sirf bhaagte hain. */
+const MAX_SHUTTLE_RATE = 8;
+
 export interface PlaybackState {
   isPlaying: boolean;
   loop: boolean;
@@ -49,6 +53,8 @@ export interface PlaybackState {
   stutter: boolean;
   /** Aakhri naapi hui asli fps — hint me dikhti hai. */
   measuredFps: number | null;
+  /** J/K/L shuttle ki abhi ki raftaar. 0 = shuttle band. */
+  shuttleRate: number;
 }
 
 export interface PlaybackApi extends PlaybackState {
@@ -64,6 +70,15 @@ export interface PlaybackApi extends PlaybackState {
   stepSeconds(delta: number): void;
   toStart(): void;
   toEnd(): void;
+  /**
+   * J / K / L shuttle (16.5).
+   *
+   * `-1` peeche, `+1` aage, `0` roko. Usi disha me dobara dabane par raftaar
+   * dugni ho jaati hai (1x -> 2x -> 4x), aur ulti disha me dabane par pehle
+   * raftaar 1x par wapas aati hai. Yahi har NLE karta hai, aur usi ki wajah se
+   * footage me ek jagah dhoondhna J-J-L-K jitna hi hota hai.
+   */
+  shuttle(direction: -1 | 0 | 1): void;
 
   setLoop(value: boolean): void;
   setMuted(value: boolean): void;
@@ -101,6 +116,7 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     draft: false,
     stutter: false,
     measuredFps: null,
+    shuttleRate: 0,
   });
 
   /**
@@ -119,8 +135,66 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
     [store],
   );
 
+  /**
+   * Shuttle ki raftaar ek ref me hai, state me nahi — aur ye zaroori hai.
+   *
+   * `shuttle()` ko turant purani raftaar chahiye hoti hai taaki wo dugni kar
+   * sake. State se padhne par `api` ke dobara bante hi purana closure baith
+   * jaata aur J dabate rehne par raftaar 2x par atak jaati.
+   */
+  const shuttleRef = useRef(0);
+
   const pause = useCallback(() => {
     playerRef.current?.pause();
+  }, []);
+
+  /*
+   * Shuttle ka apna loop.
+   *
+   * ⚠️ Remotion ke `<Player>` par "speed" jaisa koi prop nahi hai, aur peeche
+   * chalane ka to sawaal hi nahi. Isliye shuttle playhead ko khud aage-peeche
+   * khiskata hai. 1x aage wale case ko chhod diya gaya hai — wahan asli playback
+   * behtar hai (awaaz ke saath, aur frames chhootenge nahi).
+   *
+   * Kadam **beete hue asli waqt** se banta hai, har tick par ek frame se nahi:
+   * bhaari project me rAF 60 ki jagah 20 baar chalta hai, aur tab fixed kadam
+   * lene par shuttle ki raftaar apne aap teen guna dheemi ho jaati.
+   */
+  useEffect(() => {
+    const rate = state.shuttleRate;
+    if (rate === 0 || rate === 1) return;
+
+    let raf = 0;
+    let last = performance.now();
+
+    const tick = (now: number) => {
+      const editor = store.getState();
+      const fps = editor.doc.project.fps;
+      const elapsed = (now - last) / 1000;
+      last = now;
+
+      const next = editor.playheadFrame + rate * fps * elapsed;
+      const clamped = Math.max(0, Math.min(editor.doc.project.durationInFrames, next));
+      goTo(Math.round(clamped));
+
+      // Kinare par pahunch kar shuttle apne aap ruk jaata hai — warna user ko
+      // lagta hai ki wo chal raha hai par kuch ho nahi raha.
+      if (clamped <= 0 || clamped >= editor.doc.project.durationInFrames) {
+        shuttleRef.current = 0;
+        setState((previous) => ({ ...previous, shuttleRate: 0 }));
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [state.shuttleRate, goTo, store]);
+
+  const stopShuttle = useCallback(() => {
+    if (shuttleRef.current === 0) return;
+    shuttleRef.current = 0;
+    setState((previous) => ({ ...previous, shuttleRate: 0 }));
   }, []);
 
   const api = useMemo<PlaybackApi>(
@@ -128,17 +202,24 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       ...state,
       playerRef,
 
-      play: () => playerRef.current?.play(),
+      play: () => {
+        // Shuttle chalte hue Space dabana — playback jeetna chahiye, warna do
+        // cheezein ek saath playhead likhti hain aur wo kaanpta hai.
+        stopShuttle();
+        playerRef.current?.play();
+      },
       pause,
       toggle: () => playerRef.current?.toggle(),
 
       stepFrames: (delta) => {
         // Chalte-chalte frame step karna hamesha ulta padta hai: playback agla
         // frame likh deta hai aur step gayab ho jaata hai.
+        stopShuttle();
         pause();
         goTo(store.getState().playheadFrame + delta);
       },
       stepSeconds: (delta) => {
+        stopShuttle();
         pause();
         const editor = store.getState();
         goTo(editor.playheadFrame + secondsToFrames(delta, editor.doc.project.fps));
@@ -150,6 +231,36 @@ export function PlaybackProvider({ children }: { children: ReactNode }) {
       toEnd: () => {
         pause();
         goTo(store.getState().doc.project.durationInFrames);
+      },
+
+      shuttle: (direction) => {
+        if (direction === 0) {
+          shuttleRef.current = 0;
+          pause();
+          setState((previous) => ({ ...previous, shuttleRate: 0 }));
+          return;
+        }
+
+        const current = shuttleRef.current;
+        /*
+         * Ulti disha me dabane par seedha -2x par chala jaana galat lagta hai:
+         * user ko lagta hai ki wo "wapas" jaana chahta tha, aur video bhaag
+         * jaati hai. Isliye pehle 1x par aata hai, phir hi tez hota hai.
+         */
+        const next =
+          current === 0 || Math.sign(current) !== direction
+            ? direction
+            : Math.sign(current) * Math.min(MAX_SHUTTLE_RATE, Math.abs(current) * 2);
+
+        shuttleRef.current = next;
+        setState((previous) => ({ ...previous, shuttleRate: next }));
+
+        // Aage ki taraf 1x par asli playback hi sabse sahi hai — awaaz ke saath.
+        if (next === 1) {
+          playerRef.current?.play();
+          return;
+        }
+        pause();
       },
 
       setLoop: (loop) => setState((previous) => ({ ...previous, loop })),

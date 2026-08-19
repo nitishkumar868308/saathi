@@ -2,8 +2,9 @@
 
 import { requireTrackType, type Track } from "@reel/core";
 import clsx from "clsx";
-import { Eye, EyeOff, Lock, LockOpen, Volume2, VolumeX } from "lucide-react";
+import { Eye, EyeOff, Headphones, Lock, LockOpen, Volume2, VolumeX } from "lucide-react";
 
+import { TrackMenu, TrackOpacity } from "@/components/editor/timeline/TrackMenu";
 import { Icon } from "@/components/ui/Icon";
 import { useEditorStore } from "@/lib/store";
 import { MIN_TRACK_HEIGHT, clampTrackHeight } from "@/lib/timeline";
@@ -23,7 +24,7 @@ export function TrackHeader({ track, height }: { track: Track; height: number })
   const setTrackHeight = useEditorStore((state) => state.setTrackHeight);
   const type = requireTrackType(track.type);
 
-  function toggle(path: "muted" | "hidden" | "locked", value: boolean) {
+  function toggle(path: "muted" | "hidden" | "locked" | "solo", value: boolean) {
     applyOp(
       "setTrackProperty",
       { trackId: track.id, path, value },
@@ -47,7 +48,17 @@ export function TrackHeader({ track, height }: { track: Track; height: number })
         {track.name}
       </span>
 
+      <TrackOpacity track={track} />
+      <TrackMenu track={track} />
+
       <div className="flex shrink-0 items-center gap-0.5">
+        <HeaderToggle
+          on={track.solo}
+          onIcon={<Headphones size={11} />}
+          offIcon={<Headphones size={11} />}
+          title={track.solo ? "Solo hatao" : "Solo — sirf yahi"}
+          onClick={() => toggle("solo", !track.solo)}
+        />
         <HeaderToggle
           on={track.muted}
           onIcon={<VolumeX size={11} />}

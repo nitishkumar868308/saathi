@@ -2,13 +2,13 @@
   "name": "@reel/studio",
   "version": "0.0.0",
   "private": true,
-  "description": "AI Reel Studio ka editor — localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
+  "description": "AI Reel Studio ka editor \u2014 localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts && tsx scripts/check-preview.ts && tsx scripts/check-timeline.ts && tsx scripts/check-properties.ts"
+    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts && tsx scripts/check-preview.ts && tsx scripts/check-timeline.ts && tsx scripts/check-properties.ts && tsx scripts/check-shortcuts.ts"
   },
   "dependencies": {
     "@reel/core": "*",

@@ -9,6 +9,8 @@ import { SceneCards } from "@/components/editor/scenes/SceneCards";
 import { ResizeHandle } from "@/components/editor/ResizeHandle";
 import { RightSidebar } from "@/components/editor/RightSidebar";
 import { TimelineView } from "@/components/editor/timeline/TimelineView";
+import { DraftRecovery } from "@/components/editor/DraftRecovery";
+import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { TopBar } from "@/components/editor/TopBar";
 import { useLayout } from "@/lib/layout";
 import { PlaybackProvider } from "@/lib/playback";
@@ -82,6 +84,10 @@ function EditorShell() {
     <div className="flex h-screen flex-col overflow-hidden">
       <TopBar />
       <ConflictBanner />
+      {/* Crash/offline ke baad bacha hua kaam (16.14). */}
+      <DraftRecovery />
+      {/* `?` se khulta hai — list registry se banti hai, haath se nahi (16.6). */}
+      <ShortcutsDialog />
 
       {opError ? (
         <div className="flex items-center gap-3 border-b border-red-500/40 bg-red-500/10 px-4 py-1.5 text-sm text-red-300">

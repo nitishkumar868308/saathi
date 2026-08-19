@@ -157,6 +157,7 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
 
     hidden: false,
     locked: false,
+    groupId: null,
   };
 
   const { fps: _ignored, ...overrides } = partial;
@@ -176,6 +177,9 @@ export function createTrack(typeId: string, partial: Partial<Track> = {}): Track
     muted: false,
     hidden: false,
     locked: false,
+    solo: false,
+    opacity: 1,
+    heightPx: null,
   };
   return deepMerge(
     deepMerge(base as unknown as PlainObject, entry.defaults),
@@ -242,6 +246,7 @@ export function createEmptyProject(input: CreateEmptyProjectInput = {}): Doc {
     tracks,
     items: [],
     scenes: [],
+    markers: [],
     brand: { presetId: null },
     meta: { createdBy: "manual", sourceStory: null },
   };
