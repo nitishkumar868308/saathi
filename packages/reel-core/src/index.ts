@@ -12,6 +12,7 @@ export * from "./path";
 export * from "./time";
 
 // Config — sab data, koi magic number nahi
+export * from "./config/brand";
 export * from "./config/easing";
 export * from "./config/fit";
 export * from "./config/presets";
@@ -23,6 +24,9 @@ export * from "./registry/index";
 export * from "./schema/project";
 export * from "./schema/migrate";
 export * from "./schema/factory";
+
+// Keyframes — value nikalna (poora engine Phase 13 me)
+export * from "./keyframes/interpolate";
 
 // Storage — sirf contract aur key layout (asli drivers @reel/storage me)
 export * from "./storage/types";

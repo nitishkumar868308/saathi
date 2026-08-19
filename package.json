@@ -15,7 +15,8 @@
     "build:studio": "npm run build --workspace @reel/studio",
     "check": "npm run check --workspaces --if-present",
     "storage-smoke": "npm run storage-smoke --workspace @reel/worker --",
-    "db-verify": "npm run db-verify --workspace @reel/worker --"
+    "db-verify": "npm run db-verify --workspace @reel/worker --",
+    "render:sample": "npm run render:sample --workspace @reel/worker --"
   },
   "devDependencies": {
     "typescript": "^5.5.4"

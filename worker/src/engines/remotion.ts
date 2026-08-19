@@ -1,0 +1,125 @@
+import { stat } from "node:fs/promises";
+import { resolve } from "node:path";
+
+import { COLOR_SPACE, GOP_SECONDS, requireExportPreset } from "@reel/core";
+import { requireRepoRoot } from "@reel/storage";
+import { bundle } from "@remotion/bundler";
+import { ensureBrowser, renderMedia, selectComposition } from "@remotion/renderer";
+
+import type { RenderEngine, RenderRequest, RenderResult } from "./types";
+
+/**
+ * Remotion se render.
+ *
+ * ⚠️ **Section 3A ka single-encode rule yahan bandha hua hai.** Remotion se
+ * seedha final H.264 nikalta hai — CRF, x264 preset, pixel format, aur audio sab
+ * yahin tay hote hain. Baad me FFmpeg sirf remux karta hai (`-c copy`). Video ko
+ * dobara encode karne se quality girti hai bina kisi faayde ke.
+ *
+ * `bundle()` har render par chalta hai. Ye thoda kharcha hai (~5-15s) par
+ * imaandaar hai: code badal gaya ho to purana bundle chupchaap chalte rehna
+ * "maine to theek kar diya tha, video me kyun nahi aaya" wali sabse chidhane
+ * wali cheez banta hai. Cache Phase 11 me jodenge, jab render UI se chalega.
+ */
+
+/** Remotion ka entry file — repo root se, cwd se nahi. */
+function entryPoint(): string {
+  return resolve(requireRepoRoot(), "packages/reel-remotion/src/entry.ts");
+}
+
+export class RemotionRenderEngine implements RenderEngine {
+  readonly name = "remotion";
+
+  async render(request: RenderRequest): Promise<RenderResult> {
+    const startedAt = Date.now();
+    const preset = requireExportPreset(request.preset);
+
+    /*
+     * Pehli baar chalane par Remotion Chrome Headless Shell utaarta hai (~150MB).
+     * Ye Remotion ka apna hissa hai, koi alag service nahi — par bina bataye 150MB
+     * kheenchna bura hota hai, isliye pehle hi saaf bol dete hain.
+     */
+    request.onProgress?.({ stage: "bundling", progress: 0 });
+    await ensureBrowser();
+
+    const serveUrl = await bundle({
+      entryPoint: entryPoint(),
+      // Assets isi folder me utari gayi hain — `staticFile()` yahin se padhta hai.
+      publicDir: request.publicDir,
+      onProgress: (percent) => {
+        request.onProgress?.({ stage: "bundling", progress: 0.05 + (percent / 100) * 0.1 });
+      },
+    });
+
+    const inputProps = { doc: request.doc, assets: request.assets };
+
+    /*
+     * Composition ki width/height/fps/duration `calculateMetadata` se aati hain,
+     * aur wo doc padhta hai. Isliye 1080x1920@30 aur 1920x1080@24 ke liye do alag
+     * composition nahi banti — sirf doc badalta hai (Dynamic rule 4).
+     */
+    const composition = await selectComposition({
+      serveUrl,
+      id: "Reel",
+      inputProps,
+    });
+
+    const renderStartedAt = Date.now();
+
+    await renderMedia({
+      composition,
+      serveUrl,
+      codec: "h264",
+      outputLocation: request.outPath,
+      inputProps,
+
+      // --- Section 3A: quality bar, poora ka poora ---
+      // Har number EXPORT_PRESETS registry se aata hai — yahan koi magic value nahi.
+      crf: preset.crf,
+      x264Preset: preset.x264Preset,
+      // yuv420p ke bina video kai players (aur WhatsApp) me chalti hi nahi.
+      pixelFormat: "yuv420p",
+      /*
+       * GOP ~2 second. Chhota GOP = seek tez aur social platforms ka re-encode
+       * saaf, par file thodi badi. Frames me isliye ki fps kuch bhi ho sakta hai.
+       */
+      gopSize: Math.max(1, Math.round(composition.fps * GOP_SECONDS)),
+      /*
+       * Colour space ke tags. Bina inke player apna andaza lagata hai aur wahi
+       * video kisi phone par thodi alag rang ki dikhti hai.
+       */
+      colorSpace: COLOR_SPACE,
+      audioCodec: "aac",
+      audioBitrate: `${preset.audioBitrateKbps}k`,
+      /*
+       * Audio track hamesha rahe — chahe project me abhi koi audio na ho.
+       * Bina audio track wali MP4 kai jagah (Instagram, kuch Android players)
+       * ya to reject hoti hai ya chalte-chalte atak jaati hai.
+       */
+      enforceAudioTrack: true,
+
+      ...(request.concurrency ? { concurrency: request.concurrency } : {}),
+
+      onProgress: ({ progress, renderedFrames, encodedFrames, stitchStage }) => {
+        request.onProgress?.({
+          // 0.15 tak bundling ho chuki hai; baaki 0.85 render ka hissa.
+          progress: 0.15 + progress * 0.85,
+          stage: stitchStage === "muxing" ? "encoding" : "rendering",
+          renderedFrames: renderedFrames ?? encodedFrames,
+          totalFrames: composition.durationInFrames,
+        });
+      },
+    });
+
+    const finishedAt = Date.now();
+    const { size } = await stat(request.outPath);
+
+    return {
+      outPath: request.outPath,
+      bytes: size,
+      renderMs: finishedAt - renderStartedAt,
+      totalMs: finishedAt - startedAt,
+      frames: composition.durationInFrames,
+    };
+  }
+}

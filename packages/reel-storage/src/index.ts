@@ -12,6 +12,7 @@ import { R2StorageDriver } from "./drivers/r2";
  * studio ke server-side routes aur worker dono ise import karte hain.
  */
 
+export * from "./assets";
 export * from "./config";
 export * from "./drivers/local";
 export * from "./drivers/r2";

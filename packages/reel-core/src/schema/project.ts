@@ -34,12 +34,10 @@ export const DurationFramesSchema = z.number().int().min(1);
  * Rang ya to hex hai (`#C25A37`) ya **brand token** (`brand.primary`).
  * Token likhne se brand badalte hi poori reel badal jaati hai — isliye UI hamesha
  * token ki taraf dhakelta hai (Dynamic rule 9).
+ *
+ * Resolve karne wale helpers `config/brand.ts` me hain (`isBrandToken`, `resolveToken`).
  */
 export const ColorSchema = z.string().min(1);
-
-export function isBrandToken(value: string): boolean {
-  return value.startsWith("brand.");
-}
 
 const evenDimension = (label: string) =>
   z

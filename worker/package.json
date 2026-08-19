@@ -10,7 +10,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "storage-smoke": "tsx scripts/storage-smoke.ts",
-    "db-verify": "tsx scripts/db-verify.ts"
+    "db-verify": "tsx scripts/db-verify.ts",
+    "render:sample": "tsx scripts/render-sample.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -18,6 +19,8 @@
   },
   "dependencies": {
     "@reel/core": "*",
-    "@reel/storage": "*"
+    "@reel/storage": "*",
+    "@remotion/bundler": "4.0.513",
+    "@remotion/renderer": "4.0.513"
   }
 }

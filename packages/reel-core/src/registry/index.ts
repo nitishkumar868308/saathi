@@ -1,4 +1,5 @@
 import type { Doc } from "../schema/project";
+import { BUILTIN_EXPORT_PRESETS, type ExportPresetEntry } from "./exportPresets";
 import { BUILTIN_ITEM_TYPES, type ItemTypeEntry } from "./itemTypes";
 import { BUILTIN_TRACK_TYPES, type TrackTypeEntry } from "./trackTypes";
 import { createRegistry, type Registry, type RegistryEntry } from "./types";
@@ -10,10 +11,11 @@ import { createRegistry, type Registry, type RegistryEntry } from "./types";
  * renderer aur validation — sab in lists ko padhte hain. Isliye naya feature
  * jodna matlab ek file + ek entry, poore codebase me edit nahi.
  *
- * TRANSITIONS / EFFECTS / ANIMATIONS / SCENE_TYPES / EXPORT_PRESETS /
- * VALIDATION_RULES abhi jaan-boojhkar **khaali** hain — inme entries apne-apne
- * phase me aayengi (10, 14, 12, 11, 20). Khaali registry rakhna zaroori hai
- * taaki UI aaj hi list par map kar sake aur baad me koi rewiring na karni pade.
+ * Bhari hui: ITEM_TYPES, TRACK_TYPES, EXPORT_PRESETS.
+ * Abhi khaali (entries apne-apne phase me aayengi): TRANSITIONS (10), ANIMATIONS
+ * (10), SCENE_TYPES (12), EFFECTS (14), VALIDATION_RULES (20). Khaali registry
+ * rakhna zaroori hai taaki UI aaj hi list par map kar sake aur baad me koi
+ * rewiring na karni pade.
  */
 
 // ---------------------------------------------------------------- item types
@@ -97,21 +99,15 @@ export interface SceneTypeEntry extends RegistryEntry {
 export const SCENE_TYPES: Registry<SceneTypeEntry> = createRegistry<SceneTypeEntry>("SCENE_TYPES");
 
 /**
- * Phase 11/20 — export presets. Section 3A ka quality bar inhi me baithega
- * (CRF <= 18, high preset par 16), isliye shape abhi se ready hai.
+ * Export presets — Section 3A ka quality bar. Entries `exportPresets.ts` me hain
+ * (Phase 3 me hi bhar di gayin, kyunki renderer ko CRF kahin se lena tha).
  */
-export interface ExportPresetEntry {
-  id: string;
-  label: string;
-  hint: string;
-  crf: number;
-  x264Preset: string;
-  audioBitrateKbps: number;
-  /** null = project ki apni size. */
-  scaleTo: { width: number; height: number } | null;
-}
 export const EXPORT_PRESETS: Registry<ExportPresetEntry> =
   createRegistry<ExportPresetEntry>("EXPORT_PRESETS");
+
+export function requireExportPreset(id: string): ExportPresetEntry {
+  return EXPORT_PRESETS.require(id);
+}
 
 /**
  * Phase 20 — quality validation. **Rule list hai, if-else spaghetti nahi**
@@ -152,6 +148,7 @@ export function registerBuiltins(): void {
   registered = true;
   for (const entry of BUILTIN_ITEM_TYPES) ITEM_TYPES.register(entry);
   for (const entry of BUILTIN_TRACK_TYPES) TRACK_TYPES.register(entry);
+  for (const entry of BUILTIN_EXPORT_PRESETS) EXPORT_PRESETS.register(entry);
 }
 
 /** Sirf tests ke liye — sab saaf karke dobara register. */
@@ -170,6 +167,7 @@ export function resetRegistries(): void {
 
 registerBuiltins();
 
+export * from "./exportPresets";
 export type { ItemTypeEntry } from "./itemTypes";
 export type { TrackTypeEntry } from "./trackTypes";
 export * from "./types";

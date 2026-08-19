@@ -56,7 +56,7 @@ type Env = Record<string, string | undefined>;
  *
  * Root se resolve karne par dono ek hi folder dekhte hain, chahe kahin se bhi chale.
  */
-function findRepoRoot(startDir: string): string | null {
+export function findRepoRoot(startDir: string = process.cwd()): string | null {
   let dir = resolve(startDir);
   for (let depth = 0; depth < 12; depth += 1) {
     const pkgPath = join(dir, "package.json");
@@ -73,6 +73,23 @@ function findRepoRoot(startDir: string): string | null {
     dir = parent;
   }
   return null;
+}
+
+/**
+ * Repo root — na mile to saaf error.
+ *
+ * Worker ko Remotion ka entry file dhoondhna hota hai; usko cwd par chhodna
+ * matlab "kis folder se chalaya" par nirbhar ho jaana, jo hamesha kisi din tootta hai.
+ */
+export function requireRepoRoot(startDir: string = process.cwd()): string {
+  const root = findRepoRoot(startDir);
+  if (!root) {
+    throw new Error(
+      `Repo root nahi mila (${startDir} se upar koi package.json with "workspaces" nahi). ` +
+        `Command repo ke andar se chalao.`,
+    );
+  }
+  return root;
 }
 
 /** Relative output dir ko hamesha repo root se resolve karo, cwd se nahi. */
