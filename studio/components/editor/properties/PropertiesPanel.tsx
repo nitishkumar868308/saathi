@@ -2,6 +2,7 @@
 
 import {
   AUTO_FIT_ACTIONS,
+  animationsMaxScale,
   framesToTimecode,
   getByPath,
   getItemType,
@@ -14,6 +15,7 @@ import {
 import clsx from "clsx";
 import { useState } from "react";
 
+import { AnimationSection } from "@/components/editor/properties/AnimationSection";
 import { controlComponent } from "@/components/controls";
 import { NumberField } from "@/components/controls/NumberField";
 import { Button } from "@/components/ui/Button";
@@ -81,6 +83,7 @@ export function PropertiesPanel() {
 
       <TimingSection items={items} />
       <FitSection items={items} />
+      <AnimationSection items={items} />
 
       {groups.map((group) => (
         <section key={group.group}>
@@ -319,6 +322,10 @@ function FitSection({ items }: { items: readonly Item[] }) {
         frame,
         fitMode: single.item.fit.mode,
         itemScale: single.item.transform.scale,
+        // Ken Burns ka blur clip ke **aakhir** me aata hai — isliye animations ka
+        // sabse bada scale bhi ginti me aana chahiye (10.11), warna chetavni tab
+        // aati hai jab video ban chuki hoti hai.
+        animationScale: animationsMaxScale(single.item),
       })
     : null;
   const suggestion = single ? suggestFit(single.source, frame) : null;

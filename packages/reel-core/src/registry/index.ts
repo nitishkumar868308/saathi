@@ -1,7 +1,9 @@
 import type { Doc } from "../schema/project";
 import { ASSET_KINDS, BUILTIN_ASSET_KINDS } from "./assetKinds";
 import { BUILTIN_EXPORT_PRESETS, type ExportPresetEntry } from "./exportPresets";
+import { ANIMATIONS, BUILTIN_ANIMATIONS } from "./animations";
 import { BUILTIN_ITEM_TYPES, type ItemTypeEntry } from "./itemTypes";
+import { BUILTIN_TRANSITIONS, TRANSITIONS } from "./transitions";
 import { BUILTIN_TRACK_TYPES, type TrackTypeEntry } from "./trackTypes";
 import { createRegistry, type Registry, type RegistryEntry } from "./types";
 
@@ -12,11 +14,11 @@ import { createRegistry, type Registry, type RegistryEntry } from "./types";
  * renderer aur validation — sab in lists ko padhte hain. Isliye naya feature
  * jodna matlab ek file + ek entry, poore codebase me edit nahi.
  *
- * Bhari hui: ITEM_TYPES, TRACK_TYPES, EXPORT_PRESETS.
- * Abhi khaali (entries apne-apne phase me aayengi): TRANSITIONS (10), ANIMATIONS
- * (10), SCENE_TYPES (12), EFFECTS (14), VALIDATION_RULES (20). Khaali registry
- * rakhna zaroori hai taaki UI aaj hi list par map kar sake aur baad me koi
- * rewiring na karni pade.
+ * Bhari hui: ITEM_TYPES, TRACK_TYPES, EXPORT_PRESETS, ASSET_KINDS, ANIMATIONS,
+ * TRANSITIONS.
+ * Abhi khaali (entries apne-apne phase me aayengi): SCENE_TYPES (12), EFFECTS
+ * (14), VALIDATION_RULES (20). Khaali registry rakhna zaroori hai taaki UI aaj
+ * hi list par map kar sake aur baad me koi rewiring na karni pade.
  */
 
 // ---------------------------------------------------------------- item types
@@ -70,27 +72,11 @@ export function trackAccepts(trackTypeId: string, itemTypeId: string): boolean {
 
 // ------------------------------------------------- abhi khaali (aage ke phases)
 
-/** Phase 10 — fade, crossfade, slide, zoom, blur. */
-export interface TransitionEntry extends RegistryEntry {
-  componentKey: string;
-  defaultDurationSeconds: number;
-}
-export const TRANSITIONS: Registry<TransitionEntry> =
-  createRegistry<TransitionEntry>("TRANSITIONS");
-
 /** Phase 14 — blur, colour grade, vignette… */
 export interface EffectEntry extends RegistryEntry {
   componentKey: string;
 }
 export const EFFECTS: Registry<EffectEntry> = createRegistry<EffectEntry>("EFFECTS");
-
-/** Phase 10 — Ken Burns, pop-in, slide-up… */
-export interface AnimationEntry extends RegistryEntry {
-  componentKey: string;
-  /** Kaun se item types par lag sakti hai. Khaali = sab. */
-  appliesTo: readonly string[];
-}
-export const ANIMATIONS: Registry<AnimationEntry> = createRegistry<AnimationEntry>("ANIMATIONS");
 
 /** Phase 12 — scene cards (beginner mode) ke templates. */
 export interface SceneTypeEntry extends RegistryEntry {
@@ -151,6 +137,8 @@ export function registerBuiltins(): void {
   for (const entry of BUILTIN_TRACK_TYPES) TRACK_TYPES.register(entry);
   for (const entry of BUILTIN_EXPORT_PRESETS) EXPORT_PRESETS.register(entry);
   for (const entry of BUILTIN_ASSET_KINDS) ASSET_KINDS.register(entry);
+  for (const entry of BUILTIN_ANIMATIONS) ANIMATIONS.register(entry);
+  for (const entry of BUILTIN_TRANSITIONS) TRANSITIONS.register(entry);
 }
 
 /** Sirf tests ke liye — sab saaf karke dobara register. */
@@ -170,8 +158,10 @@ export function resetRegistries(): void {
 
 registerBuiltins();
 
+export * from "./animations";
 export * from "./assetKinds";
 export * from "./exportPresets";
+export * from "./transitions";
 export type { ItemTypeEntry } from "./itemTypes";
 export type { TrackTypeEntry } from "./trackTypes";
 export * from "./types";

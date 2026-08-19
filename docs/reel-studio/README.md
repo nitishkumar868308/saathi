@@ -266,7 +266,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 7 | in progress — 7.1/7.2/7.5/7.7/7.9 verified; baaki browser par (38 test pass) | 2026-08-19 |
 | 8 | in progress — core poora + naapa hua (8.4/8.5/8.6/8.9/8.11/8.13/8.14/8.16 verified); UI ka pointer wala hissa baaki | 2026-08-19 |
 | 9 | in progress — panel poora + naapa hua (9.1/9.2/9.3/9.5/9.6/9.6b/9.6c/9.8/9.9/9.11/9.12 verified); browser wala hissa baaki | 2026-08-19 |
-| 10 | not started | — |
+| 10 | in progress — registry+renderer poore aur naape hue (10.1-10.6, 10.8-10.12 verified); 10.7/10.13 browser par | 2026-08-20 |
 | 11 | not started | — |
 | 12 | not started | — |
 | 13 | not started | — |

@@ -1,10 +1,18 @@
 "use client";
 
-import { getItemType, requireTrackType, type Item, type Track } from "@reel/core";
+import {
+  clampTransitionFrames,
+  getItemType,
+  getTransition,
+  requireTrackType,
+  type Item,
+  type Track,
+} from "@reel/core";
 import clsx from "clsx";
 import { EyeOff, Lock } from "lucide-react";
 
 import { useAssetUrl } from "@/lib/assetUrls";
+import { useEditorStore } from "@/lib/store";
 import { TRIM_HANDLE_PX, type DragMode } from "@/lib/clipEdit";
 import { clipLabel, clipTooltip, frameToX } from "@/lib/timeline";
 
@@ -65,6 +73,20 @@ export function Clip({
    * karna padega, jo saaf raasta hai).
    */
   const showHandles = !item.locked && width > TRIM_HANDLE_PX * 3;
+
+  /*
+   * Transition ka badge (10.7).
+   *
+   * Lambai **clamp ke baad** dikhti hai, doc ki kaachi value nahi — warna clip
+   * chhoti karne par badge clip se bahar nikal jaata hai aur wo jhooth bolta
+   * hai. Clamp ka asli kaam op me hota hai; yahan sirf wahi ginti dohrayi jaati
+   * hai taaki jo dikhe wahi sach ho.
+   */
+  const clamped = clampTransitionFrames({
+    durationInFrames: item.durationInFrames,
+    inFrames: item.transitionIn.durationInFrames,
+    outFrames: item.transitionOut.durationInFrames,
+  });
 
   return (
     <div
@@ -130,6 +152,19 @@ export function Clip({
         </span>
       </button>
 
+      <TransitionBadge
+        item={item}
+        side="in"
+        frames={clamped.inFrames}
+        pxPerFrame={pxPerFrame}
+      />
+      <TransitionBadge
+        item={item}
+        side="out"
+        frames={clamped.outFrames}
+        pxPerFrame={pxPerFrame}
+      />
+
       {showHandles ? (
         <>
           <TrimHandle side="start" onPointerDown={(event) => onBeginDrag(event, item, "trim-start")} />
@@ -164,6 +199,82 @@ function TrimHandle({
         side === "start" ? "left-0" : "right-0",
       )}
       style={{ width: TRIM_HANDLE_PX }}
+    />
+  );
+}
+
+/**
+ * Clip ke kinare par transition ka nishaan (10.7).
+ *
+ * ⚠️ Ye badge tabhi dikhta hai jab transition sach me lagi ho. Har clip par
+ * hamesha do khaali badge dikhana aasan hota, par wo do jagah jhooth bolta:
+ * ek to timeline bhara-bhara lagta hai, aur doosra "yahan transition hai"
+ * dikhta rehta hai jabki hai nahi (README rule 5).
+ *
+ * Ghaseet kar lambai badalti hai, aur double-click se transition hat jaati hai.
+ * Dono asli ops se — isliye Ctrl+Z dono ko wapas laata hai.
+ */
+function TransitionBadge({
+  item,
+  side,
+  frames,
+  pxPerFrame,
+}: {
+  item: Item;
+  side: "in" | "out";
+  frames: number;
+  pxPerFrame: number;
+}) {
+  const applyOp = useEditorStore((state) => state.applyOp);
+  const transition = side === "in" ? item.transitionIn : item.transitionOut;
+  const entry = getTransition(transition.type);
+
+  if (!entry || entry.id === "none" || frames <= 0) return null;
+
+  return (
+    <span
+      title={`${entry.label} ${side} — ${frames} frames (ghaseeto se lambai, double-click se hatao)`}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        const element = event.currentTarget;
+        element.setPointerCapture(event.pointerId);
+        const startX = event.clientX;
+        const startFrames = frames;
+
+        function onMove(move: PointerEvent) {
+          // `in` badge daayein kheenchne par badi hoti hai, `out` baayein.
+          const delta = (move.clientX - startX) / pxPerFrame;
+          applyOp(
+            "setTransition",
+            {
+              itemIds: [item.id],
+              side,
+              durationInFrames: Math.round(startFrames + (side === "in" ? delta : -delta)),
+            },
+            { label: `Transition ${side}`, coalesceKey: `transdrag:${item.id}:${side}` },
+          );
+        }
+        function onUp() {
+          element.removeEventListener("pointermove", onMove);
+          element.removeEventListener("pointerup", onUp);
+        }
+        element.addEventListener("pointermove", onMove);
+        element.addEventListener("pointerup", onUp);
+      }}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        applyOp(
+          "setTransition",
+          { itemIds: [item.id], side, type: "none" },
+          { label: `Transition ${side} hataya` },
+        );
+      }}
+      className={clsx(
+        "absolute inset-y-0 z-10 cursor-ew-resize border-amber/70 bg-amber/25",
+        side === "in" ? "left-0 border-r" : "right-0 border-l",
+      )}
+      style={{ width: Math.max(3, frames * pxPerFrame) }}
     />
   );
 }

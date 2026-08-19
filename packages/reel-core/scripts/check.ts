@@ -33,8 +33,26 @@ import {
   createCountingIdFactory,
   createEmptyProject,
   createHistory,
+  ANIMATION_PRESETS,
   BUILTIN_FONTS,
+  IDENTITY_ANIMATION,
+  addAnimation,
+  animationsMaxScale,
+  applyAnimationPreset,
   applyAutoFit,
+  clampTransitionFrames,
+  composeAnimations,
+  getAnimation,
+  getAnimationPreset,
+  getEasingFunction,
+  listAnimations,
+  listTransitions,
+  parseCubicBezier,
+  reorderAnimations,
+  requireAnimation,
+  setAnimationParam,
+  setTransition,
+  transitionOutputAt,
   copyItems,
   createItem,
   fontFaceCss,
@@ -2175,6 +2193,384 @@ test("missing fonts pehchane jaate hain, par brand tokens nahi", () => {
   // Brand token render ke waqt asli naam me badalta hai — uski shikayat yahan
   // karna galat chetavni hoti (Phase 17 me uski apni jaanch hogi).
   assert.deepEqual(missingFonts(BUILTIN_FONTS, ["brand.font.display"]), []);
+});
+
+// ------------------------------------------ Phase 10 (animations + transitions)
+
+section("easing (10.3 — ek hi implementation dono jagah)");
+
+test("har curve 0 par 0 aur 1 par 1 deti hai", () => {
+  for (const id of ["linear", "ease", "ease-in", "ease-out", "ease-in-out", "spring"]) {
+    const fn = getEasingFunction(id);
+    assert.equal(fn(0), 0, `${id} 0 par`);
+    assert.equal(fn(1), 1, `${id} 1 par`);
+  }
+});
+
+test("curve beech me 0..1 ke andar hi rehti hai (spring ke halke uchhaal ko chhod kar)", () => {
+  for (const id of ["linear", "ease", "ease-in", "ease-out", "ease-in-out"]) {
+    const fn = getEasingFunction(id);
+    for (let t = 0; t <= 1; t += 0.05) {
+      const value = fn(t);
+      assert.ok(value >= -0.01 && value <= 1.01, `${id} ${t.toFixed(2)} par ${value}`);
+    }
+  }
+});
+
+test("ease-in dheere shuru hota hai, ease-out dheere khatam", () => {
+  // Ye do curve aapas me ulte hone chahiye — agar dono ek jaise nikle to kahin
+  // ek hi function do naam se register hai.
+  assert.ok(getEasingFunction("ease-in")(0.25) < 0.25, "ease-in shuru me peeche hona chahiye");
+  assert.ok(getEasingFunction("ease-out")(0.25) > 0.25, "ease-out shuru me aage hona chahiye");
+});
+
+test("custom cubic-bezier CSS ki likhawat se chalta hai", () => {
+  const fn = getEasingFunction("cubic-bezier(0.42, 0, 0.58, 1)");
+  const builtin = getEasingFunction("ease-in-out");
+  for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+    assert.ok(Math.abs(fn(t) - builtin(t)) < 1e-6, `t=${t}: custom aur ease-in-out alag`);
+  }
+});
+
+test("galat easing par default milta hai, crash nahi", () => {
+  // Purana doc kisi aise easing ka naam le sakta hai jo ab nahi hai. Uske liye
+  // poora render rok dena galat hoga.
+  const fn = getEasingFunction("kuch-bhi-nahi");
+  assert.equal(fn(0), 0);
+  assert.equal(fn(1), 1);
+  assert.equal(parseCubicBezier("cubic-bezier(a,b,c,d)"), null);
+});
+
+section("animations registry (10.1 / 10.2)");
+
+test("saatoon built-in animation registered hain", () => {
+  const ids = listAnimations().map((entry) => entry.id);
+  for (const id of ["kenburns", "pan", "fade", "slide", "scalePop", "rotateIn", "blurIn"]) {
+    assert.ok(ids.includes(id), `${id} registry me nahi hai`);
+  }
+});
+
+test("har animation ke defaults uske apne schema se pass hote hain", () => {
+  // Ye jaanch isliye hai ki defaults aur schema aksar alag-alag likhe jaate hain
+  // aur ek din default hi invalid ho jaata — jo naya item banate hi phat'ta hai.
+  for (const entry of listAnimations()) {
+    const result = entry.schema.safeParse(entry.defaults);
+    assert.equal(result.success, true, `${entry.id} ke defaults schema se bahar hain`);
+  }
+});
+
+test("har animation ka har control uske defaults me maujood hai", () => {
+  for (const entry of listAnimations()) {
+    for (const control of entry.controls) {
+      assert.ok(
+        control.path in entry.defaults,
+        `${entry.id}: control "${control.path}" ka koi default nahi`,
+      );
+    }
+  }
+});
+
+section("animation compose hoti hai, overwrite nahi (10.1)");
+
+/** Ek item jispar animation lagayi ja sake. */
+function animItem(animations: Record<string, unknown>[], scale = 1): Item {
+  const base = createItem("image", { fps: 30, trackId: "tr", durationInFrames: 100 });
+  return {
+    ...base,
+    transform: { ...base.transform, scale },
+    animations: animations as Item["animations"],
+  };
+}
+
+const FRAME = { width: 1080, height: 1920 };
+
+test("bina animation ke sab kuch waisa ka waisa", () => {
+  const out = composeAnimations(animItem([]), 0, FRAME);
+  assert.deepEqual(out, IDENTITY_ANIMATION);
+});
+
+test("Ken Burns scale badhati hai aur ant me `to` par pahunchti hai", () => {
+  const item = animItem([{ type: "kenburns", enabled: true, from: 1, to: 1.4, easing: "linear" }]);
+  assert.ok(Math.abs(composeAnimations(item, 0, FRAME).scale - 1) < 1e-9);
+  assert.ok(Math.abs(composeAnimations(item, 50, FRAME).scale - 1.2) < 1e-9, "beech me aadha");
+  assert.ok(Math.abs(composeAnimations(item, 100, FRAME).scale - 1.4) < 1e-9);
+});
+
+test("do animations ek doosre ko mitati nahi — scale guna, position jud", () => {
+  const item = animItem([
+    { type: "kenburns", enabled: true, from: 1, to: 2, easing: "linear" },
+    { type: "pan", enabled: true, direction: "left", amountPercent: 10, easing: "linear" },
+  ]);
+  const out = composeAnimations(item, 100, FRAME);
+  assert.ok(Math.abs(out.scale - 2) < 1e-9, "zoom bacha hona chahiye");
+  assert.ok(out.x < 0, "pan ne bhi apna kaam kiya hona chahiye");
+});
+
+test("`enabled: false` wali animation ginti me nahi aati", () => {
+  const item = animItem([{ type: "kenburns", enabled: false, from: 1, to: 2, easing: "linear" }]);
+  assert.equal(composeAnimations(item, 100, FRAME).scale, 1);
+});
+
+test("anjaan animation chup-chaap chhoot jaati hai, crash nahi", () => {
+  // Purana doc kisi aise animation ka naam le sakta hai jo ab nahi hai — uske
+  // liye poora render rok dena galat hoga. Uski shikayat Phase 20 karega.
+  const item = animItem([{ type: "koi-purani-animation", enabled: true }]);
+  assert.deepEqual(composeAnimations(item, 50, FRAME), IDENTITY_ANIMATION);
+});
+
+test("fade in/out dono kinaron par 0 par pahunchta hai", () => {
+  const item = animItem([
+    { type: "fade", enabled: true, mode: "both", durationInFrames: 10, easing: "linear" },
+  ]);
+  assert.equal(composeAnimations(item, 0, FRAME).opacity, 0, "shuruaat me gayab");
+  assert.equal(composeAnimations(item, 10, FRAME).opacity, 1, "10 frame baad poora");
+  assert.equal(composeAnimations(item, 50, FRAME).opacity, 1, "beech me poora");
+  assert.equal(composeAnimations(item, 100, FRAME).opacity, 0, "ant me gayab");
+});
+
+test("item ka apna transform animation se mitta nahi (10.1 ka asli niyam)", () => {
+  // Ye is poore phase ka sabse zaroori niyam hai: animation `transform.scale`
+  // ko overwrite kare to user ka zoom aur uske keyframes chup-chaap gayab ho
+  // jaate hain. Yahan item ki apni scale 2 hai aur animation 1.5 maang rahi hai
+  // — nateeja 3 hona chahiye, 1.5 nahi.
+  const item = animItem(
+    [{ type: "kenburns", enabled: true, from: 1.5, to: 1.5, easing: "linear" }],
+    2,
+  );
+  const animation = composeAnimations(item, 0, FRAME);
+  assert.equal(animation.scale, 1.5, "animation apna delta deti hai");
+  assert.equal(item.transform.scale * animation.scale, 3, "renderer dono ko guna karta hai");
+});
+
+test("focal point beech se hatane par position bhi khiskti hai", () => {
+  const center = animItem([
+    { type: "kenburns", enabled: true, from: 1, to: 2, focalX: 0.5, focalY: 0.5, easing: "linear" },
+  ]);
+  const corner = animItem([
+    { type: "kenburns", enabled: true, from: 1, to: 2, focalX: 0, focalY: 0, easing: "linear" },
+  ]);
+  assert.equal(composeAnimations(center, 100, FRAME).x, 0, "beech par koi drift nahi");
+  assert.ok(composeAnimations(corner, 100, FRAME).x > 0, "kone par drift hona chahiye");
+});
+
+section("upscale guard (10.11)");
+
+test("animationsMaxScale sabse bada scale deta hai, chalte hue wala nahi", () => {
+  // Ken Burns 1 -> 1.4 me blur clip ke **aakhir** me aata hai. Shuruaati scale
+  // dekhne se sab theek lagta hai aur dhundhlapan video me baad me pakda jaata.
+  const item = animItem([{ type: "kenburns", enabled: true, from: 1, to: 1.4, easing: "linear" }]);
+  assert.equal(animationsMaxScale(item), 1.4);
+  assert.equal(composeAnimations(item, 0, FRAME).scale, 1, "chalte hue wala 1 hi hai");
+});
+
+test("bina scale wali animations 1 hi dete hain", () => {
+  const item = animItem([
+    { type: "fade", enabled: true, mode: "in", durationInFrames: 10 },
+    { type: "pan", enabled: true, direction: "left", amountPercent: 20 },
+  ]);
+  assert.equal(animationsMaxScale(item), 1);
+});
+
+section("transitions (10.4 / 10.5 / 10.6)");
+
+test("saatoon transition registered hain", () => {
+  const ids = listTransitions().map((entry) => entry.id);
+  for (const id of ["none", "fade", "crossfade", "slide", "zoom", "blur", "wipe"]) {
+    assert.ok(ids.includes(id), `${id} registry me nahi hai`);
+  }
+});
+
+test("har transition ke defaults uske schema se pass hote hain", () => {
+  for (const entry of listTransitions()) {
+    assert.equal(entry.schema.safeParse(entry.defaults).success, true, `${entry.id}`);
+  }
+});
+
+test("transition sirf apne hisse me chalti hai, beech me nahi", () => {
+  const args = {
+    durationInFrames: 100,
+    transitionIn: { type: "fade", durationInFrames: 10 },
+    transitionOut: { type: "fade", durationInFrames: 10 },
+    frame: FRAME,
+  };
+  assert.ok(transitionOutputAt({ ...args, localFrame: 0 }) !== null, "shuruaat me chalni chahiye");
+  assert.equal(transitionOutputAt({ ...args, localFrame: 50 }), null, "beech me kuch nahi");
+  assert.ok(transitionOutputAt({ ...args, localFrame: 95 }) !== null, "ant me chalni chahiye");
+});
+
+test("fade in 0 se 1 aur fade out 1 se 0", () => {
+  const args = {
+    durationInFrames: 100,
+    transitionIn: { type: "fade", durationInFrames: 10, easing: "linear" },
+    transitionOut: { type: "fade", durationInFrames: 10, easing: "linear" },
+    frame: FRAME,
+  };
+  assert.equal(transitionOutputAt({ ...args, localFrame: 0 })?.opacity, 0);
+  assert.ok((transitionOutputAt({ ...args, localFrame: 5 })?.opacity ?? 0) > 0.4);
+  // Out ka aakhri frame lagbhag gayab hona chahiye.
+  const last = transitionOutputAt({ ...args, localFrame: 99 })?.opacity ?? 1;
+  assert.ok(last < 0.2, `ant par opacity ${last}`);
+});
+
+test("`none` par kuch nahi lagta", () => {
+  assert.equal(
+    transitionOutputAt({
+      localFrame: 0,
+      durationInFrames: 100,
+      transitionIn: { type: "none", durationInFrames: 10 },
+      transitionOut: { type: "none", durationInFrames: 0 },
+      frame: FRAME,
+    }),
+    null,
+  );
+});
+
+test("wipe ka clip-path disha ke hisaab se banta hai", () => {
+  const out = transitionOutputAt({
+    localFrame: 0,
+    durationInFrames: 100,
+    transitionIn: { type: "wipe", durationInFrames: 10, direction: "left", easing: "linear" },
+    transitionOut: { type: "none", durationInFrames: 0 },
+    frame: FRAME,
+  });
+  assert.equal(out?.clipPath, "inset(0 100% 0 0)", "shuruaat me poora chhupa hona chahiye");
+});
+
+test("clamp: do transitions milkar clip se lambi nahi ho sakti (10.6)", () => {
+  const clamped = clampTransitionFrames({ durationInFrames: 30, inFrames: 20, outFrames: 20 });
+  assert.equal(clamped.clamped, true);
+  assert.ok(clamped.inFrames + clamped.outFrames <= 29, "kam se kam ek frame poora dikhna chahiye");
+  // Anupaat bana rehna chahiye — ek ko poora kaat dena galat lagta hai.
+  assert.equal(clamped.inFrames, clamped.outFrames);
+});
+
+test("clamp: samaane wali lambai chhui nahi jaati", () => {
+  const clamped = clampTransitionFrames({ durationInFrames: 100, inFrames: 10, outFrames: 10 });
+  assert.deepEqual(clamped, { inFrames: 10, outFrames: 10, clamped: false });
+});
+
+test("clamp ke baad bhi transition apni jagah par hi chalti hai", () => {
+  // Clip 30 frame ki, dono transitions 20-20 maang rahi thi. Clamp ke baad
+  // beech me kam se kam ek frame aisa hona chahiye jahan kuch na ho.
+  const clamped = clampTransitionFrames({ durationInFrames: 30, inFrames: 20, outFrames: 20 });
+  const args = {
+    durationInFrames: 30,
+    transitionIn: { type: "fade", durationInFrames: 20 },
+    transitionOut: { type: "fade", durationInFrames: 20 },
+    frame: FRAME,
+  };
+  const middle = clamped.inFrames;
+  assert.equal(transitionOutputAt({ ...args, localFrame: middle }), null, `frame ${middle} khaali hona chahiye`);
+});
+
+section("animation ops (10.9 / 10.10)");
+
+test("addAnimation stack me jodti hai, badalti nahi", () => {
+  const { doc, ids } = chainFixture();
+  let next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "kenburns" });
+  next = addAnimation(next, { itemIds: [ids[0]!], typeId: "fade" });
+
+  const item = itemById(next, ids[0]!);
+  assert.equal(item.animations.length, 2);
+  assert.deepEqual(item.animations.map((a) => a.type), ["kenburns", "fade"]);
+});
+
+test("naya animation apne registry defaults ke saath aata hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "kenburns" });
+  const animation = itemById(next, ids[0]!).animations[0] as Record<string, unknown>;
+  assert.equal(animation.to, requireAnimation("kenburns").defaults.to);
+});
+
+test("reorder kram badalta hai (aur kram sach me matlab rakhta hai)", () => {
+  const { doc, ids } = chainFixture();
+  let next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "kenburns" });
+  next = addAnimation(next, { itemIds: [ids[0]!], typeId: "pan" });
+  next = reorderAnimations(next, { itemId: ids[0]!, from: 1, to: 0 });
+
+  assert.deepEqual(itemById(next, ids[0]!).animations.map((a) => a.type), ["pan", "kenburns"]);
+});
+
+test("param badalne se sirf wahi animation badalti hai", () => {
+  const { doc, ids } = chainFixture();
+  let next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "kenburns" });
+  next = addAnimation(next, { itemIds: [ids[0]!], typeId: "kenburns" });
+  next = setAnimationParam(next, { itemId: ids[0]!, index: 1, path: "to", value: 3 });
+
+  const animations = itemById(next, ids[0]!).animations as Record<string, unknown>[];
+  assert.equal(animations[0]?.to, 1.2, "pehli waali chhuti nahi honi chahiye");
+  assert.equal(animations[1]?.to, 3);
+});
+
+test("type path se nahi badalta", () => {
+  const { doc, ids } = chainFixture();
+  const next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "kenburns" });
+  throws(
+    () => setAnimationParam(next, { itemId: ids[0]!, index: 0, path: "type", value: "pan" }),
+    /purani hatao/,
+    "type badalna",
+  );
+});
+
+test("preset ek hi baar me poora stack lagata hai", () => {
+  const { doc, ids } = chainFixture();
+  const preset = getAnimationPreset("cinematic-drift");
+  assert.ok(preset && preset.animations.length === 3);
+
+  const next = applyAnimationPreset(doc, { itemIds: [ids[0]!], presetId: "cinematic-drift" });
+  assert.equal(itemById(next, ids[0]!).animations.length, 3);
+});
+
+test("preset default me purani animations hata deta hai", () => {
+  const { doc, ids } = chainFixture();
+  let next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "rotateIn" });
+  next = applyAnimationPreset(next, { itemIds: [ids[0]!], presetId: "kenburns-slow" });
+
+  const animations = itemById(next, ids[0]!).animations;
+  assert.equal(animations.length, 1);
+  assert.equal(animations[0]?.type, "kenburns");
+});
+
+test("har preset sirf registered animations use karta hai", () => {
+  // Preset data hai, isliye usme galat naam likhna bahut aasan hai — aur wo
+  // galti chup-chaap "animation lagi hi nahi" bankar aati hai.
+  for (const preset of ANIMATION_PRESETS) {
+    for (const animation of preset.animations) {
+      const type = String((animation as Record<string, unknown>).type);
+      assert.ok(getAnimation(type), `preset "${preset.id}" me anjaan animation "${type}"`);
+    }
+  }
+});
+
+test("setTransition lambai clip ke hisaab se clamp karta hai", () => {
+  const { doc, ids } = chainFixture();
+  // Clip 100 frame ki hai; 80 + 80 nahi sama sakte.
+  let next = setTransition(doc, { itemIds: [ids[0]!], side: "in", type: "fade", durationInFrames: 80 });
+  next = setTransition(next, { itemIds: [ids[0]!], side: "out", type: "fade", durationInFrames: 80 });
+
+  const item = itemById(next, ids[0]!);
+  assert.ok(
+    item.transitionIn.durationInFrames + item.transitionOut.durationInFrames <= 99,
+    `${item.transitionIn.durationInFrames} + ${item.transitionOut.durationInFrames}`,
+  );
+});
+
+test("`none` chunte hi lambai bhi 0 ho jaati hai", () => {
+  const { doc, ids } = chainFixture();
+  let next = setTransition(doc, { itemIds: [ids[0]!], side: "in", type: "fade", durationInFrames: 15 });
+  next = setTransition(next, { itemIds: [ids[0]!], side: "in", type: "none" });
+
+  const item = itemById(next, ids[0]!);
+  assert.equal(item.transitionIn.durationInFrames, 0, "cut par badge dikhta rehta par kuch hota nahi");
+});
+
+test("anjaan transition type par saaf error", () => {
+  const { doc, ids } = chainFixture();
+  throws(
+    () => setTransition(doc, { itemIds: [ids[0]!], side: "in", type: "koi-bhi" }),
+    /nahi mila/,
+    "anjaan transition",
+  );
 });
 
 // ------------------------------------------------------------------ sample

@@ -167,18 +167,29 @@ export function resolutionReadout(args: {
   frame: { width: number; height: number };
   fitMode: FitMode;
   itemScale: number;
+  /**
+   * Animations sabse zyada kitni scale maangte hain (10.11).
+   *
+   * ⚠️ Ye alag se aana **zaroori** hai. Ken Burns 1 → 1.4 me blur clip ke
+   * **aakhir** me aata hai; sirf item ki apni scale dekhne se shuruaat me sab
+   * theek lagta hai aur dhundhlapan final MP4 me baad me pakda jaata hai. Isi
+   * baat ke liye `animationsMaxScale()` sabse bada scale deta hai, chalte hue
+   * wala nahi.
+   */
+  animationScale?: number;
 }): ResolutionReadout {
   const fit = computeFit(args.source, args.frame, args.fitMode);
-  const check = checkUpscale(args.source, args.frame, fit, args.itemScale);
+  const extra = args.itemScale * (args.animationScale ?? 1);
+  const check = checkUpscale(args.source, args.frame, fit, extra);
 
-  const totalScale = Math.max(fit.scaleX, fit.scaleY) * args.itemScale;
+  const totalScale = Math.max(fit.scaleX, fit.scaleY) * extra;
   return {
     source: args.source,
     frame: args.frame,
     totalScale,
     effective: {
-      width: Math.round(args.source.width * fit.scaleX * args.itemScale),
-      height: Math.round(args.source.height * fit.scaleY * args.itemScale),
+      width: Math.round(args.source.width * fit.scaleX * extra),
+      height: Math.round(args.source.height * fit.scaleY * extra),
     },
     upscaled: check.upscaled,
     requiredSource: check.requiredSource,

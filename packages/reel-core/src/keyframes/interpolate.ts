@@ -1,6 +1,13 @@
-import { DEFAULT_EASING } from "../config/easing";
 import { getByPath } from "../path";
+import { getEasingFunction } from "./easing";
 import type { Item, Keyframe } from "../schema/project";
+
+/*
+ * Easing ab apni file me hai (`keyframes/easing.ts`) — Phase 10 me animations
+ * ko bhi wahi curve chahiye the, aur do copy rakhne par ek din CSS wala
+ * `ease-out` aur video wala `ease-out` alag ho jaate.
+ */
+export * from "./easing";
 
 /**
  * Keyframe evaluation.
@@ -15,74 +22,6 @@ import type { Item, Keyframe } from "../schema/project";
  *  - keyframes property **path** se address hote hain (`"transform.scale"`),
  *    isliye koi bhi nayi property apne aap keyframable ho jaati hai
  */
-
-/** Ek easing curve: 0..1 andar, 0..1 bahar. */
-export type EasingFunction = (t: number) => number;
-
-/**
- * Cubic-bezier solver (CSS jaisa hi).
- *
- * Newton-Raphson se x ke liye t dhoondhte hain, phir us t par y. Ye wahi tarika
- * hai jo browser use karte hain — isliye preview aur render me curve bilkul ek
- * jaisa lagta hai, aur "CSS me aur video me animation alag lag rahi hai" wali
- * pareshani hoti hi nahi.
- */
-export function cubicBezier(x1: number, y1: number, x2: number, y2: number): EasingFunction {
-  const curve = (a: number, b: number, t: number): number => {
-    const c = 3 * a;
-    const bTerm = 3 * (b - a) - c;
-    const aTerm = 1 - c - bTerm;
-    return ((aTerm * t + bTerm) * t + c) * t;
-  };
-  const slope = (a: number, b: number, t: number): number => {
-    const c = 3 * a;
-    const bTerm = 3 * (b - a) - c;
-    const aTerm = 1 - c - bTerm;
-    return (3 * aTerm * t + 2 * bTerm) * t + c;
-  };
-
-  return (x: number): number => {
-    if (x <= 0) return 0;
-    if (x >= 1) return 1;
-
-    let t = x;
-    for (let i = 0; i < 8; i += 1) {
-      const error = curve(x1, x2, t) - x;
-      if (Math.abs(error) < 1e-6) return curve(y1, y2, t);
-      const d = slope(x1, x2, t);
-      // Derivative 0 ke aas-paas Newton bhaag jaata hai — tab bisection par gir jao.
-      if (Math.abs(d) < 1e-6) break;
-      t -= error / d;
-    }
-
-    let low = 0;
-    let high = 1;
-    t = x;
-    for (let i = 0; i < 20; i += 1) {
-      const value = curve(x1, x2, t);
-      if (Math.abs(value - x) < 1e-6) break;
-      if (value > x) high = t;
-      else low = t;
-      t = (low + high) / 2;
-    }
-    return curve(y1, y2, t);
-  };
-}
-
-/** CSS ke wahi curve, wahi numbers. */
-export const EASING_FUNCTIONS: Record<string, EasingFunction> = {
-  linear: (t) => t,
-  ease: cubicBezier(0.25, 0.1, 0.25, 1),
-  "ease-in": cubicBezier(0.42, 0, 1, 1),
-  "ease-out": cubicBezier(0, 0, 0.58, 1),
-  "ease-in-out": cubicBezier(0.42, 0, 0.58, 1),
-  // Step: beech me kuch nahi badalta, agle keyframe par ek jhatke me badal jaata hai.
-  step: () => 0,
-};
-
-export function getEasingFunction(id: string): EasingFunction {
-  return EASING_FUNCTIONS[id] ?? EASING_FUNCTIONS[DEFAULT_EASING] ?? ((t: number) => t);
-}
 
 /**
  * Do keyframes ke beech ka easing **baayen** keyframe se aata hai.

@@ -1,9 +1,16 @@
 import { produce, type Draft } from "immer";
 
+import { getAnimationPreset } from "../config/animationPresets";
 import { DEFAULT_OVERLAP_POLICY, type OverlapPolicy } from "../config/overlap";
 import { createId } from "../id";
 import { getByPath, setByPath } from "../path";
-import { requireItemType, trackAccepts } from "../registry/index";
+import {
+  clampTransitionFrames,
+  createAnimation,
+  requireItemType,
+  requireTransition,
+  trackAccepts,
+} from "../registry/index";
 import { createTrack } from "../schema/factory";
 import { itemEndFrame, type Doc, type Item, type Keyframe, type Track } from "../schema/project";
 import { assertFps, clampFrame } from "../time";
@@ -1264,7 +1271,211 @@ export function copyItems(doc: Doc, itemIds: readonly string[]): ClipboardFragme
   };
 }
 
+/* ==========================================================================
+ * Phase 10 — animations aur transitions
+ * ========================================================================== */
+
+export interface AddAnimationArgs {
+  itemIds: readonly string[];
+  /** ANIMATIONS registry ka id. */
+  typeId: string;
+}
+
+/**
+ * Item par ek animation chadhao (10.9).
+ *
+ * ⚠️ Animations ek **stack** hain, ek value nahi. Ken Burns + fade-in saath
+ * chalna aam hai, aur `composeAnimations()` unhe milata hai. Isliye ye op purani
+ * animation hatata nahi — aakhir me jodta hai.
+ */
+export const addAnimation = defineOp<AddAnimationArgs>("addAnimation", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  const fresh = createAnimation(args.typeId);
+
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    item.animations.push(clone(fresh) as Draft<Item>["animations"][number]);
+  }
+});
+
+export interface RemoveAnimationArgs {
+  itemId: string;
+  index: number;
+}
+
+export const removeAnimation = defineOp<RemoveAnimationArgs>("removeAnimation", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  if (args.index < 0 || args.index >= item.animations.length) {
+    throw new TimelineOpError(`Animation ${args.index} is item par hai hi nahi`);
+  }
+  item.animations.splice(args.index, 1);
+});
+
+export interface ReorderAnimationsArgs {
+  itemId: string;
+  from: number;
+  to: number;
+}
+
+/**
+ * Stack me kram badlo (10.9).
+ *
+ * Kram sach me matlab rakhta hai: `composeAnimations()` scale ko **guna** karta
+ * hai aur position ko **jodta** hai, isliye pehle zoom phir pan aur pehle pan
+ * phir zoom do alag nateeje dete hain (zoom ke baad pan ki doori bhi zoom ho
+ * jaati hai). Isi wajah se reorder ek asli feature hai, saja nahi.
+ */
+export const reorderAnimations = defineOp<ReorderAnimationsArgs>(
+  "reorderAnimations",
+  (draft, args) => {
+    const item = findItem(draft, args.itemId);
+    assertUnlocked(item);
+
+    const count = item.animations.length;
+    if (args.from < 0 || args.from >= count) {
+      throw new TimelineOpError(`Animation ${args.from} is item par hai hi nahi`);
+    }
+    const to = Math.min(count - 1, Math.max(0, Math.round(args.to)));
+    if (to === args.from) return;
+
+    const [moved] = item.animations.splice(args.from, 1);
+    if (moved) item.animations.splice(to, 0, moved);
+  },
+);
+
+export interface SetAnimationParamArgs {
+  itemId: string;
+  index: number;
+  /** Animation ke andar ka path — `"from"`, `"focalX"`, `"easing"`… */
+  path: string;
+  value: unknown;
+}
+
+export const setAnimationParam = defineOp<SetAnimationParamArgs>(
+  "setAnimationParam",
+  (draft, args) => {
+    const item = findItem(draft, args.itemId);
+    assertUnlocked(item);
+
+    const animation = item.animations[args.index];
+    if (!animation) throw new TimelineOpError(`Animation ${args.index} is item par hai hi nahi`);
+    if (args.path === "type") {
+      throw new TimelineOpError("Animation ka type badalna hai to purani hatao aur nayi jodo");
+    }
+    setByPath(animation, args.path, args.value);
+  },
+);
+
+export interface ApplyAnimationPresetArgs {
+  itemIds: readonly string[];
+  /** ANIMATION_PRESETS ka id. */
+  presetId: string;
+  /** `true` (default) = purani animations hatao. `false` = upar jodo. */
+  replace?: boolean;
+}
+
+/**
+ * Preset lagao (10.10).
+ *
+ * Preset kai animations ka stack ho sakta hai ("Cinematic drift" me teen hain),
+ * aur wo sab **ek hi undo entry** me lagte hain — warna ek preset lagane ke baad
+ * Ctrl+Z teen baar dabana padta.
+ */
+export const applyAnimationPreset = defineOp<ApplyAnimationPresetArgs>(
+  "applyAnimationPreset",
+  (draft, args) => {
+    const preset = getAnimationPreset(args.presetId);
+    if (!preset) throw new TimelineOpError(`"${args.presetId}" naam ka koi preset nahi hai`);
+
+    const ids = new Set(args.itemIds);
+    for (const item of draft.items) {
+      if (!ids.has(item.id)) continue;
+      if (item.locked) continue;
+
+      if (args.replace !== false) item.animations = [];
+      for (const animation of preset.animations) {
+        item.animations.push(clone(animation) as Draft<Item>["animations"][number]);
+      }
+    }
+  },
+);
+
+export interface SetTransitionArgs {
+  itemIds: readonly string[];
+  side: "in" | "out";
+  /** TRANSITIONS registry ka id. `"none"` = hata do. */
+  type?: string;
+  durationInFrames?: number;
+  /**
+   * Transition ke apne params (`direction`, `easing`, `from`…).
+   *
+   * Ye ek khula record hai kyunki har transition ke apne params hote hain aur wo
+   * uski registry entry ke schema me likhe hain — yahan unhe ginana matlab poori
+   * list dobara likhna.
+   */
+  params?: Record<string, unknown>;
+}
+
+/**
+ * Clip ki transition lagao / badlo (10.5 / 10.6).
+ *
+ * ⚠️ Lambai yahin **clamp** hoti hai (`clampTransitionFrames`), UI me nahi. UI
+ * me clamp karne par ek hi hadd do jagah rehti aur AI ka patch ya template usko
+ * bypass kar jaata — aur tab clip ka beech ka hissa kabhi poora dikhta hi nahi.
+ * Do transitions (in + out) milkar clip se lambi nahi ho sakti, aur kam se kam
+ * ek frame poora dikhna chahiye.
+ */
+export const setTransition = defineOp<SetTransitionArgs>("setTransition", (draft, args) => {
+  const ids = new Set(args.itemIds);
+
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+
+    const target = args.side === "in" ? item.transitionIn : item.transitionOut;
+    if (args.type !== undefined) {
+      const entry = requireTransition(args.type);
+      /*
+       * Type badalne par purane params **hata** kar naye ke defaults bharte
+       * hain. Purane rakhne par `slide` ka `direction` `zoom` par baitha reh
+       * jaata — schema use maan leta (passthrough) aur wo chup-chaap bekaar
+       * pada rehta, jo baad me "ye param kahan se aaya" wala sawaal banta hai.
+       */
+      for (const key of Object.keys(target)) {
+        if (key !== "type" && key !== "durationInFrames") {
+          delete (target as Record<string, unknown>)[key];
+        }
+      }
+      Object.assign(target, clone(entry.defaults));
+      target.type = args.type;
+      // "Cut" ka matlab hai koi transition nahi — uski lambai rakhna sirf
+      // uljhan hai, kyunki timeline par badge dikhta rehta par kuch hota nahi.
+      if (args.type === "none") target.durationInFrames = 0;
+    }
+    if (args.params) {
+      for (const [key, value] of Object.entries(args.params)) {
+        if (key === "type" || key === "durationInFrames") continue;
+        (target as Record<string, unknown>)[key] = value;
+      }
+    }
+    if (args.durationInFrames !== undefined) {
+      target.durationInFrames = Math.max(0, Math.round(args.durationInFrames));
+    }
+
+    const clamped = clampTransitionFrames({
+      durationInFrames: item.durationInFrames,
+      inFrames: item.transitionIn.durationInFrames,
+      outFrames: item.transitionOut.durationInFrames,
+    });
+    item.transitionIn.durationInFrames = clamped.inFrames;
+    item.transitionOut.durationInFrames = clamped.outFrames;
+  }
+});
+
 export interface ReplaceDocArgs {
+
 
   /** Poora naya doc — caller ise `parseDoc`/`migrateDoc` se guzaar kar de. */
   doc: Doc;
@@ -1316,6 +1527,12 @@ export const OPS = {
   pasteItems,
   setItemProperty,
   setItemsProperty,
+  addAnimation,
+  removeAnimation,
+  reorderAnimations,
+  setAnimationParam,
+  applyAnimationPreset,
+  setTransition,
   applyAutoFit,
   setProjectSize,
   setProjectFps,

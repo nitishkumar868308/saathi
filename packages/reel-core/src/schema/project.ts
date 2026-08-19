@@ -146,11 +146,25 @@ export const AudioSettingsSchema = z.object({
   fadeOutFrames: FrameSchema,
 });
 
-export const TransitionSchema = z.object({
-  /** TRANSITIONS registry ka id. `"none"` ka matlab koi transition nahi. */
-  type: z.string().min(1),
-  durationInFrames: FrameSchema,
-});
+export const TransitionSchema = z
+  .object({
+    /** TRANSITIONS registry ka id. `"none"` ka matlab koi transition nahi. */
+    type: z.string().min(1),
+    durationInFrames: FrameSchema,
+  })
+  /*
+   * `passthrough` — bilkul `AnimationSchema` ki tarah, aur usi wajah se.
+   *
+   * Har transition ke apne params hote hain (`slide` ka `direction`, `zoom` ka
+   * `from`, sabka `easing`) aur wo TRANSITIONS registry me apne zod schema ke
+   * saath rehte hain. Un sab ko yahan ginana matlab registry ki poori list is
+   * file me dobara likhna — aur tab naya transition jodna do jagah ka kaam ban
+   * jaata, jo poore dynamic-first design ke khilaf hai.
+   *
+   * Ye gap type-checker ne pakda tha: params kahin save hi nahi ho paate the,
+   * aur transition hamesha apne default par chalti rehti.
+   */
+  .passthrough();
 
 export const TextStrokeSchema = z.object({
   color: ColorSchema,
