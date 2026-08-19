@@ -1,0 +1,10 @@
+{
+  // src/ ko jaan-boojhkar "pure TS" rakha hai — wahan Node ke types nahi aate,
+  // warna koi galti se `fs` import kar leta aur browser me jaakar phatta.
+  // Check script Node par chalta hai, isliye uska typecheck yahan alag hota hai.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src", "scripts"]
+}

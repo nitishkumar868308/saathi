@@ -2,7 +2,7 @@
   "name": "saathi-monorepo",
   "private": true,
   "version": "0.0.0",
-  "description": "AI Reel Studio ka workspace root. web/ aur app-mobile/ jaan-boojhkar isme nahi hain — wo apne alag installs pe chalte hain (docs/reel-studio/00-architecture-and-plan.md Section E rule 11).",
+  "description": "AI Reel Studio ka workspace root. web/ aur app-mobile/ jaan-boojhkar isme nahi hain \u2014 wo apne alag installs pe chalte hain (docs/reel-studio/00-architecture-and-plan.md Section E rule 11).",
   "workspaces": [
     "studio",
     "packages/*",
@@ -12,7 +12,8 @@
     "dev:studio": "npm run dev --workspace @reel/studio",
     "dev:worker": "npm run dev --workspace @reel/worker",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build:studio": "npm run build --workspace @reel/studio"
+    "build:studio": "npm run build --workspace @reel/studio",
+    "check": "npm run check --workspaces --if-present"
   },
   "devDependencies": {
     "typescript": "^5.5.4"

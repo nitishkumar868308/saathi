@@ -1,0 +1,393 @@
+import { z } from "zod";
+
+import { CONTAIN_BACKGROUNDS, FIT_MODES } from "../config/fit";
+import { ShapeSpecSchema, TextSpecSchema } from "../schema/project";
+import type { ControlDescriptor, RegistryEntry } from "./types";
+
+/**
+ * ITEM_TYPES — image / video / audio / text / shape.
+ *
+ * Timeline, properties panel, sidebar aur renderer sab yahi entries padhte hain.
+ * Naya item type add karna = is file me ek entry (+ Phase 3 me ek component).
+ * Kisi bhi doosri file me `if (type === "...")` likhna mana hai.
+ */
+
+export interface ItemTypeEntry extends RegistryEntry {
+  kind: "media" | "text" | "graphic" | "audio";
+  /** Phase 3 me Remotion component isi key se joda jaayega. Core me React nahi hai. */
+  componentKey: string;
+  /** Bina asset ke ye item ban hi nahi sakta (image/video/audio). */
+  needsAsset: boolean;
+  hasVisual: boolean;
+  hasAudio: boolean;
+  /** Source ke andar trim/split ho sakta hai (sirf timed media). */
+  supportsTrim: boolean;
+  /** Naya item kis track type par gira. */
+  defaultTrackType: string;
+  /** Naya item kitna lamba shuru ho — seconds, frames project fps se bante hain. */
+  defaultDurationSeconds: number;
+}
+
+const FIT_MODE_OPTIONS = FIT_MODES.map((mode) => ({ value: mode.id, label: mode.label }));
+const CONTAIN_BACKGROUND_OPTIONS = CONTAIN_BACKGROUNDS.map((bg) => ({
+  value: bg.id,
+  label: bg.label,
+}));
+
+/**
+ * Transform ke controls har visual item par ek jaise hote hain, isliye ek hi
+ * jagah likhe hain — paanch jagah copy karne se hi panel dhire-dhire alag hote hain.
+ */
+const TRANSFORM_CONTROLS: readonly ControlDescriptor[] = [
+  {
+    path: "transform.scale",
+    control: "slider",
+    label: "Scale",
+    group: "Transform",
+    min: 0.1,
+    max: 4,
+    step: 0.01,
+    keyframable: true,
+    help: "Fit ki base scale ke upar lagti hai",
+  },
+  {
+    path: "transform.x",
+    control: "number",
+    label: "X",
+    group: "Transform",
+    step: 1,
+    unit: "px",
+    keyframable: true,
+  },
+  {
+    path: "transform.y",
+    control: "number",
+    label: "Y",
+    group: "Transform",
+    step: 1,
+    unit: "px",
+    keyframable: true,
+  },
+  {
+    path: "transform.rotation",
+    control: "slider",
+    label: "Rotation",
+    group: "Transform",
+    min: -180,
+    max: 180,
+    step: 0.5,
+    unit: "deg",
+    keyframable: true,
+  },
+  {
+    path: "transform.opacity",
+    control: "slider",
+    label: "Opacity",
+    group: "Transform",
+    min: 0,
+    max: 1,
+    step: 0.01,
+    keyframable: true,
+  },
+];
+
+/** Size & Fit — README Section 3B. Har visual item par milta hai. */
+const FIT_CONTROLS: readonly ControlDescriptor[] = [
+  {
+    path: "fit.mode",
+    control: "segmented",
+    label: "Fit",
+    group: "Size & fit",
+    options: FIT_MODE_OPTIONS,
+    help: "Cover = bhar do (crop), Contain = poora dikhe (khaali jagah)",
+  },
+  {
+    path: "fit.background.kind",
+    control: "select",
+    label: "Background",
+    group: "Size & fit",
+    options: CONTAIN_BACKGROUND_OPTIONS,
+    // Background sirf tab matlab rakhta hai jab khaali jagah bachti ho.
+    when: { path: "fit.mode", equals: "contain" },
+  },
+  {
+    path: "fit.background.value",
+    control: "color",
+    label: "Background colour",
+    group: "Size & fit",
+    when: { path: "fit.background.kind", equals: "color" },
+  },
+];
+
+const AUDIO_CONTROLS: readonly ControlDescriptor[] = [
+  {
+    path: "audio.volume",
+    control: "slider",
+    label: "Volume",
+    group: "Audio",
+    min: 0,
+    max: 2,
+    step: 0.01,
+    keyframable: true,
+    help: "1 se upar clipping ka khatra — export se pehle check hota hai",
+  },
+  { path: "audio.muted", control: "toggle", label: "Mute", group: "Audio" },
+  {
+    path: "audio.fadeInFrames",
+    control: "number",
+    label: "Fade in",
+    group: "Audio",
+    min: 0,
+    step: 1,
+    unit: "frames",
+  },
+  {
+    path: "audio.fadeOutFrames",
+    control: "number",
+    label: "Fade out",
+    group: "Audio",
+    min: 0,
+    step: 1,
+    unit: "frames",
+  },
+];
+
+const SPEED_CONTROL: ControlDescriptor = {
+  path: "playbackRate",
+  control: "slider",
+  label: "Speed",
+  group: "Clip",
+  min: 0.25,
+  max: 4,
+  step: 0.05,
+  unit: "x",
+};
+
+const TRANSFORM_KEYFRAMABLE = [
+  "transform.x",
+  "transform.y",
+  "transform.scale",
+  "transform.rotation",
+  "transform.opacity",
+] as const;
+
+/** Naya text item kaisa dikhega. Rang aur font **brand tokens** hain, hex nahi. */
+const DEFAULT_TEXT: z.infer<typeof TextSpecSchema> = {
+  content: "Naya text",
+  fontFamily: "brand.font.display",
+  fontSize: 72,
+  fontWeight: 700,
+  color: "brand.text",
+  align: "center",
+  verticalAlign: "middle",
+  lineHeight: 1.2,
+  letterSpacing: 0,
+  uppercase: false,
+  maxWidthPercent: 80,
+  stroke: null,
+  shadow: null,
+  background: null,
+};
+
+const DEFAULT_SHAPE: z.infer<typeof ShapeSpecSchema> = {
+  kind: "rect",
+  fill: "brand.primary",
+  stroke: null,
+  widthPercent: 60,
+  heightPercent: 20,
+  radius: 16,
+};
+
+export const BUILTIN_ITEM_TYPES: readonly ItemTypeEntry[] = [
+  {
+    id: "image",
+    label: "Image",
+    icon: "Image",
+    kind: "media",
+    componentKey: "ImageItem",
+    needsAsset: true,
+    hasVisual: true,
+    hasAudio: false,
+    supportsTrim: false,
+    defaultTrackType: "image",
+    defaultDurationSeconds: 4,
+    schema: z.object({ assetId: z.string().min(1) }),
+    defaults: {},
+    controls: [...FIT_CONTROLS, ...TRANSFORM_CONTROLS],
+    keyframable: [...TRANSFORM_KEYFRAMABLE],
+  },
+  {
+    id: "video",
+    label: "Video",
+    icon: "Video",
+    kind: "media",
+    componentKey: "VideoItem",
+    needsAsset: true,
+    hasVisual: true,
+    hasAudio: true,
+    supportsTrim: true,
+    defaultTrackType: "video",
+    defaultDurationSeconds: 5,
+    schema: z.object({ assetId: z.string().min(1) }),
+    defaults: {},
+    controls: [...FIT_CONTROLS, ...TRANSFORM_CONTROLS, SPEED_CONTROL, ...AUDIO_CONTROLS],
+    keyframable: [...TRANSFORM_KEYFRAMABLE, "audio.volume"],
+  },
+  {
+    id: "audio",
+    label: "Audio",
+    icon: "Music",
+    kind: "audio",
+    componentKey: "AudioItem",
+    needsAsset: true,
+    hasVisual: false,
+    hasAudio: true,
+    supportsTrim: true,
+    defaultTrackType: "audio",
+    defaultDurationSeconds: 10,
+    schema: z.object({ assetId: z.string().min(1) }),
+    defaults: {},
+    controls: [SPEED_CONTROL, ...AUDIO_CONTROLS],
+    keyframable: ["audio.volume"],
+  },
+  {
+    id: "text",
+    label: "Text",
+    icon: "Type",
+    kind: "text",
+    componentKey: "TextItem",
+    needsAsset: false,
+    hasVisual: true,
+    hasAudio: false,
+    supportsTrim: false,
+    defaultTrackType: "text",
+    defaultDurationSeconds: 3,
+    schema: z.object({ text: TextSpecSchema }),
+    defaults: { text: DEFAULT_TEXT },
+    controls: [
+      { path: "text.content", control: "textarea", label: "Text", group: "Text" },
+      { path: "text.fontFamily", control: "font", label: "Font", group: "Text" },
+      {
+        path: "text.fontSize",
+        control: "number",
+        label: "Size",
+        group: "Text",
+        min: 4,
+        step: 1,
+        unit: "px",
+        keyframable: true,
+      },
+      {
+        path: "text.fontWeight",
+        control: "select",
+        label: "Weight",
+        group: "Text",
+        options: [
+          { value: 400, label: "Regular" },
+          { value: 500, label: "Medium" },
+          { value: 600, label: "Semibold" },
+          { value: 700, label: "Bold" },
+          { value: 800, label: "Extrabold" },
+        ],
+      },
+      { path: "text.color", control: "color", label: "Colour", group: "Text" },
+      { path: "text.align", control: "align", label: "Align", group: "Text" },
+      { path: "text.uppercase", control: "toggle", label: "UPPERCASE", group: "Text" },
+      {
+        path: "text.lineHeight",
+        control: "slider",
+        label: "Line height",
+        group: "Text",
+        min: 0.8,
+        max: 2.5,
+        step: 0.01,
+      },
+      {
+        path: "text.letterSpacing",
+        control: "slider",
+        label: "Letter spacing",
+        group: "Text",
+        min: -5,
+        max: 20,
+        step: 0.1,
+        unit: "px",
+      },
+      {
+        path: "text.maxWidthPercent",
+        control: "slider",
+        label: "Max width",
+        group: "Text",
+        min: 10,
+        max: 100,
+        step: 1,
+        unit: "%",
+      },
+      ...TRANSFORM_CONTROLS,
+    ],
+    keyframable: [...TRANSFORM_KEYFRAMABLE, "text.fontSize"],
+  },
+  {
+    id: "shape",
+    label: "Shape",
+    icon: "Square",
+    kind: "graphic",
+    componentKey: "ShapeItem",
+    needsAsset: false,
+    hasVisual: true,
+    hasAudio: false,
+    supportsTrim: false,
+    defaultTrackType: "overlay",
+    defaultDurationSeconds: 3,
+    schema: z.object({ shape: ShapeSpecSchema }),
+    defaults: { shape: DEFAULT_SHAPE },
+    controls: [
+      {
+        path: "shape.kind",
+        control: "segmented",
+        label: "Shape",
+        group: "Shape",
+        options: [
+          { value: "rect", label: "Rectangle" },
+          { value: "ellipse", label: "Ellipse" },
+          { value: "line", label: "Line" },
+        ],
+      },
+      { path: "shape.fill", control: "color", label: "Fill", group: "Shape" },
+      {
+        path: "shape.widthPercent",
+        control: "slider",
+        label: "Width",
+        group: "Shape",
+        min: 1,
+        max: 200,
+        step: 1,
+        unit: "%",
+        keyframable: true,
+      },
+      {
+        path: "shape.heightPercent",
+        control: "slider",
+        label: "Height",
+        group: "Shape",
+        min: 1,
+        max: 200,
+        step: 1,
+        unit: "%",
+        keyframable: true,
+      },
+      {
+        path: "shape.radius",
+        control: "slider",
+        label: "Corner radius",
+        group: "Shape",
+        min: 0,
+        max: 200,
+        step: 1,
+        unit: "px",
+        when: { path: "shape.kind", equals: "rect" },
+      },
+      ...TRANSFORM_CONTROLS,
+    ],
+    keyframable: [...TRANSFORM_KEYFRAMABLE, "shape.widthPercent", "shape.heightPercent"],
+  },
+];

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pure TypeScript core — schema, timeline ops, keyframes, validation. Isme React ya DOM ka koi import nahi aata (studio aur worker dono ise chalate hain).",
+  "description": "Pure TypeScript core \u2014 schema, timeline ops, keyframes, validation. Isme React ya DOM ka koi import nahi aata (studio aur worker dono ise chalate hain).",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
@@ -11,6 +11,15 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "check": "tsx scripts/check.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json"
+  },
+  "dependencies": {
+    "immer": "^10.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.2"
   }
 }
