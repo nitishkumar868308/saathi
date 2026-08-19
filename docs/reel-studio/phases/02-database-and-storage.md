@@ -1,7 +1,6 @@
 # Phase 2 — Database + storage drivers
 
-**STATUS:** in progress — **saara code done aur verified. Sirf SQL apply baaki hai
-(2.8 ka rule: tumhare confirm ke bina apply nahi karna).**
+**STATUS:** COMPLETE (2026-08-19)
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 2 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding. Resume Protocol follow karo.
 **Depends on:** Phase 1 complete ✅
@@ -33,9 +32,9 @@
       koshishein poori hone par `failed`.
 - [x] 2.7 RLS: aathon tables par on, **zero policies** = sirf service_role. Queue ke dono
       functions `security definer` hain isliye unse anon/authenticated ka execute revoke kiya.
-- [ ] 2.8 SQL apply karne ka tarika (neeche "2.8" section me likha hai) — **khud apply
-      nahi kiya**, tumhare confirm ka intezaar hai. Apply hone aur verify queries ka
-      output aane par ye tick hoga.
+- [x] 2.8 SQL apply karne ka tarika bataya, khud apply **nahi** kiya. User ne Supabase
+      SQL Editor me chalaya (2026-08-19), aur uske baad `worker/scripts/db-verify.ts` se
+      sach me jaancha gaya — 27/27 pass (output neeche).
 - [x] 2.9 `packages/reel-core/src/storage/types.ts` — `StorageDriver` interface
       (`putSigned`, `getSignedUrl`, `put`, `get`, `delete`, `exists`). Pure TS, koi Node import nahi.
 - [x] 2.10 `local` driver: files `<REEL_OUTPUT_DIR>/media` me; signed URL ki jagah studio ka
@@ -136,6 +135,50 @@ temp/probe/file%20space.bin        -> 400
 
 Ek bhi attempt me `package.json` ka content nahi mila.
 
+### DB verify — asli Supabase par (SQL apply hone ke baad)
+
+```
+$ npm run db-verify -- --env-file=web/.env.local
+
+1. aathon tables maujood hain?
+  ok   reel_projects          ok   reel_templates
+  ok   reel_project_versions  ok   reel_brand_presets
+  ok   reel_assets            ok   reel_characters
+  ok   reel_render_jobs       ok   reel_voices
+
+2. RLS sach me band hai? (anon key se padhne ki koshish)
+  ok   anon ko reel_projects se koi row nahi mili
+
+3. queue sach me chalti hai? (yahi asli test hai)
+  ok   test project ban gaya
+  ok   doc_version default 1 hai — mila: 1
+  ok   test render job ban gaya
+  ok   naya job 'queued' me hai — queued
+  ok   attempts 0 se shuru — 0
+  ok   reel_claim_render_job ne job uthaya
+  ok   claim ke baad status 'processing' — processing
+  ok   worker_id likha gaya — db-verify-worker
+  ok   attempts 1 ho gaya — 1
+  ok   claimed_at set hua
+  ok   doosra worker khaali haath lauta (atka nahi) — 0 rows
+  ok   reel_requeue_stale_jobs ne atki job pakdi
+  ok   wapas 'queued' me daali gayi — queued
+  ok   worker_id saaf kiya gaya — null
+  ok   error me wajah likhi hai — Worker 0 minute se chup raha — wapas queue me (koshish 1/3)
+  ok   koshishein poori hone par job 'failed' hui (loop nahi banta) — failed
+  ok   test data saaf ho gaya (jobs cascade se)
+  ok   DB me kuch peeche nahi bacha
+
+ALL PASS: 27 checks, 0 fail
+```
+
+**"doosra worker khaali haath lauta"** hi is poore phase ka sabse zaroori assert hai —
+yahi sabit karta hai ki `for update skip locked` sach me chal raha hai: doosra worker
+pehle wale par atakta nahi, seedha aage badh jaata hai. Iske bina ek 4-minute ka render
+poore queue ko rok deta.
+
+Script ne DB me kuch nahi chhoda — test project cascade se apni job ke saath mit gaya.
+
 ### Typecheck + Phase 1 ke tests abhi bhi pass
 
 ```
@@ -143,7 +186,7 @@ $ npm run typecheck        EXIT=0   (paanchon workspaces)
 $ npm run check            ALL PASS: 70 assertions groups, 0 fail
 ```
 
-## 2.8 — SQL apply karne ka tarika (ye tum karo)
+## 2.8 — SQL apply (ho gaya, aur verify bhi)
 
 Repo ki apni convention yahi hai (saari 65 `supabase/*.sql` files me ye line likhi hai:
 "Supabase SQL Editor me Run karo"), aur is machine par `supabase` CLI / `psql` install
@@ -153,7 +196,11 @@ bhi nahi hai. To:
 2. `supabase/reel-studio.sql` ka poora content paste karo → **Run**
 3. Dobara run karna safe hai (sab `if not exists` / `create or replace` hai).
 
-Apply ke baad ye chala kar output mujhe bhej dena — tabhi 2.8 sach me tick hoga:
+User ne 2026-08-19 ko yahi kiya. Uske baad haath se query chalane ki jagah ek script
+likhi gayi (`worker/scripts/db-verify.ts`) jo queue ko **sach me chalati hai** —
+dobara kabhi bhi `npm run db-verify -- --env-file=web/.env.local` se check ho sakta hai.
+
+Reference ke liye wahi cheezein SQL me:
 
 ```sql
 -- 1. tables bane?
@@ -241,12 +288,13 @@ isliye dono kahin se bhi chalein, ek hi folder dekhte hain.
 SQL file taiyaar (aur mere confirm ke baad applied), claim function `skip locked` ke saath
 kaam karta hai, aur dono storage driver ka round-trip smoke test pass hai.
 
-→ Storage wala hissa **poora ho gaya** (local 20/20, r2 20/20). SQL file taiyaar hai par
-**apply nahi hui**, isliye claim function abhi chalake dikhaya nahi ja sakta. Ye do
-tumhare ek "haan" par khatam ho jaayenge.
+→ **Teeno ho gaye.** SQL applied (8 tables + 3 functions, db-verify 27/27), claim function
+asli DB par chalta hua dekha gaya (doosra worker 0 rows leke lauta), aur dono storage
+driver 20/20.
 
 ## Progress log
 
 | Date | What was done | Verified by | Next |
 |---|---|---|---|
 | 2026-08-19 | 2.1-2.7 SQL likhi (8 tables + claim/requeue functions + RLS). 2.9-2.15: StorageDriver interface + key layout `@reel/core` me, naya `@reel/storage` package (local + r2 driver, SigV4 `web/lib/r2.ts` se copy), studio ka `/api/local-media` route, aur smoke script. Commit `2a05f13`. | `storage-smoke --driver=local` 20/20; `--driver=r2` 20/20 asli bucket par (upload+download+delete, file hata di); prod build me route 404 jabki file disk par thi; 4 traversal attempts 400/404; `npm run typecheck` exit 0; `npm run check` 70/70 | **2.8 — tum SQL apply karo** (Dashboard → SQL Editor → `supabase/reel-studio.sql` → Run), phir upar wali 4 verify queries ka output do. Uske baad Phase 3 |
+| 2026-08-19 | 2.8 poora: user ne SQL Editor me `supabase/reel-studio.sql` chalaya. Uske baad `worker/scripts/db-verify.ts` likha jo asli DB par queue chalata hai (koi npm dep nahi, plain PostgREST). Phase 2 COMPLETE. | `npm run db-verify` → `ALL PASS: 27 checks, 0 fail` — 8/8 tables, anon ko 0 rows (RLS), claim ne job uthaya (processing/attempts 1), **doosra worker 0 rows leke lauta (skip locked)**, requeue ne wapas queued kiya, 3 koshishon ke baad failed, aur test data saaf | Phase 3 — Remotion composition + worker + pehli asli MP4 |
