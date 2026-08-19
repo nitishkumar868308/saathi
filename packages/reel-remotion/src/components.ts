@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 
 import type { AssetMap } from "./assets";
-import type { Doc, Item, Track } from "@reel/core";
+import type { Doc, FontEntry, Item, Track } from "@reel/core";
 
 /**
  * Item component registry.
@@ -19,6 +19,8 @@ export interface ItemComponentProps {
   track: Track;
   doc: Doc;
   assets: AssetMap;
+  /** Font registry — composition se neeche aati hai (9.10). */
+  fonts?: readonly FontEntry[];
   /** Item ke apne start se gina hua frame (Sequence ke andar wala). */
   localFrame: number;
 }

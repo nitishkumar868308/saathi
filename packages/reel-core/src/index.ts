@@ -16,6 +16,7 @@ export * from "./hash/sha256";
 export * from "./config/brand";
 export * from "./config/easing";
 export * from "./config/fit";
+export * from "./config/fonts";
 export * from "./config/overlap";
 export * from "./config/presets";
 export * from "./config/safeArea";

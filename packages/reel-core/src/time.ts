@@ -63,6 +63,53 @@ export function framesToTimecode(
   return `${sign}${pad(hh)}:${pad(mm)}:${pad(ss)}:${pad(ff)}`;
 }
 
+/**
+ * Timecode se frames — `framesToTimecode` ka ulta (9.7).
+ *
+ * Ye isliye chahiye ki timing wale khaane me user timecode likh sake, sirf frame
+ * number nahi. Chaar roop chalte hain, aur teeno chhote roop se seekh kar likhe
+ * gaye hain ki aadmi kya type karta hai:
+ *
+ *   `"90"`              -> 90 frames (seedha number)
+ *   `"12:05"`           -> 12 second 5 frame
+ *   `"01:12:05"`        -> 1 min 12 sec 5 frame
+ *   `"00:01:12:05"`     -> poora HH:MM:SS:FF
+ *
+ * ⚠️ Aakhri hissa hamesha **frames** hai, seconds ka dashamlav nahi. `12:05` ko
+ * "12.05 second" padhna sabse aam galti hoti — isliye yahan ginti hamesha
+ * daayein se hoti hai: frames, phir seconds, phir minutes, phir ghante.
+ *
+ * Galat input par `null` — chupchaap 0 laut'na sabse bura jawab hai, kyunki tab
+ * ek typo clip ko shuruaat me pahucha deta hai.
+ */
+export function parseTimecode(input: string, fps: number): number | null {
+  assertFps(fps);
+  const text = input.trim();
+  if (!text) return null;
+
+  const negative = text.startsWith("-");
+  const parts = (negative ? text.slice(1) : text).split(":");
+  if (parts.length > 4) return null;
+
+  const numbers: number[] = [];
+  for (const part of parts) {
+    if (!/^\d+$/.test(part.trim())) return null;
+    numbers.push(Number(part.trim()));
+  }
+
+  // Daayein se: frames, seconds, minutes, hours.
+  const [frames = 0, seconds = 0, minutes = 0, hours = 0] = [...numbers].reverse();
+  const fpsInt = Math.round(fps);
+
+  // Ek akela number seedha frames hai; usme 60 se badi value bilkul theek hai.
+  if (numbers.length > 1 && frames >= fpsInt) return null;
+  if (numbers.length > 2 && seconds >= 60) return null;
+  if (numbers.length > 3 && minutes >= 60) return null;
+
+  const total = ((hours * 60 + minutes) * 60 + seconds) * fpsInt + frames;
+  return negative ? -total : total;
+}
+
 export function clampFrame(frame: number, min: number, max: number): number {
   if (max < min) throw new Error(`clampFrame: max (${max}) < min (${min})`);
   return Math.min(max, Math.max(min, Math.round(frame)));

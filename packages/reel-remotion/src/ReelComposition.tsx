@@ -1,4 +1,12 @@
-import { itemEndFrame, resolveToken, type Doc } from "@reel/core";
+import {
+  BUILTIN_FONTS,
+  fontFaceCss,
+  itemEndFrame,
+  mergeFonts,
+  resolveToken,
+  type Doc,
+  type FontEntry,
+} from "@reel/core";
 import type React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 
@@ -20,6 +28,19 @@ export type ReelCompositionProps = {
   doc: Doc;
   /** assetId -> URL / public-dir filename. Doc me URL kabhi nahi hote. */
   assets: AssetMap;
+  /**
+   * Font registry — **wahi list jo studio ke panel me dikhti hai** (9.10).
+   *
+   * ⚠️ Ye props se aati hai, module-level constant se nahi, aur ye jaan-boojhkar
+   * hai: preview studio ke process me chalta hai aur render Remotion ke apne
+   * bundle me. Do jagah do alag list rakhne par ek din preview me ek font dikhta
+   * hai aur MP4 me doosra — aur wo galti tab pata chalti hai jab reel ban chuki
+   * hoti hai. Ek hi list dono taraf jaati hai, aur `@font-face` ka CSS bhi ek hi
+   * function (`fontFaceCss`) banata hai.
+   *
+   * Na di jaaye to sirf system fonts — jo har machine par hain.
+   */
+  fonts?: readonly FontEntry[];
 };
 
 /**
@@ -33,11 +54,19 @@ export type ReelCompositionProps = {
  * isi kram me hain: video(0) -> image(1) -> overlay(2) -> text(3) -> subtitle(4).
  * Isliye text apne aap video ke upar aata hai, bina kisi special case ke.
  */
-export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets }) => {
+export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, fonts }) => {
+  const fontList = mergeFonts(fonts ?? BUILTIN_FONTS);
   const tracks = [...doc.tracks].filter((track) => !track.hidden).sort((a, b) => a.order - b.order);
 
   return (
     <AbsoluteFill style={{ backgroundColor: resolveToken(doc.project.background) }}>
+      {/*
+       * Font ka CSS composition ke **andar** hai, bahar nahi. Render ke waqt
+       * Remotion is component ko apne page me chadhata hai; bahar rakha hua CSS
+       * wahan pahunchta hi nahi aur text chup-chaap fallback font me nikal jaata.
+       */}
+      <style>{fontFaceCss(fontList)}</style>
+
       {tracks.map((track) => {
         const items = doc.items
           .filter((item) => item.trackId === track.id && !item.hidden)
@@ -58,7 +87,7 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets })
                   Math.min(item.durationInFrames, doc.project.durationInFrames - item.startFrame),
                 )}
               >
-                <ItemRenderer item={item} track={track} doc={doc} assets={assets} />
+                <ItemRenderer item={item} track={track} doc={doc} assets={assets} fonts={fontList} />
               </Sequence>
             ))}
           </AbsoluteFill>

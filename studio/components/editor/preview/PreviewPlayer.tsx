@@ -6,6 +6,7 @@ import { Player, type CallbackListener } from "@remotion/player";
 import { useEffect, useMemo, useRef } from "react";
 
 import { GuidesOverlay } from "@/components/editor/preview/GuidesOverlay";
+import { useFonts } from "@/lib/fonts";
 import { usePlayback } from "@/lib/playback";
 import {
   createSeekThrottle,
@@ -64,7 +65,8 @@ export function PreviewPlayer({ assets }: { assets: AssetMap }) {
    * hai (module-level const), isliye Player **remount nahi hota** aur chalte hue
    * playback ki jagah nahi khoti (checklist 6.2).
    */
-  const inputProps = useMemo(() => ({ doc, assets }), [doc, assets]);
+  const { fonts } = useFonts(doc);
+  const inputProps = useMemo(() => ({ doc, assets, fonts }), [doc, assets, fonts]);
 
   /**
    * Kitne `<audio>` tag pehle se bana kar rakhne hain (6.9).

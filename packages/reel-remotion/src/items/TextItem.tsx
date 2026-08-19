@@ -1,4 +1,11 @@
-import { resolveItemValue, resolveToken } from "@reel/core";
+import {
+  BUILTIN_FONTS,
+  fontFamilyCss,
+  isBrandToken,
+  mergeFonts,
+  resolveItemValue,
+  resolveToken,
+} from "@reel/core";
 import type React from "react";
 import { AbsoluteFill } from "remotion";
 
@@ -16,7 +23,7 @@ import { Transformed } from "../Transformed";
  * `fontSize` project pixels me hai. Composition apne aap project ke width/height
  * par bani hai, isliye "72px" har size me utna hi bada dikhta hai jitna editor me.
  */
-export const TextItem: React.FC<ItemComponentProps> = ({ item, localFrame }) => {
+export const TextItem: React.FC<ItemComponentProps> = ({ item, localFrame, fonts }) => {
   const text = item.text;
   if (!text) return null;
 
@@ -47,7 +54,16 @@ export const TextItem: React.FC<ItemComponentProps> = ({ item, localFrame }) => 
           style={{
             // Percent me isliye ki 9:16 aur 16:9 dono me line-break ek jaisa lage.
             maxWidth: text.maxWidthPercent === null ? "100%" : `${text.maxWidthPercent}%`,
-            fontFamily: resolveToken(text.fontFamily),
+            /*
+             * Do raaste, aur dono zaroori hain:
+             *  - brand token (`brand.font.display`) -> brand se poori family
+             *  - warna font registry se, jo `@font-face` bhi lagata hai (9.10)
+             * Dono me fallback stack saath jaata hai, taaki font na mile to text
+             * gayab na ho — sirf alag dikhe, aur uski chetavni panel me aaye.
+             */
+            fontFamily: isBrandToken(text.fontFamily)
+              ? resolveToken(text.fontFamily)
+              : fontFamilyCss(mergeFonts(fonts ?? BUILTIN_FONTS), text.fontFamily),
             fontSize,
             fontWeight: text.fontWeight,
             color: resolveToken(text.color),

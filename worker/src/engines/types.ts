@@ -25,6 +25,17 @@ export interface RenderProgress {
 export type RenderStage = "bundling" | "rendering" | "encoding" | "finalizing";
 
 export interface RenderRequest {
+  /**
+   * Font registry — **wahi list jo studio ke panel me dikhti hai** (9.10).
+   *
+   * Preview studio ke process me chalta hai aur render Remotion ke apne bundle
+   * me; do jagah do alag list rakhne par ek din preview me ek font dikhta hai
+   * aur MP4 me doosra. Isliye list yahan se `inputProps` me jaati hai — wahi
+   * raasta jispar doc aur assets jaate hain.
+   *
+   * Na di jaaye to sirf system fonts (jo har machine par hain).
+   */
+  fonts?: readonly import("@reel/core").FontEntry[];
   doc: Doc;
   /** assetId -> publicDir ke andar ka filename (`resolveAssets()` se). */
   assets: AssetMap;

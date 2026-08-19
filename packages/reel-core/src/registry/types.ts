@@ -11,20 +11,31 @@ import type { ZodTypeAny } from "zod";
  * `if (type === "image")` wali switch-chain dhoondhne ki zaroorat nahi padti.
  */
 
-/** UI control ke kism — Phase 9 ka generated panel inhi se banega. */
-export type ControlKind =
-  | "slider"
-  | "number"
-  | "text"
-  | "textarea"
-  | "color"
-  | "select"
-  | "segmented"
-  | "toggle"
-  | "vector2"
-  | "asset"
-  | "font"
-  | "align";
+/**
+ * UI control ke kism — Phase 9 ka generated panel inhi se banta hai.
+ *
+ * List **runtime par bhi** chahiye (panel ka registry poora hai ya nahi, ye
+ * jaanchne ke liye), isliye ye ek asli array hai aur type usi se banta hai. Do
+ * jagah likhne par ek din ek nayi kism type me aa jaati hai par list me nahi,
+ * aur uska control chup-chaap text ban jaata hai.
+ */
+export const CONTROL_KINDS = [
+  "slider",
+  "number",
+  "text",
+  "textarea",
+  "color",
+  "select",
+  "segmented",
+  "toggle",
+  "vector2",
+  "asset",
+  "font",
+  "align",
+  "enable",
+] as const;
+
+export type ControlKind = (typeof CONTROL_KINDS)[number];
 
 export interface ControlOption {
   value: string | number | boolean;
@@ -49,8 +60,15 @@ export interface ControlDescriptor {
   step?: number;
   unit?: string;
   options?: readonly ControlOption[];
-  /** Control tabhi dikhe jab dusri property ki value ye ho (declarative, code nahi). */
-  when?: { path: string; equals: unknown };
+  /**
+   * Control tabhi dikhe jab shart poori ho — **declarative**, code nahi.
+   *
+   * `equals` value milane ke liye, `isSet` "wo cheez on hai ya nahi" ke liye
+   * (nullable object). Dono me se ek hi dena hota hai.
+   */
+  when?: { path: string; equals?: unknown; isSet?: boolean };
+  /** `enable` control ke liye: on karne par kaunsa object bharna hai. */
+  enableDefault?: Record<string, unknown>;
   /** Is property par keyframe lagaya ja sakta hai? */
   keyframable?: boolean;
   help?: string;
@@ -134,6 +152,28 @@ export function createRegistry<T extends { id: string }>(name: string): Registry
 /** Registry ke saare entries ke controls ek saath — panel isse render hota hai. */
 export function collectControls(entry: RegistryEntry): readonly ControlDescriptor[] {
   return entry.controls;
+}
+
+/**
+ * Ye control abhi dikhna chahiye ya nahi.
+ *
+ * Ye faisla **core me** hai, panel me nahi — kyunki isi shart par Phase 20 ka
+ * validator bhi chalega ("jo control dikh hi nahi raha uski value ki shikayat
+ * mat karo"). Do jagah do tarah likhne par wo dono kabhi ek jaise nahi rehte.
+ */
+export function controlVisible(
+  control: ControlDescriptor,
+  read: (path: string) => unknown,
+): boolean {
+  const when = control.when;
+  if (!when) return true;
+
+  const value = read(when.path);
+  if (when.isSet !== undefined) {
+    const set = value !== null && value !== undefined;
+    return when.isSet ? set : !set;
+  }
+  return value === when.equals;
 }
 
 /** Controls ko unke group ke hisaab se baant do (panel ke sections banane ke liye). */

@@ -6,25 +6,32 @@ import { useEffect, useState } from "react";
 import type { Asset } from "@/lib/assets";
 
 /**
- * Asset ka naap — khaas kar uski **asli lambai** (8.3).
+ * Asset ka naap — uski **asli lambai** aur **asli pixels**.
  *
- * Trim ka daayan kinara source ke ant par rukna chahiye. Uske bina clip source
- * se aage khinch jaati hai aur render me wahan **kaala frame** aata hai — jo
- * timeline me bilkul theek dikhta hai aur sirf final MP4 me pakda jaata hai.
- * Wo lambai `reel_assets.duration_ms` me hai, jo Phase 5 ke asli ffprobe se
- * bhari thi.
+ * Do jagah ye zaroori hai:
+ *  - trim ka daayan kinara source ke ant par ruke (8.3). Uske bina clip source
+ *    se aage khinch jaati hai aur render me wahan **kaala frame** aata hai — jo
+ *    timeline me bilkul theek dikhta hai aur sirf final MP4 me pakda jaata hai.
+ *  - effective resolution ka readout (9.6c) — "480p ko 1080p frame me 2.2x bada
+ *    kiya ja raha hai" wali baat asli source pixels ke bina ho hi nahi sakti.
+ *
+ * Dono numbers Phase 5 ke asli ffprobe se aaye the, andaaze se nahi.
  *
  * ⚠️ Ek hi request me poori list aati hai (`GET /api/assets`), har asset ke liye
  * alag nahi. Timeline par 200 clips ho sakti hain; 200 request bhejna sirf
  * pehli baar theek lagta hai.
  *
- * ⚠️ Lambai `null` ho sakti hai — image ka koi ant nahi hota, aur probe fail ho
- * chuka ho to bhi hum jaante nahi. Dono halat me trim par upar ki hadd **nahi**
- * lagti: andaaze se hadd laga dena user ki clip chup-chaap kaat deta.
+ * ⚠️ Sab kuch `null` ho sakta hai — image ki koi lambai nahi hoti, audio ke koi
+ * pixels nahi, aur probe fail ho chuka ho to hum kuch bhi nahi jaante. Aise me
+ * **koi hadd aur koi warning nahi** lagti: andaaze se hadd laga dena user ki
+ * clip chup-chaap kaat deta, aur andaaze se warning dena chetavni ka matlab hi
+ * khatam kar deta hai.
  */
 
 interface Cached {
   durationMs: number | null;
+  width: number | null;
+  height: number | null;
 }
 
 let cache: Map<string, Cached> | null = null;
@@ -41,7 +48,11 @@ async function loadAll(): Promise<Map<string, Cached>> {
       if (response.ok) {
         const data = (await response.json()) as { assets?: Asset[] };
         for (const asset of data.assets ?? []) {
-          next.set(asset.id, { durationMs: asset.durationMs });
+          next.set(asset.id, {
+            durationMs: asset.durationMs,
+            width: asset.width,
+            height: asset.height,
+          });
         }
       }
     } catch {
@@ -62,13 +73,20 @@ export function forgetAssetMeta(): void {
   inflight = null;
 }
 
-export interface AssetDurations {
+export interface AssetSize {
+  width: number;
+  height: number;
+}
+
+export interface AssetMeta {
   /** Source ki lambai project ke frames me — `null` = pata nahi / hadd nahi. */
   sourceFrames(assetId: string | null): number | null;
+  /** Source ke asli pixels — `null` = pata nahi (ya audio hai). */
+  sourceSize(assetId: string | null): AssetSize | null;
   loaded: boolean;
 }
 
-export function useAssetDurations(fps: number): AssetDurations {
+export function useAssetDurations(fps: number): AssetMeta {
   const [map, setMap] = useState<Map<string, Cached> | null>(cache);
 
   useEffect(() => {
@@ -88,6 +106,12 @@ export function useAssetDurations(fps: number): AssetDurations {
       const durationMs = map.get(assetId)?.durationMs;
       if (durationMs === undefined || durationMs === null || durationMs <= 0) return null;
       return secondsToFrames(durationMs / 1000, fps);
+    },
+    sourceSize(assetId) {
+      if (!assetId || !map) return null;
+      const entry = map.get(assetId);
+      if (!entry?.width || !entry.height) return null;
+      return { width: entry.width, height: entry.height };
     },
   };
 }

@@ -5,6 +5,7 @@ import { aspectRatioLabel } from "@reel/core";
 import { PreviewPlayer } from "@/components/editor/preview/PreviewPlayer";
 import { TransportBar } from "@/components/editor/preview/TransportBar";
 import { useAssetMap } from "@/lib/assetMap";
+import { useFonts } from "@/lib/fonts";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -20,6 +21,7 @@ import { useEditorStore } from "@/lib/store";
 export function PreviewStage() {
   const doc = useEditorStore((state) => state.doc);
   const { assets, missing, loading } = useAssetMap(doc);
+  const { missing: missingFontNames } = useFonts(doc);
 
   const { width, height, fps } = doc.project;
 
@@ -40,6 +42,14 @@ export function PreviewStage() {
           <span className="text-red-300">
             {missing.length} asset nahi mila — frame me gulaabi card us item par hai
           </span>
+        ) : null}
+        {missingFontNames.length > 0 ? (
+          /*
+           * Font chup-chaap fallback par gir jaata hai aur wo ek baar dekh kar
+           * samajh nahi aata — isliye naam ke saath saaf likha jaata hai (9.10).
+           * Yahi jaanch Phase 20 ke validator me bhi jaayegi.
+           */
+          <span className="text-amber">font nahi mila: {missingFontNames.join(", ")}</span>
         ) : null}
       </div>
 

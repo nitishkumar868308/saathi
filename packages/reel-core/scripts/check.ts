@@ -33,8 +33,19 @@ import {
   createCountingIdFactory,
   createEmptyProject,
   createHistory,
+  BUILTIN_FONTS,
+  applyAutoFit,
   copyItems,
   createItem,
+  fontFaceCss,
+  fontFamilyCss,
+  isScaleUnchanged,
+  mergeFonts,
+  missingFonts,
+  parseTimecode,
+  setItemsProperty,
+  setProjectFps,
+  setProjectSize,
   cutRange,
   deleteItems,
   duplicateItems,
@@ -1845,6 +1856,325 @@ test("ops purana doc kabhi nahi badalte (immutability)", () => {
   pasteItems(doc, { fragment: copyItems(doc, ids), atFrame: 0 });
 
   assert.equal(JSON.stringify(doc), before, "kisi op ne purana doc badal diya");
+});
+
+// -------------------------------------------------- Phase 9 (panel + text)
+
+section("timecode padhna (9.7)");
+
+test("chaaron roop chalte hain", () => {
+  assert.equal(parseTimecode("90", 30), 90, "seedha frame number");
+  assert.equal(parseTimecode("12:05", 30), 12 * 30 + 5, "SS:FF");
+  assert.equal(parseTimecode("01:12:05", 30), (60 + 12) * 30 + 5, "MM:SS:FF");
+  assert.equal(parseTimecode("00:01:12:05", 30), (60 + 12) * 30 + 5, "HH:MM:SS:FF");
+});
+
+test("aakhri hissa hamesha frames hai, seconds ka dashamlav nahi", () => {
+  // "12:05" ko 12.05 second padhna sabse aam galti hoti — 30fps par wo 361
+  // frames deta, jabki sahi jawab 365 hai.
+  assert.equal(parseTimecode("12:05", 30), 365);
+});
+
+test("har fps par sahi ginti", () => {
+  assert.equal(parseTimecode("00:01:00", 24), 24);
+  assert.equal(parseTimecode("00:01:00", 25), 25);
+  assert.equal(parseTimecode("00:01:00", 60), 60);
+});
+
+test("galat input par null milta hai, 0 nahi", () => {
+  // Chupchaap 0 laut'na sabse bura jawab hai: ek typo clip ko shuruaat me
+  // phenk deta aur user ko lagta hai editor ne khud kuch kar diya.
+  assert.equal(parseTimecode("", 30), null);
+  assert.equal(parseTimecode("abc", 30), null);
+  assert.equal(parseTimecode("1:2:3:4:5", 30), null);
+  assert.equal(parseTimecode("00:1x:00", 30), null);
+});
+
+test("hadd se bahar wale hisse mana hain", () => {
+  assert.equal(parseTimecode("00:35", 30), null, "30fps par frame 35 ho hi nahi sakta");
+  assert.equal(parseTimecode("00:75:00", 30), null, "75 second ho hi nahi sakte");
+  assert.equal(parseTimecode("500", 30), 500, "par akela number bada ho sakta hai");
+});
+
+test("framesToTimecode ke saath aana-jaana barabar rehta hai", () => {
+  for (const fps of [24, 25, 30, 60]) {
+    for (const frames of [0, 1, 37, 512, 18000]) {
+      const text = framesToTimecode(frames, fps);
+      assert.equal(parseTimecode(text, fps), frames, `${fps}fps / ${frames}f -> "${text}"`);
+    }
+  }
+});
+
+section("multi-select edit ek undo entry me (9.5)");
+
+test("setItemsProperty saare chune hue items par lagti hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = setItemsProperty(doc, { itemIds: ids, path: "transform.opacity", value: 0.4 });
+  for (const id of ids) assert.equal(itemById(next, id).transform.opacity, 0.4);
+});
+
+test("jis item par wo property hai hi nahi, wo chhoot jaata hai", () => {
+  const { doc, videoTrackId, audioTrackId } = buildFixture();
+  const image = doc.items.find((item) => item.trackId === videoTrackId)!;
+  const audio = doc.items.find((item) => item.trackId === audioTrackId)!;
+
+  // `text.color` image ya audio kisi par nahi hai — error nahi aana chahiye,
+  // aur doc bhi nahi badalna chahiye.
+  const next = setItemsProperty(doc, {
+    itemIds: [image.id, audio.id],
+    path: "text.color",
+    value: "#fff",
+  });
+  assert.equal(itemById(next, image.id).text, null);
+  assert.equal(itemById(next, audio.id).text, null);
+});
+
+test("null ke andar likhna mana hai (mixed selection ka asli case)", () => {
+  /*
+   * Ye test ek asli bug ke baad juda hai. Pehle sirf root (`text`) ki jaanch
+   * thi aur wo `undefined` se compare hoti thi; image par `text` `null` hota
+   * hai, isliye jaanch paas ho jaati thi aur op image par
+   * `text: { color: "..." }` bana deta tha — ek aisa item jo schema ke hisaab
+   * se toota hua hai, aur ye save hone ke baad hi pakda jaata.
+   *
+   * Yahi baat ek level gehre bhi lagti hai: do text items chune hon jinme se
+   * ek par stroke hai aur ek par nahi, to panel `—` ke saath stroke ka control
+   * dikhata hai. Uspar likhne se **bina stroke wale** item par aadha stroke
+   * (sirf width, bina color ke) nahi banna chahiye.
+   */
+  // Khaali project do track ke saath aata hai (video + audio) — text ka track
+  // jodna padta hai.
+  const base = addTrack(createEmptyProject({ name: "Null guard" }), { typeId: "text" });
+  const trackId = base.tracks[base.tracks.length - 1]!.id;
+  const withStroke = createItem("text", { fps: base.project.fps, trackId, name: "A" });
+  const withoutStroke = createItem("text", { fps: base.project.fps, trackId, name: "B" });
+
+  let doc = addItem(base, { item: withStroke });
+  doc = addItem(doc, { item: withoutStroke });
+  doc = setItemsProperty(doc, {
+    itemIds: [withStroke.id],
+    path: "text.stroke",
+    value: { color: "#000000", width: 4 },
+  });
+
+  const next = setItemsProperty(doc, {
+    itemIds: [withStroke.id, withoutStroke.id],
+    path: "text.stroke.width",
+    value: 9,
+  });
+
+  assert.equal(itemById(next, withStroke.id).text?.stroke?.width, 9, "jispar stroke tha wo badla");
+  assert.equal(
+    itemById(next, withoutStroke.id).text?.stroke,
+    null,
+    "jispar stroke nahi tha uspar aadha stroke nahi banna chahiye",
+  );
+  // Poora doc abhi bhi schema ke hisaab se sahi hona chahiye.
+  assert.equal(safeParseDoc(next).success, true, "op ke baad doc schema se bahar chala gaya");
+});
+
+test("locked item par kuch nahi lagta", () => {
+  const { doc, ids } = chainFixture();
+  const locked = setItemProperty(doc, { itemId: ids[0]!, path: "locked", value: true });
+  const next = setItemsProperty(locked, { itemIds: ids, path: "transform.opacity", value: 0.2 });
+
+  assert.equal(itemById(next, ids[0]!).transform.opacity, 1, "locked ko chhua nahi jaana chahiye");
+  assert.equal(itemById(next, ids[1]!).transform.opacity, 0.2);
+});
+
+test("protected paths yahan bhi bandh hain", () => {
+  const { doc, ids } = chainFixture();
+  for (const path of ["startFrame", "durationInFrames", "trackId"]) {
+    throws(
+      () => setItemsProperty(doc, { itemIds: ids, path, value: 5 }),
+      /seedhe set nahi hota/,
+      `${path} multi-set`,
+    );
+  }
+});
+
+section("auto-fit ek undo entry me (9.6b)");
+
+test("applyAutoFit chaaron property ek saath lagata hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = applyAutoFit(doc, {
+    patches: [{ itemId: ids[0]!, mode: "contain", scale: 0.5, x: 10, y: -20 }],
+  });
+  const item = itemById(next, ids[0]!);
+  assert.equal(item.fit.mode, "contain");
+  assert.equal(item.transform.scale, 0.5);
+  assert.equal(item.transform.x, 10);
+  assert.equal(item.transform.y, -20);
+});
+
+test("scale null ho to usko haath nahi lagta (Center wala case)", () => {
+  const { doc, ids } = chainFixture();
+  const zoomed = setItemProperty(doc, { itemId: ids[0]!, path: "transform.scale", value: 2.5 });
+  const next = applyAutoFit(zoomed, {
+    patches: [{ itemId: ids[0]!, mode: "custom", scale: null, x: 0, y: 0 }],
+  });
+  assert.equal(itemById(next, ids[0]!).transform.scale, 2.5, "Center ko scale nahi badalni chahiye");
+  assert.equal(itemById(next, ids[0]!).transform.x, 0);
+});
+
+test("AUTO_FIT_ACTIONS ka nateeja seedha patch banta hai", () => {
+  // Panel yahi karta hai: action se patch, phir ek op. Yahan wo poora raasta
+  // milaya jaata hai taaki "Center" jaisa NaN wala case chhoot na jaaye.
+  const frame = { width: 1080, height: 1920 };
+  const source = { width: 1920, height: 1080 };
+  const { doc, ids } = chainFixture();
+
+  for (const action of AUTO_FIT_ACTIONS) {
+    const patch = action.apply(source, frame);
+    const next = applyAutoFit(doc, {
+      patches: [
+        {
+          itemId: ids[0]!,
+          mode: patch.mode,
+          scale: isScaleUnchanged(patch) ? null : patch.scale,
+          x: patch.x,
+          y: patch.y,
+        },
+      ],
+    });
+    const item = itemById(next, ids[0]!);
+    assert.ok(item.transform.scale > 0, `${action.id}: scale ${item.transform.scale}`);
+    assert.ok(Number.isFinite(item.transform.x), `${action.id}: x NaN ho gaya`);
+  }
+});
+
+section("project ka size aur fps (9.13)");
+
+test("size badalne par frame badalta hai, items nahi (bina refit ke)", () => {
+  const { doc, ids } = chainFixture();
+  const before = itemById(doc, ids[0]!).transform.scale;
+  const next = setProjectSize(doc, { width: 1920, height: 1080 });
+
+  assert.deepEqual([next.project.width, next.project.height], [1920, 1080]);
+  assert.equal(itemById(next, ids[0]!).transform.scale, before, "bina maange re-fit nahi hona chahiye");
+});
+
+test("refit par items anupaat me badalte hain", () => {
+  const { doc, ids } = chainFixture();
+  const moved = setItemProperty(doc, { itemId: ids[0]!, path: "transform.x", value: 108 });
+  // 1080x1920 -> 540x960 : aadha.
+  const next = setProjectSize(moved, { width: 540, height: 960, refit: true });
+
+  const item = itemById(next, ids[0]!);
+  assert.equal(item.transform.x, 54, "x aadha hona chahiye tha");
+  assert.equal(item.transform.scale, 0.5, "scale bhi aadhi");
+});
+
+test("bahut chhote naap par saaf error", () => {
+  const { doc } = chainFixture();
+  throws(() => setProjectSize(doc, { width: 1, height: 1 }), /bahut chhota/, "chhota size");
+});
+
+test("fps badalne par bina rescale ke frames waise ke waise rehte hain", () => {
+  const { doc, ids } = chainFixture();
+  const before = itemById(doc, ids[1]!).startFrame;
+  const next = setProjectFps(doc, { fps: 60 });
+
+  assert.equal(next.project.fps, 60);
+  assert.equal(itemById(next, ids[1]!).startFrame, before);
+});
+
+test("rescale par har clip ka waqt (seconds) waisa hi rehta hai", () => {
+  const { doc, ids } = chainFixture();
+  const item = itemById(doc, ids[1]!);
+  const secondsBefore = framesToSeconds(item.startFrame, doc.project.fps);
+
+  const next = setProjectFps(doc, { fps: 60, rescaleItems: true });
+  const after = itemById(next, ids[1]!);
+
+  assert.equal(framesToSeconds(after.startFrame, 60), secondsBefore, "start ka waqt badal gaya");
+  assert.equal(after.startFrame, item.startFrame * 2);
+  assert.equal(after.durationInFrames, item.durationInFrames * 2);
+});
+
+test("rescale keyframes ko bhi le jaata hai", () => {
+  const { doc, ids } = chainFixture();
+  const withKeys = setItemProperty(doc, {
+    itemId: ids[0]!,
+    path: "keyframes",
+    value: { "transform.scale": [{ frame: 30, value: 2, easing: "linear" }] },
+  });
+  const next = setProjectFps(withKeys, { fps: 60, rescaleItems: true });
+  // 30fps ke frame 30 (1 second) ko 60fps par frame 60 hona chahiye — warna
+  // animation aadhe waqt me khatam ho jaati aur wajah samajh nahi aati.
+  assert.equal(itemById(next, ids[0]!).keyframes["transform.scale"]?.[0]?.frame, 60);
+});
+
+section("font registry (9.10)");
+
+test("built-in sirf system fonts hain — koi file nahi maangte", () => {
+  for (const font of BUILTIN_FONTS) {
+    assert.equal(font.files.length, 0, `${font.id} kisi file par tika hai`);
+    assert.ok(font.fallback.length > 0, `${font.id} ka fallback khaali hai`);
+  }
+});
+
+test("mergeFonts baahar wale font jodta hai aur wahi id ho to badal deta hai", () => {
+  const custom = {
+    id: "Poppins",
+    label: "Poppins",
+    fallback: "sans-serif",
+    files: [{ file: "poppins-700.woff2", weight: 700, style: "normal" as const }],
+    weights: [700],
+  };
+  const merged = mergeFonts([custom]);
+  assert.ok(merged.some((font) => font.id === "Poppins"));
+  assert.equal(merged.length, BUILTIN_FONTS.length + 1);
+
+  // Wahi id dobara — list badhni nahi chahiye.
+  assert.equal(mergeFonts([custom, { ...custom, label: "Poppins 2" }]).length, BUILTIN_FONTS.length + 1);
+});
+
+test("@font-face sirf un fonts ka banta hai jinki file hai", () => {
+  const css = fontFaceCss(BUILTIN_FONTS);
+  assert.equal(css, "", "system fonts ke liye koi @font-face nahi hona chahiye");
+
+  const withFile = mergeFonts([
+    {
+      id: "Poppins",
+      label: "Poppins",
+      fallback: "sans-serif",
+      files: [{ file: "poppins-700.woff2", weight: 700, style: "normal" }],
+      weights: [700],
+    },
+  ]);
+  const out = fontFaceCss(withFile);
+  assert.ok(out.includes("@font-face"));
+  assert.ok(out.includes("/fonts/poppins-700.woff2"), out);
+  assert.ok(out.includes('format("woff2")'), out);
+  // `font-display: block` isliye ki text pehle kisi aur font me dikh kar phir
+  // badal na jaaye — wo "flash" render me ek-do frame par pakda jaata hai.
+  assert.ok(out.includes("font-display: block"));
+});
+
+test("family stack me hamesha fallback rehta hai", () => {
+  const fonts = mergeFonts([
+    {
+      id: "Poppins",
+      label: "Poppins",
+      fallback: "sans-serif",
+      files: [{ file: "p.woff2", weight: 400, style: "normal" }],
+      weights: [400],
+    },
+  ]);
+  assert.equal(fontFamilyCss(fonts, "Poppins"), "Poppins, sans-serif");
+  // Anjaan naam bhi aage jaata hai (user ke system par ho sakta hai), par
+  // fallback ke saath — taaki text gayab na ho.
+  assert.ok(fontFamilyCss(fonts, "Koi Aur Font").includes("Koi Aur Font"));
+  assert.ok(fontFamilyCss(fonts, "Koi Aur Font").includes("system-ui"));
+});
+
+test("missing fonts pehchane jaate hain, par brand tokens nahi", () => {
+  assert.deepEqual(missingFonts(BUILTIN_FONTS, ["system-ui", "Georgia"]), []);
+  assert.deepEqual(missingFonts(BUILTIN_FONTS, ["Poppins"]), ["Poppins"]);
+  // Brand token render ke waqt asli naam me badalta hai — uski shikayat yahan
+  // karna galat chetavni hoti (Phase 17 me uski apni jaanch hogi).
+  assert.deepEqual(missingFonts(BUILTIN_FONTS, ["brand.font.display"]), []);
 });
 
 // ------------------------------------------------------------------ sample

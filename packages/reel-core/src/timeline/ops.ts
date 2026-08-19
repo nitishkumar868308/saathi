@@ -2,11 +2,11 @@ import { produce, type Draft } from "immer";
 
 import { DEFAULT_OVERLAP_POLICY, type OverlapPolicy } from "../config/overlap";
 import { createId } from "../id";
-import { setByPath } from "../path";
+import { getByPath, setByPath } from "../path";
 import { requireItemType, trackAccepts } from "../registry/index";
 import { createTrack } from "../schema/factory";
 import { itemEndFrame, type Doc, type Item, type Keyframe, type Track } from "../schema/project";
-import { clampFrame } from "../time";
+import { assertFps, clampFrame } from "../time";
 
 /**
  * Timeline ke saare named ops.
@@ -416,6 +416,199 @@ export const setItemProperty = defineOp<SetItemPropertyArgs>("setItemProperty", 
     );
   }
   setByPath(item, args.path, args.value);
+});
+
+export interface SetItemsPropertyArgs {
+  itemIds: readonly string[];
+  path: string;
+  value: unknown;
+}
+
+/**
+ * Ek hi property kai items par — **ek undo entry** (9.5).
+ *
+ * Multi-select me har item par alag `setItemProperty` chalane se paanch clips ka
+ * rang badalne par paanch baar Ctrl+Z dabana padta hai, aur user ke liye wo ek
+ * hi kaam tha. Isliye loop op ke **andar** hai, UI me nahi.
+ *
+ * ⚠️ Jis item par ye property hai hi nahi (jaise `text.color` kisi image par) wo
+ * chhod diya jaata hai, error nahi aata. Mixed selection me ek hi common control
+ * dikhta hai; uspar likhne par baaki items ko chhedna hi nahi chahiye.
+ */
+export const setItemsProperty = defineOp<SetItemsPropertyArgs>(
+  "setItemsProperty",
+  (draft, args) => {
+    const root = args.path.split(".")[0] as string;
+    if (PROTECTED_PATHS.has(args.path) || PROTECTED_PATHS.has(root)) {
+      throw new TimelineOpError(
+        `"${args.path}" seedhe set nahi hota — iske liye apna op hai (move/trim/split)`,
+      );
+    }
+
+    const ids = new Set(args.itemIds);
+    const parentPath = args.path.slice(0, args.path.lastIndexOf("."));
+
+    for (const item of draft.items) {
+      if (!ids.has(item.id)) continue;
+      if (item.locked) continue;
+
+      /*
+       * ⚠️ Yahan **parent** dekha jaata hai, root nahi — aur ye ek asli bug
+       * theek karne ke baad likha gaya hai.
+       *
+       * Pehle sirf root (`text`) ki jaanch thi, aur `undefined` se compare hota
+       * tha. Image par `text` `null` hota hai, `undefined` nahi — isliye jaanch
+       * paas ho jaati thi aur `setByPath` image par `text: { color: "..." }`
+       * bana deta tha. Wo item schema ke hisaab se toota hua hota hai (baaki
+       * saari text fields gayab), aur ye galti save hone ke baad hi pakdi jaati.
+       *
+       * Parent dekhne se teeno case sahi baithte hain:
+       *   `text.color`        image par  -> parent `text` null    -> chhod do
+       *   `text.stroke`       text par   -> parent `text` object  -> lagao
+       *   `text.stroke.width` bina stroke -> parent null          -> chhod do
+       */
+      if (parentPath) {
+        const parent = getByPath(item, parentPath);
+        if (parent === null || parent === undefined) continue;
+      }
+      setByPath(item, args.path, args.value);
+    }
+  },
+);
+
+export interface AutoFitPatchArgs {
+  /** UI har item ka source naap jaanta hai, isliye patch wahin banta hai. */
+  patches: readonly {
+    itemId: string;
+    mode: string;
+    /** `null` = scale ko haath mat lagao ("Center" aisa hi karta hai). */
+    scale: number | null;
+    x: number;
+    y: number;
+  }[];
+}
+
+/**
+ * Auto-fit buttons ka nateeja lagao (9.6b) — **ek undo entry me**.
+ *
+ * "Fill frame" ek button hai par chaar property badalta hai (fit mode, scale, x,
+ * y). Chaar alag `setItemProperty` chalane se chaar undo entries banti hain aur
+ * Ctrl+Z aadha fit chhod deta hai — jo poore fit se bhi bura dikhta hai.
+ *
+ * ⚠️ Patch **UI banata hai, op nahi**. Wajah: patch ke liye source ka pixel naap
+ * chahiye (`AUTO_FIT_ACTIONS[].apply(source, frame)`), aur wo `reel_assets` me
+ * hai — doc me nahi. Op ko DB ka pata nahi hona chahiye.
+ */
+export const applyAutoFit = defineOp<AutoFitPatchArgs>("applyAutoFit", (draft, args) => {
+  for (const patch of args.patches) {
+    const item = findItem(draft, patch.itemId);
+    if (item.locked) continue;
+
+    item.fit.mode = patch.mode as typeof item.fit.mode;
+    item.transform.x = patch.x;
+    item.transform.y = patch.y;
+    if (patch.scale !== null && Number.isFinite(patch.scale) && patch.scale > 0) {
+      item.transform.scale = patch.scale;
+    }
+  }
+});
+
+export interface SetProjectSizeArgs {
+  width: number;
+  height: number;
+  sizePresetId?: string;
+  /**
+   * `true` = items ko naye frame ke hisaab se dobara set karo (scale + position
+   * proportionally). `false` = sirf frame badlo, items waise ke waise.
+   */
+  refit?: boolean;
+}
+
+/**
+ * Project ka naap badlo (9.13).
+ *
+ * ⚠️ `refit` ek **maang** hai, default nahi. Chupchaap sab kuch re-fit kar dena
+ * sabse bura hota: user ne shayad ghanton lagakar har clip ki jagah tay ki ho.
+ * UI pehle poochhta hai, phir yahan flag aata hai.
+ *
+ * Re-fit ka ganit seedha hai aur jaan-boojhkar seedha rakha gaya hai: position
+ * frame ke naap ke anupaat me khisakti hai, aur scale chhote wale anupaat se
+ * badalti hai (taaki clip frame se bahar na nikal jaaye). Poora safe-area aware
+ * re-layout Phase 20 ka kaam hai.
+ */
+export const setProjectSize = defineOp<SetProjectSizeArgs>("setProjectSize", (draft, args) => {
+  const width = Math.round(args.width);
+  const height = Math.round(args.height);
+  if (width < 2 || height < 2) throw new TimelineOpError(`Naap bahut chhota hai (${width}x${height})`);
+
+  const oldWidth = draft.project.width;
+  const oldHeight = draft.project.height;
+
+  draft.project.width = width;
+  draft.project.height = height;
+  if (args.sizePresetId !== undefined) draft.project.sizePresetId = args.sizePresetId;
+
+  if (!args.refit) return;
+  if (oldWidth === width && oldHeight === height) return;
+
+  const ratioX = width / oldWidth;
+  const ratioY = height / oldHeight;
+  const scaleRatio = Math.min(ratioX, ratioY);
+
+  for (const item of draft.items) {
+    if (item.locked) continue;
+    item.transform.x *= ratioX;
+    item.transform.y *= ratioY;
+    item.transform.scale *= scaleRatio;
+  }
+});
+
+export interface SetProjectFpsArgs {
+  fps: number;
+  /**
+   * `true` = saare frames ko naye fps par convert karo, taaki har clip ka waqt
+   * (seconds me) waisa hi rahe.
+   */
+  rescaleItems?: boolean;
+}
+
+/**
+ * fps badlo (9.13).
+ *
+ * ⚠️ `rescaleItems` ke bina fps badalna poori reel ki **timing badal deta hai**:
+ * 30fps ke 90 frames 3 second hain, 60fps par wahi 90 frames 1.5 second ho jaate
+ * hain. Isliye UI ye baat saaf poochhta hai — chupchaap dono me se koi bhi
+ * chunna galat hai, kyunki dono kabhi-kabhi sahi hote hain.
+ */
+export const setProjectFps = defineOp<SetProjectFpsArgs>("setProjectFps", (draft, args) => {
+  const fps = args.fps;
+  assertFps(fps);
+
+  const oldFps = draft.project.fps;
+  draft.project.fps = fps;
+  if (!args.rescaleItems || oldFps === fps) return;
+
+  const scale = fps / oldFps;
+  const convert = (frames: number): number => Math.round(frames * scale);
+
+  draft.project.durationInFrames = Math.max(1, convert(draft.project.durationInFrames));
+  for (const item of draft.items) {
+    item.startFrame = Math.max(0, convert(item.startFrame));
+    item.durationInFrames = Math.max(1, convert(item.durationInFrames));
+    item.trimStartFrame = Math.max(0, convert(item.trimStartFrame));
+    item.audio.fadeInFrames = Math.max(0, convert(item.audio.fadeInFrames));
+    item.audio.fadeOutFrames = Math.max(0, convert(item.audio.fadeOutFrames));
+    item.keyframes = shiftKeyframes(
+      Object.fromEntries(
+        Object.entries(clone(item.keyframes)).map(([path, list]) => [
+          path,
+          list.map((kf) => ({ ...kf, frame: convert(kf.frame) })),
+        ]),
+      ),
+      0,
+      () => true,
+    );
+  }
 });
 
 // ------------------------------------------------------------------- tracks
@@ -1122,6 +1315,10 @@ export const OPS = {
   keepRange,
   pasteItems,
   setItemProperty,
+  setItemsProperty,
+  applyAutoFit,
+  setProjectSize,
+  setProjectFps,
   addTrack,
   removeTrack,
   reorderTracks,
@@ -1159,6 +1356,7 @@ export const STRUCTURAL_OPS: readonly OpName[] = [
   "cutRange",
   "keepRange",
   "pasteItems",
+  "setProjectFps",
   "removeTrack",
 ];
 

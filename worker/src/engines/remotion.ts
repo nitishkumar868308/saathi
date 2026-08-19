@@ -51,7 +51,11 @@ export class RemotionRenderEngine implements RenderEngine {
       },
     });
 
-    const inputProps = { doc: request.doc, assets: request.assets };
+    const inputProps = {
+      doc: request.doc,
+      assets: request.assets,
+      ...(request.fonts ? { fonts: request.fonts } : {}),
+    };
 
     /*
      * Composition ki width/height/fps/duration `calculateMetadata` se aati hain,
