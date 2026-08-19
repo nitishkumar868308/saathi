@@ -5,11 +5,13 @@ import {
   estimateExportBytes,
   formatBytes,
   framesToSeconds,
-  preflight,
-  type PreflightIssue,
+  canExport,
+  requireExportPreset,
+  validateExportSettings,
+  type ValidationIssue,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Download, XCircle } from "lucide-react";
+import { AlertTriangle, Info, Download, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -89,7 +91,15 @@ export function ExportDialog({
     }
   }
 
-  const check = preflight({ doc, presetId, assets: assetMap });
+  /*
+   * ⚠️ Ab poora validator chalta hai (`validateExportSettings`), purana
+   * `preflight()` nahi — aur wo ek hi jagah se aata hai jise worker bhi chalata
+   * hai (20.7). Do jagah do list rakhne par ek din UI kuch kehta aur render
+   * kuch aur, aur user ko lagta ki editor jhooth bol raha hai.
+   */
+  const check = validateExportSettings({ doc, presetId, assets: assetMap });
+  const preset = requireExportPreset(presetId);
+  const allowed = canExport(check, preset.tier);
   const bytes = estimateExportBytes(doc, presetId);
   const seconds = framesToSeconds(doc.project.durationInFrames, doc.project.fps);
 
@@ -168,11 +178,22 @@ export function ExportDialog({
           hain.
         </p>
 
-        {check.errors.length > 0 ? (
-          <IssueList issues={check.errors} level="error" />
+        {check.errors.length > 0 ? <IssueList issues={check.errors} level="error" /> : null}
+        {check.warnings.length > 0 ? <IssueList issues={check.warnings} level="warning" /> : null}
+        {check.recommendations.length > 0 ? (
+          <IssueList issues={check.recommendations} level="info" />
         ) : null}
-        {check.warnings.length > 0 ? (
-          <IssueList issues={check.warnings} level="warning" />
+
+        {/*
+         * Strict me warnings bhi rokti hain (20.6). Ye baat **pehle se** likhi
+         * honi chahiye — warna user Export dabata hai, kuch nahi hota, aur wo
+         * sochta hai button toota hua hai.
+         */}
+        {preset.tier === "strict" && check.warnings.length > 0 ? (
+          <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">
+            <strong>Strict Quality</strong> me har chetavni bhi export rok deti hai. Upar wali{" "}
+            {check.warnings.length} baat theek karo, ya koi doosra preset chuno.
+          </p>
         ) : null}
 
         {worker && !worker.online ? (
@@ -198,11 +219,13 @@ export function ExportDialog({
           <Button
             variant="primary"
             icon={<Download size={14} />}
-            disabled={busy || !check.canExport}
+            disabled={busy || !allowed}
             title={
-              check.canExport
+              allowed
                 ? undefined
-                : "Pehle upar wali error theek karo — aadhi-adhoori video banane me waqt bekaar jaata hai"
+                : preset.tier === "strict"
+                  ? "Strict me har chetavni bhi rokti hai — ya sab theek karo, ya doosra preset chuno"
+                  : "Pehle upar wali error theek karo — aadhi-adhoori video banane me waqt bekaar jaata hai"
             }
             onClick={() => void start()}
           >
@@ -226,21 +249,39 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function IssueList({ issues, level }: { issues: PreflightIssue[]; level: "error" | "warning" }) {
+function IssueList({
+  issues,
+  level,
+}: {
+  issues: ValidationIssue[];
+  level: "error" | "warning" | "info";
+}) {
   const isError = level === "error";
+  /*
+   * `info` ka apna rang hai (halka), aur ye zaroori hai. Use amber me dikhane
+   * par wo chetavni ki tarah padha jaata hai — aur "4K se quality nahi badhegi"
+   * ek jaankari hai, galti nahi. Sab kuch amber karne se do-teen baar me har
+   * amber cheez anadekhi hone lagti hai.
+   */
   return (
     <ul
       className={clsx(
         "space-y-1 rounded border px-2 py-1.5 text-[11px]",
-        isError ? "border-red-500/40 bg-red-500/10 text-red-300" : "border-amber/40 bg-amber/10 text-amber",
+        isError
+          ? "border-red-500/40 bg-red-500/10 text-red-300"
+          : level === "warning"
+            ? "border-amber/40 bg-amber/10 text-amber"
+            : "border-ink-600 bg-ink-900 text-chalk-400",
       )}
     >
       {issues.map((issue, index) => (
         <li key={`${issue.ruleId}-${index}`} className="flex items-start gap-1.5">
           {isError ? (
             <XCircle size={12} className="mt-0.5 shrink-0" />
-          ) : (
+          ) : level === "warning" ? (
             <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+          ) : (
+            <Info size={12} className="mt-0.5 shrink-0" />
           )}
           <span>{issue.message}</span>
         </li>

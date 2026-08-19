@@ -72,6 +72,17 @@ export interface StorageDriver {
    * yahan se poochhna hi ekmatra sachcha jawab hai.
    */
   exists(key: string): Promise<StorageObjectInfo | null>;
+
+  /**
+   * Ek prefix ke neeche kya-kya pada hai (20.11).
+   *
+   * ⚠️ Ye sirf **orphan scan** ke liye hai — R2 me pade wo files jinka DB row
+   * nahi bacha. Aam kaam me kabhi list nahi karni chahiye: R2 par har list call
+   * ke paise lagte hain aur 10,000 files par wo dheemi bhi hai. DB hi sach ka
+   * ghar hai; ye function sirf ye jaanchne ke liye hai ki dono ka mel baitha
+   * hai ya nahi.
+   */
+  list(prefix: string): Promise<StorageObjectInfo[]>;
 }
 
 export const STORAGE_DRIVER_NAMES = ["local", "r2"] as const;

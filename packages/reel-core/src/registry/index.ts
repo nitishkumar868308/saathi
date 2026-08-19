@@ -86,28 +86,7 @@ export function requireExportPreset(id: string): ExportPresetEntry {
   return EXPORT_PRESETS.require(id);
 }
 
-/**
- * Phase 20 — quality validation. **Rule list hai, if-else spaghetti nahi**
- * (Dynamic rule 11): nayi check = yahan ek entry.
- */
-export type ValidationSeverity = "info" | "warning" | "critical";
 
-export interface ValidationIssue {
-  ruleId: string;
-  severity: ValidationSeverity;
-  message: string;
-  /** Kis cheez par lagi — item id, track id, ya null (poore doc par). */
-  targetId: string | null;
-}
-
-export interface ValidationRuleEntry {
-  id: string;
-  label: string;
-  severity: ValidationSeverity;
-  check(doc: Doc): ValidationIssue[];
-}
-export const VALIDATION_RULES: Registry<ValidationRuleEntry> =
-  createRegistry<ValidationRuleEntry>("VALIDATION_RULES");
 
 // ------------------------------------------------------------------ bootstrap
 
@@ -145,7 +124,6 @@ export function resetRegistries(): void {
   SCENE_TYPES.clear();
   EXPORT_PRESETS.clear();
   ASSET_KINDS.clear();
-  VALIDATION_RULES.clear();
   registered = false;
   registerBuiltins();
 }

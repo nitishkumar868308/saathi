@@ -26,6 +26,7 @@ import {
   parseDoc,
   storageKey,
   type Doc,
+  validateExportSettings,
 } from "@reel/core";
 import {
   audioStream,
@@ -195,6 +196,30 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
 
     const assets = await resolveAssets(doc, stored, storage, { publicDir });
     if (cancelled) return { status: "cancelled" };
+
+    /*
+     * 1b. Dobara validation (20.7).
+     *
+     * ⚠️ UI me bhi jaanch hoti hai, par wo kaafi nahi hai. Job ka doc **jama
+     * hua** hota hai (queue me pada rehta hai), aur us beech me asset delete ho
+     * sakti hai, expire ho sakti hai, ya user doosre tab se kuch badal sakta
+     * hai. Yahan dobara jaanchne se ek toota hua render 30 second ki jagah
+     * turant ruk jaata hai.
+     *
+     * **Wahi function** chalta hai jo UI chalati hai — do jagah do list rakhne
+     * par ek din UI kuch kehti aur worker kuch aur.
+     */
+    const validation = validateExportSettings({
+      doc,
+      presetId: job.preset,
+      assets: Object.fromEntries(
+        stored.map((asset) => [asset.id, { width: null, height: null, durationMs: null }]),
+      ),
+    });
+    if (!validation.valid) {
+      const reasons = validation.errors.map((issue) => issue.message).join(" | ");
+      throw new Error(`Render se pehle ki jaanch fail hui: ${reasons}`);
+    }
 
     // 2. Render.
     const engine = new RemotionRenderEngine();

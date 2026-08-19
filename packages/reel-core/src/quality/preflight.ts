@@ -1,7 +1,7 @@
-import { animationsMaxScale } from "../registry/animations";
-import { getItemType, requireExportPreset } from "../registry/index";
+import { requireExportPreset } from "../registry/index";
 import { itemEndFrame, type Doc, type Item } from "../schema/project";
 import { framesToSeconds } from "../time";
+import { validateExportSettings, type ValidationIssue } from "./validate";
 
 /**
  * Export se pehle ki jaanch (11.4 — halka roop; poora validator Phase 20 me).
@@ -40,260 +40,12 @@ export interface PreflightInput {
   /**
    * assetId -> source ka naap aur lambai. Jo asset yahan **nahi** hai use
    * "gayab" maana jaata hai.
-   *
-   * ⚠️ Ye baahar se aata hai kyunki `@reel/core` ko DB ka pata nahi hona
-   * chahiye — wahi package browser aur worker dono me chalta hai.
    */
-  assets: Record<string, { width: number | null; height: number | null; durationMs: number | null } | undefined>;
+  assets: Record<
+    string,
+    { width: number | null; height: number | null; durationMs: number | null } | undefined
+  >;
 }
-
-export interface PreflightRule {
-  id: string;
-  label: string;
-  run(input: PreflightInput): PreflightIssue[];
-}
-
-/** Source se kitna upar khinchne par "blurry" maana jaaye. */
-export const UPSCALE_WARN_FACTOR = 1.15;
-
-export const PREFLIGHT_RULES: readonly PreflightRule[] = [
-  {
-    id: "empty-timeline",
-    label: "Timeline khaali hai",
-    run: ({ doc }) =>
-      doc.items.length === 0
-        ? [
-            {
-              ruleId: "empty-timeline",
-              level: "error",
-              message: "Timeline khaali hai — export karne ko kuch hai hi nahi.",
-            },
-          ]
-        : [],
-  },
-
-  {
-    id: "missing-asset",
-    label: "Asset nahi mila",
-    run: ({ doc, assets }) => {
-      const issues: PreflightIssue[] = [];
-      for (const item of doc.items) {
-        if (!item.assetId) continue;
-        if (assets[item.assetId]) continue;
-        issues.push({
-          ruleId: "missing-asset",
-          level: "error",
-          itemId: item.id,
-          message: `"${item.name}" ka asset nahi mila (${item.assetId}). Ye clip render me gulaabi card banegi.`,
-        });
-      }
-      return issues;
-    },
-  },
-
-  {
-    id: "needs-asset",
-    label: "Clip ko asset chahiye par lagi nahi",
-    run: ({ doc }) => {
-      const issues: PreflightIssue[] = [];
-      for (const item of doc.items) {
-        const entry = getItemType(item.type);
-        if (!entry?.needsAsset) continue;
-        if (item.assetId) continue;
-        issues.push({
-          ruleId: "needs-asset",
-          level: "error",
-          itemId: item.id,
-          message: `"${item.name}" (${entry.label}) par koi asset lagi hi nahi hai.`,
-        });
-      }
-      return issues;
-    },
-  },
-
-  {
-    id: "zero-duration",
-    label: "Clip ki lambai 0 hai",
-    run: ({ doc }) => {
-      const issues: PreflightIssue[] = [];
-      for (const item of doc.items) {
-        if (item.durationInFrames >= 1) continue;
-        issues.push({
-          ruleId: "zero-duration",
-          level: "error",
-          itemId: item.id,
-          message: `"${item.name}" ki lambai ${item.durationInFrames} frames hai — kam se kam 1 chahiye.`,
-        });
-      }
-      return issues;
-    },
-  },
-
-  {
-    id: "all-hidden",
-    label: "Sab kuch chhupa hua hai",
-    run: ({ doc }) => {
-      const hiddenTracks = new Set(doc.tracks.filter((track) => track.hidden).map((t) => t.id));
-      const visible = doc.items.filter(
-        (item) => !item.hidden && !hiddenTracks.has(item.trackId) && getItemType(item.type)?.hasVisual,
-      );
-      if (doc.items.length === 0 || visible.length > 0) return [];
-      return [
-        {
-          ruleId: "all-hidden",
-          level: "warning",
-          message: "Koi bhi dikhne wali clip chalu nahi hai — video poori kaali aayegi.",
-        },
-      ];
-    },
-  },
-
-  {
-    id: "silent",
-    label: "Koi awaaz nahi",
-    run: ({ doc }) => {
-      const mutedTracks = new Set(doc.tracks.filter((track) => track.muted).map((t) => t.id));
-      const audible = doc.items.filter((item) => {
-        if (!getItemType(item.type)?.hasAudio) return false;
-        if (item.audio.muted || item.audio.volume <= 0) return false;
-        return !mutedTracks.has(item.trackId);
-      });
-      if (audible.length > 0) return [];
-      return [
-        {
-          ruleId: "silent",
-          level: "warning",
-          message: "Poori reel me koi awaaz nahi hai. Jaan-boojhkar ho to theek hai.",
-        },
-      ];
-    },
-  },
-
-  {
-    id: "clipping-risk",
-    label: "Volume 1 se upar",
-    run: ({ doc }) => {
-      const issues: PreflightIssue[] = [];
-      for (const item of doc.items) {
-        if (item.audio.volume <= 1) continue;
-        issues.push({
-          ruleId: "clipping-risk",
-          level: "warning",
-          itemId: item.id,
-          message: `"${item.name}" ka volume ${item.audio.volume}x hai — clipping ka khatra. Loudness pass isko theek karne ki koshish karega, par source hi toota ho to nahi kar sakta.`,
-        });
-      }
-      return issues;
-    },
-  },
-
-  {
-    id: "upscale",
-    label: "Source se bada khincha ja raha hai",
-    run: ({ doc, assets }) => {
-      const issues: PreflightIssue[] = [];
-      const frameHeight = doc.project.height;
-
-      for (const item of doc.items) {
-        if (!item.assetId) continue;
-        const source = assets[item.assetId];
-        if (!source?.height || !source.width) continue;
-        if (!getItemType(item.type)?.hasVisual) continue;
-
-        /*
-         * ⚠️ Yahan **animations ka sabse bada scale** bhi ginti me aata hai.
-         * Ken Burns 1 → 1.4 me dhundhlapan clip ke *aakhir* me aata hai; sirf
-         * item ki apni scale dekhne se sab theek lagta hai aur blur final MP4
-         * me hi pakda jaata (Section 3A / 10.11).
-         */
-        const totalScale = item.transform.scale * animationsMaxScale(item);
-        const needed = (frameHeight * totalScale) / source.height;
-        if (needed <= UPSCALE_WARN_FACTOR) continue;
-
-        issues.push({
-          ruleId: "upscale",
-          level: "warning",
-          itemId: item.id,
-          message:
-            `"${item.name}" ${source.width}×${source.height} ka hai par ${needed.toFixed(2)}x bada ` +
-            `dikhaya ja raha hai — dhundhla aayega. Saaf dikhne ke liye kam se kam ` +
-            `${Math.ceil(source.width * needed)}×${Math.ceil(source.height * needed)} chahiye.`,
-        });
-      }
-      return issues;
-    },
-  },
-
-  {
-    id: "source-shorter",
-    label: "Clip apne source se lambi hai",
-    run: ({ doc, assets }) => {
-      const issues: PreflightIssue[] = [];
-      const fps = doc.project.fps;
-
-      for (const item of doc.items) {
-        if (!item.assetId) continue;
-        const source = assets[item.assetId];
-        if (!source?.durationMs || source.durationMs <= 0) continue;
-        if (!getItemType(item.type)?.supportsTrim) continue;
-
-        const sourceFrames = Math.round((source.durationMs / 1000) * fps);
-        const needed = item.trimStartFrame + item.durationInFrames * item.playbackRate;
-        if (needed <= sourceFrames + 1) continue;
-
-        issues.push({
-          ruleId: "source-shorter",
-          level: "warning",
-          itemId: item.id,
-          message:
-            `"${item.name}" apne source se lambi hai — aakhri ` +
-            `${framesToSeconds(Math.round((needed - sourceFrames) / item.playbackRate), fps).toFixed(1)}s ` +
-            `me kaala frame aayega.`,
-        });
-      }
-      return issues;
-    },
-  },
-
-  {
-    id: "preset-too-big",
-    label: "Preset project se bada hai",
-    run: ({ doc, presetId }) => {
-      const preset = requireExportPreset(presetId);
-      if (!preset.requiresMinHeight) return [];
-      if (doc.project.height >= preset.requiresMinHeight) return [];
-
-      return [
-        {
-          ruleId: "preset-too-big",
-          level: "warning",
-          message:
-            `"${preset.label}" preset ${preset.requiresMinHeight}p ke liye hai par project ` +
-            `${doc.project.height}p ka hai. File badi hogi, quality behtar nahi — aur "4K" ka ` +
-            `label lagakar upscaled video dena mana hai.`,
-        },
-      ];
-    },
-  },
-
-  {
-    id: "beyond-duration",
-    label: "Clip project ke bahar hai",
-    run: ({ doc }) => {
-      const issues: PreflightIssue[] = [];
-      for (const item of doc.items) {
-        if (item.startFrame < doc.project.durationInFrames) continue;
-        issues.push({
-          ruleId: "beyond-duration",
-          level: "warning",
-          itemId: item.id,
-          message: `"${item.name}" project ke ant ke baad shuru hoti hai — video me dikhegi hi nahi.`,
-        });
-      }
-      return issues;
-    },
-  },
-];
 
 export interface PreflightResult {
   issues: PreflightIssue[];
@@ -303,13 +55,44 @@ export interface PreflightResult {
   canExport: boolean;
 }
 
+/**
+ * Export se pehle ki jaanch (11.4).
+ *
+ * ⚠️ Phase 20 me is function ka **poora dimaag `quality/validate.ts` me chala
+ * gaya**. Yahan ab sirf naam aur shape bachi hai.
+ *
+ * Wajah: Phase 20 me ek asli registry bani (`VALIDATION_RULE_LIST`) jisme har
+ * rule ka `scope` aur `severity` hai. Purane rules ko waise ka waisa chhod dene
+ * par do jagah do list hoti — aur unme se ek dheere-dheere purani padti. Ek
+ * rule kahin theek hota aur doosri jagah wahi bug pada rehta.
+ *
+ * `info` wale issues yahan **nahi** aate: purane callers sirf error/warning
+ * jaante hain, aur unhe warning bana dena jhooth hota (wo rokti nahi par dikhti
+ * chetavni ki tarah hain). Jise recommendations chahiye wo seedha
+ * `validateExportSettings()` bulaye.
+ */
 export function preflight(input: PreflightInput): PreflightResult {
-  const issues: PreflightIssue[] = [];
-  for (const rule of PREFLIGHT_RULES) issues.push(...rule.run(input));
+  const report = validateExportSettings({
+    doc: input.doc,
+    assets: input.assets,
+    presetId: input.presetId,
+  });
 
-  const errors = issues.filter((issue) => issue.level === "error");
-  const warnings = issues.filter((issue) => issue.level === "warning");
-  return { issues, errors, warnings, canExport: errors.length === 0 };
+  const map = (issue: ValidationIssue): PreflightIssue => ({
+    ruleId: issue.ruleId,
+    level: issue.severity === "error" ? "error" : "warning",
+    message: issue.message,
+    ...(issue.itemId === undefined ? {} : { itemId: issue.itemId }),
+  });
+
+  const errors = report.errors.map(map);
+  const warnings = report.warnings.map(map);
+  return {
+    issues: [...errors, ...warnings],
+    errors,
+    warnings,
+    canExport: report.valid,
+  };
 }
 
 /**

@@ -155,6 +155,64 @@ export class R2StorageDriver implements StorageDriver {
       contentType: response.headers.get("content-type"),
     };
   }
+
+  /**
+   * ListObjectsV2 (20.11).
+   *
+   * ⚠️ Jawab XML me aata hai aur yahan use ek regex se padha jaata hai, poora
+   * XML parser laakar nahi. Ye jaan-boojhkar hai: ek dependency sirf iske liye
+   * jodna mehnga hai, aur S3 ka ListObjectsV2 ka jawab bilkul tay shakl ka hota
+   * hai (`<Contents><Key>…</Key><Size>…</Size></Contents>`). Agar kabhi shakl
+   * badli to ye function khaali list dega — aur orphan scan me "kuch nahi mila"
+   * saaf dikhta hai, chup-chaap galat jawab nahi deta.
+   *
+   * 1000 se zyada files par continuation token se aage ki page bhi aati hai.
+   */
+  async list(prefix: string): Promise<StorageObjectInfo[]> {
+    const out: StorageObjectInfo[] = [];
+    let token: string | null = null;
+
+    do {
+      const query: Record<string, string> = {
+        "list-type": "2",
+        prefix,
+        "max-keys": "1000",
+      };
+      if (token) query["continuation-token"] = token;
+
+      const url = presignUrl({
+        method: "GET",
+        host: this.host(),
+        path: `/${this.config.bucket}`,
+        region: REGION,
+        service: SERVICE,
+        accessKeyId: this.config.accessKeyId,
+        secretAccessKey: this.config.secretAccessKey,
+        expiresIn: 120,
+        extraQuery: query,
+      });
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`R2 list fail hui (${response.status}) — prefix "${prefix}"`);
+      }
+      const xml = await response.text();
+
+      for (const match of xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+        const block = match[1] ?? "";
+        const key = /<Key>([\s\S]*?)<\/Key>/.exec(block)?.[1];
+        const size = Number(/<Size>(\d+)<\/Size>/.exec(block)?.[1] ?? "0");
+        if (key) out.push({ key, size: Number.isFinite(size) ? size : 0, contentType: null });
+      }
+
+      const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml);
+      token = truncated
+        ? (/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/.exec(xml)?.[1] ?? null)
+        : null;
+    } while (token);
+
+    return out;
+  }
 }
 
 /** Error body padhne me bhi fail ho sakta hai — usse asli error nahi dabna chahiye. */

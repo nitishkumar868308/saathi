@@ -41,10 +41,13 @@ export * from "./keyframes/interpolate";
 // Quality — Section 3A ka naapne wala hissa (poora validator Phase 20 me)
 export * from "./quality/assetQuality";
 export * from "./quality/preflight";
+export * from "./quality/scale";
+export * from "./quality/validate";
 
 // Storage — sirf contract aur key layout (asli drivers @reel/storage me)
 export * from "./storage/types";
 export * from "./storage/keys";
+export * from "./storage/lifecycle";
 
 // Timeline
 export * from "./timeline/ops";

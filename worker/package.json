@@ -14,7 +14,9 @@
     "render:sample": "tsx scripts/render-sample.ts",
     "render:template": "tsx scripts/render-template.ts",
     "render:mockup": "tsx scripts/render-mockup.ts",
-    "render:captions": "tsx scripts/render-captions.ts"
+    "render:captions": "tsx scripts/render-captions.ts",
+    "cleanup": "tsx scripts/cleanup.ts",
+    "validate:demo": "tsx scripts/validate-demo.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

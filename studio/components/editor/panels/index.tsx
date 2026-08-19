@@ -2,6 +2,7 @@
 
 import {
   Captions,
+  ShieldCheck,
   Clapperboard,
   FolderOpen,
   History,
@@ -15,6 +16,7 @@ import type { ComponentType } from "react";
 
 import { TemplatePanel } from "@/components/editor/panels/TemplatePanel";
 import { CaptionsPanel } from "@/components/editor/panels/CaptionsPanel";
+import { ValidationPanel } from "@/components/editor/panels/ValidationPanel";
 import { BrandPanel } from "@/components/editor/panels/BrandPanel";
 import { MasterAudioPanel } from "@/components/editor/panels/MasterAudioPanel";
 import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
@@ -74,6 +76,12 @@ export const LEFT_PANELS: readonly PanelEntry[] = [
     label: "Captions",
     icon: Captions,
     component: CaptionsPanel,
+  },
+  {
+    id: "quality",
+    label: "Quality",
+    icon: ShieldCheck,
+    component: ValidationPanel,
   },
   {
     id: "renders",

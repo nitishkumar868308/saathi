@@ -42,6 +42,17 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  findOrphans,
+  planCleanup,
+  referencedAssetIds,
+  LOW_RES_MESSAGE,
+  canExport,
+  maxEffectiveScale,
+  requiredSourcePixels,
+  validateAssetQuality,
+  validateExportSettings,
+  validateProjectQuality,
+  type AssetInfo,
   activeWordIndex,
   addCue,
   cueAt,
@@ -152,7 +163,7 @@ import {
   setSceneSlot,
   validateSceneIntegrity,
   EXPORT_PRESETS,
-  PREFLIGHT_RULES,
+  VALIDATION_RULE_LIST,
   estimateExportBytes,
   preflight,
   requireExportPreset,
@@ -2909,8 +2920,10 @@ test("asset chahiye par lagi nahi — error", () => {
 });
 
 test("har rule ka id apna hai (do rule ek naam par nahi)", () => {
+  // Phase 20 me `PREFLIGHT_RULES` `VALIDATION_RULE_LIST` me chala gaya — ek hi
+  // list, taaki ek rule kahin theek ho aur doosri jagah wahi bug pada na rahe.
   const seen = new Set<string>();
-  for (const rule of PREFLIGHT_RULES) {
+  for (const rule of VALIDATION_RULE_LIST) {
     assert.equal(seen.has(rule.id), false, `"${rule.id}" do baar hai`);
     seen.add(rule.id);
   }
@@ -5980,6 +5993,508 @@ test("lambi line par chetavni aati hai, par rukavat nahi", () => {
   assert.deepEqual(cueProblems({ text: "chhoti line" }), []);
   assert.equal(cueProblems({ text: "ek\ndo\nteen" }).length, 1);
   assert.equal(cueProblems({ text: "a".repeat(40) }).length, 1);
+});
+
+
+// ------------------------------------------------------------- Phase 20
+
+section("validation registry (20.1 / 20.2)");
+
+test("har rule me id, severity aur scope hai", () => {
+  for (const rule of VALIDATION_RULE_LIST) {
+    assert.ok(rule.id.length > 0, "id chahiye");
+    assert.ok(["error", "warning", "info"].includes(rule.severity), `${rule.id}: severity galat`);
+    assert.ok(
+      ["project", "item", "asset", "export"].includes(rule.scope),
+      `${rule.id}: scope galat`,
+    );
+  }
+});
+
+test("teeno darwaze apne-apne scope ke rules chalate hain (20.2)", () => {
+  /*
+   * ⚠️ Teeno **wahi** rules chalate hain, copy nahi. Isliye ek rule theek karne
+   * par teeno jagah theek ho jaata hai — aur yahi is registry ka poora point hai.
+   */
+  const { doc, assets } = exportFixture();
+
+  const asset = validateAssetQuality({ doc, assets });
+  const project = validateProjectQuality({ doc, assets });
+  const exported = validateExportSettings({ doc, presetId: "uhd", assets });
+
+  // Asset wale rules teeno me aate hain; export wale sirf aakhri me.
+  assert.ok(project.issues.length >= asset.issues.length);
+  assert.ok(exported.issues.length >= project.issues.length);
+  assert.ok(
+    exported.issues.some((issue) => issue.scope === "export"),
+    "export ki jaanch me export-scope ke rules aane chahiye",
+  );
+  assert.ok(
+    !project.issues.some((issue) => issue.scope === "export"),
+    "project ki jaanch me export ke rules nahi aane chahiye",
+  );
+});
+
+test("report me errors, warnings aur recommendations alag hain", () => {
+  const { doc, assets } = exportFixture();
+  const report = validateExportSettings({ doc, presetId: "standard", assets });
+
+  assert.ok(report.errors.every((issue) => issue.severity === "error"));
+  assert.ok(report.warnings.every((issue) => issue.severity === "warning"));
+  assert.ok(report.recommendations.every((issue) => issue.severity === "info"));
+  assert.equal(report.valid, report.errors.length === 0);
+});
+
+section("upscale ka asli ganit (20.4)");
+
+test("keyframes ka sabse bada scale ginti me aata hai, base nahi", () => {
+  /*
+   * ⚠️ Ye Ken Burns wali galti ka test hai. `transform.scale` 1 hi rehta hai;
+   * badlav keyframes me hota hai, aur blur clip ke **aakhir** me aata hai. Sirf
+   * base dekhne se sab theek lagta hai aur dhundhlapan MP4 me hi pakda jaata.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = addKeyframe(doc, { itemId: id, path: "transform.scale", frame: 0, value: 1 });
+  next = addKeyframe(next, { itemId: id, path: "transform.scale", frame: 60, value: 1.8 });
+
+  assert.equal(maxEffectiveScale(itemById(next, id)), 1.8);
+});
+
+test("keyframes hon to base scale nahi ginte (dono ginne par jhoothi chetavni aati)", () => {
+  /*
+   * Keyframe engine keyframe wali value ko static value ke **upar** nahi lagata,
+   * uski **jagah** chalata hai. Dono ginne par 1.4x Ken Burns 1.96 batata aur
+   * har baar bina wajah chetavni aati.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = setItemProperty(doc, { itemId: id, path: "transform.scale", value: 1.4 });
+  next = addKeyframe(next, { itemId: id, path: "transform.scale", frame: 0, value: 1 });
+  next = addKeyframe(next, { itemId: id, path: "transform.scale", frame: 60, value: 1.4 });
+
+  assert.equal(maxEffectiveScale(itemById(next, id)), 1.4, "1.4 hona chahiye, 1.96 nahi");
+});
+
+test("animation ka scale bhi guna hota hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = setItemProperty(doc, { itemId: id, path: "transform.scale", value: 1.2 });
+  next = addAnimation(next, { itemIds: [id], typeId: "kenburns" });
+  next = setAnimationParam(next, { itemId: id, index: 0, path: "to", value: 1.5 });
+
+  // 1.2 (apna) * 1.5 (animation ka sabse bada) = 1.8
+  assert.ok(Math.abs(maxEffectiveScale(itemById(next, id)) - 1.8) < 1e-9);
+});
+
+test("zoom-pan ke keyframes apne aap ginti me aate hain", () => {
+  // Zoom tool wahi `transform.scale` keyframes banata hai (Phase 18), isliye
+  // uske liye alag code likhna hi nahi pada.
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const next = applyZoomPan(doc, {
+    itemId: id,
+    steps: [
+      { frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } },
+      { frame: 60, rect: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } },
+    ],
+  });
+  assert.ok(Math.abs(maxEffectiveScale(itemById(next, id)) - 2) < 1e-9);
+});
+
+test("required pixels fit ki scale ke saath milte hain", () => {
+  const { doc } = buildFixture();
+  const item = itemById(doc, doc.items[0]!.id);
+  const required = requiredSourcePixels({
+    item,
+    source: { width: 1000, height: 1000 },
+    fitScale: 2,
+  });
+  assert.equal(required.totalScale, 2);
+  assert.equal(required.width, 2000);
+});
+
+section("4K aur low-res (20.5 / 20.9)");
+
+/** 480p image wala doc — 4K par test karne ke liye. */
+function lowResFixture(): { doc: Doc; assets: Record<string, AssetInfo | undefined> } {
+  const base = createEmptyProject({ name: "Low res", presetId: "reel" });
+  const item = createItem("image", {
+    fps: base.project.fps,
+    trackId: base.tracks[0]!.id,
+    name: "Chhoti tasveer",
+    assetId: "as_small",
+    startFrame: 0,
+    durationInFrames: 90,
+  });
+  return {
+    doc: addItem(base, { item }),
+    assets: { as_small: { width: 854, height: 480, durationMs: null } },
+  };
+}
+
+test("4K par low-res asset ka message spec se hu-ba-hu hai (20.5)", () => {
+  /*
+   * ⚠️ Ye message **badalna mana hai**. Wo spec me likha hai aur uspar baahar ke
+   * tools ya test tike ho sakte hain. Isliye test bhi exact string par hai,
+   * "kuch aisa hi" par nahi.
+   */
+  const { doc, assets } = lowResFixture();
+  const report = validateExportSettings({ doc, presetId: "uhd", assets });
+  const issue = report.issues.find((entry) => entry.ruleId === "low-res-for-preset");
+
+  assert.ok(issue, "low-res wala issue aana chahiye");
+  assert.equal(issue?.message, LOW_RES_MESSAGE);
+  assert.equal(issue?.message, "Low-resolution asset detected. This asset may appear blurry in 4K.");
+});
+
+test("standard preset par low-res ki chetavni nahi aati", () => {
+  // 480p image 1080p reel me thodi dhundhli hogi par "4K blurry" wala message
+  // wahan jhooth hoga — wo rule sirf usi preset par lagta hai jo 4K maangta hai.
+  const { doc, assets } = lowResFixture();
+  const report = validateExportSettings({ doc, presetId: "standard", assets });
+  assert.ok(!report.issues.some((entry) => entry.ruleId === "low-res-for-preset"));
+});
+
+test("saare assets 1080p se chhote hon to 4K ki sachchai batayi jaati hai (20.9)", () => {
+  const { doc, assets } = lowResFixture();
+  const report = validateExportSettings({ doc, presetId: "uhd", assets });
+  const info = report.recommendations.find((entry) => entry.ruleId === "no-gain-from-4k");
+
+  assert.ok(info, "4K ki sachchai ek info honi chahiye");
+  assert.equal(info?.severity, "info", "ye jaankari hai, galti nahi — user 4K jaan kar chun sakta hai");
+  assert.ok(info?.message.includes("480p"));
+});
+
+section("Strict tier (20.6)");
+
+test("normal me warning rokti nahi, strict me rokti hai", () => {
+  const { doc, assets } = lowResFixture();
+  const report = validateExportSettings({ doc, presetId: "uhd", assets });
+
+  assert.ok(report.warnings.length > 0, "is fixture me warning honi chahiye");
+  assert.equal(report.valid, true, "koi error nahi hai");
+  assert.equal(canExport(report, "normal"), true);
+  assert.equal(canExport(report, "strict"), false, "strict me chetavni bhi rokti hai");
+});
+
+test("strict preset registry me hai aur uska tier strict hai", () => {
+  const strict = requireExportPreset("strict");
+  assert.equal(strict.tier, "strict");
+  // Baaki sab normal — warna har export ruk jaata.
+  for (const preset of EXPORT_PRESETS.list()) {
+    if (preset.id === "strict") continue;
+    assert.equal(preset.tier, "normal", `${preset.id} ka tier normal hona chahiye`);
+  }
+});
+
+test("error har tier me rokti hai", () => {
+  const base = createEmptyProject({ name: "Khaali" });
+  const report = validateExportSettings({ doc: base, presetId: "standard", assets: {} });
+  assert.equal(canExport(report, "normal"), false);
+  assert.equal(canExport(report, "strict"), false);
+});
+
+section("naye rules (20.3)");
+
+test("padhi na ja sakne wali asset error hai", () => {
+  const { doc } = lowResFixture();
+  const report = validateProjectQuality({
+    doc,
+    assets: { as_small: { width: 854, height: 480, durationMs: null, readable: false } },
+  });
+  assert.ok(report.errors.some((issue) => issue.ruleId === "unreadable-asset"));
+});
+
+test("anjaan font par chetavni aati hai", () => {
+  const base = createEmptyProject({ name: "Font test" });
+  const withTrack = addTrack(base, { typeId: "text" });
+  const trackId = withTrack.tracks[withTrack.tracks.length - 1]!.id;
+
+  const item = createItem("text", {
+    fps: base.project.fps,
+    trackId,
+    name: "Caption",
+    startFrame: 0,
+    durationInFrames: 60,
+  });
+  let doc = addItem(withTrack, { item });
+  doc = setItemProperty(doc, { itemId: item.id, path: "text.fontFamily", value: "MeraApnaFont" });
+
+  const report = validateProjectQuality({ doc, assets: {} });
+  assert.ok(report.warnings.some((issue) => issue.ruleId === "missing-font"));
+});
+
+test("brand token aur CSS stack par font ki chetavni nahi aati", () => {
+  // Dono bilkul theek hain — inpar chetavni dena jhoothi chetavni hai, aur
+  // do-teen jhoothi chetavni ke baad user har chetavni anadekhi kar deta hai.
+  const base = createEmptyProject({ name: "Font test" });
+  const withTrack = addTrack(base, { typeId: "text" });
+  const trackId = withTrack.tracks[withTrack.tracks.length - 1]!.id;
+  const item = createItem("text", {
+    fps: base.project.fps,
+    trackId,
+    name: "Caption",
+    startFrame: 0,
+    durationInFrames: 60,
+  });
+  const doc = addItem(withTrack, { item });
+
+  const report = validateProjectQuality({ doc, assets: {} });
+  assert.ok(!report.warnings.some((issue) => issue.ruleId === "missing-font"));
+});
+
+test("expire hone wali temp asset par chetavni aati hai", () => {
+  const { doc } = lowResFixture();
+  const now = Date.parse("2026-01-10T00:00:00Z");
+
+  const soon = validateAssetQuality({
+    doc,
+    now,
+    assets: {
+      as_small: {
+        width: 854,
+        height: 480,
+        durationMs: null,
+        expiresAt: "2026-01-13T00:00:00Z",
+      },
+    },
+  });
+  assert.ok(soon.warnings.some((issue) => issue.ruleId === "temp-asset-expiring"));
+
+  const later = validateAssetQuality({
+    doc,
+    now,
+    assets: {
+      as_small: {
+        width: 854,
+        height: 480,
+        durationMs: null,
+        expiresAt: "2026-06-01T00:00:00Z",
+      },
+    },
+  });
+  assert.ok(!later.warnings.some((issue) => issue.ruleId === "temp-asset-expiring"));
+});
+
+test("bahut lambi reel par jaankari milti hai (galti nahi)", () => {
+  const base = createEmptyProject({ name: "Lambi" });
+  const item = createItem("image", {
+    fps: base.project.fps,
+    trackId: base.tracks[0]!.id,
+    assetId: "as_x",
+    startFrame: 0,
+    durationInFrames: base.project.fps * 120,
+  });
+  const doc = addItem(base, { item });
+
+  const report = validateProjectQuality({
+    doc,
+    assets: { as_x: { width: 4000, height: 4000, durationMs: null } },
+  });
+  const long = report.recommendations.find((issue) => issue.ruleId === "long-reel");
+  assert.ok(long, "lambi reel par jaankari milni chahiye");
+  assert.equal(long?.severity, "info");
+});
+
+test("loudness target se door ho to chetavni", () => {
+  const { doc, assets } = lowResFixture();
+  const off = validateExportSettings({
+    doc,
+    presetId: "standard",
+    assets,
+    measured: { integratedLufs: -8 },
+  });
+  assert.ok(off.warnings.some((issue) => issue.ruleId === "loudness-off-target"));
+
+  const fine = validateExportSettings({
+    doc,
+    presetId: "standard",
+    assets,
+    measured: { integratedLufs: -14.5 },
+  });
+  assert.ok(!fine.warnings.some((issue) => issue.ruleId === "loudness-off-target"));
+});
+
+test("issue me itemId hota hai taaki UI 'Dikhao' kar sake (20.8)", () => {
+  /*
+   * Iske bina 40-second ki reel me "koi ek clip dhundhla hai" padh kar user ko
+   * poori timeline khangalni padti hai — aur wo aksar chhod deta hai.
+   */
+  const { doc } = lowResFixture();
+  const scaled = setItemProperty(doc, {
+    itemId: doc.items[0]!.id,
+    path: "transform.scale",
+    value: 4,
+  });
+  const report = validateProjectQuality({
+    doc: scaled,
+    assets: { as_small: { width: 854, height: 480, durationMs: null } },
+  });
+
+  const upscale = report.warnings.find((issue) => issue.ruleId === "upscale");
+  assert.ok(upscale?.itemId, "upscale ke issue par itemId hona chahiye");
+  assert.ok(typeof upscale?.data?.neededWidth === "number", "auto-fix ke liye number chahiye");
+});
+
+test("purana preflight() abhi bhi chalta hai aur wahi jawab deta hai", () => {
+  /*
+   * Phase 11 ke callers `preflight()` bulate hain. Uska dimaag ab validator me
+   * hai; ye test pakka karta hai ki puraana raasta toota nahi.
+   */
+  const base = createEmptyProject({ name: "Khaali" });
+  const result = preflight({ doc: base, presetId: "standard", assets: {} });
+  assert.equal(result.canExport, false);
+  assert.ok(result.errors.some((issue) => issue.ruleId === "empty-timeline"));
+
+  // `info` wale issues purane roop me nahi aate — unhe warning banana jhooth hota.
+  const { doc, assets } = lowResFixture();
+  const withInfo = preflight({ doc, presetId: "uhd", assets });
+  assert.ok(!withInfo.issues.some((issue) => issue.ruleId === "no-gain-from-4k"));
+});
+
+
+section("asset lifecycle cleanup ka faisla (20.10 / 20.15)");
+
+/** Ek doc jisme di gayi asset lagi ho. */
+function docUsing(assetId: string | null): Doc {
+  const base = createEmptyProject({ name: "Cleanup fixture" });
+  if (assetId === null) return base;
+  return addItem(base, {
+    item: createItem("image", {
+      fps: base.project.fps,
+      trackId: base.tracks[0]!.id,
+      assetId,
+      startFrame: 0,
+      durationInFrames: 30,
+    }),
+  });
+}
+
+const NOW = Date.parse("2026-03-01T00:00:00Z");
+const PAST = "2026-02-01T00:00:00Z";
+const FUTURE = "2026-04-01T00:00:00Z";
+
+test("expire ho chuki aur kahin use na hone wali temp asset mitne layak hai", () => {
+  const plan = planCleanup({
+    assets: [{ id: "as_1", key: "assets/1.png", lifecycle: "temporary", expiresAt: PAST, bytes: 500 }],
+    docs: [docUsing(null)],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 1);
+  assert.equal(plan.freedBytes, 500);
+});
+
+test("permanent asset kabhi nahi mit'ti, expiry ho ya na ho", () => {
+  const plan = planCleanup({
+    assets: [{ id: "as_1", key: "assets/1.png", lifecycle: "permanent", expiresAt: PAST }],
+    docs: [docUsing(null)],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 0);
+  assert.equal(plan.notExpired.length, 0, "permanent to list me aati hi nahi");
+});
+
+test("referenced temp asset expiry ke baad bhi bach jaati hai", () => {
+  /*
+   * ⚠️ Ye is poore system ka sabse zaroori niyam hai. Expiry ka matlab "ab
+   * shayad kisi ko chahiye nahi" hai, "ab ye kisi project me nahi hai" nahi.
+   * User ne temp asset ko apni reel me daal diya ho to wo asset us reel ka hissa
+   * hai — expiry beetne se reel toot nahi sakti.
+   */
+  const plan = planCleanup({
+    assets: [{ id: "as_1", key: "assets/1.png", lifecycle: "temporary", expiresAt: PAST }],
+    docs: [docUsing("as_1")],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 0);
+  assert.equal(plan.keptBecauseUsed.length, 1);
+});
+
+test("ek project me na ho par doosre me ho — phir bhi bach jaati hai", () => {
+  // Duplicate karne par ek hi temp asset do project me hoti hai; ek se hatane
+  // par doosre me abhi bhi chahiye hoti hai.
+  const plan = planCleanup({
+    assets: [{ id: "as_1", key: "assets/1.png", lifecycle: "temporary", expiresAt: PAST }],
+    docs: [docUsing(null), docUsing("as_1")],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 0);
+});
+
+test("abhi expire na hui asset ko haath nahi lagta", () => {
+  const plan = planCleanup({
+    assets: [{ id: "as_1", key: "assets/1.png", lifecycle: "temporary", expiresAt: FUTURE }],
+    docs: [docUsing(null)],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 0);
+  assert.equal(plan.notExpired.length, 1);
+});
+
+test("bina expiry wali temp asset kabhi nahi mit'ti", () => {
+  // Wo aksar abhi ban rahi hoti hai (expiry set hone se pehle) — use mitana ek
+  // chalti hui upload ke beech me use mita dene jaisa hai.
+  const plan = planCleanup({
+    assets: [{ id: "as_1", key: "assets/1.png", lifecycle: "temporary", expiresAt: null }],
+    docs: [docUsing(null)],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 0);
+  assert.equal(plan.notExpired.length, 1);
+});
+
+test("brand ka logo aur watermark bhi 'use me' ginte hain", () => {
+  /*
+   * Wo item nahi hote par asset hote hain (Phase 17). Chhodne par ek din
+   * watermark ka logo cleanup me chala jaata aur poori brand ki reels me wo
+   * gayab ho jaata — bina kisi error ke.
+   */
+  const base = createEmptyProject({ name: "Brand" });
+  const withLogo = setWatermark(base, { enabled: true, assetId: "as_logo" });
+
+  const plan = planCleanup({
+    assets: [{ id: "as_logo", key: "assets/logo.png", lifecycle: "temporary", expiresAt: PAST }],
+    docs: [withLogo],
+    now: NOW,
+  });
+  assert.equal(plan.deletable.length, 0);
+  assert.equal(plan.keptBecauseUsed.length, 1);
+});
+
+test("referencedAssetIds items aur brand dono se uthata hai", () => {
+  const base = createEmptyProject({ name: "Dono" });
+  const withItem = addItem(base, {
+    item: createItem("image", {
+      fps: base.project.fps,
+      trackId: base.tracks[0]!.id,
+      assetId: "as_item",
+      startFrame: 0,
+      durationInFrames: 30,
+    }),
+  });
+  const doc = setWatermark(withItem, { enabled: true, assetId: "as_logo" });
+
+  const ids = referencedAssetIds(doc);
+  assert.ok(ids.has("as_item"));
+  assert.ok(ids.has("as_logo"));
+});
+
+test("orphan scan dono taraf dekhta hai (20.11)", () => {
+  const { inStorageOnly, inDbOnly } = findOrphans({
+    assets: [
+      { id: "as_1", key: "assets/1.png" },
+      { id: "as_2", key: "assets/2.png" },
+    ],
+    keys: ["assets/1.png", "assets/3.png"],
+  });
+
+  assert.deepEqual(inStorageOnly, ["assets/3.png"], "storage me hai par DB me nahi");
+  assert.deepEqual(
+    inDbOnly.map((asset) => asset.id),
+    ["as_2"],
+    "DB me hai par storage me nahi",
+  );
 });
 
 

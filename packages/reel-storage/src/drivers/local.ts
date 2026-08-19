@@ -1,5 +1,6 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve, sep } from "node:path";
+import type { Dirent } from "node:fs";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { assertValidKey } from "@reel/core/storage/keys";
 import type {
@@ -103,6 +104,36 @@ export class LocalStorageDriver implements StorageDriver {
       if (isNotFound(error)) return null;
       throw error;
     }
+  }
+
+  async list(prefix: string): Promise<StorageObjectInfo[]> {
+    const root = this.pathFor("");
+    const out: StorageObjectInfo[] = [];
+
+    // Prefix ke andar poori gehrai tak — assets nested folders me hote hain.
+    const walk = async (dir: string): Promise<void> => {
+      let entries: Dirent[];
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        // Folder hai hi nahi — "kuch nahi mila" koi error nahi hai.
+        return;
+      }
+      for (const entry of entries) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(full);
+          continue;
+        }
+        const key = relative(root, full).split(sep).join("/");
+        if (!key.startsWith(prefix)) continue;
+        const info = await stat(full);
+        out.push({ key, size: info.size, contentType: null });
+      }
+    };
+
+    await walk(root);
+    return out;
   }
 }
 

@@ -54,6 +54,16 @@ export interface ExportPresetEntry {
    * validation isse "4K preset par 1080p project" wali galti pakdegi.
    */
   requiresMinHeight: number | null;
+  /**
+   * Quality tier (20.6).
+   *
+   * `"strict"` me **warnings bhi export rok deti hain**, sirf errors nahi. Yahi
+   * Strict ka poora matlab hai: "mujhe pakka pata hona chahiye ki kuch bhi
+   * dhundhla ya adhoora nahi hai". Baaki tiers me warning dikhti hai aur
+   * "Export anyway" chalta hai — kyunki aksar user ko pata hota hai ki wo
+   * warning uske liye maayne nahi rakhti.
+   */
+  tier: "normal" | "strict";
 }
 
 export const DEFAULT_EXPORT_PRESET_ID = "standard";
@@ -87,6 +97,7 @@ export const BUILTIN_EXPORT_PRESETS: readonly ExportPresetEntry[] = [
     audioBitrateKbps: 128,
     scaleTo: null,
     requiresMinHeight: null,
+    tier: "normal",
   },
   {
     id: "standard",
@@ -97,6 +108,7 @@ export const BUILTIN_EXPORT_PRESETS: readonly ExportPresetEntry[] = [
     audioBitrateKbps: 192,
     scaleTo: null,
     requiresMinHeight: null,
+    tier: "normal",
   },
   {
     id: "high",
@@ -107,6 +119,7 @@ export const BUILTIN_EXPORT_PRESETS: readonly ExportPresetEntry[] = [
     audioBitrateKbps: 256,
     scaleTo: null,
     requiresMinHeight: null,
+    tier: "normal",
   },
   {
     id: "uhd",
@@ -117,5 +130,25 @@ export const BUILTIN_EXPORT_PRESETS: readonly ExportPresetEntry[] = [
     audioBitrateKbps: 320,
     scaleTo: null,
     requiresMinHeight: 2160,
+    tier: "normal",
+  },
+  {
+    /*
+     * Strict — quality ka darwaza (20.6).
+     *
+     * ⚠️ Ye ek **alag preset** hai, `high` par ek checkbox nahi. Wajah: tier doc
+     * me save hota hai (`exportPresetId`), isliye "maine strict me export kiya
+     * tha" baad me bhi pata chalta hai. Checkbox hone par wo baat kahin darj hi
+     * nahi hoti.
+     */
+    id: "strict",
+    label: "Strict Quality",
+    hint: "Koi bhi chetavni ho to export rukega — client ko bhejne wali reel ke liye.",
+    crf: 16,
+    x264Preset: "slow",
+    audioBitrateKbps: 256,
+    scaleTo: null,
+    requiresMinHeight: null,
+    tier: "strict",
   },
 ];

@@ -1,5 +1,6 @@
 import { dbToGain, fadeGain, type FadeShape } from "../config/audio";
 import { resolveItemValue } from "../keyframes/interpolate";
+import { getItemType } from "../registry/index";
 import { itemEndFrame, type Doc, type Item, type Track } from "../schema/project";
 
 /**
@@ -204,9 +205,18 @@ export function estimateMixPeak(doc: Doc): { peak: number; frame: number } {
       if (frame < item.startFrame || frame >= itemEndFrame(item)) continue;
       const track = trackById.get(item.trackId);
       if (!track) continue;
-      // Sirf awaaz wale items ginti me — shape/text ka apna volume hota hai par
-      // wo kabhi bajta nahi.
+      /*
+       * Sirf **awaaz wale** items ginti me.
+       *
+       * ⚠️ Pehle yahan sirf `assetId === null` dekha jaata tha, aur wo ek asli
+       * bug tha: image aur video-bina-audio jaise items ke paas bhi `assetId`
+       * hota hai aur unka `audio.volume` default 1 hota hai. Nateeja: do image
+       * wali reel par bhi "clipping ka khatra 2.00" wali chetavni aati thi,
+       * jabki wahan awaaz thi hi nahi. Aisi jhoothi chetavni sabse bura karti
+       * hai — do-teen baar ke baad user har chetavni anadekhi kar deta hai.
+       */
       if (item.assetId === null) continue;
+      if (!getItemType(item.type)?.hasAudio) continue;
       sum += itemGainAt({
         doc,
         item,
