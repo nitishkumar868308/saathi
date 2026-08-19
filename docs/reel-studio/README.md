@@ -277,7 +277,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 18 | in progress — phone frame + zoom-pan poore, MP4 se naape gaye (2x zoom par pixels me 1.99x); over-zoom par exact numbers; tap indicator jaan-boojhkar skip | 2026-08-20 |
 | 19 | in progress — captions poore (SRT/VTT round-trip exact, 7 styles); MP4 se naapa: karaoke ka highlight 272→533 px chala, Devanagari sahi bana; 19.3 (cue blocks) nahi bana | 2026-08-20 |
 | 20 | in progress — validator registry poora (17 rules, teen darwaze), Strict tier, cleanup ka faisla test se pakka; ek jhoothi-chetavni wala bug pakda; cleanup ka asli chalna worker/.env par ruka | 2026-08-20 |
-| 21 | not started | — |
+| 21 | in progress — AI provider + mock + Gemini adapter + reviewable diff; zero-AI guard (10 edits, 0 calls) aur key-off dono sach me chalaye gaye; asli Gemini call GEMINI_API_KEY par ruki | 2026-08-20 |
 | 22 | not started | — |
 | 23 | not started | — |
 | 24 | not started | — |

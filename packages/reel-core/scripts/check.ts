@@ -42,6 +42,17 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  splitAtFrame,
+  MockAiProvider,
+  OPS,
+  SCENE_TYPES,
+  applyProposal,
+  buildProposal,
+  mockAiProvider,
+  resetRegistries,
+  sceneTypesForPrompt,
+  type AIProvider,
+  type AiScript,
   findOrphans,
   planCleanup,
   referencedAssetIds,
@@ -6495,6 +6506,346 @@ test("orphan scan dono taraf dekhta hai (20.11)", () => {
     ["as_2"],
     "DB me hai par storage me nahi",
   );
+});
+
+
+// ------------------------------------------------------------- Phase 21
+
+section("AI editing me kabhi nahi bulaya jaata (21.12)");
+
+/**
+ * Provider ka jasoos — har call ginta hai.
+ *
+ * ⚠️ Ye test is poore phase ka sabse zaroori test hai. "AI optional hai" ek
+ * daawa hai; ye us daawe ka **saboot** hai. Ek din koi `moveItems` ke andar
+ * "AI se poochh lo ki ye theek lag raha hai" jaisa kuch daal de — ye test usi
+ * din laal ho jaayega.
+ */
+function spyProvider(): { provider: AIProvider; calls: () => number } {
+  let calls = 0;
+  const base = new MockAiProvider();
+
+  const provider: AIProvider = {
+    name: "spy",
+    isConfigured: () => false,
+    generateScript: (input) => {
+      calls += 1;
+      return base.generateScript(input);
+    },
+    suggestCaptions: (input) => {
+      calls += 1;
+      return base.suggestCaptions(input);
+    },
+    suggestAnimations: (input) => {
+      calls += 1;
+      return base.suggestAnimations(input);
+    },
+    suggestTransitions: (input) => {
+      calls += 1;
+      return base.suggestTransitions(input);
+    },
+    suggestAssets: (input) => {
+      calls += 1;
+      return base.suggestAssets(input);
+    },
+  };
+  return { provider, calls: () => calls };
+}
+
+test("move / trim / split / transition / text / volume / export me ek bhi AI call nahi", () => {
+  const spy = spyProvider();
+  void spy.provider;
+
+  const { doc, ids } = chainFixture();
+  let next = doc;
+
+  // Har wo cheez jo user rozana karta hai.
+  next = moveItems(next, { itemIds: [ids[1]!], deltaFrames: 20 });
+  next = trimItemStart(next, { itemId: ids[1]!, deltaFrames: 5 });
+  next = trimItemEnd(next, { itemId: ids[1]!, deltaFrames: -5 });
+  next = splitAtFrame(next, { frame: 150 });
+  next = setTransition(next, { itemIds: [ids[0]!], side: "out", type: "fade", durationInFrames: 10 });
+  next = setItemsProperty(next, { itemIds: [ids[0]!], path: "audio.volume", value: 0.5 });
+  next = duplicateItems(next, { itemIds: [ids[0]!] });
+  next = deleteItems(next, { itemIds: [ids[2]!] });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 0, value: 1 });
+  next = addEffect(next, { itemIds: [ids[0]!], typeId: "blur" });
+
+  // Export ki jaanch bhi.
+  validateExportSettings({ doc: next, presetId: "standard", assets: {} });
+  estimateExportBytes(next, "standard");
+
+  assert.equal(spy.calls(), 0, "editing me AI ki ek bhi call nahi honi chahiye");
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("ops ki poori list me kahin 'ai' naam ka op nahi hai", () => {
+  /*
+   * Doosra taala: agar kabhi koi "AI se theek karo" wala op jud jaaye to wo
+   * `OPS` me dikhega — aur tab ye test poochhega ki wo kya kar raha hai.
+   */
+  /*
+   * ⚠️ Naam ko **shabdon me tod kar** dekha jaata hai, seedha `/ai/` se nahi.
+   * `repairScenes` me bhi "ai" hai — aur wo ek bilkul aam op hai. Aisa test
+   * jhoothi galti dikhata hai, aur do-teen baar ke baad log use hata dete hain.
+   */
+  const words = (name: string) => name.replace(/([A-Z])/g, " $1").toLowerCase().split(/\s+/);
+  const aiOps = Object.keys(OPS).filter((name) =>
+    words(name).some((word) => word === "ai" || word === "gemini" || word === "llm"),
+  );
+  assert.deepEqual(aiOps, [], `AI wale ops mile: ${aiOps.join(", ")}`);
+});
+
+section("mock provider (21.2)");
+
+test("mock kabhi 'configured' hone ka daawa nahi karta", () => {
+  /*
+   * ⚠️ Ye jaan-boojhkar hai. Mock kaam karta hai par wo **AI nahi hai**, aur UI
+   * ko yahi sach dikhana chahiye. `true` lauta dene par user ko lagta ki AI chal
+   * raha hai aur uske scenes AI ke hain, jabki wo sirf uski apni kahani ke
+   * tukde hain.
+   */
+  assert.equal(mockAiProvider.isConfigured(), false);
+});
+
+test("mock ke scenes asli registry ke types se bante hain", async () => {
+  const result = await mockAiProvider.generateScript({
+    story: "Papa pareshan hain. Rahul unhe app dikhata hai. Kaam ho jaata hai.",
+    language: "hinglish",
+    durationSeconds: 20,
+    aspect: "9:16",
+    sceneTypes: sceneTypesForPrompt(),
+  });
+
+  assert.ok(result.data.scenes.length >= 3);
+  const known = new Set(listSceneTypes().map((entry) => entry.id));
+  for (const scene of result.data.scenes) {
+    assert.ok(known.has(scene.type), `"${scene.type}" registry me nahi hai`);
+  }
+  assert.equal(result.usage.calls, 0, "mock koi network call nahi karta");
+});
+
+test("khaali kahani par bhi ek scene banta hai", () => {
+  // Khaali proposal user ko atka deta hai ("Generate dabaya, kuch nahi hua").
+  return mockAiProvider
+    .generateScript({
+      story: "",
+      language: "hinglish",
+      durationSeconds: 10,
+      aspect: "9:16",
+      sceneTypes: sceneTypesForPrompt(),
+    })
+    .then((result) => {
+      assert.ok(result.data.scenes.length >= 1);
+    });
+});
+
+section("prastaav — doc me seedha kuch nahi jaata (21.9)");
+
+const SAMPLE_SCRIPT: AiScript = {
+  summary: "Teen scene",
+  scenes: [
+    { type: "text", name: "Hook", durationSeconds: 3, slots: { text: "Papa pareshan the" }, reason: "" },
+    { type: "text", name: "Baat", durationSeconds: 3, slots: { text: "Ab kaam ghar se" }, reason: "" },
+    { type: "cta", name: "CTA", durationSeconds: 3, slots: { text: "Aaj try karo" }, reason: "" },
+  ],
+};
+
+test("buildProposal doc ko chhoota bhi nahi", () => {
+  const base = createEmptyProject({ name: "AI test" });
+  const before = JSON.stringify(base);
+
+  const proposal = buildProposal({ doc: base, script: SAMPLE_SCRIPT });
+  assert.equal(JSON.stringify(base), before, "doc bilkul waisa ka waisa rehna chahiye");
+  assert.equal(proposal.entries.length, 3);
+  assert.ok(proposal.entries.every((entry) => entry.action === "add"));
+});
+
+test("sirf manzoor ki hui entries lagti hain", () => {
+  const base = createEmptyProject({ name: "AI test" });
+  const proposal = buildProposal({ doc: base, script: SAMPLE_SCRIPT });
+
+  const result = applyProposal({
+    doc: base,
+    proposal,
+    // Beech wala reject.
+    acceptedIds: [proposal.entries[0]!.id, proposal.entries[2]!.id],
+  });
+
+  assert.equal(result.applied, 2);
+  assert.equal(result.doc.scenes.length, 2);
+  assert.equal(result.skipped.length, 1);
+  assert.equal(result.skipped[0]?.reason, "user ne manzoor nahi kiya");
+  assert.ok(safeParseDoc(result.doc).success);
+});
+
+test("anjaan scene type apne aap ruk jaata hai, par chup-chaap nahi", () => {
+  const base = createEmptyProject({ name: "AI test" });
+  const proposal = buildProposal({
+    doc: base,
+    script: {
+      summary: "",
+      scenes: [
+        { type: "koi-nahi", name: "Galat", durationSeconds: 3, slots: {}, reason: "" },
+        { type: "text", name: "Sahi", durationSeconds: 3, slots: { text: "ok" }, reason: "" },
+      ],
+    },
+  });
+
+  assert.ok(proposal.entries[0]?.problem, "galat type par wajah likhi honi chahiye");
+  assert.equal(proposal.entries[1]?.problem, null);
+
+  // Zabardasti manzoor karne par bhi wo nahi banta.
+  const result = applyProposal({
+    doc: base,
+    proposal,
+    acceptedIds: proposal.entries.map((entry) => entry.id),
+  });
+  assert.equal(result.applied, 1);
+  assert.ok(result.skipped[0]?.reason.includes("koi-nahi"));
+});
+
+test("AI se bane scene par aam ops waise ke waise chalte hain (21.7)", () => {
+  /*
+   * Yahi is poore design ka point hai: AI ke liye koi alag raasta nahi hai.
+   * `addScene` wahi op hai jo "scene jodo" button chalata hai.
+   */
+  const base = createEmptyProject({ name: "AI test" });
+  const proposal = buildProposal({ doc: base, script: SAMPLE_SCRIPT });
+  const { doc } = applyProposal({
+    doc: base,
+    proposal,
+    acceptedIds: proposal.entries.map((entry) => entry.id),
+  });
+
+  const first = doc.items[0] as Item;
+  const moved = moveItems(doc, { itemIds: [first.id], deltaFrames: 30 });
+  assert.equal(itemById(moved, first.id).startFrame, first.startFrame + 30);
+
+  const split = splitAtFrame(doc, { frame: first.startFrame + 30 });
+  assert.ok(split.items.length > doc.items.length, "split waise hi chalta hai");
+});
+
+test("asset ka naam library me na mile to slot khaali rehta hai, id bani nahi jaati", () => {
+  /*
+   * ⚠️ AI kabhi asset "bana" nahi sakta (21.8). Wo ek bhoomika deta hai
+   * (`character:rahul`); use asli id me badalna hamara kaam hai. Na mile to
+   * slot khaali — ek nakli id likh dena sabse bura hota (clip chup-chaap khaali
+   * reh jaati aur wajah kahin nahi dikhti).
+   */
+  const base = createEmptyProject({ name: "AI test" });
+  const proposal = buildProposal({
+    doc: base,
+    script: {
+      summary: "",
+      scenes: [
+        {
+          type: "image",
+          name: "Tasveer",
+          durationSeconds: 3,
+          slots: { image: "character:rahul" },
+          reason: "",
+        },
+      ],
+    },
+  });
+
+  const without = applyProposal({
+    doc: base,
+    proposal,
+    acceptedIds: [proposal.entries[0]!.id],
+  });
+  assert.equal(without.applied, 0, "bina asset ke image scene nahi banta");
+  assert.ok(without.skipped.some((entry) => entry.reason.includes("character:rahul")));
+
+  // Naam mil jaaye to bilkul banta hai.
+  const withAsset = applyProposal({
+    doc: base,
+    proposal,
+    acceptedIds: [proposal.entries[0]!.id],
+    assetByRole: { "character:rahul": "as_rahul" },
+  });
+  assert.equal(withAsset.applied, 1);
+  assert.equal(withAsset.doc.items[0]?.assetId, "as_rahul");
+});
+
+test("replace mode purane scenes ko dikhata hai, chhupata nahi", () => {
+  const base = createEmptyProject({ name: "AI test" });
+  const first = buildProposal({ doc: base, script: SAMPLE_SCRIPT });
+  const { doc } = applyProposal({
+    doc: base,
+    proposal: first,
+    acceptedIds: first.entries.map((entry) => entry.id),
+  });
+
+  const replace = buildProposal({
+    doc,
+    script: { summary: "", scenes: [SAMPLE_SCRIPT.scenes[0] as never] },
+    mode: "replace",
+  });
+
+  assert.equal(replace.entries[0]?.action, "replace");
+  // Bache hue do scenes ki apni `keep` entry — warna user ko lagta hai AI ne
+  // unhe bhi banaya.
+  assert.equal(replace.entries.filter((entry) => entry.action === "keep").length, 2);
+});
+
+test("default mode append hai — galti se poora project nahi mit'ta", () => {
+  const base = createEmptyProject({ name: "AI test" });
+  const first = buildProposal({ doc: base, script: SAMPLE_SCRIPT });
+  const { doc } = applyProposal({
+    doc: base,
+    proposal: first,
+    acceptedIds: first.entries.map((entry) => entry.id),
+  });
+
+  const again = buildProposal({ doc, script: SAMPLE_SCRIPT });
+  assert.ok(
+    again.entries.every((entry) => entry.action === "add"),
+    "bina maange kuch replace nahi hona chahiye",
+  );
+});
+
+section("prompt ki scene list registry se aati hai (21.5)");
+
+test("sceneTypesForPrompt registry ki poori list deta hai", () => {
+  const forPrompt = sceneTypesForPrompt();
+  assert.equal(forPrompt.length, listSceneTypes().length);
+
+  for (const entry of forPrompt) {
+    assert.ok(entry.id.length > 0);
+    assert.ok(entry.label.length > 0);
+    // Slots bhi jaate hain — bina unke AI ko pata hi nahi chalta ki kya bharna hai.
+    assert.ok(Array.isArray(entry.slots));
+  }
+});
+
+test("naya scene type apne aap prompt me aa jaata hai", () => {
+  /*
+   * Ye "dynamic-first" ka seedha saboot hai: registry me kuch jodne par prompt
+   * apne aap badal jaata hai. Prompt me list likhi hoti to naya type kabhi AI
+   * tak pahunchta hi nahi, aur wo chup-chaap purane types hi use karta rehta.
+   */
+  const before = sceneTypesForPrompt().length;
+  SCENE_TYPES.replace({
+    id: "test_scene",
+    label: "Test",
+    icon: "Square",
+    hint: "sirf test ke liye",
+    group: "special",
+    slots: [],
+    defaultDurationSeconds: 2,
+    build: () => [],
+  });
+
+  try {
+    const after = sceneTypesForPrompt();
+    assert.equal(after.length, before + 1);
+    assert.ok(after.some((entry) => entry.id === "test_scene"));
+  } finally {
+    // Registry ko wapas saaf karo — warna aage ke test ispar theek jaate.
+    resetRegistries();
+  }
 });
 
 

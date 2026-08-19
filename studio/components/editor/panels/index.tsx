@@ -2,6 +2,7 @@
 
 import {
   Captions,
+  Sparkles,
   ShieldCheck,
   Clapperboard,
   FolderOpen,
@@ -17,6 +18,7 @@ import type { ComponentType } from "react";
 import { TemplatePanel } from "@/components/editor/panels/TemplatePanel";
 import { CaptionsPanel } from "@/components/editor/panels/CaptionsPanel";
 import { ValidationPanel } from "@/components/editor/panels/ValidationPanel";
+import { AiPanel } from "@/components/editor/panels/AiPanel";
 import { BrandPanel } from "@/components/editor/panels/BrandPanel";
 import { MasterAudioPanel } from "@/components/editor/panels/MasterAudioPanel";
 import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
@@ -58,6 +60,12 @@ export const LEFT_PANELS: readonly PanelEntry[] = [
     label: "Audio",
     icon: Volume2,
     component: MasterAudioPanel,
+  },
+  {
+    id: "ai",
+    label: "AI",
+    icon: Sparkles,
+    component: AiPanel,
   },
   {
     id: "templates",

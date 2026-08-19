@@ -70,3 +70,6 @@ export * from "./captions/cues";
 export * from "./templates/schema";
 export * from "./templates/apply";
 export * from "./templates/builtins";
+export * from "./ai/types";
+export * from "./ai/mock";
+export * from "./ai/proposal";
