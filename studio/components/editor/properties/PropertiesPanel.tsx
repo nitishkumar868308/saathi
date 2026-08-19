@@ -17,6 +17,7 @@ import { useState } from "react";
 
 import { AnimationSection } from "@/components/editor/properties/AnimationSection";
 import { AudioSection } from "@/components/editor/properties/AudioSection";
+import { AudioSourceSection } from "@/components/editor/properties/AudioSourceSection";
 import { ClipSection } from "@/components/editor/properties/ClipSection";
 import { MockupSection } from "@/components/editor/properties/MockupSection";
 import { EffectsSection } from "@/components/editor/properties/EffectsSection";
@@ -94,6 +95,7 @@ export function PropertiesPanel() {
       <ClipSection items={items} />
       <MockupSection items={items} />
       <AudioSection items={items} localFrame={playheadFrame - first.startFrame} />
+      <AudioSourceSection items={items} />
       <AnimationSection items={items} />
       <EffectsSection items={items} localFrame={playheadFrame - first.startFrame} />
 

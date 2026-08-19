@@ -42,6 +42,11 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  CLEANUP_STEPS,
+  DEFAULT_CLEANUP,
+  VOICE_TARGET_LUFS,
+  cleanupFilterChain,
+  cleanupFilterString,
   splitAtFrame,
   MockAiProvider,
   OPS,
@@ -6846,6 +6851,178 @@ test("naya scene type apne aap prompt me aa jaata hai", () => {
     // Registry ko wapas saaf karo — warna aage ke test ispar theek jaate.
     resetRegistries();
   }
+});
+
+
+// ------------------------------------------------------------- Phase 22
+
+section("cleanup chain — data hai, pipeline nahi (22.7)");
+
+test("har kadam ka filter apne defaults se banta hai", () => {
+  for (const step of CLEANUP_STEPS) {
+    const filter = step.filter(step.defaults);
+    assert.ok(filter && filter.length > 0, `${step.id} ka filter khaali hai`);
+  }
+});
+
+test("default me shor aur deesser BAND hain", () => {
+  /*
+   * ⚠️ Dono achhi recording ko kharab kar sakte hain (awaaz "underwater" ya
+   * patli ho jaati hai). Sab kuch on kar dena aasan hota par tab har voice thodi
+   * si nakli lagti — aur wajah kabhi pakad me nahi aati.
+   */
+  assert.equal(DEFAULT_CLEANUP.enabled.noiseReduction, false);
+  assert.equal(DEFAULT_CLEANUP.enabled.deesser, false);
+  assert.equal(DEFAULT_CLEANUP.enabled.normalize, true);
+  assert.equal(DEFAULT_CLEANUP.enabled.limiter, true);
+});
+
+test("kram badla ja sakta hai", () => {
+  const one = cleanupFilterChain({ enabled: { highpass: true, normalize: true } });
+  const two = cleanupFilterChain({
+    enabled: { highpass: true, normalize: true },
+    order: ["normalize", "highpass"],
+  });
+  assert.notDeepEqual(one, two, "kram badalne se chain badalni chahiye");
+});
+
+test("limiter hamesha aakhir me jaata hai, chahe kahin bhi rakho", () => {
+  /*
+   * ⚠️ Uske baad kuch bhi lagane par peak dobara upar ja sakta hai aur
+   * `-1 dBTP` ka vaada toot jaata hai — aur wo vaada Section 3A me likha hai.
+   * Isliye niyam yahan lagta hai, UI par nahi chhoda gaya.
+   */
+  const chain = cleanupFilterChain({
+    enabled: { limiter: true, highpass: true, normalize: true },
+    order: ["limiter", "highpass", "normalize"],
+  });
+  assert.ok(chain[chain.length - 1]?.startsWith("alimiter"), chain.join(" | "));
+  assert.equal(chain.length, 3);
+});
+
+test("band kiye hue kadam chain me nahi aate", () => {
+  const chain = cleanupFilterChain({ enabled: { highpass: true, noiseReduction: false } });
+  assert.equal(chain.length, 1);
+  assert.ok(chain[0]?.startsWith("highpass"));
+});
+
+test("sab band karne par chain khaali (null) hoti hai", () => {
+  // `""` lautana galat hota — ffmpeg `-af ""` par phat jaata hai.
+  assert.equal(cleanupFilterString({ enabled: {} }), null);
+});
+
+test("ek hi kadam do baar likhne par bhi ek hi baar lagta hai", () => {
+  const chain = cleanupFilterChain({
+    enabled: { highpass: true },
+    order: ["highpass", "highpass"],
+  });
+  assert.equal(chain.length, 1);
+});
+
+test("params se filter badalta hai", () => {
+  const soft = cleanupFilterChain({ enabled: { highpass: true }, params: { highpass: { hz: 60 } } });
+  assert.ok(soft[0]?.includes("f=60"), soft[0]);
+});
+
+test("voice ka target -16 LUFS hai (mix se alag)", () => {
+  // Mix -14 par jaata hai; voice usse thoda neeche, taaki mix me jagah bache.
+  assert.equal(VOICE_TARGET_LUFS, -16);
+  const chain = cleanupFilterChain({ enabled: { normalize: true } });
+  assert.ok(chain[0]?.includes("I=-16"), chain[0]);
+});
+
+section("audio source — teen mode, ek hi model (22.1)");
+
+test("naye item par source null hota hai (purana raasta chalta rehta hai)", () => {
+  const { doc } = buildFixture();
+  for (const item of doc.items) assert.equal(item.audio.source, null);
+});
+
+test("teeno mode schema se guzarte hain", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[1]!.id;
+
+  for (const mode of ["generate", "upload", "both"] as const) {
+    const next = setItemAudio(doc, {
+      itemIds: [id],
+      field: "source",
+      value: {
+        mode,
+        text: "Papa, documents",
+        voiceId: "hi-IN-MadhurNeural",
+        rate: 1,
+        pitch: 0,
+        uploadedAssetId: mode === "generate" ? null : "as_recording",
+        generatedAssetId: mode === "upload" ? null : "as_tts",
+        primary: "uploaded",
+        generatedFromText: "Papa, documents",
+        cleanup: { enabled: {}, params: {}, order: [] },
+      },
+    });
+    const parsed = safeParseDoc(next);
+    assert.ok(parsed.success, `${mode}: ${parsed.success ? "" : JSON.stringify(parsed.error.issues[0])}`);
+    assert.equal(itemById(next, id).audio.source?.mode, mode);
+  }
+});
+
+test("generatedFromText se 'voice outdated' pakda jaa sakta hai (22.10)", () => {
+  /*
+   * ⚠️ Iske bina text badalne par purani awaaz chup-chaap chalti rehti hai aur
+   * user ko lagta hai ki regenerate kaam nahi kar raha — jabki usne kabhi dabaya
+   * hi nahi.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[1]!.id;
+
+  const withVoice = setItemAudio(doc, {
+    itemIds: [id],
+    field: "source",
+    value: {
+      mode: "generate",
+      text: "Pehli line",
+      voiceId: "hi-IN-MadhurNeural",
+      rate: 1,
+      pitch: 0,
+      uploadedAssetId: null,
+      generatedAssetId: "as_tts",
+      primary: "generated",
+      generatedFromText: "Pehli line",
+      cleanup: { enabled: {}, params: {}, order: [] },
+    },
+  });
+
+  const fresh = itemById(withVoice, id).audio.source!;
+  assert.equal(fresh.text, fresh.generatedFromText, "abhi taaza hai");
+
+  const edited = setItemAudio(withVoice, {
+    itemIds: [id],
+    field: "source",
+    value: { ...fresh, text: "Doosri line" },
+  });
+  const stale = itemById(edited, id).audio.source!;
+  assert.notEqual(stale.text, stale.generatedFromText, "ab purani hai — badge dikhna chahiye");
+});
+
+test("rate aur pitch ki hadd schema me hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[1]!.id;
+  const bad = setItemAudio(doc, {
+    itemIds: [id],
+    field: "source",
+    value: {
+      mode: "generate",
+      text: "x",
+      voiceId: "v",
+      rate: 5,
+      pitch: 0,
+      uploadedAssetId: null,
+      generatedAssetId: null,
+      primary: "generated",
+      generatedFromText: "",
+      cleanup: { enabled: {}, params: {}, order: [] },
+    },
+  });
+  assert.ok(!safeParseDoc(bad).success, "5x rate ruk jaana chahiye");
 });
 
 

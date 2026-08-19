@@ -148,6 +148,7 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
       fadeShape: DEFAULT_FADE_SHAPE,
       loop: false,
       pan: 0,
+      source: null,
     },
 
     transitionIn: { type: "none", durationInFrames: 0 },

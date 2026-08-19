@@ -18,6 +18,7 @@ export * from "./config/audio";
 export * from "./config/effectPresets";
 export * from "./config/mask";
 export * from "./audio/mix";
+export * from "./audio/cleanup";
 export * from "./config/brand";
 export * from "./config/devices";
 export * from "./config/easing";

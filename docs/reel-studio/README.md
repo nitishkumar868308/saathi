@@ -278,7 +278,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 19 | in progress — captions poore (SRT/VTT round-trip exact, 7 styles); MP4 se naapa: karaoke ka highlight 272→533 px chala, Devanagari sahi bana; 19.3 (cue blocks) nahi bana | 2026-08-20 |
 | 20 | in progress — validator registry poora (17 rules, teen darwaze), Strict tier, cleanup ka faisla test se pakka; ek jhoothi-chetavni wala bug pakda; cleanup ka asli chalna worker/.env par ruka | 2026-08-20 |
 | 21 | in progress — AI provider + mock + Gemini adapter + reviewable diff; zero-AI guard (10 edits, 0 calls) aur key-off dono sach me chalaye gaye; asli Gemini call GEMINI_API_KEY par ruki | 2026-08-20 |
-| 22 | not started | — |
+| 22 | in progress — cleanup chain data se banti hai (limiter zabardasti aakhir me), aur sach me chal kar naapi gayi: -45.3 -> -16.0 LUFS, chuppi 5.0s -> 2.40s, rumble awaaz ke muqable 12 dB neeche; teen mode ka model+UI taiyaar; TTS `pip install edge-tts` par ruka (koi jhootha Generate button nahi) | 2026-08-20 |
 | 23 | not started | — |
 | 24 | not started | — |
 

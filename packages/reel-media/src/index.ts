@@ -16,3 +16,4 @@ export * from "./loudness";
 export * from "./probe";
 export * from "./thumbnails";
 export * from "./reverse";
+export * from "./voice";

@@ -50,6 +50,61 @@ const evenDimension = (label: string) =>
       message: `${label} even hona chahiye (yuv420p ki zaroorat)`,
     });
 
+/**
+ * Audio ka source — **teen mode, ek hi model** (22.1).
+ *
+ * ⚠️ Scene ka audio slot aur audio item **dono** yahi use karte hain. Do jagah
+ * do model rakhne par ek din scene me "both" mode aata aur item me nahi, aur
+ * user ko lagta ki wahi cheez kabhi chalti hai kabhi nahi.
+ *
+ * Teen mode ka matlab:
+ *  - `generate` — text likho, awaaz ban jaaye (TTS)
+ *  - `upload`   — apni recording
+ *  - `both`     — dono; `primary` batata hai kaun sunai dega
+ *
+ * `both` sabse zaroori hai aur sabse aasani se galat samjha jaata hai: wo "dono
+ * ek saath baja do" nahi hai. Wo "dono rakho, ek chalao" hai — taaki apni
+ * recording aane tak generated wali chalti rahe, aur aane ke baad ek click me
+ * badal jaaye.
+ */
+export const AudioSourceSchema = z
+  .object({
+    mode: z.enum(["generate", "upload", "both"]).default("generate"),
+
+    /** `generate` / `both` — jo bolna hai. */
+    text: z.string().default(""),
+    /** TTS voice ka id — `hi-IN-MadhurNeural` jaisa. */
+    voiceId: z.string().default(""),
+    rate: z.number().min(0.5).max(2).default(1),
+    pitch: z.number().min(-12).max(12).default(0),
+
+    /** Jo file user ne di. */
+    uploadedAssetId: IdSchema.nullable().default(null),
+    /** Jo TTS ne banayi — `temporary` lifecycle par rehti hai (22.9). */
+    generatedAssetId: IdSchema.nullable().default(null),
+
+    /** `both` me kaun sunai dega. */
+    primary: z.enum(["uploaded", "generated"]).default("uploaded"),
+
+    /**
+     * Jo text se ye awaaz bani thi.
+     *
+     * ⚠️ Iske bina "voice outdated" pakda hi nahi ja sakta (22.10). Text badalne
+     * par purani awaaz chup-chaap chalti rehti hai aur user ko lagta hai ki
+     * regenerate kaam nahi kar raha — jabki usne kabhi dabaya hi nahi.
+     */
+    generatedFromText: z.string().default(""),
+
+    cleanup: z
+      .object({
+        enabled: z.record(z.boolean()).default({}),
+        params: z.record(z.record(z.union([z.number(), z.boolean()]))).default({}),
+        order: z.array(z.string()).default([]),
+      })
+      .default({}),
+  })
+  .nullable();
+
 export const AudioSettingsSchema = z.object({
   /** 1 = jaisa hai. 1 se upar clipping ka khatra — Phase 20 validation warn karegi. */
   volume: z.number().min(0).max(4),
@@ -91,6 +146,15 @@ export const AudioSettingsSchema = z.object({
    * hota, aur wo galti dhoondhne me ghanton jaate.
    */
   pan: z.number().min(-1).max(1).default(0),
+
+  /**
+   * Awaaz kahan se aayi (22.1).
+   *
+   * `null` = seedha `assetId` wali file (purana raasta, aur wo abhi bhi chalta
+   * hai). Ye field tabhi bharti hai jab user ne Generate/Upload/Both wala form
+   * use kiya ho.
+   */
+  source: AudioSourceSchema.default(null),
 });
 
 /**
@@ -703,6 +767,7 @@ export type Marker = z.infer<typeof MarkerSchema>;
 export type Watermark = z.infer<typeof WatermarkSchema>;
 export type Mockup = z.infer<typeof MockupSchema>;
 export type Subtitle = z.infer<typeof SubtitleSchema>;
+export type AudioSource = z.infer<typeof AudioSourceSchema>;
 export type Ducking = z.infer<typeof DuckingSchema>;
 export type MasterAudio = z.infer<typeof MasterAudioSchema>;
 export type BlendMode = (typeof BLEND_MODES)[number];
