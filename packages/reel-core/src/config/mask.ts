@@ -74,5 +74,48 @@ export function maskCss(mask: Mask): Record<string, string> {
 }
 
 function pct(fraction: number): string {
-  return `${Math.round(Math.max(0, Math.min(1, fraction)) * 100)}%`;
+  return `${Math.round(Math.max(0, Math.min(1, fraction)) * 10000) / 100}%`;
+}
+
+/**
+ * Crop ko CSS me badlo (15.10).
+ *
+ * Crop mask nahi hai, aur ye farak maayne rakhta hai: mask item ka kuch hissa
+ * **chhupata** hai, crop us hisse ko **bada karke frame me bharta** hai. Isliye
+ * yahan clip-path ke saath ek scale + shift bhi jaati hai.
+ *
+ * ⚠️ Do `transform` ek hi element par nahi lag sakte, isliye crop ka transform
+ * item ke apne transform wale element par nahi jaata — wo andar wale (effects
+ * wale) element par jaata hai. Dono ek jagah rakhne par item ka apna scale crop
+ * ke scale se mit jaata aur user ka zoom chup-chaap gayab ho jaata.
+ */
+export function cropCss(
+  crop: { x: number; y: number; width: number; height: number } | null,
+): Record<string, string> {
+  if (!crop) return {};
+  if (crop.width <= 0 || crop.height <= 0) return {};
+  // Poora frame = koi crop nahi. Tab kuch likhna hi nahi — har extra transform
+  // browser se ek naya layer bulwata hai.
+  if (crop.x <= 0 && crop.y <= 0 && crop.width >= 1 && crop.height >= 1) return {};
+
+  const right = 1 - (crop.x + crop.width);
+  const bottom = 1 - (crop.y + crop.height);
+
+  const scaleX = 1 / crop.width;
+  const scaleY = 1 / crop.height;
+  // Bache hue tukde ka beech kahan hai — usi ko frame ke beech me laana hai.
+  const centerX = crop.x + crop.width / 2;
+  const centerY = crop.y + crop.height / 2;
+  const shiftX = (0.5 - centerX) * 100 * scaleX;
+  const shiftY = (0.5 - centerY) * 100 * scaleY;
+
+  return {
+    clipPath: `inset(${pct(crop.y)} ${pct(right)} ${pct(bottom)} ${pct(crop.x)})`,
+    transform: `scale(${round(scaleX)}, ${round(scaleY)}) translate(${round(shiftX)}%, ${round(shiftY)}%)`,
+    transformOrigin: "center center",
+  };
+}
+
+function round(value: number): number {
+  return Math.round(value * 10000) / 10000;
 }

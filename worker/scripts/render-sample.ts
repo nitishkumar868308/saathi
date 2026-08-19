@@ -38,6 +38,7 @@ import {
   type Doc,
   type Item,
   resolveItemValue,
+  setDucking,
 } from "@reel/core";
 import {
   createStorageDriver,
@@ -53,6 +54,8 @@ import {
   checkFfmpegAvailable,
   extractFrame,
   ffmpegPath,
+  finalizeMp4,
+  measureEbur128,
   parseFrameRate,
   probe,
   remuxFaststart,
@@ -123,6 +126,17 @@ function section(title: string): void {
 /** Naapne layak sample image ka nap-jokh — ek hi jagah, taaki assert bhi yahi padhe. */
 const SOURCE = { width: 2560, height: 2560, squareSide: 400 } as const;
 
+/** Music aur voice ki tone. Do octave door — bandpass se alag-alag naapi ja sakti hain. */
+const MUSIC_HZ = 220;
+const VOICE_HZ = 880;
+
+/** Voice kab bajti hai (seconds). Ducking ka naap isi khidki par hoti hai. */
+const VOICE_FROM_SECONDS = 3;
+const VOICE_SECONDS = 3;
+
+/** Music kitna neeche jaaye jab voice chale. */
+const DUCK_TARGET_DB = -18;
+
 /** Sample video ka size — blurred-background check isi se hisaab lagata hai. */
 const SOURCE_VIDEO = { width: 1080, height: 1920 } as const;
 
@@ -137,11 +151,13 @@ async function makePlaceholderMedia(dir: string): Promise<{
   image: string;
   video: string;
   audio: string;
+  voice: string;
 }> {
   await mkdir(dir, { recursive: true });
   const image = resolve(dir, "sample-image.png");
   const video = resolve(dir, "sample-video.mp4");
   const audio = resolve(dir, "sample-audio.wav");
+  const voice = resolve(dir, "sample-voice.wav");
 
   const squareX = (SOURCE.width - SOURCE.squareSide) / 2;
   const squareY = (SOURCE.height - SOURCE.squareSide) / 2;
@@ -179,17 +195,33 @@ async function makePlaceholderMedia(dir: string): Promise<{
     video,
   ]);
 
-  // WAV/PCM — Section 3A: intermediate audio kabhi lossy nahi.
+  /*
+   * Do alag **frequency** ki tone — aur ye ducking naapne ke liye zaroori hai.
+   *
+   * Mix ho jaane ke baad music aur voice ko alag karne ka koi tarika nahi hota…
+   * jab tak dono alag frequency par na hon. 220 Hz aur 880 Hz do octave door
+   * hain, isliye ek bandpass filter se sirf music ka level naapa ja sakta hai,
+   * chahe voice usi waqt baj rahi ho. Yahi 15.12 ka poora saboot hai.
+   */
   await run(ffmpegPath(), [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi",
-    "-i", "sine=frequency=330:duration=10:sample_rate=48000",
+    "-i", `sine=frequency=${MUSIC_HZ}:duration=10:sample_rate=48000`,
     "-af", "volume=0.28,aformat=channel_layouts=stereo",
     "-c:a", "pcm_s16le",
     audio,
   ]);
 
-  return { image, video, audio };
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-f", "lavfi",
+    "-i", `sine=frequency=${VOICE_HZ}:duration=3:sample_rate=48000`,
+    "-af", "volume=0.3,aformat=channel_layouts=stereo",
+    "-c:a", "pcm_s16le",
+    voice,
+  ]);
+
+  return { image, video, audio, voice };
 }
 
 // ------------------------------------------------------------- sample doc
@@ -213,17 +245,22 @@ interface SampleDoc {
  * aur seconds se banta hai, isliye `--preset=landscape --fps=24` par yahi ek
  * function bina badle doosri shape ki reel bana deta hai. Yahi 3.16 ka poora point hai.
  */
-function buildSampleDoc(args: Args, assetIds: { image: string; video: string; audio: string }): SampleDoc {
+function buildSampleDoc(
+  args: Args,
+  assetIds: { image: string; video: string; audio: string; voice: string },
+): SampleDoc {
   const preset = requireSizePreset(args.sizePresetId);
   let doc = createEmptyProject({
     name: `Sample — ${preset.label}`,
     presetId: preset.id,
     fps: args.fps,
     // Tracks apni zaroorat ke hisaab se — fixed 7 nahi (Dynamic rule 5).
-    initialTrackTypes: ["video", "overlay", "text", "audio"],
+    // Do audio tracks — ek music, ek voice. Ducking ka poora matlab hi do
+    // tracks ke beech ka rishta hai (15.3).
+    initialTrackTypes: ["video", "overlay", "text", "audio", "audio"],
   });
 
-  const [videoTrack, overlayTrack, textTrack, audioTrack] = doc.tracks;
+  const [videoTrack, overlayTrack, textTrack, musicTrack, voiceTrack] = doc.tracks;
   const { fps, width, height } = doc.project;
 
   const imageSeconds = 5;
@@ -382,7 +419,7 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
   // --- 5. Audio poore project par ---
   const audioItem = createItem("audio", {
     fps,
-    trackId: audioTrack!.id,
+    trackId: musicTrack!.id,
     name: "Background tone",
     assetId: assetIds.audio,
     startFrame: 0,
@@ -397,10 +434,52 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
   });
   doc = addItem(doc, { item: audioItem });
 
+  // --- 6. Voice + ducking (15.3 / 15.12) ---
+  const voiceItem = createItem("audio", {
+    fps,
+    trackId: voiceTrack!.id,
+    name: "Voice (ducking test)",
+    assetId: assetIds.voice,
+    startFrame: durationFromSeconds(VOICE_FROM_SECONDS, fps),
+    durationInFrames: durationFromSeconds(VOICE_SECONDS, fps),
+    audio: {
+      volume: 1,
+      muted: false,
+      // Voice par fade nahi — ducking ki dhalaan saaf naapni hai, aur fade uske
+      // upar apni ek aur dhalaan daal deta.
+      fadeInFrames: 0,
+      fadeOutFrames: 0,
+      solo: false,
+      fadeShape: "equal-power",
+      loop: false,
+      pan: 0,
+    },
+  });
+  doc = addItem(doc, { item: voiceItem });
+
+  doc = setDucking(doc, {
+    enabled: true,
+    voiceTrackIds: [voiceTrack!.id],
+    duckedTrackIds: [musicTrack!.id],
+    targetDb: DUCK_TARGET_DB,
+    attackFrames: durationFromSeconds(0.2, fps),
+    releaseFrames: durationFromSeconds(0.5, fps),
+  });
+
   // Project ki lambai items ke hisaab se exact — trailing khaali jagah nahi.
   doc = recomputeDuration(doc, undefined);
 
-  return { doc, imageItem, videoItem, textItem, probe, probeY, kenBurnsFrom, kenBurnsTo, panTo };
+  return {
+    doc,
+    imageItem,
+    videoItem,
+    textItem,
+    probe,
+    probeY,
+    kenBurnsFrom,
+    kenBurnsTo,
+    panTo,
+  };
 }
 
 // ---------------------------------------------------- pixel-level measurement
@@ -736,6 +815,61 @@ async function measureBanding(
   return { longestFlatRun: longest, distinctLevels: levels.size };
 }
 
+/**
+ * Ek khidki me, ek hi frequency ke aas-paas ki awaaz kitni oonchi hai (15.12).
+ *
+ * ⚠️ Ducking naapne ka yahi ek imaandaar tarika hai. Mix ho jaane ke baad music
+ * aur voice alag nahi kiye ja sakte — poore mix ka level naapna sirf ye batata
+ * hai ki "kuch badla", ye nahi ki **music** neeche gaya.
+ *
+ * Isliye sample me music 220 Hz par hai aur voice 880 Hz par. Bandpass sirf
+ * music ki patti kholta hai, aur uske baad `volumedetect` jo bhi bataye wo sirf
+ * music ka hai — chahe usi waqt voice baj rahi ho.
+ */
+async function measureBandVolumeDb(
+  video: string,
+  fromSeconds: number,
+  durationSeconds: number,
+  frequency: number,
+): Promise<number | null> {
+  const { stderr } = await run(ffmpegPath(), [
+    "-hide_banner",
+    "-ss", fromSeconds.toFixed(3),
+    "-t", durationSeconds.toFixed(3),
+    "-i", video,
+    // `w=30` yaani ±30 Hz. Itni patli patti me doosri tone bilkul nahi aati
+    // (220 aur 880 do octave door hain), aur apni tone poori aa jaati hai.
+    "-af", `bandpass=f=${frequency}:width_type=h:w=30,volumedetect`,
+    "-f", "null",
+    "-",
+  ]);
+  const match = /mean_volume:\s*(-?[\d.]+) dB/.exec(stderr);
+  return match ? Number(match[1]) : null;
+}
+
+/**
+ * Mix ka sabse ooncha sample (15.5) — `astats` se.
+ *
+ * `volumedetect` ka `max_volume` bhi peak batata hai, par `astats` **true peak**
+ * bhi deta hai. Farak maayne rakhta hai: digital samples 0 dBFS ke neeche reh
+ * sakte hain aur phir bhi lossy encode ke baad (jahan waveform ke beech ki
+ * values dobara bani jaati hain) clipping ho jaati hai. Isi liye Section 3A ki
+ * hadd -1 dBTP hai, 0 dBFS nahi.
+ */
+async function measurePeaks(video: string): Promise<{ peakDb: number | null; truePeakDb: number | null }> {
+  const { stderr } = await run(ffmpegPath(), [
+    "-hide_banner", "-i", video,
+    "-af", "astats=measure_overall=Peak_level+Max_level:measure_perchannel=none",
+    "-f", "null", "-",
+  ]);
+  const peak = /Peak level dB:\s*(-?[\d.]+|-inf)/.exec(stderr);
+  const parse = (value: string | undefined): number | null =>
+    value === undefined || value === "-inf" ? null : Number(value);
+
+  const ebur = await measureEbur128(video);
+  return { peakDb: parse(peak?.[1]), truePeakDb: ebur.truePeakDb };
+}
+
 /** Video sach me aawaz wali hai ya khaali track hai? */
 async function meanVolumeDb(video: string): Promise<number | null> {
   const { stderr } = await run(ffmpegPath(), [
@@ -805,6 +939,7 @@ async function main(): Promise<void> {
     image: "as_sample_image",
     video: "as_sample_video",
     audio: "as_sample_audio",
+    voice: "as_sample_voice",
   };
   const sample = buildSampleDoc(args, assetIds);
   const parsed = safeParseDoc(sample.doc);
@@ -819,7 +954,7 @@ async function main(): Promise<void> {
 
   section("4. assets resolve (doc me sirf assetId hota hai)");
   const assets = await resolveAssets(sample.doc, stored, storage, { publicDir });
-  check("saare assets publicDir me utre", Object.keys(assets).length === 3, Object.values(assets).join(", "));
+  check("saare assets publicDir me utre", Object.keys(assets).length === 4, Object.values(assets).join(", "));
 
   section("5. render");
   const engine = new RemotionRenderEngine();
@@ -844,10 +979,27 @@ async function main(): Promise<void> {
   });
   check("render poora hua", existsSync(rawOut), `${(renderResult.bytes / 1024 / 1024).toFixed(2)} MB`);
 
-  section("6. faststart remux (-c copy, koi re-encode nahi)");
+  section("6. finalize — faststart + loudness (11.2 / 15.6)");
+  /*
+   * ⚠️ Yahan pehle sirf `remuxFaststart` tha, aur wo ek chhupi hui kami thi:
+   * asli worker `finalizeMp4` chalata hai (loudness ke saath), par sample uske
+   * bina chalta tha. Yaani master ka loudness target aur limiter — jo project me
+   * set hote hain — kabhi naapa hi nahi jaata tha. Ab sample wahi raasta chalta
+   * hai jo asli render chalata hai.
+   */
   await mkdir(outDir, { recursive: true });
-  await remuxFaststart(rawOut, finalOut);
+  const finalize = await finalizeMp4(rawOut, finalOut, {
+    normalizeLoudness: true,
+    audioBitrateKbps: 192,
+    targetLufs: sample.doc.project.audio.loudnessLufs,
+    limiter: sample.doc.project.audio.limiter,
+  });
   check("final MP4 ban gayi", existsSync(finalOut));
+  check(
+    "loudness sach me lagayi gayi",
+    finalize.normalized,
+    finalize.skippedReason ?? `input ${finalize.measurement?.inputI ?? "—"} LUFS`,
+  );
 
   section("7. ffprobe — asli output");
   const info = await probe(finalOut);
@@ -1124,6 +1276,83 @@ async function main(): Promise<void> {
     banding.distinctLevels >= 8,
     `${banding.distinctLevels} levels; sabse lambi ek-jaisi patti ${banding.longestFlatRun}px ` +
       `(is sample me dhalaan lagbhag-kaale par hai, isliye lambi patti 8-bit ki hadd hai)`,
+  );
+
+  section("11b. ducking — naapa hua (15.12)");
+  /*
+   * Music 220 Hz par poore 10 second bajta hai; voice 880 Hz par 3s se 6s tak.
+   * Ducking on hai, target -18 dB.
+   *
+   * Do khidkiyan naapi jaati hain, dono me **sirf music ki patti**:
+   *   A: 1.0s - 2.5s  -> voice se pehle, music poora
+   *   B: 4.0s - 5.5s  -> voice ke beech me, music neeche hona chahiye
+   *
+   * `loudnorm linear=true` poori file par ek hi gain lagata hai, isliye dono
+   * khidkiyon ka **aapsi farak** waisa ka waisa rehta hai.
+   */
+  const musicBefore = await measureBandVolumeDb(finalOut, 1.0, 1.5, MUSIC_HZ);
+  const musicDuring = await measureBandVolumeDb(finalOut, VOICE_FROM_SECONDS + 1, 1.5, MUSIC_HZ);
+  const voiceDuring = await measureBandVolumeDb(finalOut, VOICE_FROM_SECONDS + 1, 1.5, VOICE_HZ);
+
+  console.log(`  .. music (voice se pehle) : ${musicBefore?.toFixed(2) ?? "—"} dB`);
+  console.log(`  .. music (voice ke beech) : ${musicDuring?.toFixed(2) ?? "—"} dB`);
+  console.log(`  .. voice (voice ke beech) : ${voiceDuring?.toFixed(2) ?? "—"} dB`);
+
+  check(
+    "voice sach me baj rahi hai",
+    voiceDuring !== null && voiceDuring > -50,
+    `${voiceDuring?.toFixed(2)} dB`,
+  );
+
+  const drop = musicBefore !== null && musicDuring !== null ? musicBefore - musicDuring : null;
+  /*
+   * Poore -18 dB ki ummeed nahi ki ja sakti aur ye jaan-boojhkar likha hai:
+   * bandpass ki patti ke kinaron se voice ka thoda sa hissa aur encode ka shor
+   * naap me aa hi jaate hain, jo asli girawat ko thoda dabate hain. 12 dB ki
+   * girawat ka koi doosra kaaran ho hi nahi sakta — wo char guna se zyada
+   * dheemi awaaz hai.
+   */
+  check(
+    "ducking sach me music ko neeche laa rahi hai",
+    drop !== null && drop >= 12,
+    `music ${drop?.toFixed(2) ?? "—"} dB neeche gaya (target ${Math.abs(DUCK_TARGET_DB)} dB)`,
+  );
+
+  const musicAfter = await measureBandVolumeDb(
+    finalOut,
+    VOICE_FROM_SECONDS + VOICE_SECONDS + 1,
+    1.5,
+    MUSIC_HZ,
+  );
+  console.log(`  .. music (voice ke baad)  : ${musicAfter?.toFixed(2) ?? "—"} dB`);
+  check(
+    "voice khatam hone par music wapas upar aata hai",
+    musicAfter !== null && musicBefore !== null && Math.abs(musicAfter - musicBefore) < 3,
+    `${musicAfter?.toFixed(2)} dB vs pehle ${musicBefore?.toFixed(2)} dB`,
+  );
+
+  section("11c. clipping (15.5)");
+  const mixPeaks = await measurePeaks(finalOut);
+  console.log(`  .. sample peak ${mixPeaks.peakDb?.toFixed(2) ?? "—"} dBFS, true peak ${mixPeaks.truePeakDb?.toFixed(2) ?? "—"} dBTP`);
+
+  check(
+    "koi clipping nahi (sample peak 0 dBFS ke neeche)",
+    mixPeaks.peakDb !== null && mixPeaks.peakDb < 0,
+    `${mixPeaks.peakDb?.toFixed(2)} dBFS`,
+  );
+  check(
+    "true peak Section 3A ki chhat ke neeche (-1 dBTP)",
+    mixPeaks.truePeakDb !== null && mixPeaks.truePeakDb <= -1 + 0.05,
+    `${mixPeaks.truePeakDb?.toFixed(2)} dBTP`,
+  );
+
+  const loudness = await measureEbur128(finalOut);
+  const target = sample.doc.project.audio.loudnessLufs;
+  console.log(`  .. integrated ${loudness.integratedLufs?.toFixed(2) ?? "—"} LUFS (target ${target})`);
+  check(
+    "loudness project ke target ke paas hai (15.6)",
+    loudness.integratedLufs !== null && Math.abs(loudness.integratedLufs - target) <= 1.5,
+    `${loudness.integratedLufs?.toFixed(2)} LUFS vs target ${target}`,
   );
 
   section("12. waqt");

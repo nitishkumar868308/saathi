@@ -225,6 +225,9 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
     const finalize = await finalizeMp4(rawPath, finalPath, {
       normalizeLoudness: true,
       audioBitrateKbps: preset.audioBitrateKbps,
+      // Master section jo chuna hai wahi (15.6) — do jagah volume ka ganit nahi.
+      targetLufs: doc.project.audio.loudnessLufs,
+      limiter: doc.project.audio.limiter,
     });
     if (cancelled) return { status: "cancelled" };
 

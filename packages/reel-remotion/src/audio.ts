@@ -1,31 +1,43 @@
-import type { Item, Track } from "@reel/core";
+import { duckEnvelope, hasSolo, itemGainAt, type Doc, type Item, type Track } from "@reel/core";
 
 /**
- * Audio volume — fades ke saath.
+ * Audio volume — poora hisaab **core me** hai (15.1 / 15.3 / 15.6).
  *
- * Fade sirf sundarta ke liye nahi hai: clip ke shuru/ant me awaaz ko ek jhatke
- * se on/off karne par "click" ki aawaz aati hai, jo speaker par saaf sunai deti
- * hai. Poori audio depth (curves, ducking) Phase 15 me hai; ye utna hi hai jitna
- * pehli MP4 ko sun-ne layak banane ke liye chahiye.
+ * ⚠️ Pehle yahan apna chhota sa fade ka ganit likha tha. Phase 15 me wo hataya
+ * gaya, aur wajah seedhi hai: ab volume par keyframes, equal-power fades,
+ * solo, ducking aur master volume — paanch cheezein lagti hain. Wo ganit do
+ * jagah rakhne par ek din editor me music -18 dB par duck hota aur MP4 me -20
+ * par, aur wo farak sirf kaan se pakda jaata — wo bhi tab jab video kisi ko
+ * bhej di ho.
  *
- * Track ka mute item ke upar chalta hai — wahi har editor karta hai.
+ * Ab dono taraf `itemGainAt()` chalta hai. Yahan sirf itna kaam bacha hai ki
+ * Remotion ko us function ka frame-wise roop de diya jaaye.
+ *
+ * Fade ke bina bhi function hi lautate hain jab ducking chal rahi ho — kyunki
+ * ducking ka gain frame par badalta hai, chahe clip par koi fade na ho.
  */
-export function itemVolume(item: Item, track: Track): number | ((frame: number) => number) {
-  if (item.audio.muted || track.muted) return 0;
+export function itemVolume(
+  doc: Doc,
+  item: Item,
+  track: Track,
+): number | ((frame: number) => number) {
+  const soloActive = hasSolo(doc);
+  const ducked =
+    doc.project.audio.ducking.enabled && doc.project.audio.ducking.duckedTrackIds.includes(track.id);
 
-  const base = item.audio.volume;
-  const { fadeInFrames, fadeOutFrames } = item.audio;
-  if (fadeInFrames <= 0 && fadeOutFrames <= 0) return base;
+  const hasVolumeKeyframes = (item.keyframes["audio.volume"]?.length ?? 0) > 0;
+  const hasFade = item.audio.fadeInFrames > 0 || item.audio.fadeOutFrames > 0;
 
-  const duration = item.durationInFrames;
-  return (frame: number): number => {
-    let gain = base;
-    if (fadeInFrames > 0 && frame < fadeInFrames) {
-      gain *= frame / fadeInFrames;
-    }
-    if (fadeOutFrames > 0 && frame > duration - fadeOutFrames) {
-      gain *= Math.max(0, (duration - frame) / fadeOutFrames);
-    }
-    return Math.max(0, gain);
-  };
+  if (!ducked && !hasFade && !hasVolumeKeyframes) {
+    // Sthir gain par Remotion ek hi baar hisaab karta hai — har frame par
+    // function bulane se bachna sasta hai aur waveform bhi saaf rehta hai.
+    return itemGainAt({ doc, item, track, localFrame: 0, soloActive });
+  }
+
+  // Envelope ek hi baar banta hai, har frame par nahi — warna 10s ke project me
+  // ye 300 baar poori item list par chalta.
+  const envelope = ducked ? duckEnvelope(doc) : undefined;
+
+  return (frame: number): number =>
+    itemGainAt({ doc, item, track, localFrame: frame, envelope, soloActive });
 }

@@ -19,7 +19,7 @@ import { Transformed } from "../Transformed";
  * `trimBefore` = source ke andar kahan se shuru karna hai. Ye non-destructive
  * trim hai (Phase 1 ka locked rule) — asli file kabhi nahi badalti.
  */
-export const VideoItem: React.FC<ItemComponentProps> = ({ item, track, assets, localFrame }) => {
+export const VideoItem: React.FC<ItemComponentProps> = ({ item, track, doc, assets, localFrame }) => {
   const src = assetSrc(assets, item.assetId);
   if (!src) return <MissingAsset item={item} />;
 
@@ -50,7 +50,8 @@ export const VideoItem: React.FC<ItemComponentProps> = ({ item, track, assets, l
         src={src}
         trimBefore={item.trimStartFrame}
         playbackRate={item.playbackRate}
-        volume={itemVolume(item, track)}
+        preservePitch
+        volume={itemVolume(doc, item, track)}
         style={{ width: "100%", height: "100%", objectFit: objectFitFor(item) }}
       />
     </Transformed>

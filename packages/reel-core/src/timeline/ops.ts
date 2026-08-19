@@ -1,5 +1,10 @@
 import { produce, type Draft } from "immer";
 
+import {
+  FREEZE_PLAYBACK_RATE,
+  MAX_PLAYBACK_RATE,
+  MIN_PLAYBACK_RATE,
+} from "../config/audio";
 import { getAnimationPreset } from "../config/animationPresets";
 import { findEffectPreset } from "../config/effectPresets";
 import { DEFAULT_EASING } from "../config/easing";
@@ -1747,6 +1752,246 @@ export const setMask = defineOp<SetMaskArgs>("setMask", (draft, args) => {
   }
 });
 
+// ------------------------------------------------------- speed / freeze / crop
+
+export interface SetPlaybackRateArgs {
+  itemIds: readonly string[];
+  /** 0.25x se 4x. */
+  rate: number;
+  /**
+   * Timeline par clip ki lambai bhi badle?
+   *
+   * Lagbhag hamesha `true` — 2x speed par clip ko utna hi lamba chhod dena matlab
+   * source ka aadha hissa dikhega hi nahi. `false` sirf tab kaam aata hai jab
+   * user ne pehle se trim kiya ho aur wahi hissa tez chalana ho.
+   */
+  recomputeDuration?: boolean;
+}
+
+/**
+ * Clip ki raftaar (15.7) — **aur yahin 13.7 poora hota hai**.
+ *
+ * ⚠️ Teen cheezein ek saath badalti hain, aur teeno ka ek saath badalna zaroori
+ * hai:
+ *
+ *  1. `playbackRate`
+ *  2. clip ki lambai — 2x par source ke 60 frames timeline par 30 me aate hain
+ *  3. **keyframes** — warna 2x karne par animation apni jagah rehti aur clip
+ *     aadhi ho jaati, yaani aadhi animation clip ke bahar chali jaati
+ *
+ * Teesri cheez sabse aasani se chhoot jaati hai, aur uska nateeja "speed badalte
+ * hi meri animation toot gayi" jaisi shikayat hoti hai jiski wajah kabhi pakad
+ * me nahi aati. Isliye wo yahin, isi op me hai — UI par nahi chhoda gaya.
+ */
+export const setPlaybackRate = defineOp<SetPlaybackRateArgs>("setPlaybackRate", (draft, args) => {
+  const rate = args.rate;
+  if (!Number.isFinite(rate) || rate < MIN_PLAYBACK_RATE || rate > MAX_PLAYBACK_RATE) {
+    throw new TimelineOpError(
+      `Speed ${rate}x nahi chalegi — ${MIN_PLAYBACK_RATE}x se ${MAX_PLAYBACK_RATE}x tak hi.`,
+    );
+  }
+
+  const ids = new Set(args.itemIds);
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    if (item.playbackRate === rate) continue;
+
+    const factor = item.playbackRate / rate;
+    item.playbackRate = rate;
+
+    if (args.recomputeDuration !== false) {
+      const next = Math.max(1, Math.round(item.durationInFrames * factor));
+      item.durationInFrames = next;
+      // Fades bhi clip ke saath simatne/failne chahiye — warna 4x par 15-frame
+      // ka fade clip se lamba ho jaata hai.
+      item.audio.fadeInFrames = Math.min(next, Math.round(item.audio.fadeInFrames * factor));
+      item.audio.fadeOutFrames = Math.min(next, Math.round(item.audio.fadeOutFrames * factor));
+    }
+
+    for (const path of Object.keys(item.keyframes)) {
+      const list = item.keyframes[path];
+      if (!list) continue;
+      const moved = new Map<number, Draft<Keyframe>>();
+      for (const keyframe of list) {
+        keyframe.frame = Math.max(0, Math.round(keyframe.frame * factor));
+        moved.set(keyframe.frame, keyframe);
+      }
+      item.keyframes[path] = [...moved.values()].sort((a, b) => a.frame - b.frame) as never;
+    }
+  }
+  growDuration(draft);
+});
+
+export interface FreezeFrameArgs {
+  itemId: string;
+  /** Doc ka frame jahan freeze karna hai. */
+  frame: number;
+  /** Freeze kitna lamba ho. */
+  durationInFrames: number;
+}
+
+/**
+ * Freeze frame (15.8) — playhead par clip ko rok do.
+ *
+ * Clip do tukdon me tootti hai aur beech me ek naya item aata hai jo wahi source
+ * dikhata hai par **hilta nahi**: uska `trimStartFrame` freeze wale frame par
+ * jama diya jaata hai aur `playbackRate` 0 ke bahut kareeb.
+ *
+ * ⚠️ `playbackRate` theek 0 nahi rakha ja sakta — schema use positive maangta
+ * hai aur 0 se bhaag dene wale hisaab (bacha hua source) toot jaate hain. Ek
+ * bahut chhota number wahi kaam karta hai: 300 frames me source sirf 0.03 frame
+ * aage badhta hai, yaani aankh ko bilkul sthir dikhta hai.
+ */
+export const freezeFrame = defineOp<FreezeFrameArgs>("freezeFrame", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const localFrame = Math.round(args.frame) - item.startFrame;
+  if (localFrame <= 0 || localFrame >= item.durationInFrames) {
+    throw new TimelineOpError("Freeze clip ke andar hi ho sakta hai, kinare par nahi");
+  }
+
+  const holdFrames = Math.max(1, Math.round(args.durationInFrames));
+  const sourceOffset = item.trimStartFrame + Math.round(localFrame * item.playbackRate);
+
+  // Pehle clip ko todo — split ka poora hisaab (keyframes, transitions, trim)
+  // wahin ek jagah likha hai aur use dobara likhna hi sabse badi galti hoti.
+  splitAtFrame.recipe(draft, { frame: args.frame, itemIds: [item.id] });
+
+  const right = draft.items.find(
+    (candidate) => candidate.startFrame === args.frame && candidate.id !== item.id,
+  );
+  if (!right) throw new TimelineOpError("Split ke baad daayan tukda nahi mila");
+
+  const frozen = clone(right) as Draft<Item>;
+  frozen.id = createId("it");
+  frozen.name = `${item.name} (freeze)`;
+  frozen.durationInFrames = holdFrames;
+  frozen.trimStartFrame = sourceOffset;
+  frozen.playbackRate = FREEZE_PLAYBACK_RATE;
+  frozen.keyframes = {} as Draft<Item>["keyframes"];
+  frozen.transitionIn = { type: "none", durationInFrames: 0 } as Draft<Item>["transitionIn"];
+  frozen.transitionOut = { type: "none", durationInFrames: 0 } as Draft<Item>["transitionOut"];
+  // Sthir tasveer se awaaz aana ajeeb lagta hai — aur asal me wo ek hi frame ki
+  // awaaz baar-baar bajti, jo shor hoti hai.
+  frozen.audio.muted = true;
+
+  // Aage ki har cheez utni hi khisak jaati hai — warna freeze agli clip ke upar
+  // chadh jaata hai. Ye `right` se pehle karna zaroori hai, warna `right` do
+  // baar khisak jaata hai.
+  for (const other of draft.items) {
+    if (other.trackId !== right.trackId) continue;
+    if (other.startFrame >= args.frame) other.startFrame += holdFrames;
+  }
+
+  frozen.startFrame = args.frame;
+  const index = draft.items.indexOf(right);
+  draft.items.splice(index, 0, frozen);
+  growDuration(draft);
+});
+
+export interface SetCropArgs {
+  itemIds: readonly string[];
+  /** `null` = crop hata do. Sab values 0..1 me, item ke apne dabbe ke hisaab se. */
+  crop: { x: number; y: number; width: number; height: number } | null;
+}
+
+export const setCrop = defineOp<SetCropArgs>("setCrop", (draft, args) => {
+  const ids = new Set(args.itemIds);
+
+  const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+  const crop =
+    args.crop === null
+      ? null
+      : {
+          // Hadd yahin lagti hai, UI me nahi — AI ka patch aur template bhi isi
+          // raaste se aate hain aur unke paas UI ki hadd nahi hoti.
+          x: clamp(args.crop.x),
+          y: clamp(args.crop.y),
+          width: Math.max(0.01, Math.min(1 - clamp(args.crop.x), args.crop.width)),
+          height: Math.max(0.01, Math.min(1 - clamp(args.crop.y), args.crop.height)),
+        };
+
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    item.transform.crop = crop as Draft<Item>["transform"]["crop"];
+  }
+});
+
+// ------------------------------------------------------------------- audio
+
+export interface SetMasterAudioArgs {
+  volume?: number;
+  loudnessLufs?: number;
+  limiter?: boolean;
+}
+
+export const setMasterAudio = defineOp<SetMasterAudioArgs>("setMasterAudio", (draft, args) => {
+  const audio = draft.project.audio;
+  if (args.volume !== undefined) audio.volume = Math.max(0, Math.min(4, args.volume));
+  if (args.loudnessLufs !== undefined) {
+    audio.loudnessLufs = Math.max(-32, Math.min(-5, args.loudnessLufs));
+  }
+  if (args.limiter !== undefined) audio.limiter = args.limiter;
+});
+
+export interface SetDuckingArgs {
+  enabled?: boolean;
+  voiceTrackIds?: readonly string[];
+  duckedTrackIds?: readonly string[];
+  targetDb?: number;
+  attackFrames?: number;
+  releaseFrames?: number;
+}
+
+/**
+ * Ducking ka rule badlo (15.3 / 15.4).
+ *
+ * ⚠️ Ek track dono list me nahi ho sakta. Wo apne aap ko duck karta — voice
+ * chalti aur usi waqt voice hi neeche chali jaati. Ye galti UI se rokna kaafi
+ * nahi hai, kyunki AI ka patch aur template UI se nahi guzarte.
+ */
+export const setDucking = defineOp<SetDuckingArgs>("setDucking", (draft, args) => {
+  const ducking = draft.project.audio.ducking;
+
+  if (args.enabled !== undefined) ducking.enabled = args.enabled;
+  if (args.voiceTrackIds) ducking.voiceTrackIds = [...args.voiceTrackIds];
+  if (args.duckedTrackIds) ducking.duckedTrackIds = [...args.duckedTrackIds];
+  if (args.targetDb !== undefined) ducking.targetDb = Math.max(-60, Math.min(0, args.targetDb));
+  if (args.attackFrames !== undefined) {
+    ducking.attackFrames = Math.max(0, Math.round(args.attackFrames));
+  }
+  if (args.releaseFrames !== undefined) {
+    ducking.releaseFrames = Math.max(0, Math.round(args.releaseFrames));
+  }
+
+  const voice = new Set(ducking.voiceTrackIds);
+  const overlap = ducking.duckedTrackIds.filter((id) => voice.has(id));
+  if (overlap.length > 0) {
+    throw new TimelineOpError(
+      `Ek hi track voice aur ducked dono nahi ho sakta — wo khud ko neeche karega (${overlap.join(", ")})`,
+    );
+  }
+});
+
+export interface SetItemAudioArgs {
+  itemIds: readonly string[];
+  /** `audio` ke andar ka field — `volume`, `muted`, `solo`, `loop`, `fadeInFrames`… */
+  field: string;
+  value: unknown;
+}
+
+export const setItemAudio = defineOp<SetItemAudioArgs>("setItemAudio", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    (item.audio as unknown as Record<string, unknown>)[args.field] = args.value;
+  }
+});
+
 export interface SetTransitionArgs {
   itemIds: readonly string[];
   side: "in" | "out";
@@ -2637,6 +2882,12 @@ export const OPS = {
   copyKeyframes,
   scaleKeyframes,
   setTransition,
+  setPlaybackRate,
+  freezeFrame,
+  setCrop,
+  setMasterAudio,
+  setDucking,
+  setItemAudio,
   addEffect,
   removeEffect,
   reorderEffects,

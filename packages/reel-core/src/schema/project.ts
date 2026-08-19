@@ -50,6 +50,89 @@ const evenDimension = (label: string) =>
       message: `${label} even hona chahiye (yuv420p ki zaroorat)`,
     });
 
+export const AudioSettingsSchema = z.object({
+  /** 1 = jaisa hai. 1 se upar clipping ka khatra — Phase 20 validation warn karegi. */
+  volume: z.number().min(0).max(4),
+  muted: z.boolean(),
+  fadeInFrames: FrameSchema,
+  fadeOutFrames: FrameSchema,
+
+  /**
+   * Solo — is track/item ke alawa sab chup.
+   *
+   * Ye ek **kaam ka** switch hai, save karne layak setting nahi... par save hota
+   * hai, aur ye jaan-boojhkar hai: project band karke kholne par bhi wahi sunai
+   * dena chahiye jo band karte waqt sunai de raha tha. Warna user ko lagta hai
+   * ki uska mix apne aap badal gaya.
+   */
+  solo: z.boolean().default(false),
+
+  /** Fade ka aakaar — `equal-power` (default) ya `linear`. */
+  fadeShape: z.enum(["equal-power", "linear"]).default("equal-power"),
+
+  /**
+   * Music ko clip ki poori lambai tak dohrao.
+   *
+   * Sirf tab lagta hai jab source clip se chhota ho. Bina iske chhota loop
+   * lagane ke liye user ko haath se 8 baar clip copy karni padti hai.
+   */
+  loop: z.boolean().default(false),
+
+  /**
+   * Stereo pan — -1 (poora baayan) se +1 (poora daayan).
+   *
+   * ⚠️ **Schema me hai, lagta nahi hai — aur UI me iska koi control bhi nahi.**
+   * Remotion ke `<Audio>` par sirf `volume` hota hai, pan nahi (`props.d.ts`
+   * dekho). Pan lagane ke liye har audio item ka apna Web Audio graph chahiye
+   * hoga, ya audio ko alag se mix karna padega — dono Phase 15 ke bahar hain.
+   *
+   * Field yahan isliye hai ki jab wo bane tab purane project bina migration ke
+   * khul jaayein. Slider abhi dikhana galat hota: user use ghumata aur kuch na
+   * hota, aur wo galti dhoondhne me ghanton jaate.
+   */
+  pan: z.number().min(-1).max(1).default(0),
+});
+
+/**
+ * Ducking — voice chale to music apne aap neeche (15.3).
+ *
+ * ⚠️ Ye **rule** hai, per-clip setting nahi. Isi wajah se ye project par hai:
+ * har music clip par alag-alag duck settings rakhne par mix ek hi video me
+ * jagah-jagah alag lagta hai, aur user ko wajah kabhi samajh nahi aati.
+ *
+ * Tarika timing-based hai (silence detection nahi): jahan voice track par koi
+ * item hai, wahan duck. Ye seedha hai, preview me turant dikhta hai, aur render
+ * me bilkul wahi nikalta hai — kyunki dono ek hi function chalate hain.
+ */
+export const DuckingSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Jin tracks ki awaaz "voice" maani jaaye. */
+  voiceTrackIds: z.array(IdSchema).default([]),
+  /** Jin tracks ko neeche laana hai. */
+  duckedTrackIds: z.array(IdSchema).default([]),
+  /** Kitna neeche — dB me (negative). */
+  targetDb: z.number().min(-60).max(0).default(-18),
+  /** Neeche jaane me kitne frames. */
+  attackFrames: FrameSchema.default(6),
+  /** Wapas upar aane me kitne frames. */
+  releaseFrames: FrameSchema.default(15),
+});
+
+/** Master audio — poore mix par (15.6). */
+export const MasterAudioSchema = z.object({
+  volume: z.number().min(0).max(4).default(1),
+  /** Final MP4 ka loudness target. Phase 11 ka finalize yahi leta hai. */
+  loudnessLufs: z.number().min(-32).max(-5).default(-14),
+  /**
+   * Limiter — peak ko `-1 dBTP` ke neeche rakhta hai.
+   *
+   * Band karne ka option isliye hai ki kuch platform khud normalize karte hain
+   * aur do baar limit karna awaaz ko chapta kar deta hai.
+   */
+  limiter: z.boolean().default(true),
+  ducking: DuckingSchema.default({}),
+});
+
 export const ProjectSettingsSchema = z.object({
   id: IdSchema,
   name: z.string().min(1),
@@ -60,6 +143,8 @@ export const ProjectSettingsSchema = z.object({
   fps: z.number().int().min(MIN_FPS).max(MAX_FPS),
   durationInFrames: DurationFramesSchema,
   background: ColorSchema,
+  /** Master + ducking. Purane project bina iske bhi khulte hain (default). */
+  audio: MasterAudioSchema.default({}),
 });
 
 export const TrackSchema = z.object({
@@ -185,14 +270,6 @@ export const MaskSchema = z
 export const BLEND_MODES = ["normal", "multiply", "screen", "overlay"] as const;
 export const BlendModeSchema = z.enum(BLEND_MODES).default("normal");
 
-export const AudioSettingsSchema = z.object({
-  /** 1 = jaisa hai. 1 se upar clipping ka khatra — Phase 20 validation warn karegi. */
-  volume: z.number().min(0).max(4),
-  muted: z.boolean(),
-  fadeInFrames: FrameSchema,
-  fadeOutFrames: FrameSchema,
-});
-
 export const TransitionSchema = z
   .object({
     /** TRANSITIONS registry ka id. `"none"` ka matlab koi transition nahi. */
@@ -277,6 +354,20 @@ export const ItemSchema = z.object({
   /** Source ke andar non-destructive trim — asli file kabhi nahi badalti. */
   trimStartFrame: FrameSchema,
   playbackRate: z.number().positive(),
+
+  /**
+   * Source kitna lamba hai, **project ke fps me** (15.1).
+   *
+   * `null` = pata nahi (image, shape, text — inka koi source lambai hoti hi
+   * nahi; ya asset abhi probe nahi hui).
+   *
+   * ⚠️ Ye field isliye aayi ki iske bina teen cheezein sirf andaaze par chalti
+   * thi: trim ki daayein hadd, music ka loop, aur "clip source se lambi hai"
+   * wali chetavni. Pehle `trimItemEnd` ise ek argument ki tarah maangta tha,
+   * yaani har caller ko yaad rakhna padta tha — aur jo bhool jaata uska trim
+   * source ke ant se aage nikal jaata aur wahan kaala frame aata.
+   */
+  sourceDurationFrames: z.number().int().positive().nullable().default(null),
 
   assetId: IdSchema.nullable(),
 
@@ -428,6 +519,8 @@ export type Keyframes = z.infer<typeof KeyframesSchema>;
 export type Animation = z.infer<typeof AnimationSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
 export type Mask = z.infer<typeof MaskSchema>;
+export type Ducking = z.infer<typeof DuckingSchema>;
+export type MasterAudio = z.infer<typeof MasterAudioSchema>;
 export type BlendMode = (typeof BLEND_MODES)[number];
 export type AudioSettings = z.infer<typeof AudioSettingsSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;

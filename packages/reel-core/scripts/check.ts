@@ -42,6 +42,23 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  DEFAULT_LOUDNESS_LUFS,
+  FADE_SHAPES,
+  MIN_VOLUME_DB,
+  cropCss,
+  dbToGain,
+  duckEnvelope,
+  estimateMixPeak,
+  fadeGain,
+  freezeFrame,
+  gainToDb,
+  itemGainAt,
+  setCrop,
+  setDucking,
+  setItemAudio,
+  setMasterAudio,
+  setPlaybackRate,
+  suggestedMasterVolume,
   EFFECTS,
   EFFECT_PRESETS,
   addEffect,
@@ -4048,6 +4065,439 @@ test("blendMode schema sirf apni chaar values maanta hai", () => {
 
   const bad = setItemProperty(doc, { itemId: id, path: "blendMode", value: "color-dodge" });
   assert.ok(!safeParseDoc(bad).success, "list se bahar ka mode ruk jaana chahiye");
+});
+
+
+// ------------------------------------------------------------- Phase 15
+
+section("dB <-> linear (15.1)");
+
+test("0 dB par gain 1, aur wapas 0 dB", () => {
+  assert.ok(Math.abs(dbToGain(0) - 1) < 1e-12);
+  assert.ok(Math.abs(gainToDb(1) - 0) < 1e-12);
+});
+
+test("-6 dB lagbhag aadha gain deta hai", () => {
+  // -6.02 dB theek aadha hai; -6 par 0.501. Yahi wo number hai jo har mixer par
+  // likha hota hai, isliye test bhi wahi maanta hai.
+  assert.ok(Math.abs(dbToGain(-6) - 0.5012) < 1e-3, String(dbToGain(-6)));
+});
+
+test("-18 dB (ducking ka default) 0.126 ke aas-paas hai", () => {
+  assert.ok(Math.abs(dbToGain(-18) - 0.1259) < 1e-3, String(dbToGain(-18)));
+});
+
+test("chup (0 gain) par -Infinity nahi, MIN_VOLUME_DB aata hai", () => {
+  /*
+   * `20*log10(0)` `-Infinity` hai. Wo number UI me pahunchte hi slider, text
+   * field aur JSON teeno todta hai — aur galti "NaN" bankar dikhti hai jiska
+   * source dhoondhna bahut mushkil hota hai.
+   */
+  assert.equal(gainToDb(0), MIN_VOLUME_DB);
+  assert.equal(dbToGain(MIN_VOLUME_DB), 0, "sabse neeche par sach me chup");
+});
+
+test("equal-power fade beech me linear se ooncha hota hai", () => {
+  /*
+   * Kaan power sunta hai, amplitude nahi. Linear fade ke beech me awaaz dab
+   * jaati hai — isi liye default equal-power hai.
+   */
+  const linear = fadeGain(0.5, "linear");
+  const equalPower = fadeGain(0.5, "equal-power");
+  assert.equal(linear, 0.5);
+  assert.ok(equalPower > 0.7, `equal-power beech me ${equalPower} hona chahiye (~0.707)`);
+});
+
+test("dono fade shapes kinaron par theek 0 aur 1 par khatam hote hain", () => {
+  for (const shape of FADE_SHAPES) {
+    assert.equal(fadeGain(0, shape), 0, `${shape} 0 par 0 nahi`);
+    assert.ok(Math.abs(fadeGain(1, shape) - 1) < 1e-12, `${shape} 1 par 1 nahi`);
+  }
+});
+
+section("duck envelope (15.3)");
+
+/** voice track + music track, dono par ek-ek clip. */
+function duckFixture(): { doc: Doc; voiceTrack: string; musicTrack: string; musicItem: string } {
+  let doc = createEmptyProject({ name: "duck", initialTrackTypes: ["audio", "audio"] });
+  const [voiceTrack, musicTrack] = doc.tracks;
+
+  const music = createItem("audio", {
+    trackId: musicTrack!.id,
+    assetId: "as_music",
+    startFrame: 0,
+    durationInFrames: 300,
+  });
+  doc = addItem(doc, { item: music });
+
+  const voice = createItem("audio", {
+    trackId: voiceTrack!.id,
+    assetId: "as_voice",
+    startFrame: 100,
+    durationInFrames: 100,
+  });
+  doc = addItem(doc, { item: voice });
+
+  return {
+    doc,
+    voiceTrack: voiceTrack!.id,
+    musicTrack: musicTrack!.id,
+    musicItem: music.id,
+  };
+}
+
+test("ducking band ho to envelope hamesha 1 hai", () => {
+  const { doc } = duckFixture();
+  const envelope = duckEnvelope(doc);
+  for (const frame of [0, 100, 150, 200, 299]) {
+    assert.equal(envelope(frame), 1, `frame ${frame}`);
+  }
+});
+
+test("voice ke dauraan music target par chala jaata hai", () => {
+  const { doc, voiceTrack, musicTrack } = duckFixture();
+  const on = setDucking(doc, {
+    enabled: true,
+    voiceTrackIds: [voiceTrack],
+    duckedTrackIds: [musicTrack],
+    targetDb: -18,
+    attackFrames: 6,
+    releaseFrames: 15,
+  });
+
+  const envelope = duckEnvelope(on);
+  assert.equal(envelope(50), 1, "voice se pehle poora");
+  assert.ok(Math.abs(envelope(150) - dbToGain(-18)) < 1e-9, "voice ke beech me poora duck");
+  assert.equal(envelope(280), 1, "release ke baad wapas poora");
+});
+
+test("attack voice se PEHLE shuru hota hai", () => {
+  /*
+   * Ye ek soch-samajh kar liya faisla hai. Attack voice ke saath shuru karne par
+   * pehla shabd music ke upar chadh jaata hai — aur wahi ek shabd sabse zaroori
+   * hota hai. Isliye dhalaan `startFrame - attackFrames` se shuru hoti hai.
+   */
+  const { doc, voiceTrack, musicTrack } = duckFixture();
+  const on = setDucking(doc, {
+    enabled: true,
+    voiceTrackIds: [voiceTrack],
+    duckedTrackIds: [musicTrack],
+    attackFrames: 10,
+  });
+  const envelope = duckEnvelope(on);
+
+  assert.equal(envelope(89), 1, "attack se pehle poora");
+  assert.ok(envelope(95) < 1, "voice se 5 frame pehle hi neeche jaana shuru");
+  assert.ok(envelope(95) > envelope(99), "dhalaan neeche ki taraf hai");
+});
+
+test("paas-paas ke do voice clips ke beech music upar-neeche nahi kudta", () => {
+  /*
+   * Do voice clips ke beech ke chhote gap me music ka upar aakar wapas neeche
+   * jaana "pump" kehlata hai aur wo saaf sunai deta hai. Isliye milte-julte
+   * spans jod diye jaate hain.
+   */
+  const { doc, voiceTrack, musicTrack } = duckFixture();
+  let next = addItem(doc, {
+    item: createItem("audio", {
+      trackId: voiceTrack,
+      assetId: "as_voice2",
+      // Pehla voice 100-200 par hai; ye 205 se — beech me sirf 5 frame.
+      startFrame: 205,
+      durationInFrames: 50,
+    }),
+  });
+  next = setDucking(next, {
+    enabled: true,
+    voiceTrackIds: [voiceTrack],
+    duckedTrackIds: [musicTrack],
+    attackFrames: 6,
+    releaseFrames: 15,
+  });
+
+  const envelope = duckEnvelope(next);
+  assert.ok(
+    Math.abs(envelope(202) - dbToGain(-18)) < 1e-9,
+    `gap me bhi duck rehna chahiye, mila ${envelope(202)}`,
+  );
+});
+
+test("ek hi track voice aur ducked dono nahi ho sakta", () => {
+  const { doc, voiceTrack } = duckFixture();
+  assert.throws(
+    () =>
+      setDucking(doc, {
+        enabled: true,
+        voiceTrackIds: [voiceTrack],
+        duckedTrackIds: [voiceTrack],
+      }),
+    /khud ko neeche/,
+  );
+});
+
+test("chupi hui (muted) voice duck nahi karti", () => {
+  const { doc, voiceTrack, musicTrack } = duckFixture();
+  let next = setDucking(doc, {
+    enabled: true,
+    voiceTrackIds: [voiceTrack],
+    duckedTrackIds: [musicTrack],
+  });
+  const voice = next.items.find((item) => item.trackId === voiceTrack)!;
+  next = setItemAudio(next, { itemIds: [voice.id], field: "muted", value: true });
+
+  assert.equal(duckEnvelope(next)(150), 1, "chup voice par music neeche nahi jaana chahiye");
+});
+
+section("itemGainAt — ek hi gain math (15.1 / 15.6)");
+
+test("mute, track mute aur solo teeno chup kar dete hain", () => {
+  const { doc, musicTrack, musicItem } = duckFixture();
+  const track = doc.tracks.find((entry) => entry.id === musicTrack)!;
+  const item = itemById(doc, musicItem);
+
+  assert.equal(itemGainAt({ doc, item, track, localFrame: 0 }), 1);
+
+  const muted = setItemAudio(doc, { itemIds: [musicItem], field: "muted", value: true });
+  assert.equal(
+    itemGainAt({ doc: muted, item: itemById(muted, musicItem), track, localFrame: 0 }),
+    0,
+  );
+
+  // Kisi aur item par solo laga do — ye wala chup ho jaana chahiye.
+  const voice = doc.items.find((entry) => entry.id !== musicItem)!;
+  const solo = setItemAudio(doc, { itemIds: [voice.id], field: "solo", value: true });
+  assert.equal(
+    itemGainAt({ doc: solo, item: itemById(solo, musicItem), track, localFrame: 0 }),
+    0,
+    "solo lagne par baaki sab chup",
+  );
+});
+
+test("master volume gain par gunaa hota hai", () => {
+  const { doc, musicTrack, musicItem } = duckFixture();
+  const half = setMasterAudio(doc, { volume: 0.5 });
+  const track = half.tracks.find((entry) => entry.id === musicTrack)!;
+  assert.equal(itemGainAt({ doc: half, item: itemById(half, musicItem), track, localFrame: 0 }), 0.5);
+});
+
+test("volume ke keyframes gain me aate hain (Phase 13 ka engine)", () => {
+  const { doc, musicTrack, musicItem } = duckFixture();
+  let next = addKeyframe(doc, { itemId: musicItem, path: "audio.volume", frame: 0, value: 0 });
+  next = addKeyframe(next, { itemId: musicItem, path: "audio.volume", frame: 100, value: 1 });
+  next = setKeyframeEasing(next, {
+    itemId: musicItem,
+    path: "audio.volume",
+    frame: 0,
+    easing: "linear",
+  });
+
+  const track = next.tracks.find((entry) => entry.id === musicTrack)!;
+  const item = itemById(next, musicItem);
+  assert.ok(Math.abs(itemGainAt({ doc: next, item, track, localFrame: 50 }) - 0.5) < 1e-9);
+});
+
+test("fade in/out gain ko kinaron par 0 par le aate hain", () => {
+  const { doc, musicTrack, musicItem } = duckFixture();
+  let next = setItemAudio(doc, { itemIds: [musicItem], field: "fadeInFrames", value: 30 });
+  next = setItemAudio(next, { itemIds: [musicItem], field: "fadeOutFrames", value: 30 });
+
+  const track = next.tracks.find((entry) => entry.id === musicTrack)!;
+  const item = itemById(next, musicItem);
+
+  assert.equal(itemGainAt({ doc: next, item, track, localFrame: 0 }), 0);
+  assert.equal(itemGainAt({ doc: next, item, track, localFrame: 300 }), 0);
+  assert.ok(itemGainAt({ doc: next, item, track, localFrame: 150 }) > 0.99, "beech me poora");
+});
+
+test("estimateMixPeak do awaazon ka jod leta hai (aur wo jaan-boojhkar zyada batata hai)", () => {
+  const { doc } = duckFixture();
+  // Dono clips 100-200 par overlap karti hain, dono volume 1 par.
+  const { peak } = estimateMixPeak(doc);
+  assert.ok(peak >= 2, `overlap par peak ${peak} hona chahiye tha >= 2`);
+});
+
+test("clipping par master ka sujhaav aata hai, warna nahi", () => {
+  const { doc } = duckFixture();
+  const suggestion = suggestedMasterVolume(doc);
+  assert.ok(suggestion !== null && suggestion < 1, `sujhaav ${suggestion}`);
+
+  const quiet = setItemAudio(doc, { itemIds: doc.items.map((item) => item.id), field: "volume", value: 0.4 });
+  assert.equal(suggestedMasterVolume(quiet), null, "peak 1 se neeche ho to koi sujhaav nahi");
+});
+
+section("clip speed (15.7 — aur 13.7 ka baaki hissa)");
+
+test("speed badalne par lambai ulti disha me badalti hai", () => {
+  const { doc, ids } = chainFixture();
+  const before = itemById(doc, ids[1]!).durationInFrames;
+
+  const fast = setPlaybackRate(doc, { itemIds: [ids[1]!], rate: 2 });
+  assert.equal(itemById(fast, ids[1]!).durationInFrames, Math.round(before / 2));
+
+  const slow = setPlaybackRate(doc, { itemIds: [ids[1]!], rate: 0.5 });
+  assert.equal(itemById(slow, ids[1]!).durationInFrames, before * 2);
+});
+
+test("speed ke saath keyframes bhi time-scale hote hain (13.7)", () => {
+  /*
+   * Ye wahi cheez hai jo Phase 13 me adhoori chhoot gayi thi. Bina iske 2x
+   * karne par clip aadhi ho jaati par keyframes apni jagah rehte — yaani aadhi
+   * animation clip ke bahar chali jaati aur kabhi dikhti hi nahi.
+   */
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[1]!, path: "transform.scale", frame: 0, value: 1 });
+  // 80 par, 100 par nahi: 100 clip ka aakhri kinara hai (duration hi 100 hai) aur
+  // wahan "clip ke andar hai ya bahar" ka sawaal apne aap kinare par atak jaata.
+  next = addKeyframe(next, { itemId: ids[1]!, path: "transform.scale", frame: 80, value: 2 });
+
+  const fast = setPlaybackRate(next, { itemIds: [ids[1]!], rate: 2 });
+  const item = itemById(fast, ids[1]!);
+
+  assert.deepEqual(
+    item.keyframes["transform.scale"]?.map((kf) => kf.frame),
+    [0, 40],
+    "keyframes bhi aadhe frame par aane chahiye",
+  );
+  assert.ok(
+    (item.keyframes["transform.scale"]?.[1]?.frame ?? 0) < item.durationInFrames,
+    "koi keyframe clip ke bahar nahi bachna chahiye",
+  );
+});
+
+test("fades bhi speed ke saath simatte hain", () => {
+  const { doc, ids } = chainFixture();
+  const withFade = setItemAudio(doc, { itemIds: [ids[1]!], field: "fadeInFrames", value: 20 });
+  const fast = setPlaybackRate(withFade, { itemIds: [ids[1]!], rate: 2 });
+  assert.equal(itemById(fast, ids[1]!).audio.fadeInFrames, 10);
+});
+
+test("hadd se bahar ki speed ruk jaati hai", () => {
+  const { doc, ids } = chainFixture();
+  assert.throws(() => setPlaybackRate(doc, { itemIds: [ids[1]!], rate: 10 }), /nahi chalegi/);
+  assert.throws(() => setPlaybackRate(doc, { itemIds: [ids[1]!], rate: 0.1 }), /nahi chalegi/);
+});
+
+test("speed do baar badalne par lambai wapas wahi aati hai", () => {
+  // Round-trip test — bina iske factor ka ganit ulta likha ho to bhi pata nahi chalta.
+  const { doc, ids } = chainFixture();
+  const before = itemById(doc, ids[1]!).durationInFrames;
+  let next = setPlaybackRate(doc, { itemIds: [ids[1]!], rate: 2 });
+  next = setPlaybackRate(next, { itemIds: [ids[1]!], rate: 1 });
+  assert.equal(itemById(next, ids[1]!).durationInFrames, before);
+});
+
+section("freeze frame (15.8)");
+
+test("freeze clip ko todta hai aur beech me sthir tukda daalta hai", () => {
+  const { doc, ids } = chainFixture();
+  // Clip 100-200 par hai. Frame 150 par freeze, 60 frames ka.
+  const next = freezeFrame(doc, { itemId: ids[1]!, frame: 150, durationInFrames: 60 });
+
+  const onTrack = next.items
+    .filter((item) => item.trackId === itemById(doc, ids[1]!).trackId)
+    .sort((a, b) => a.startFrame - b.startFrame);
+
+  const frozen = onTrack.find((item) => item.name.includes("freeze"));
+  assert.ok(frozen, "freeze wala item banna chahiye");
+  assert.equal(frozen!.startFrame, 150);
+  assert.equal(frozen!.durationInFrames, 60);
+  assert.ok(frozen!.audio.muted, "sthir tasveer se awaaz nahi aani chahiye");
+});
+
+test("freeze ke baad wala tukda utna hi aage khisakta hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = freezeFrame(doc, { itemId: ids[1]!, frame: 150, durationInFrames: 60 });
+
+  const right = next.items.find(
+    (item) => item.trackId === itemById(doc, ids[1]!).trackId && item.startFrame === 210,
+  );
+  assert.ok(right, "daayan tukda 150 + 60 = 210 par hona chahiye");
+  assert.equal(right!.durationInFrames, 50, "150-200 wala hissa bacha hai");
+});
+
+test("freeze ka source offset freeze wale frame par jama hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = freezeFrame(doc, { itemId: ids[1]!, frame: 150, durationInFrames: 60 });
+  const frozen = next.items.find((item) => item.name.includes("freeze"))!;
+
+  // Clip 100 par shuru hoti hai, yaani local 50; playbackRate 1.
+  assert.equal(frozen.trimStartFrame, 50);
+  assert.ok(frozen.playbackRate > 0, "schema positive maangta hai");
+  assert.ok(frozen.playbackRate < 0.001, "aankh ko bilkul sthir dikhna chahiye");
+});
+
+test("kinare par freeze mana hai", () => {
+  const { doc, ids } = chainFixture();
+  assert.throws(
+    () => freezeFrame(doc, { itemId: ids[1]!, frame: 100, durationInFrames: 30 }),
+    /clip ke andar/,
+  );
+});
+
+test("freeze ke baad doc schema pass karta hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = freezeFrame(doc, { itemId: ids[1]!, frame: 150, durationInFrames: 60 });
+  const parsed = safeParseDoc(next);
+  assert.ok(parsed.success, parsed.success ? "" : JSON.stringify(parsed.error.issues.slice(0, 3)));
+});
+
+section("crop (15.10)");
+
+test("crop ka CSS clip aur scale dono deta hai", () => {
+  const css = cropCss({ x: 0.25, y: 0.25, width: 0.5, height: 0.5 });
+  assert.equal(css.clipPath, "inset(25% 25% 25% 25%)");
+  assert.ok(css.transform?.startsWith("scale(2, 2)"), css.transform);
+});
+
+test("poora frame wala crop kuch nahi likhta", () => {
+  // Har extra transform browser se ek naya layer bulwata hai — bekaar ka kharcha.
+  assert.deepEqual(cropCss({ x: 0, y: 0, width: 1, height: 1 }), {});
+  assert.deepEqual(cropCss(null), {});
+});
+
+test("kinare wala crop beech ki taraf khisakta hai", () => {
+  // Upar-baayan chauthai: use frame ke beech me laane ke liye daayein-neeche shift.
+  const css = cropCss({ x: 0, y: 0, width: 0.5, height: 0.5 });
+  assert.ok(css.transform?.includes("translate(50%, 50%)"), css.transform);
+});
+
+test("setCrop hadd ke bahar ki value ko andar le aata hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const next = setCrop(doc, { itemIds: [id], crop: { x: 0.8, y: 0, width: 0.9, height: 1 } });
+  const crop = itemById(next, id).transform.crop!;
+
+  assert.ok(crop.x + crop.width <= 1 + 1e-9, `crop frame se bahar nikal gaya: ${JSON.stringify(crop)}`);
+});
+
+test("setCrop null par crop hat jaata hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = setCrop(doc, { itemIds: [id], crop: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } });
+  next = setCrop(next, { itemIds: [id], crop: null });
+  assert.equal(itemById(next, id).transform.crop, null);
+});
+
+section("master audio (15.6)");
+
+test("loudness target aur limiter doc me save hote hain", () => {
+  const { doc } = duckFixture();
+  const next = setMasterAudio(doc, { loudnessLufs: -16, limiter: false });
+  assert.equal(next.project.audio.loudnessLufs, -16);
+  assert.equal(next.project.audio.limiter, false);
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("hadd se bahar ka loudness target andar le aaya jaata hai", () => {
+  const { doc } = duckFixture();
+  assert.equal(setMasterAudio(doc, { loudnessLufs: -80 }).project.audio.loudnessLufs, -32);
+  assert.equal(setMasterAudio(doc, { loudnessLufs: 5 }).project.audio.loudnessLufs, -5);
+});
+
+test("naye project ka default -14 LUFS hai (Section 3A)", () => {
+  const { doc } = duckFixture();
+  assert.equal(doc.project.audio.loudnessLufs, DEFAULT_LOUDNESS_LUFS);
+  assert.equal(doc.project.audio.limiter, true);
 });
 
 

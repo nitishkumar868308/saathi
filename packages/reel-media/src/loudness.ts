@@ -132,6 +132,22 @@ export interface FinalizeOptions {
   audioBitrateKbps: number;
   /** Pehle se naapi hui loudness — na ho to yahin naap li jaati hai. */
   measurement?: LoudnessMeasurement | null;
+  /**
+   * Project ka apna loudness target (15.6). Na do to Section 3A ka -14 LUFS.
+   *
+   * ⚠️ Ye argument isliye hai ki volume ka ganit **do jagah na ho**. Master
+   * section me user jo number chunta hai wahi seedha yahan aata hai; agar UI
+   * apna alag hisaab lagakar item volumes badal deti, to project file kholne par
+   * user ke apne set kiye hue volume badle hue milte.
+   */
+  targetLufs?: number;
+  /**
+   * True-peak limiter (15.6). Band karne par `TP` ki hadd nahi lagti.
+   *
+   * Band karne ka option isliye hai ki kuch platform khud normalize karte hain
+   * aur do baar limit karna awaaz ko chapta kar deta hai.
+   */
+  limiter?: boolean;
 }
 
 export interface FinalizeResult {
@@ -187,9 +203,17 @@ export async function finalizeMp4(
     };
   }
 
+  const targetI = options.targetLufs ?? TARGET_LUFS;
+  /*
+   * Limiter band ho to bhi `TP` dena padta hai — `loudnorm` bina TP ke chalta hi
+   * nahi. Tab use 0 dBTP par rakh dete hain: yaani hadd sirf wahan lagti hai
+   * jahan digital clipping shuru hoti hai, uske pehle nahi.
+   */
+  const targetTP = options.limiter === false ? 0 : TARGET_TRUE_PEAK;
+
   const filter = [
-    `loudnorm=I=${TARGET_LUFS}`,
-    `TP=${TARGET_TRUE_PEAK}`,
+    `loudnorm=I=${targetI}`,
+    `TP=${targetTP}`,
     `LRA=${TARGET_LRA}`,
     `measured_I=${measurement.inputI}`,
     `measured_TP=${measurement.inputTP}`,

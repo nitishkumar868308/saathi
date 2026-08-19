@@ -16,6 +16,8 @@ import clsx from "clsx";
 import { useState } from "react";
 
 import { AnimationSection } from "@/components/editor/properties/AnimationSection";
+import { AudioSection } from "@/components/editor/properties/AudioSection";
+import { ClipSection } from "@/components/editor/properties/ClipSection";
 import { EffectsSection } from "@/components/editor/properties/EffectsSection";
 import { controlComponent } from "@/components/controls";
 import { KeyframeButton } from "@/components/controls/KeyframeButton";
@@ -88,6 +90,8 @@ export function PropertiesPanel() {
 
       <TimingSection items={items} />
       <FitSection items={items} />
+      <ClipSection items={items} />
+      <AudioSection items={items} localFrame={playheadFrame - first.startFrame} />
       <AnimationSection items={items} />
       <EffectsSection items={items} localFrame={playheadFrame - first.startFrame} />
 

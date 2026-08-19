@@ -1,6 +1,7 @@
 import {
   applyEffects,
   composeAnimations,
+  cropCss,
   maskCss,
   resolveItemValue,
   transitionOutputAt,
@@ -82,6 +83,7 @@ export const Transformed: React.FC<{
 
   const effects = applyEffects(item, localFrame, frame);
   const mask = maskCss(item.mask);
+  const crop = cropCss(item.transform.crop);
 
   /*
    * Filter ki ek hi lambi string banti hai, aur kram maayne rakhta hai:
@@ -141,8 +143,23 @@ export const Transformed: React.FC<{
           ...mask,
         }}
       >
-        {background}
-        {children}
+        {/*
+         * Crop ki apni parat (15.10).
+         *
+         * ⚠️ Ise mask ke saath ek hi element par nahi rakha ja sakta: bina
+         * feather ke mask bhi `clipPath` likhta hai aur crop bhi. Ek hi object
+         * me dono daalne par baad wala pehle wale ko chup-chaap mita deta —
+         * yaani mask lagane par crop gayab, ya ulta. Do parat hone se dono
+         * apna-apna kaam karte hain.
+         *
+         * Crop ka `transform` bhi yahin hai, bahar wale element par nahi —
+         * wahan item ka apna scale/rotate baitha hai aur ek element par do
+         * transform nahi lag sakte.
+         */}
+        <AbsoluteFill style={crop}>
+          {background}
+          {children}
+        </AbsoluteFill>
       </AbsoluteFill>
 
       {/*

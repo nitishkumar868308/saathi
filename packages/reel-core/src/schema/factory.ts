@@ -9,6 +9,14 @@ import {
   DEFAULT_SIZE_PRESET_ID,
   resolveSize,
 } from "../config/presets";
+import {
+  DEFAULT_DUCK_ATTACK_FRAMES,
+  DEFAULT_DUCK_RELEASE_FRAMES,
+  DEFAULT_DUCK_TARGET_DB,
+  DEFAULT_FADE_SHAPE,
+  DEFAULT_LOUDNESS_LUFS,
+  DEFAULT_MASTER_VOLUME,
+} from "../config/audio";
 import { createId } from "../id";
 import {
   requireItemType,
@@ -107,6 +115,7 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
 
     trimStartFrame: 0,
     playbackRate: 1,
+    sourceDurationFrames: null,
 
     assetId: null,
 
@@ -129,7 +138,16 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
     effects: [],
     mask: null,
     blendMode: "normal" as const,
-    audio: { volume: 1, muted: false, fadeInFrames: 0, fadeOutFrames: 0 },
+    audio: {
+      volume: 1,
+      muted: false,
+      fadeInFrames: 0,
+      fadeOutFrames: 0,
+      solo: false,
+      fadeShape: DEFAULT_FADE_SHAPE,
+      loop: false,
+      pan: 0,
+    },
 
     transitionIn: { type: "none", durationInFrames: 0 },
     transitionOut: { type: "none", durationInFrames: 0 },
@@ -207,6 +225,19 @@ export function createEmptyProject(input: CreateEmptyProjectInput = {}): Doc {
       fps,
       durationInFrames,
       background: input.background ?? DEFAULT_BACKGROUND,
+      audio: {
+        volume: DEFAULT_MASTER_VOLUME,
+        loudnessLufs: DEFAULT_LOUDNESS_LUFS,
+        limiter: true,
+        ducking: {
+          enabled: false,
+          voiceTrackIds: [],
+          duckedTrackIds: [],
+          targetDb: DEFAULT_DUCK_TARGET_DB,
+          attackFrames: DEFAULT_DUCK_ATTACK_FRAMES,
+          releaseFrames: DEFAULT_DUCK_RELEASE_FRAMES,
+        },
+      },
     },
     tracks,
     items: [],

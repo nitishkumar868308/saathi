@@ -13,11 +13,12 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  MAX_REVERSE_SECONDS,
   TARGET_LUFS,
   audioStream,
   checkFfmpegAvailable,
@@ -29,6 +30,7 @@ import {
   parseFrameRate,
   probe,
   probeAsset,
+  reverseMedia,
   run,
   videoStream,
 } from "../src/index";
@@ -305,6 +307,95 @@ async function main(): Promise<void> {
       assert.equal(after?.codec_name, before?.codec_name);
       assert.equal(after?.sample_rate, before?.sample_rate);
     });
+    section("reverse (15.9)");
+
+    /**
+     * Ek frame ki beech ki roshni — reverse sach me hua ya nahi, yahi batata hai.
+     */
+    async function frameBrightness(file: string, atSeconds: number): Promise<number> {
+      const raw = join(dir, `rev-${atSeconds}-${Math.round(atSeconds * 1000)}.gray`);
+      await run(ffmpegPath(), [
+        ...QUIET,
+        "-i", file,
+        "-ss", atSeconds.toFixed(3),
+        "-frames:v", "1",
+        "-f", "rawvideo", "-pix_fmt", "gray",
+        raw,
+      ]);
+      const bytes = await readFile(raw);
+      let total = 0;
+      for (let index = 0; index < bytes.length; index += 97) total += bytes[index] ?? 0;
+      return total / Math.ceil(bytes.length / 97);
+    }
+
+    /*
+     * Aisi clip jiski roshni waqt ke saath badhti hai. Reverse ke baad wahi clip
+     * ghatti hui honi chahiye — aur ye naap content par nahi, sirf kram par tiki
+     * hai, isliye ise dhoka dena mushkil hai.
+     */
+    const ramp = join(dir, "ramp.mp4");
+    await run(ffmpegPath(), [
+      ...QUIET,
+      "-f", "lavfi",
+      "-i", "color=c=black:s=320x240:d=4:r=30",
+      "-vf", "geq=lum='T/4*255':cb=128:cr=128",
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
+      ramp,
+    ]);
+
+    await test("reverse video ko sach me ulta karta hai", async () => {
+      const out = join(dir, "ramp-reversed.mp4");
+      const result = await reverseMedia(ramp, out);
+
+      assert.ok(Math.abs(result.durationSeconds - 4) < 0.2, `lambai ${result.durationSeconds}`);
+
+      const originalStart = await frameBrightness(ramp, 0.3);
+      const originalEnd = await frameBrightness(ramp, 3.6);
+      const reversedStart = await frameBrightness(out, 0.3);
+      const reversedEnd = await frameBrightness(out, 3.6);
+
+      assert.ok(originalEnd > originalStart + 50, "source me roshni badhni chahiye thi");
+      assert.ok(
+        reversedStart > reversedEnd + 50,
+        `reverse me roshni ghatni chahiye: shuru ${reversedStart.toFixed(1)}, ant ${reversedEnd.toFixed(1)}`,
+      );
+      // Ulti clip ka pehla frame seedhi clip ke aakhri jaisa hona chahiye.
+      assert.ok(
+        Math.abs(reversedStart - originalEnd) < 25,
+        `${reversedStart.toFixed(1)} vs ${originalEnd.toFixed(1)}`,
+      );
+    });
+
+    await test("asli file reverse ke baad bilkul nahi badalti", async () => {
+      // Phase 1 ka locked rule, aur reverse uska sabse bada imtihan hai.
+      const before = await stat(ramp);
+      const out = join(dir, "ramp-reversed-2.mp4");
+      await reverseMedia(ramp, out);
+      const after = await stat(ramp);
+      assert.equal(after.size, before.size);
+      assert.equal(after.mtimeMs, before.mtimeMs);
+    });
+
+    await test("bahut lambi clip par reverse saaf mana karta hai", async () => {
+      /*
+       * `reverse` filter poori clip ko memory me rakhta hai (aakhri frame pehle
+       * dena hota hai). Chup-chaap machine ki RAM khatam karne se behtar hai
+       * batana — isliye ek hadd hai aur wo error me dikhti hai.
+       */
+      const long = join(dir, "long.mp4");
+      await run(ffmpegPath(), [
+        ...QUIET,
+        "-f", "lavfi",
+        "-i", `color=c=black:s=160x120:d=${MAX_REVERSE_SECONDS + 5}:r=10`,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        long,
+      ]);
+      await assert.rejects(
+        () => reverseMedia(long, join(dir, "long-rev.mp4")),
+        /Reverse .* tak hi hota hai/,
+      );
+    });
+
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

@@ -12,6 +12,7 @@ import clsx from "clsx";
 import { EyeOff, Lock } from "lucide-react";
 
 import { useAssetUrl } from "@/lib/assetUrls";
+import { VolumeLine } from "@/components/editor/timeline/VolumeLine";
 import { useEditorStore } from "@/lib/store";
 import { TRIM_HANDLE_PX, type DragMode } from "@/lib/clipEdit";
 import { clipLabel, clipTooltip, frameToX } from "@/lib/timeline";
@@ -151,6 +152,9 @@ export function Clip({
           </span>
         </span>
       </button>
+
+      {/* Volume ki lakeer (15.2) — label ke neeche, trim handles ke upar. */}
+      <VolumeLine item={item} width={Math.max(2, width)} />
 
       <TransitionBadge
         item={item}
