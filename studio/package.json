@@ -2,19 +2,24 @@
   "name": "@reel/studio",
   "version": "0.0.0",
   "private": true,
-  "description": "AI Reel Studio ka editor \u2014 localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
+  "description": "AI Reel Studio ka editor — localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts"
   },
   "dependencies": {
     "@reel/core": "*",
     "@reel/storage": "*",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
     "next": "^14.2.35",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "zod": "^3.25.76",
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
@@ -22,6 +27,7 @@
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.41",
-    "tailwindcss": "^3.4.10"
+    "tailwindcss": "^3.4.10",
+    "tsx": "^4.23.12"
   }
 }

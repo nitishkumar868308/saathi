@@ -436,6 +436,69 @@ export const recomputeDuration = defineOp<void>("recomputeDuration", (draft) => 
   draft.project.durationInFrames = Math.max(1, end);
 });
 
+/**
+ * Project settings ki koi bhi property path se set karo (`name`, `background`…).
+ *
+ * Rename bhi yahi op hai — na list page ke liye alag code, na editor ke liye.
+ * Isi wajah se rename undo ho jaata hai aur autosave ko kuch alag nahi sikhana padta.
+ */
+const PROTECTED_PROJECT_PATHS = new Set([
+  "id",
+  // Size/fps badalna items ko re-fit karta hai (README 3B) — wo apna op maangta
+  // hai, warna 16:9 se 9:16 karte hi poori reel chupchaap toot jaati.
+  "sizePresetId",
+  "width",
+  "height",
+  "fps",
+  // Lambai ke apne op hain: growDuration (apne aap) aur recomputeDuration.
+  "durationInFrames",
+]);
+
+export interface SetProjectPropertyArgs {
+  /** `"name"`, `"background"` … */
+  path: string;
+  value: unknown;
+}
+
+export const setProjectProperty = defineOp<SetProjectPropertyArgs>(
+  "setProjectProperty",
+  (draft, args) => {
+    const root = args.path.split(".")[0] as string;
+    if (PROTECTED_PROJECT_PATHS.has(args.path) || PROTECTED_PROJECT_PATHS.has(root)) {
+      throw new TimelineOpError(
+        `project.${args.path} seedhe set nahi hota — iske liye apna op chahiye`,
+      );
+    }
+    setByPath(draft.project, args.path, args.value);
+  },
+);
+
+export interface ReplaceDocArgs {
+  /** Poora naya doc — caller ise `parseDoc`/`migrateDoc` se guzaar kar de. */
+  doc: Doc;
+}
+
+/**
+ * Poore doc ko badal do — version restore ka op.
+ *
+ * Ye op isliye hai (aur "bas naya doc set kar do" nahi) taaki **restore bhi
+ * Ctrl+Z se wapas ho jaaye**. Bina iske "galat version restore kar diya" ka koi
+ * ilaaj nahi bachta.
+ *
+ * Top-level keys ek-ek karke likhi jaati hain, `draft = next` nahi — immer draft
+ * ko replace karne se patches nahi banti aur undo chupchaap mar jaata hai.
+ */
+export const replaceDoc = defineOp<ReplaceDocArgs>("replaceDoc", (draft, args) => {
+  const next = clone(args.doc);
+  draft.version = next.version;
+  draft.project = next.project as Draft<Doc>["project"];
+  draft.tracks = next.tracks as Draft<Doc>["tracks"];
+  draft.items = next.items as Draft<Doc>["items"];
+  draft.scenes = next.scenes as Draft<Doc>["scenes"];
+  draft.brand = next.brand as Draft<Doc>["brand"];
+  draft.meta = next.meta as Draft<Doc>["meta"];
+});
+
 /** Naya item is track par rakha ja sakta hai? UI drag ke dauraan yahi poochhta hai. */
 export function canPlaceItem(doc: Doc, itemTypeId: string, trackId: string): boolean {
   const track = doc.tracks.find((t) => t.id === trackId);
@@ -458,6 +521,8 @@ export const OPS = {
   removeTrack,
   reorderTracks,
   recomputeDuration,
+  setProjectProperty,
+  replaceDoc,
 } as const;
 
 export type OpName = keyof typeof OPS;

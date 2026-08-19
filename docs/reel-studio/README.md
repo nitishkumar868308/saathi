@@ -260,7 +260,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 1 | complete | 2026-08-19 |
 | 2 | complete | 2026-08-19 |
 | 3 | complete | 2026-08-19 |
-| 4 | not started | — |
+| 4 | complete | 2026-08-19 |
 | 5 | not started | — |
 | 6 | not started | — |
 | 7 | not started | — |

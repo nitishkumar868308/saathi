@@ -42,6 +42,7 @@ import {
   pruneSelection,
   recomputeDuration,
   removeTrack,
+  replaceDoc,
   reorderTracks,
   resolveSize,
   safeParseDoc,
@@ -51,6 +52,7 @@ import {
   setByPath,
   setIdFactory,
   setItemProperty,
+  setProjectProperty,
   snapFrame,
   splitItemAtFrame,
   suggestFit,
@@ -857,6 +859,44 @@ test("kuch na badle to history gandi nahi hoti", () => {
   const same = history.apply(doc, (draft) => moveItem.recipe(draft, { itemId: id, startFrame: 0 }));
   assert.equal(history.size().past, 0, "no-op edit history me nahi jaani chahiye");
   assert.equal(same, doc);
+});
+
+section("project ops (4.4 / 4.10 — rename aur version restore)");
+
+test("setProjectProperty naam badalta hai, purana doc chhuta nahi", () => {
+  const { doc } = buildFixture();
+  const next = setProjectProperty(doc, { path: "name", value: "Rahul + Papa" });
+  assert.equal(next.project.name, "Rahul + Papa");
+  assert.equal(doc.project.name, "Check fixture");
+});
+
+test("size / fps setProjectProperty se nahi badalte (apna op maangte hain)", () => {
+  const { doc } = buildFixture();
+  for (const path of ["width", "height", "fps", "sizePresetId", "durationInFrames", "id"]) {
+    throws(
+      () => setProjectProperty(doc, { path, value: 1 }),
+      /apna op/,
+      `project.${path} khula nahi hona chahiye`,
+    );
+  }
+});
+
+test("replaceDoc poora doc badal deta hai aur undo se wapas aata hai", () => {
+  const { doc } = buildFixture();
+  const old = setProjectProperty(doc, { path: "name", value: "Purana version" });
+
+  const history = createHistory<Doc>();
+  let live = doc;
+  live = history.apply(live, (draft) => replaceDoc.recipe(draft, { doc: old }), {
+    label: "version restore",
+  });
+  assert.equal(live.project.name, "Purana version");
+  assert.equal(live.items.length, old.items.length);
+
+  // Restore bhi undo hona chahiye — warna "galat version restore kar diya" ka
+  // koi ilaaj nahi bachta.
+  live = history.undo(live);
+  assert.equal(live.project.name, "Check fixture");
 });
 
 section("selection (1.13)");
