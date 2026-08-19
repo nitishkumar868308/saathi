@@ -39,6 +39,8 @@ Windows + Chromium + FFmpeg ka risk yahin mar jaata hai.
       bhi type nahi aata.
 - [x] 3.10 `worker/src/engines/remotion.ts` — bundle → selectComposition → renderMedia.
 - [x] 3.11 `worker/src/ffmpeg.ts` — probe, `+faststart` remux (`-c copy`), frame extract.
+      → **Phase 5 me ye file `packages/reel-media/src/ffmpeg.ts` me chali gayi** (studio ko bhi
+      probe/thumbnail chahiye the). Code wahi hai; render sample dobara chalakar dekha gaya.
       `REEL_FFMPEG_PATH` / `REEL_FFPROBE_PATH` se override.
 - [x] 3.12 `worker/scripts/render-sample.ts` — placeholder media **khud FFmpeg se**.
 - [x] 3.13 `npm run render:sample` root script.

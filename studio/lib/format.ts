@@ -38,6 +38,19 @@ export function timeAgo(iso: string, now = Date.now()): string {
   return `${Math.round(value)} ${unit} pehle`;
 }
 
+/**
+ * `30500` -> `"0:30"`. Asset ki lambai milliseconds me aati hai (DB ka
+ * `duration_ms`), frames me nahi — isliye yahan `framesToTimecode` ka koi kaam
+ * nahi. Frame ka math hamesha `@reel/core/time` se hota hai; ye uska maamla
+ * hai hi nahi.
+ */
+export function msToClock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 /** `1080×1920` — `x` nahi, asli multiplication sign. */
 export function sizeLabel(width: number, height: number): string {
   return `${width}×${height}`;

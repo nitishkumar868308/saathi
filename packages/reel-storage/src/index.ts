@@ -16,6 +16,7 @@ export * from "./assets";
 export * from "./config";
 export * from "./drivers/local";
 export * from "./drivers/r2";
+export * from "./localCopy";
 export * from "./sigv4";
 
 /**

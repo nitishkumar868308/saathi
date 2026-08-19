@@ -1,4 +1,5 @@
 import type { Doc } from "../schema/project";
+import { ASSET_KINDS, BUILTIN_ASSET_KINDS } from "./assetKinds";
 import { BUILTIN_EXPORT_PRESETS, type ExportPresetEntry } from "./exportPresets";
 import { BUILTIN_ITEM_TYPES, type ItemTypeEntry } from "./itemTypes";
 import { BUILTIN_TRACK_TYPES, type TrackTypeEntry } from "./trackTypes";
@@ -149,6 +150,7 @@ export function registerBuiltins(): void {
   for (const entry of BUILTIN_ITEM_TYPES) ITEM_TYPES.register(entry);
   for (const entry of BUILTIN_TRACK_TYPES) TRACK_TYPES.register(entry);
   for (const entry of BUILTIN_EXPORT_PRESETS) EXPORT_PRESETS.register(entry);
+  for (const entry of BUILTIN_ASSET_KINDS) ASSET_KINDS.register(entry);
 }
 
 /** Sirf tests ke liye — sab saaf karke dobara register. */
@@ -160,6 +162,7 @@ export function resetRegistries(): void {
   ANIMATIONS.clear();
   SCENE_TYPES.clear();
   EXPORT_PRESETS.clear();
+  ASSET_KINDS.clear();
   VALIDATION_RULES.clear();
   registered = false;
   registerBuiltins();
@@ -167,6 +170,7 @@ export function resetRegistries(): void {
 
 registerBuiltins();
 
+export * from "./assetKinds";
 export * from "./exportPresets";
 export type { ItemTypeEntry } from "./itemTypes";
 export type { TrackTypeEntry } from "./trackTypes";

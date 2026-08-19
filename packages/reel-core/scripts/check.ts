@@ -11,6 +11,7 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash, randomBytes } from "node:crypto";
 
 import {
   AUTO_FIT_ACTIONS,
@@ -23,7 +24,10 @@ import {
   addItem,
   addTrack,
   aspectRatioLabel,
+  assetKindForFile,
+  assetQuality,
   checkUpscale,
+  checkUploadable,
   clampFrame,
   computeFit,
   createCountingIdFactory,
@@ -32,10 +36,14 @@ import {
   createItem,
   deleteItems,
   duplicateItems,
+  formatBytes,
   framesToSeconds,
   framesToTimecode,
   getByPath,
+  libraryTags,
+  listAssetKinds,
   isValidDimension,
+  LIBRARY_TABS,
   migrateDoc,
   moveItem,
   normalizeDimension,
@@ -44,8 +52,12 @@ import {
   removeTrack,
   replaceDoc,
   reorderTracks,
+  resolutionName,
   resolveSize,
   safeParseDoc,
+  Sha256,
+  sha256Hex,
+  sha256HexFromStream,
   secondsToFrames,
   selectByTrack,
   selectRange,
@@ -859,6 +871,138 @@ test("kuch na badle to history gandi nahi hoti", () => {
   const same = history.apply(doc, (draft) => moveItem.recipe(draft, { itemId: id, startFrame: 0 }));
   assert.equal(history.size().past, 0, "no-op edit history me nahi jaani chahiye");
   assert.equal(same, doc);
+});
+
+section("sha256 (5.7 — duplicate pehchanne ke liye)");
+
+/** Node ka apna sha256 — sach ka paimana yahi hai. */
+function nodeHash(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+test("khaali aur maalum vector sahi hain", () => {
+  assert.equal(
+    sha256Hex(new Uint8Array(0)),
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  );
+  assert.equal(
+    sha256Hex(new TextEncoder().encode("abc")),
+    "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+  );
+});
+
+test("padding ke kinare (55/56/63/64/65 byte) node se milte hain", () => {
+  // Yahi wo lambaiyan hain jahan galat implementation tootti hai: 56 byte par
+  // length ke liye jagah nahi bachti aur ek block aur lagta hai.
+  for (const length of [0, 1, 55, 56, 57, 63, 64, 65, 127, 128, 129]) {
+    const bytes = randomBytes(length);
+    assert.equal(sha256Hex(bytes), nodeHash(bytes), `${length} byte par galat hash`);
+  }
+});
+
+test("chunk kaise bhi toota ho, hash wahi rehta hai", () => {
+  const bytes = randomBytes(5000);
+  const expected = nodeHash(bytes);
+
+  for (const chunkSize of [1, 7, 64, 100, 512, 4096]) {
+    const hasher = new Sha256();
+    for (let at = 0; at < bytes.length; at += chunkSize) {
+      hasher.update(bytes.subarray(at, Math.min(at + chunkSize, bytes.length)));
+    }
+    assert.equal(hasher.digestHex(), expected, `chunk ${chunkSize} par galat hash`);
+  }
+});
+
+test("digest() do baar ya uske baad update() saaf mana hai", () => {
+  const hasher = new Sha256();
+  hasher.update(new Uint8Array([1, 2, 3]));
+  hasher.digest();
+  throws(() => hasher.digest(), /do baar/, "dobara digest");
+  throws(() => hasher.update(new Uint8Array([4])), /digest\(\) ke baad/, "digest ke baad update");
+});
+
+section("asset kinds registry (5.1 / 5.8)");
+
+test("mime se kind milti hai, aur mime na ho to extension se", () => {
+  assert.equal(assetKindForFile("image/png", "a.png")?.id, "image");
+  assert.equal(assetKindForFile("video/mp4", "a.mp4")?.id, "video");
+  assert.equal(assetKindForFile("audio/mpeg", "a.mp3")?.id, "audio");
+  // Windows par .mkv ka mime aksar khaali aata hai — extension se bachna zaroori hai.
+  assert.equal(assetKindForFile("", "recording.mkv")?.id, "video");
+  assert.equal(assetKindForFile("application/octet-stream", "song.flac")?.id, "audio");
+  assert.equal(assetKindForFile("application/pdf", "bill.pdf"), null);
+});
+
+test("upload ki rok: anjaan kism, khaali file, aur hadd se badi file", () => {
+  const image = listAssetKinds().find((kind) => kind.id === "image");
+  assert.ok(image);
+
+  assert.equal(checkUploadable({ name: "a.png", type: "image/png", size: 1000 }).ok, true);
+
+  const unknown = checkUploadable({ name: "a.pdf", type: "application/pdf", size: 10 });
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.ok === false && unknown.error.reason, "unknown-kind");
+
+  const empty = checkUploadable({ name: "a.png", type: "image/png", size: 0 });
+  assert.equal(empty.ok === false && empty.error.reason, "empty");
+
+  const big = checkUploadable({ name: "a.png", type: "image/png", size: image.maxBytes + 1 });
+  assert.equal(big.ok === false && big.error.reason, "too-big");
+});
+
+test("library tabs data hain, aur unke tag ek jagah se aate hain", () => {
+  assert.equal(LIBRARY_TABS[0]?.id, "all");
+  assert.deepEqual([...libraryTags()], ["music", "screen-recording"]);
+  // Har tab ki kinds asli registry me honi chahiye — warna tab khaali dikhta
+  // hai aur wajah kahin nahi milti.
+  const kindIds = new Set(listAssetKinds().map((kind) => kind.id));
+  for (const tab of LIBRARY_TABS) {
+    for (const kind of tab.kinds) assert.ok(kindIds.has(kind), `tab ${tab.id}: kind ${kind} nahi hai`);
+  }
+});
+
+test("formatBytes padhne layak hai", () => {
+  assert.equal(formatBytes(512), "512 B");
+  assert.equal(formatBytes(1536), "1.5 KB");
+  assert.equal(formatBytes(64 * 1024 * 1024), "64 MB");
+});
+
+section("asset quality badge (5.9 — Phase 20 isi ko reuse karega)");
+
+test("resolution ka naam chhoti taraf se banta hai", () => {
+  // Reel 1080x1920 bhi "1080p" hai — use "1920p" kehna galat hoga.
+  assert.equal(resolutionName(1080, 1920), "1080p");
+  assert.equal(resolutionName(1920, 1080), "1080p");
+  assert.equal(resolutionName(3840, 2160), "4K");
+  assert.equal(resolutionName(640, 480), "480p");
+});
+
+test("target ke hisaab se good / ok / low", () => {
+  const reel = { width: 1080, height: 1920 };
+
+  const good = assetQuality({ kind: "image", width: 1080, height: 1920 }, reel);
+  assert.equal(good.level, "good");
+  assert.equal(good.badge, "1080p");
+
+  const low = assetQuality({ kind: "image", width: 640, height: 480 }, reel);
+  assert.equal(low.level, "low");
+  assert.match(low.detail, /blurry/);
+
+  const ok = assetQuality({ kind: "video", width: 864, height: 1536 }, reel);
+  assert.equal(ok.level, "ok");
+});
+
+test("audio ka quality badge nahi hota, aur bina naape resolution ka bhi nahi", () => {
+  assert.equal(assetQuality({ kind: "audio" }, { width: 1080, height: 1920 }).level, "unknown");
+  const notProbed = assetQuality({ kind: "video", width: null, height: null }, null);
+  assert.equal(notProbed.level, "unknown");
+  assert.match(notProbed.detail, /probe nahi chala/);
+});
+
+test("chaudai wali kami bhi pakdi jaati hai (sirf area dekhna dhoka hai)", () => {
+  // 3840x480: pixels bahut hain, par 1080x1920 me oonchai bilkul kam padti hai.
+  const verdict = assetQuality({ kind: "video", width: 3840, height: 480 }, { width: 1080, height: 1920 });
+  assert.equal(verdict.level, "low");
 });
 
 section("project ops (4.4 / 4.10 — rename aur version restore)");

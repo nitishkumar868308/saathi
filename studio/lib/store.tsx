@@ -269,7 +269,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       playheadFrame: 0,
       zoom: 1,
       mode: "advanced",
-      leftPanelId: "project",
+      leftPanelId: "media",
 
       saveStatus: "saved",
       saveMessage: null,

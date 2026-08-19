@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@reel/core": "*",
+    "@reel/media": "*",
     "@reel/storage": "*",
     "clsx": "^2.1.1",
     "lucide-react": "^0.454.0",

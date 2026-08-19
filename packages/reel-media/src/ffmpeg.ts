@@ -77,6 +77,12 @@ export function run(command: string, args: readonly string[]): Promise<RunResult
 
 // -------------------------------------------------------------------- probe
 
+export interface ProbeSideData {
+  side_data_type?: string;
+  /** `displaymatrix` ke saath aata hai — phone ke portrait video ka poora khel. */
+  rotation?: number;
+}
+
 export interface ProbeStream {
   index: number;
   codec_type: "video" | "audio" | string;
@@ -90,6 +96,9 @@ export interface ProbeStream {
   channels?: number;
   bit_rate?: string;
   nb_frames?: string;
+  side_data_list?: ProbeSideData[];
+  /** Purane files me rotation yahan (`tags.rotate`) hota hai. */
+  tags?: Record<string, string>;
 }
 
 export interface ProbeFormat {
@@ -113,6 +122,11 @@ export async function probe(file: string): Promise<ProbeResult> {
     "json",
     "-show_streams",
     "-show_format",
+    // Rotation `side_data_list` me aata hai (ffmpeg 7+ ne `tags.rotate` dena
+    // band kar diya) — bina iske phone ka portrait video landscape samajh
+    // liya jaata hai.
+    "-show_entries",
+    "stream_side_data=rotation",
     file,
   ]);
   return JSON.parse(stdout) as ProbeResult;

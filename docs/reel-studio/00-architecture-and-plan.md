@@ -131,10 +131,13 @@ saathi/
 │  ├─ transitions/{fade,crossfade,slide,zoom,blur}.tsx
 │  ├─ effects/applyEffects.tsx
 │  └─ mockups/PhoneFrame.tsx            # Phase 18
+├─ packages/reel-media/         # NEW (Phase 5): ffmpeg/ffprobe wrapper, Node-only
+│  ├─ ffmpeg.ts                          # run/probe/remux — pehle worker/src/ffmpeg.ts tha
+│  ├─ probe.ts                           # ffprobe -> asset metadata (rotation aware)
+│  └─ thumbnails.ts                      # image resize / video frame / audio waveform
 ├─ worker/                      # NEW: plain Node, runs on your PC
 │  ├─ index.ts                          # poll -> claim -> render -> upload -> update
 │  ├─ engines/remotion.ts                # RenderEngine impl (swappable)
-│  ├─ ffmpeg.ts
 │  └─ providers/{tts-edge.ts,captions-whisper.ts,lipsync-noop.ts}  # Phase 22-24
 ├─ supabase/reel-studio.sql     # NEW: follows existing plain-.sql convention
 └─ docs/reel-studio/            # this plan + phase prompts

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Render worker \u2014 tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
+  "description": "Render worker — tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
   "main": "./src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@reel/core": "*",
+    "@reel/media": "*",
     "@reel/storage": "*",
     "@remotion/bundler": "4.0.513",
     "@remotion/renderer": "4.0.513"

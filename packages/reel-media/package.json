@@ -1,0 +1,24 @@
+{
+  "name": "@reel/media",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FFmpeg / ffprobe ke saath baat karne ki ekmatra jagah — probe, thumbnail, remux. Studio ke server routes aur worker dono ise chalate hain, isliye Section 3A ke rules (single encode, lanczos) ek hi file me bandhe rehte hain.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "tsx scripts/check.ts"
+  },
+  "dependencies": {
+    "@reel/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.2"
+  }
+}

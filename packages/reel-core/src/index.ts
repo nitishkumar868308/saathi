@@ -10,6 +10,7 @@
 export * from "./id";
 export * from "./path";
 export * from "./time";
+export * from "./hash/sha256";
 
 // Config — sab data, koi magic number nahi
 export * from "./config/brand";
@@ -27,6 +28,9 @@ export * from "./schema/factory";
 
 // Keyframes — value nikalna (poora engine Phase 13 me)
 export * from "./keyframes/interpolate";
+
+// Quality — Section 3A ka naapne wala hissa (poora validator Phase 20 me)
+export * from "./quality/assetQuality";
 
 // Storage — sirf contract aur key layout (asli drivers @reel/storage me)
 export * from "./storage/types";

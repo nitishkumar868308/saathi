@@ -57,7 +57,7 @@ import {
   remuxFaststart,
   run,
   videoStream,
-} from "../src/ffmpeg";
+} from "@reel/media";
 
 // ------------------------------------------------------------------- config
 

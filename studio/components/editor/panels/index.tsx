@@ -1,18 +1,19 @@
 "use client";
 
-import { History, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { FolderOpen, History, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
 import { VersionsPanel } from "@/components/editor/panels/VersionsPanel";
+import { MediaPanel } from "@/components/media/MediaPanel";
 
 /**
  * Left sidebar ke tabs — **registry se** (checklist 4.11).
  *
- * ⚠️ Yahan sirf wo panel hain jo aaj sach me kaam karte hain. "Media", "Text",
- * "Effects" ke khaali tabs daal dena aasan hota, par wo README ka rule 5 todta
- * hai: jo button kuch nahi karta wo toota hua button hai. Har aage ka phase
- * apna panel yahan ek entry ki tarah jodega.
+ * ⚠️ Yahan sirf wo panel hain jo aaj sach me kaam karte hain. "Text", "Effects"
+ * jaise khaali tabs daal dena aasan hota, par wo README ka rule 5 todta hai:
+ * jo button kuch nahi karta wo toota hua button hai. Har aage ka phase apna
+ * panel yahan ek entry ki tarah jodega (Media Phase 5 me isi tarah aaya).
  */
 
 export interface PanelEntry {
@@ -23,6 +24,12 @@ export interface PanelEntry {
 }
 
 export const LEFT_PANELS: readonly PanelEntry[] = [
+  {
+    id: "media",
+    label: "Media",
+    icon: FolderOpen,
+    component: MediaPanel,
+  },
   {
     id: "project",
     label: "Project",
