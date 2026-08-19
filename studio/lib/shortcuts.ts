@@ -2,6 +2,7 @@
 
 import {
   EMPTY_SELECTION,
+  copyItems,
   selectAll,
   selectSingle,
   timelineOrder,
@@ -9,6 +10,7 @@ import {
 } from "@reel/core";
 import { useEffect } from "react";
 
+import { readClips, writeClips } from "@/lib/clipboard";
 import { usePlayback, type PlaybackApi } from "@/lib/playback";
 import { useEditorStoreApi, type EditorState } from "@/lib/store";
 import { ZOOM_STEP, clampPxPerFrame } from "@/lib/timeline";
@@ -39,7 +41,7 @@ export interface ShortcutEntry {
   keys: string;
   label: string;
   /** UI me grouping ke liye. */
-  group: "edit" | "transport" | "timeline";
+  group: "edit" | "transport" | "timeline" | "editing";
   /** Input/textarea ke andar bhi chale? Default nahi (warna typing tootegi). */
   allowInInput?: boolean;
   run(context: ShortcutContext): void | Promise<void>;
@@ -89,32 +91,45 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     run: ({ playback }) => playback.toggle(),
   },
   {
-    id: "frame-back",
+    /*
+     * ⚠️ Yahan do checklist aapas me takraati hain, aur ye faisla soch kar liya
+     * gaya hai:
+     *
+     *   6.4 kehta hai — arrow se playhead ek frame aage/peeche.
+     *   8.10 kehta hai — arrow se **chuni hui clip** ek frame aage/peeche.
+     *
+     * Dono me se ek chunna padta to doosra feature marta. Isliye arrow ka matlab
+     * halat par tay hota hai: **kuch chuna hua hai to clip hilti hai, warna
+     * playhead.** Yahi har editor karta hai aur yahi soojh-boojh wala jawab hai —
+     * clip chun kar arrow dabane wala aadmi playhead hilana chahta hi nahi tha.
+     * Selection chhodne ke liye Esc hai, jo bilkul saamne wali key hai.
+     */
+    id: "nudge-back",
     keys: "arrowleft",
-    label: "Ek frame peeche",
+    label: "Ek frame peeche (clip ya playhead)",
     group: "transport",
-    run: ({ playback }) => playback.stepFrames(-1),
+    run: (context) => nudgeOrStep(context, -1, "frames"),
   },
   {
-    id: "frame-forward",
+    id: "nudge-forward",
     keys: "arrowright",
-    label: "Ek frame aage",
+    label: "Ek frame aage (clip ya playhead)",
     group: "transport",
-    run: ({ playback }) => playback.stepFrames(1),
+    run: (context) => nudgeOrStep(context, 1, "frames"),
   },
   {
-    id: "second-back",
+    id: "nudge-second-back",
     keys: "shift+arrowleft",
-    label: "Ek second peeche",
+    label: "Ek second peeche (clip ya playhead)",
     group: "transport",
-    run: ({ playback }) => playback.stepSeconds(-1),
+    run: (context) => nudgeOrStep(context, -1, "seconds"),
   },
   {
-    id: "second-forward",
+    id: "nudge-second-forward",
     keys: "shift+arrowright",
-    label: "Ek second aage",
+    label: "Ek second aage (clip ya playhead)",
     group: "transport",
-    run: ({ playback }) => playback.stepSeconds(1),
+    run: (context) => nudgeOrStep(context, 1, "seconds"),
   },
   {
     id: "to-start",
@@ -208,7 +223,154 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     group: "timeline",
     run: ({ editor }) => stepClip(editor, -1),
   },
+
+  /* --------------------------------------------------------------- editing */
+
+  {
+    id: "split",
+    keys: "s",
+    label: "Playhead par todo",
+    group: "editing",
+    run: ({ editor }) => {
+      // Kuch chuna hua ho to sirf usi par, warna playhead ke neeche ki har clip
+      // par — dono ek hi op se, isliye undo bhi ek hi baar (8.4).
+      const itemIds = editor.selection.itemIds;
+      editor.applyOp(
+        "splitAtFrame",
+        {
+          frame: editor.playheadFrame,
+          ...(itemIds.length > 0 ? { itemIds: [...itemIds] } : {}),
+        },
+        { label: "Split" },
+      );
+    },
+  },
+  {
+    id: "delete",
+    keys: "delete",
+    label: "Delete",
+    group: "editing",
+    run: ({ editor }) => deleteSelected(editor, false),
+  },
+  {
+    // Laptop keyboard par aksar Delete hai hi nahi.
+    id: "delete-backspace",
+    keys: "backspace",
+    label: "Delete",
+    group: "editing",
+    run: ({ editor }) => deleteSelected(editor, false),
+  },
+  {
+    id: "ripple-delete",
+    keys: "shift+delete",
+    label: "Ripple delete (gaddha band karo)",
+    group: "editing",
+    run: ({ editor }) => deleteSelected(editor, true),
+  },
+  {
+    id: "ripple-delete-backspace",
+    keys: "shift+backspace",
+    label: "Ripple delete (gaddha band karo)",
+    group: "editing",
+    run: ({ editor }) => deleteSelected(editor, true),
+  },
+  {
+    id: "duplicate",
+    keys: "mod+d",
+    label: "Duplicate",
+    group: "editing",
+    run: ({ editor }) => {
+      if (editor.selection.itemIds.length === 0) return;
+      editor.applyOp(
+        "duplicateItems",
+        { itemIds: [...editor.selection.itemIds] },
+        { label: "Duplicate" },
+      );
+    },
+  },
+  {
+    id: "copy",
+    keys: "mod+c",
+    label: "Copy",
+    group: "editing",
+    run: async ({ editor }) => {
+      if (editor.selection.itemIds.length === 0) return;
+      await writeClips(copyItems(editor.doc, editor.selection.itemIds));
+    },
+  },
+  {
+    id: "cut",
+    keys: "mod+x",
+    label: "Cut",
+    group: "editing",
+    run: async ({ editor }) => {
+      if (editor.selection.itemIds.length === 0) return;
+      // Pehle copy, phir delete — ulta karne par delete ke baad copy karne ko
+      // kuch bachta hi nahi, aur wo galti chupchaap clipboard khaali chhod deti.
+      await writeClips(copyItems(editor.doc, editor.selection.itemIds));
+      deleteSelected(editor, false);
+    },
+  },
+  {
+    id: "paste",
+    keys: "mod+v",
+    label: "Paste",
+    group: "editing",
+    run: async ({ editor }) => {
+      const fragment = await readClips();
+      if (!fragment) return;
+      editor.applyOp(
+        "pasteItems",
+        { fragment, atFrame: editor.playheadFrame, policy: editor.overlapPolicy },
+        { label: "Paste" },
+      );
+    },
+  },
 ];
+
+/** Delete / ripple delete — dono ka ek hi raasta. */
+function deleteSelected(editor: EditorState, ripple: boolean): void {
+  const itemIds = [...editor.selection.itemIds];
+  if (itemIds.length === 0) return;
+
+  if (ripple) {
+    editor.applyOp("rippleDeleteItems", { itemIds }, { label: "Ripple delete" });
+    return;
+  }
+  editor.applyOp("deleteItems", { itemIds }, { label: "Delete" });
+}
+
+/**
+ * Arrow ka do-matlab wala vyavhaar (6.4 + 8.10).
+ *
+ * Kuch chuna hua hai -> wahi clips hilti hain. Kuch nahi chuna -> playhead.
+ */
+function nudgeOrStep(
+  context: ShortcutContext,
+  direction: number,
+  unit: "frames" | "seconds",
+): void {
+  const { editor, playback } = context;
+  const itemIds = [...editor.selection.itemIds];
+
+  if (itemIds.length === 0) {
+    if (unit === "frames") playback.stepFrames(direction);
+    else playback.stepSeconds(direction);
+    return;
+  }
+
+  const step = unit === "frames" ? 1 : editor.doc.project.fps;
+  editor.applyOp(
+    "moveItems",
+    { itemIds, deltaFrames: direction * step, policy: editor.overlapPolicy },
+    {
+      label: "Nudge",
+      // Lagataar arrow dabane par ek hi undo entry bane — warna 20 baar arrow
+      // dabane ke baad 20 baar Ctrl+Z dabana padta.
+      coalesceKey: `nudge:${itemIds.join(",")}`,
+    },
+  );
+}
 
 /**
  * Timeline order me agla / pichhla clip chuno (7.13).
@@ -329,6 +491,8 @@ export function comboLabel(keys: string, isMac = false): string {
     arrowdown: "↓",
     home: "Home",
     end: "End",
+    delete: "Del",
+    backspace: "Backspace",
   };
 
   return keys

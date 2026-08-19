@@ -1,5 +1,6 @@
 import { produce, type Draft } from "immer";
 
+import { DEFAULT_OVERLAP_POLICY, type OverlapPolicy } from "../config/overlap";
 import { createId } from "../id";
 import { setByPath } from "../path";
 import { requireItemType, trackAccepts } from "../registry/index";
@@ -189,6 +190,15 @@ export interface TrimArgs {
    *  - trimItemEnd:   positive = clip bada  (daayan kinara bahar)
    */
   deltaFrames: number;
+  /**
+   * Source ki apni lambai (frames me, project ke fps par) — video/audio ke liye.
+   *
+   * Image ka koi ant nahi hota, isliye wahan ye chhod dena hi sahi hai. Iske
+   * bina clip source ke aage tak khinch jaati hai aur render me wahan **kaala
+   * frame** aata hai — jo timeline me bilkul theek dikhta hai aur sirf final
+   * MP4 me pakda jaata hai. Ye number `reel_assets.duration_ms` se banta hai.
+   */
+  sourceDurationFrames?: number | null;
 }
 
 /**
@@ -215,14 +225,29 @@ export const trimItemStart = defineOp<TrimArgs>("trimItemStart", (draft, args) =
   item.keyframes = shiftKeyframes(clone(item.keyframes), -delta, () => true);
 });
 
-/** Daayan kinara khiskao — sirf timeline par lambai badalti hai. */
+/**
+ * Daayan kinara khiskao — sirf timeline par lambai badalti hai.
+ *
+ * Do hadd: kam se kam 1 frame, aur **source ke ant se aage nahi** (8.3). Doosri
+ * hadd tabhi lagti hai jab caller `sourceDurationFrames` deta hai — image ke
+ * liye wo hota hi nahi, aur wahan clip jitni marzi lambi ho sakti hai.
+ *
+ * Source me bacha hua maal `playbackRate` se bata hai: 2x speed par source ke
+ * 60 frames timeline par sirf 30 frames bhar te hain.
+ */
 export const trimItemEnd = defineOp<TrimArgs>("trimItemEnd", (draft, args) => {
   const item = findItem(draft, args.itemId);
   assertUnlocked(item);
 
-  // Source ki asli lambai Phase 5 (assets) me pata chalegi — tab upar ka clamp
-  // yahin judega. Abhi sirf "kam se kam 1 frame" wala rule hai.
-  item.durationInFrames = Math.max(1, item.durationInFrames + Math.round(args.deltaFrames));
+  let next = Math.max(1, item.durationInFrames + Math.round(args.deltaFrames));
+
+  const source = args.sourceDurationFrames;
+  if (source !== undefined && source !== null && source > 0) {
+    const left = Math.floor((source - item.trimStartFrame) / item.playbackRate);
+    next = Math.max(1, Math.min(next, left));
+  }
+
+  item.durationInFrames = next;
   growDuration(draft);
 });
 
@@ -246,14 +271,18 @@ export const splitItemAtFrame = defineOp<SplitArgs>("splitItemAtFrame", (draft, 
   assertUnlocked(item);
 
   const frame = Math.round(args.frame);
-  const start = item.startFrame;
-  const end = itemEndFrame(item);
-
-  if (frame <= start || frame >= end) {
+  if (frame <= item.startFrame || frame >= itemEndFrame(item)) {
     throw new TimelineOpError(
-      `Split frame ${frame} item ke andar nahi hai (${start}-${end}, kinare shaamil nahi)`,
+      `Split frame ${frame} item ke andar nahi hai (${item.startFrame}-${itemEndFrame(item)}, kinare shaamil nahi)`,
     );
   }
+  splitOne(draft, item, frame);
+});
+
+/** Ek item ko diye gaye frame par todo. Dono split ops isi ko bulate hain. */
+function splitOne(draft: DocDraft, item: Draft<Item>, frame: number): void {
+  const start = item.startFrame;
+  const end = itemEndFrame(item);
 
   const leftDuration = frame - start;
   const rightDuration = end - frame;
@@ -276,6 +305,46 @@ export const splitItemAtFrame = defineOp<SplitArgs>("splitItemAtFrame", (draft, 
   const at = findItemIndex(draft, item.id);
   draft.items.splice(at + 1, 0, right as Draft<Item>);
   attachToScene(draft, draft.items[at + 1] as Draft<Item>, item.id);
+}
+
+export interface SplitAtFrameArgs {
+  /** Absolute timeline frame — aam taur par playhead. */
+  frame: number;
+  /**
+   * Sirf inhi items par chalo. Khaali/undefined = frame ke neeche padi **har**
+   * clip par (locked ko chhod kar).
+   */
+  itemIds?: readonly string[];
+}
+
+/**
+ * Playhead par sab kuch ek saath todo (8.4).
+ *
+ * Ye alag op isliye hai ki **undo ek hi baar me** ho. Har clip par
+ * `splitItemAtFrame` chalane se 5 clips ke liye 5 undo entries banti hain, aur
+ * user ko 5 baar Ctrl+Z dabana padta — jabki uske liye wo ek hi kaam tha.
+ *
+ * ⚠️ Locked clips chhod di jaati hain, error nahi aata. Playhead par S dabana ek
+ * moti chhuri hai; usme se ek locked clip ki wajah se poora kaam rok dena galat
+ * hoga — lock ka matlab "isko mat chhedo" hai, "kuch mat karo" nahi.
+ */
+export const splitAtFrame = defineOp<SplitAtFrameArgs>("splitAtFrame", (draft, args) => {
+  const frame = Math.round(args.frame);
+  const only = args.itemIds && args.itemIds.length > 0 ? new Set(args.itemIds) : null;
+
+  // Pehle list bana lo — split ke dauraan `draft.items` me naye items judte hain.
+  const targets = draft.items.filter(
+    (item) =>
+      !item.locked &&
+      (!only || only.has(item.id)) &&
+      frame > item.startFrame &&
+      frame < itemEndFrame(item),
+  );
+
+  if (targets.length === 0) {
+    throw new TimelineOpError(`Frame ${frame} par todne layak koi clip nahi hai`);
+  }
+  for (const item of targets) splitOne(draft, item, frame);
 });
 
 export interface DeleteItemsArgs {
@@ -507,7 +576,503 @@ export const setTrackProperty = defineOp<SetTrackPropertyArgs>(
   },
 );
 
+/* ==========================================================================
+ * Phase 8 — range, multi-item aur overlap
+ * ========================================================================== */
+
+/**
+ * **Ye is poore phase ka dil hai.** Timeline ke ek hisse ko khaali kar do.
+ *
+ * Cut selection, keep selection, aur "overwrite" wali overlap policy — teeno
+ * asal me yahi ek cheez maangte hain: "in do frames ke beech ka maal hatao".
+ * Teen jagah teen baar likhne par teeno alag tarah se galat hoti hain, aur sabse
+ * buri baat ye ki galti ek frame ki hoti hai — jo dekh kar kabhi nahi dikhti,
+ * sirf ginti se pakdi jaati hai.
+ *
+ * Ek clip is span se chaar tarah mil sakti hai, aur chaaron ka apna jawab hai:
+ *
+ *              from|=========|to
+ *    (1)        |-----|                poora andar     -> mit gayi
+ *    (2)   |------------------------|  poora dhak rahi -> do tukde
+ *    (3)  |-------|                    daayan kinara   -> chhoti ho gayi
+ *    (4)              |-----------|    baayan kinara   -> aage se shuru
+ *
+ * ⚠️ (4) me sirf `startFrame` badalna **galat** hota hai: clip aage se shuru
+ * hogi par dikhayegi wahi purana hissa. Source ke andar ka pointer
+ * (`trimStartFrame`) bhi utna hi aage jaana chahiye — aur wo `playbackRate` se
+ * guna hota hai, warna 2x speed wali clip aadha hi khiskti hai.
+ *
+ * ⚠️ Locked clips ko haath nahi lagta. Lock ka matlab hi yahi hai ki koi doosra
+ * op galti se use na chhede.
+ */
+function removeSpan(
+  draft: DocDraft,
+  args: {
+    fromFrame: number;
+    toFrame: number;
+    /** Khaali/undefined = saare tracks. */
+    trackIds?: ReadonlySet<string> | null;
+    /** Ye items chhoo bhi nahi jaate (overwrite me "jeetne wale"). */
+    exceptIds?: ReadonlySet<string>;
+  },
+): void {
+  const from = Math.round(args.fromFrame);
+  const to = Math.round(args.toFrame);
+  if (to <= from) return;
+
+  const except = args.exceptIds ?? new Set<string>();
+  const tracks = args.trackIds ?? null;
+
+  const removed: string[] = [];
+  const added: Item[] = [];
+
+  for (const item of draft.items) {
+    if (except.has(item.id)) continue;
+    if (tracks && !tracks.has(item.trackId)) continue;
+    if (item.locked) continue;
+
+    const start = item.startFrame;
+    const end = itemEndFrame(item);
+    if (end <= from || start >= to) continue;
+
+    // (1) poora andar
+    if (start >= from && end <= to) {
+      removed.push(item.id);
+      continue;
+    }
+
+    // (2) poora dhak rahi — beech ka hissa nikaal kar do tukde
+    if (start < from && end > to) {
+      const leftDuration = from - start;
+      const cutFromItemStart = to - start;
+      const keyframes = clone(item.keyframes);
+
+      const right = clone(item) as Item;
+      right.id = createId("it");
+      right.startFrame = to;
+      right.durationInFrames = end - to;
+      right.trimStartFrame = item.trimStartFrame + Math.round(cutFromItemStart * item.playbackRate);
+      // Beech ka cut ab ek asli cut hai — uspar purani transition nahi chipkni chahiye.
+      right.transitionIn = { type: "none", durationInFrames: 0 };
+      right.keyframes = shiftKeyframes(keyframes, -cutFromItemStart, (f) => f >= cutFromItemStart);
+      added.push(right);
+
+      item.durationInFrames = leftDuration;
+      item.transitionOut = { type: "none", durationInFrames: 0 };
+      item.keyframes = shiftKeyframes(keyframes, 0, (f) => f <= leftDuration);
+      continue;
+    }
+
+    // (3) daayan kinara kat gaya
+    if (start < from) {
+      item.durationInFrames = from - start;
+      item.transitionOut = { type: "none", durationInFrames: 0 };
+      item.keyframes = shiftKeyframes(clone(item.keyframes), 0, (f) => f <= item.durationInFrames);
+      continue;
+    }
+
+    // (4) baayan kinara kat gaya
+    const delta = to - start;
+    item.startFrame = to;
+    item.durationInFrames = end - to;
+    item.trimStartFrame += Math.round(delta * item.playbackRate);
+    item.transitionIn = { type: "none", durationInFrames: 0 };
+    item.keyframes = shiftKeyframes(clone(item.keyframes), -delta, (f) => f >= delta);
+  }
+
+  if (removed.length > 0) {
+    const ids = new Set(removed);
+    draft.items = draft.items.filter((item) => !ids.has(item.id));
+    for (const id of removed) detachFromScenes(draft, id);
+  }
+
+  for (const item of added) {
+    draft.items.push(item as Draft<Item>);
+    attachToScene(draft, draft.items[draft.items.length - 1] as Draft<Item>);
+  }
+}
+
+/** `fromFrame` ya uske baad shuru hone wali har clip ko utna baayein le aao. */
+function shiftItemsLeft(
+  draft: DocDraft,
+  args: { fromFrame: number; amount: number; trackIds?: ReadonlySet<string> | null },
+): void {
+  if (args.amount <= 0) return;
+  const tracks = args.trackIds ?? null;
+
+  for (const item of draft.items) {
+    if (tracks && !tracks.has(item.trackId)) continue;
+    if (item.locked) continue;
+    if (item.startFrame < args.fromFrame) continue;
+    item.startFrame = Math.max(0, item.startFrame - args.amount);
+  }
+}
+
+/** Doc me sabse aakhri frame — "aage ka sab kuch" wale ops ke liye. */
+function contentEnd(draft: DocDraft): number {
+  let end = draft.project.durationInFrames;
+  for (const item of draft.items) end = Math.max(end, itemEndFrame(item));
+  return end;
+}
+
+/* -------------------------------------------------------- overlap policy */
+
+/**
+ * Ek track par overlap suljhao (8.9).
+ *
+ * `keepIds` wo clips hain jo abhi rakhi/khiskayi gayi hain — policy inke haq me
+ * chalti hai:
+ *  - **overwrite**: neeche wali clips me se utna hissa `removeSpan` se nikal
+ *    jaata hai. Yahi wajah hai ki `removeSpan` ek alag helper hai.
+ *  - **push**: neeche wali clips daayein khisak jaati hain, baayein-se-daayein
+ *    ek-ek karke — isliye khiskne ke baad wo aapas me bhi nahi takraati.
+ *  - **reject**: kuch nahi hota, seedha error — drop mana.
+ */
+function resolveOverlaps(
+  draft: DocDraft,
+  args: { trackId: string; keepIds: ReadonlySet<string>; policy: OverlapPolicy },
+): void {
+  const onTrack = draft.items.filter((item) => item.trackId === args.trackId);
+  const keep = onTrack.filter((item) => args.keepIds.has(item.id));
+  if (keep.length === 0) return;
+
+  const others = onTrack
+    .filter((item) => !args.keepIds.has(item.id))
+    .sort((a, b) => a.startFrame - b.startFrame);
+
+  const hits = (a: Draft<Item>, start: number, duration: number): boolean =>
+    start < itemEndFrame(a) && start + duration > a.startFrame;
+
+  if (args.policy === "reject") {
+    for (const other of others) {
+      for (const k of keep) {
+        if (hits(k, other.startFrame, other.durationInFrames)) {
+          throw new TimelineOpError(
+            `"${k.name}" yahan nahi rakhi ja sakti — "${other.name}" pehle se hai (overlap policy: reject)`,
+          );
+        }
+      }
+    }
+    return;
+  }
+
+  if (args.policy === "push") {
+    let cursor = Number.NEGATIVE_INFINITY;
+    for (const other of others) {
+      let start = other.startFrame;
+      for (const k of keep) {
+        if (hits(k, start, other.durationInFrames)) start = itemEndFrame(k);
+      }
+      if (start < cursor) start = cursor;
+      other.startFrame = Math.max(0, start);
+      cursor = itemEndFrame(other);
+    }
+    return;
+  }
+
+  // overwrite
+  const trackIds = new Set([args.trackId]);
+  for (const k of keep) {
+    removeSpan(draft, {
+      fromFrame: k.startFrame,
+      toFrame: itemEndFrame(k),
+      trackIds,
+      exceptIds: args.keepIds,
+    });
+  }
+}
+
+/* ---------------------------------------------------------- move (multi) */
+
+export interface MoveItemsArgs {
+  itemIds: readonly string[];
+  /** Sab par ek hi delta — isi se aapas ki doori bani rehti hai (8.11). */
+  deltaFrames: number;
+  /** Track list (order se) me kitne row upar (-) ya neeche (+). */
+  trackShift?: number;
+  policy?: OverlapPolicy;
+}
+
+/**
+ * Ek ya kai clips ko ek saath khiskao (8.1 / 8.10 / 8.11).
+ *
+ * ⚠️ Clamp **poore group par** lagta hai, har clip par alag nahi. Alag-alag
+ * clamp karne se ye hota hai: baayein wali clip 0 par ruk jaati hai aur baaki
+ * chalti rehti hain — yaani selection ki shakl hi badal jaati hai, aur user ne
+ * aisa kabhi nahi kaha tha.
+ *
+ * ⚠️ Track badalna **sab ya kuch nahi** hai. Ek clip ka naya track use na le
+ * paaye to poori move ruk jaati hai; aadha selection ek track par aur aadha
+ * doosre par chhod dena sabse bura nateeja hota.
+ */
+export const moveItems = defineOp<MoveItemsArgs>("moveItems", (draft, args) => {
+  if (args.itemIds.length === 0) return;
+
+  const items = args.itemIds.map((id) => findItem(draft, id));
+  for (const item of items) assertUnlocked(item);
+
+  // Poore group par ek hi clamp — shakl waisi ki waisi.
+  const minStart = Math.min(...items.map((item) => item.startFrame));
+  const delta = Math.max(Math.round(args.deltaFrames), -minStart);
+
+  const shift = Math.round(args.trackShift ?? 0);
+  const ordered = [...draft.tracks].sort((a, b) => a.order - b.order);
+  const indexOf = new Map(ordered.map((track, index) => [track.id, index]));
+
+  // Pehle sab kuch jaanch lo, phir badlo. Beech me error phenkne par immer
+  // wapas to kar deta hai, par uspar bharosa karke aadhi jaanch likhna aadat
+  // kharaab karta hai — aur `recipe` seedha draft par bhi chalta hai (history).
+  const targets = items.map((item) => {
+    if (shift === 0) return item.trackId;
+    const at = indexOf.get(item.trackId);
+    if (at === undefined) throw new TimelineOpError(`Item "${item.name}" ka track nahi mila`);
+    const next = ordered[Math.min(ordered.length - 1, Math.max(0, at + shift))];
+    if (!next) throw new TimelineOpError("Track list khaali hai");
+    if (!trackAccepts(next.type, item.type)) {
+      throw new TimelineOpError(
+        `"${item.name}" (${item.type}) track "${next.name}" (${next.type}) par nahi ja sakta`,
+      );
+    }
+    return next.id;
+  });
+
+  const touched = new Set<string>();
+  items.forEach((item, index) => {
+    item.startFrame += delta;
+    item.trackId = targets[index] as string;
+    touched.add(item.trackId);
+  });
+
+  const keepIds = new Set(args.itemIds);
+  const policy = args.policy ?? DEFAULT_OVERLAP_POLICY;
+  for (const trackId of touched) resolveOverlaps(draft, { trackId, keepIds, policy });
+
+  growDuration(draft);
+});
+
+/* ------------------------------------------------------- ripple delete */
+
+export interface RippleDeleteArgs {
+  itemIds: readonly string[];
+  /**
+   * `false` (default) = sirf usi track par aage wali clips khisken.
+   * `true` = saare tracks par.
+   */
+  allTracks?: boolean;
+}
+
+/**
+ * Delete karo **aur** peeche bacha hua gaddha bhar do (8.6).
+ *
+ * ⚠️ Jo clip gaddhe ke beecho-beech padi ho (start gaddhe se pehle, ant uske
+ * baad) use **chhua nahi jaata**. Ye sirf `allTracks: true` me ho sakta hai, aur
+ * wahan usko kaat dena ek chupchaap hone wala data-loss hota: user ne to sirf
+ * doosre track ki ek clip delete ki thi. Poora hissa hataana ho to `cutRange`
+ * hai, jo ye kaam saaf-saaf, maang kar karta hai.
+ */
+export const rippleDeleteItems = defineOp<RippleDeleteArgs>("rippleDeleteItems", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  const doomed = draft.items.filter((item) => ids.has(item.id));
+  if (doomed.length === 0) return;
+
+  const locked = doomed.filter((item) => item.locked);
+  if (locked.length > 0) {
+    throw new TimelineOpError(
+      `Ye items locked hain: ${locked.map((item) => item.name).join(", ")}`,
+    );
+  }
+
+  // Gaddhe track ke hisaab se — ya sab ek saath, agar allTracks ho.
+  const spansByTrack = new Map<string, { from: number; to: number }[]>();
+  for (const item of doomed) {
+    const key = args.allTracks ? "*" : item.trackId;
+    const list = spansByTrack.get(key) ?? [];
+    list.push({ from: item.startFrame, to: itemEndFrame(item) });
+    spansByTrack.set(key, list);
+  }
+
+  draft.items = draft.items.filter((item) => !ids.has(item.id));
+  for (const id of ids) detachFromScenes(draft, id);
+
+  for (const [key, spans] of spansByTrack) {
+    const merged = mergeSpans(spans);
+    const tracks = key === "*" ? null : new Set([key]);
+    // Peeche se aage — warna pehla shift baaki gaddhon ki jagah hi badal deta hai.
+    for (let i = merged.length - 1; i >= 0; i -= 1) {
+      const span = merged[i] as { from: number; to: number };
+      shiftItemsLeft(draft, {
+        fromFrame: span.to,
+        amount: span.to - span.from,
+        trackIds: tracks,
+      });
+    }
+  }
+});
+
+/** Aapas me lage/mile hue span ek kar do. */
+function mergeSpans(spans: { from: number; to: number }[]): { from: number; to: number }[] {
+  const sorted = [...spans].sort((a, b) => a.from - b.from);
+  const out: { from: number; to: number }[] = [];
+  for (const span of sorted) {
+    const last = out[out.length - 1];
+    if (last && span.from <= last.to) last.to = Math.max(last.to, span.to);
+    else out.push({ ...span });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------- in/out ka use */
+
+export interface RangeArgs {
+  fromFrame: number;
+  toFrame: number;
+  /** `true` = gaddha band karo / kata hua hissa 0 par le aao. */
+  ripple?: boolean;
+  /** Khaali = saare tracks. */
+  trackIds?: readonly string[];
+}
+
+/**
+ * In-Out ke beech ka hissa **hatao** (8.5).
+ *
+ * `ripple: false` par wahan gaddha reh jaata hai (baaki sab apni jagah), aur
+ * `true` par aage ka sab utna baayein aa jaata hai.
+ */
+export const cutRange = defineOp<RangeArgs>("cutRange", (draft, args) => {
+  const from = Math.max(0, Math.round(args.fromFrame));
+  const to = Math.round(args.toFrame);
+  if (to <= from) throw new TimelineOpError(`Range ulti hai (${from} se ${to})`);
+
+  const tracks = args.trackIds && args.trackIds.length > 0 ? new Set(args.trackIds) : null;
+  removeSpan(draft, { fromFrame: from, toFrame: to, trackIds: tracks });
+
+  if (args.ripple) {
+    shiftItemsLeft(draft, { fromFrame: to, amount: to - from, trackIds: tracks });
+  }
+});
+
+/**
+ * Sirf In-Out ke beech ka hissa **rakho** (8.5).
+ *
+ * `ripple: true` par bacha hua hissa 0 par aa jaata hai — yahi wo cheez hai jo
+ * "20 second me se 5-12 second nikalo" ko ek click ka kaam banati hai.
+ */
+export const keepRange = defineOp<RangeArgs>("keepRange", (draft, args) => {
+  const from = Math.max(0, Math.round(args.fromFrame));
+  const to = Math.round(args.toFrame);
+  if (to <= from) throw new TimelineOpError(`Range ulti hai (${from} se ${to})`);
+
+  const tracks = args.trackIds && args.trackIds.length > 0 ? new Set(args.trackIds) : null;
+  const end = contentEnd(draft);
+
+  // Pehle daayan hissa, phir baayan — ulta karne par baayan hatane se sab
+  // khisak jaata aur daayein wale ka naap galat pad jaata.
+  removeSpan(draft, { fromFrame: to, toFrame: end + 1, trackIds: tracks });
+  removeSpan(draft, { fromFrame: 0, toFrame: from, trackIds: tracks });
+
+  if (args.ripple) {
+    shiftItemsLeft(draft, { fromFrame: from, amount: from, trackIds: tracks });
+  }
+});
+
+/* --------------------------------------------------------------- paste */
+
+/** Clipboard me jaane wala tukda — cross-project paste isi se chalta hai (8.8). */
+export const CLIPBOARD_KIND = "reel-studio/items@1";
+
+export interface ClipboardFragment {
+  kind: typeof CLIPBOARD_KIND;
+  /** Kis fps par ye frames naape gaye the. */
+  fps: number;
+  items: Item[];
+}
+
+export interface PasteItemsArgs {
+  fragment: ClipboardFragment;
+  /** Yahan se paste — aam taur par playhead. */
+  atFrame: number;
+  /** Original track na mile to yahan girao. */
+  fallbackTrackId?: string;
+  policy?: OverlapPolicy;
+}
+
+/**
+ * Paste (8.8).
+ *
+ * ⚠️ **fps ka farak yahin sambhalta hai.** 24fps ke project se copy karke 30fps
+ * me paste karne par frames waise ke waise chipka dena clip ko 20% chhota kar
+ * deta hai — aur wo galti dikhti nahi, sirf "kuch ajeeb lag raha hai" mehsoos
+ * hoti hai. Isliye frames seconds se hokar guzarte hain.
+ *
+ * ⚠️ Track pehle apne asli id par jaane ki koshish karta hai (usi project me
+ * paste karna sabse aam hai), phir `fallbackTrackId`, phir koi bhi track jo is
+ * kism ko leta ho. Ek bhi na mile to saaf error — chupchaap galat track par
+ * daal dena baad me dhoondhna namumkin bana deta hai.
+ */
+export const pasteItems = defineOp<PasteItemsArgs>("pasteItems", (draft, args) => {
+  const { fragment } = args;
+  if (fragment.kind !== CLIPBOARD_KIND) {
+    throw new TimelineOpError(`Ye clipboard data samajh nahi aaya (${String(fragment.kind)})`);
+  }
+  if (fragment.items.length === 0) return;
+
+  const scale = draft.project.fps / fragment.fps;
+  const convert = (frames: number): number => Math.round(frames * scale);
+
+  const ordered = [...draft.tracks].sort((a, b) => a.order - b.order);
+  const minStart = Math.min(...fragment.items.map((item) => item.startFrame));
+  const at = Math.max(0, Math.round(args.atFrame));
+
+  const pasted: string[] = [];
+  const touched = new Set<string>();
+
+  for (const source of fragment.items) {
+    const copy = clone(source);
+    copy.id = createId("it");
+    copy.locked = false;
+    // Scene ka rishta paste me nahi jaata — target project me wo scene hai hi nahi.
+    copy.sceneId = null;
+
+    copy.startFrame = at + convert(source.startFrame - minStart);
+    copy.durationInFrames = Math.max(1, convert(source.durationInFrames));
+    copy.trimStartFrame = Math.max(0, convert(source.trimStartFrame));
+
+    const track =
+      ordered.find((t) => t.id === source.trackId && trackAccepts(t.type, copy.type)) ??
+      ordered.find((t) => t.id === args.fallbackTrackId && trackAccepts(t.type, copy.type)) ??
+      ordered.find((t) => trackAccepts(t.type, copy.type));
+
+    if (!track) {
+      throw new TimelineOpError(
+        `"${copy.name}" (${copy.type}) ke liye is project me koi track nahi hai`,
+      );
+    }
+    copy.trackId = track.id;
+
+    draft.items.push(copy as Draft<Item>);
+    pasted.push(copy.id);
+    touched.add(track.id);
+  }
+
+  const keepIds = new Set(pasted);
+  const policy = args.policy ?? DEFAULT_OVERLAP_POLICY;
+  for (const trackId of touched) resolveOverlaps(draft, { trackId, keepIds, policy });
+
+  growDuration(draft);
+});
+
+/** Chune hue items ka clipboard tukda banao. Op nahi — doc badalta hi nahi. */
+export function copyItems(doc: Doc, itemIds: readonly string[]): ClipboardFragment {
+  const ids = new Set(itemIds);
+  return {
+    kind: CLIPBOARD_KIND,
+    fps: doc.project.fps,
+    items: doc.items.filter((item) => ids.has(item.id)).map((item) => clone(item)),
+  };
+}
+
 export interface ReplaceDocArgs {
+
   /** Poora naya doc — caller ise `parseDoc`/`migrateDoc` se guzaar kar de. */
   doc: Doc;
 }
@@ -545,11 +1110,17 @@ export function canPlaceItem(doc: Doc, itemTypeId: string, trackId: string): boo
 export const OPS = {
   addItem,
   moveItem,
+  moveItems,
   trimItemStart,
   trimItemEnd,
   splitItemAtFrame,
+  splitAtFrame,
   deleteItems,
+  rippleDeleteItems,
   duplicateItems,
+  cutRange,
+  keepRange,
+  pasteItems,
   setItemProperty,
   addTrack,
   removeTrack,
@@ -561,3 +1132,36 @@ export const OPS = {
 } as const;
 
 export type OpName = keyof typeof OPS;
+
+/**
+ * Wo ops jo timeline ki **shakl** badalte hain (8.14).
+ *
+ * Inke baad project ki lambai dobara ginni chahiye — warna aakhri clip delete
+ * karne par project usi purani lambai ka reh jaata hai aur export ke ant me
+ * seconds bhar ka kaala hissa aata hai. Ye ek **list** hai, if-else nahi, taaki
+ * naya structural op jodne par sirf yahan ek naam judna kaafi ho.
+ *
+ * `growDuration` (jo kai ops ke andar chalta hai) sirf **badha** sakta hai —
+ * jaan-boojhkar, kyunki user ki chhodi hui khaali jagah har chhoti edit par
+ * khaa jaana bhi utna hi bura hai. Ghatane ka faisla yahan se, ek baar me hota hai.
+ */
+export const STRUCTURAL_OPS: readonly OpName[] = [
+  "addItem",
+  "moveItem",
+  "moveItems",
+  "trimItemStart",
+  "trimItemEnd",
+  "splitItemAtFrame",
+  "splitAtFrame",
+  "deleteItems",
+  "rippleDeleteItems",
+  "duplicateItems",
+  "cutRange",
+  "keepRange",
+  "pasteItems",
+  "removeTrack",
+];
+
+export function isStructuralOp(name: string): name is OpName {
+  return (STRUCTURAL_OPS as readonly string[]).includes(name);
+}

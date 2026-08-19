@@ -33,9 +33,16 @@ import {
   createCountingIdFactory,
   createEmptyProject,
   createHistory,
+  copyItems,
   createItem,
+  cutRange,
   deleteItems,
   duplicateItems,
+  isStructuralOp,
+  keepRange,
+  moveItems,
+  pasteItems,
+  rippleDeleteItems,
   formatBytes,
   framesToSeconds,
   framesToTimecode,
@@ -65,6 +72,7 @@ import {
   setIdFactory,
   setItemProperty,
   setProjectProperty,
+  setTrackProperty,
   snapFrame,
   splitItemAtFrame,
   suggestFit,
@@ -1058,6 +1066,785 @@ test("pruneSelection gayab items ko nikaal deta hai", () => {
   const { doc } = buildFixture();
   const selection = { itemIds: [doc.items[0]!.id, "it_gayab"], trackIds: [] };
   assert.deepEqual(pruneSelection(doc, selection).itemIds, [doc.items[0]!.id]);
+});
+
+// ------------------------------------------------------- Phase 8 (editing)
+
+/**
+ * Yahan se aage sab Phase 8 hai — timeline editing.
+ *
+ * Ye phase sabse nazuk hai aur uski wajah saaf hai: iski galtiyaan **ek frame**
+ * ki hoti hain. Ek frame ka gap ya overlap dekhne me bilkul theek lagta hai,
+ * timeline me dikhta hi nahi, aur sirf final MP4 me ek jhatke ki tarah samne
+ * aata hai — tab tak yaad bhi nahi rehta ki kaunsi edit ne kiya tha. Isliye
+ * yahan har cheez ginti se jaanchi jaati hai, aankh se nahi.
+ */
+
+/** Ek doc jisme teen clip ek hi track par lagatar lagi hui hain (0-100-200-300). */
+function chainFixture(): { doc: Doc; trackId: string; ids: string[] } {
+  const base = createEmptyProject({ name: "Chain fixture" });
+  const trackId = base.tracks[0]!.id;
+
+  let doc = base;
+  const ids: string[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const item = createItem("image", {
+      fps: doc.project.fps,
+      trackId,
+      name: `Clip ${i + 1}`,
+      assetId: `as_${i + 1}`,
+      startFrame: i * 100,
+      durationInFrames: 100,
+    });
+    doc = addItem(doc, { item });
+    ids.push(item.id);
+  }
+  return { doc, trackId, ids };
+}
+
+function spanOf(doc: Doc, id: string): [number, number] {
+  const item = itemById(doc, id);
+  return [item.startFrame, item.startFrame + item.durationInFrames];
+}
+
+/** Ek track ke saare clips, kram me — `[start, end]` ki list. */
+function trackSpans(doc: Doc, trackId: string): [number, number][] {
+  return doc.items
+    .filter((item) => item.trackId === trackId)
+    .sort((a, b) => a.startFrame - b.startFrame)
+    .map((item) => [item.startFrame, item.startFrame + item.durationInFrames] as [number, number]);
+}
+
+section("removeSpan ke chaaron case — cutRange se (8.5)");
+
+test("poora andar wali clip mit jaati hai", () => {
+  const { doc, trackId } = chainFixture();
+  // 90-210 kaato: beech wali clip (100-200) poori andar hai.
+  const next = cutRange(doc, { fromFrame: 90, toFrame: 210 });
+  assert.equal(next.items.length, 2, "sirf beech wali jaani chahiye thi");
+  assert.deepEqual(trackSpans(next, trackId), [
+    [0, 90],
+    [210, 300],
+  ]);
+});
+
+test("beech se kaatne par ek clip do tukdon me bantti hai", () => {
+  const { doc, trackId, ids } = chainFixture();
+  const next = cutRange(doc, { fromFrame: 120, toFrame: 160 });
+
+  assert.equal(next.items.length, 4, "ek clip ke do tukde hone chahiye the");
+  assert.deepEqual(trackSpans(next, trackId), [
+    [0, 100],
+    [100, 120],
+    [160, 200],
+    [200, 300],
+  ]);
+
+  // Daayan tukda source ke andar bhi utna hi aage se shuru hona chahiye —
+  // sirf startFrame badalna wo galti hai jo render me hi pakdi jaati hai.
+  const right = next.items.find(
+    (item) => item.startFrame === 160 && item.id !== ids[1],
+  );
+  assert.ok(right, "daayan tukda nahi mila");
+  assert.equal(right.trimStartFrame, 60, "trimStartFrame source me 60 frames aage hona chahiye");
+});
+
+test("kinare se kaatne par trimStartFrame sahi badalta hai", () => {
+  const { doc, ids } = chainFixture();
+  // 150-250: beech wali ka daayan kinara, teesri ka baayan kinara.
+  const next = cutRange(doc, { fromFrame: 150, toFrame: 250 });
+
+  const middle = itemById(next, ids[1]!);
+  assert.deepEqual([middle.startFrame, middle.durationInFrames], [100, 50]);
+  // Daayan kinara kata — source ka shuruaat wahi rehti hai.
+  assert.equal(middle.trimStartFrame, 0);
+
+  const third = itemById(next, ids[2]!);
+  assert.deepEqual([third.startFrame, third.durationInFrames], [250, 50]);
+  // Baayan kinara 50 frame kata — source bhi 50 aage.
+  assert.equal(third.trimStartFrame, 50);
+});
+
+test("2x speed par source ka pointer dugna khiskta hai", () => {
+  const base = createEmptyProject({ name: "Speed fixture" });
+  const trackId = base.tracks[0]!.id;
+  const item = createItem("video", {
+    fps: base.project.fps,
+    trackId,
+    name: "Tez clip",
+    assetId: "as_fast",
+    startFrame: 0,
+    durationInFrames: 100,
+  });
+  let doc = addItem(base, { item });
+  doc = setItemProperty(doc, { itemId: item.id, path: "playbackRate", value: 2 });
+
+  // Timeline par 30 frame kaate — source me 60 frames guzre.
+  const next = cutRange(doc, { fromFrame: 0, toFrame: 30 });
+  assert.equal(itemById(next, item.id).trimStartFrame, 60);
+});
+
+test("locked clip ko cutRange bhi haath nahi lagata", () => {
+  const { doc, ids } = chainFixture();
+  const locked = setItemProperty(doc, { itemId: ids[1]!, path: "locked", value: true });
+  const next = cutRange(locked, { fromFrame: 90, toFrame: 210 });
+
+  assert.deepEqual(spanOf(next, ids[1]!), [100, 200], "locked clip waise ki waisi rehni chahiye");
+});
+
+section("cut / keep selection (8.5)");
+
+test("cut ripple me aage ka sab utna baayein aa jaata hai", () => {
+  const { doc, trackId } = chainFixture();
+  const next = cutRange(doc, { fromFrame: 100, toFrame: 200, ripple: true });
+  assert.deepEqual(trackSpans(next, trackId), [
+    [0, 100],
+    [100, 200],
+  ]);
+});
+
+test("cut bina ripple ke gaddha chhod deta hai", () => {
+  const { doc, trackId } = chainFixture();
+  const next = cutRange(doc, { fromFrame: 100, toFrame: 200 });
+  assert.deepEqual(trackSpans(next, trackId), [
+    [0, 100],
+    [200, 300],
+  ]);
+});
+
+test("keep selection sirf beech ka hissa rakhta hai aur use 0 par le aata hai", () => {
+  const { doc, trackId } = chainFixture();
+  // 150-250 rakho: beech wali ka aadha + teesri ka aadha.
+  const next = keepRange(doc, { fromFrame: 150, toFrame: 250, ripple: true });
+
+  // 150-250 me se: doosri clip ka 150-200 (50 frame) aur teesri ka 200-250
+  // (50 frame). Ripple ke baad dono 0 se lagatar — kul theek 100 frame.
+  assert.deepEqual(trackSpans(next, trackId), [
+    [0, 50],
+    [50, 100],
+  ]);
+  const kept = next.items.reduce((sum, item) => sum + item.durationInFrames, 0);
+  assert.equal(kept, 100, "kul lambai theek 100 frame honi chahiye — na 99, na 101");
+});
+
+test("keep selection ke baad source ka pointer sahi rehta hai", () => {
+  const { doc, ids } = chainFixture();
+  const next = keepRange(doc, { fromFrame: 150, toFrame: 250, ripple: false });
+
+  const middle = itemById(next, ids[1]!);
+  // 100-200 me se sirf 150-200 bacha: 50 frame source me aage.
+  assert.deepEqual([middle.startFrame, middle.durationInFrames, middle.trimStartFrame], [150, 50, 50]);
+
+  const third = itemById(next, ids[2]!);
+  // 200-300 me se 200-250 bacha: daayan kinara kata, source wahi se.
+  assert.deepEqual([third.startFrame, third.durationInFrames, third.trimStartFrame], [200, 50, 0]);
+});
+
+test("ulti range dono ops me saaf error deti hai", () => {
+  const { doc } = chainFixture();
+  throws(() => cutRange(doc, { fromFrame: 200, toFrame: 100 }), /ulti/, "cutRange ulti range");
+  throws(() => keepRange(doc, { fromFrame: 200, toFrame: 200 }), /ulti/, "keepRange khaali range");
+});
+
+test("range sirf diye gaye tracks par lagti hai", () => {
+  const { doc, videoTrackId, audioTrackId } = buildFixture();
+  const next = cutRange(doc, { fromFrame: 0, toFrame: 60, trackIds: [videoTrackId] });
+
+  // Video track ki clip kat gayi…
+  assert.deepEqual(trackSpans(next, videoTrackId), [[60, 120]]);
+  // …par audio ko haath nahi laga.
+  assert.deepEqual(trackSpans(next, audioTrackId), [[0, 300]]);
+});
+
+section("ripple delete (8.6)");
+
+test("ripple delete usi track par gaddha bhar deta hai", () => {
+  const { doc, trackId, ids } = chainFixture();
+  const next = rippleDeleteItems(doc, { itemIds: [ids[1]!] });
+  assert.deepEqual(trackSpans(next, trackId), [
+    [0, 100],
+    [100, 200],
+  ]);
+});
+
+test("do clips ek saath delete karne par dono gaddhe bharte hain", () => {
+  const { doc, trackId, ids } = chainFixture();
+  const next = rippleDeleteItems(doc, { itemIds: [ids[0]!, ids[2]!] });
+  // Sirf beech wali bachi, aur wo 0 par aa gayi.
+  assert.deepEqual(trackSpans(next, trackId), [[0, 100]]);
+});
+
+test("bina allTracks ke doosre track ko haath nahi lagta", () => {
+  const { doc, videoTrackId, audioTrackId } = buildFixture();
+  const videoItem = doc.items.find((item) => item.trackId === videoTrackId)!;
+
+  const next = rippleDeleteItems(doc, { itemIds: [videoItem.id] });
+  assert.deepEqual(trackSpans(next, audioTrackId), [[0, 300]], "audio apni jagah rehni chahiye");
+});
+
+test("allTracks par doosre track ki aage wali clips bhi khiskti hain", () => {
+  const { doc, videoTrackId, audioTrackId } = buildFixture();
+  const audioTrack = doc.tracks.find((track) => track.id === audioTrackId)!;
+
+  // Audio track par ek aur clip 200 par.
+  const later = createItem("audio", {
+    fps: doc.project.fps,
+    trackId: audioTrack.id,
+    name: "Baad wali",
+    assetId: "as_later",
+    startFrame: 400,
+    durationInFrames: 100,
+  });
+  const withLater = addItem(doc, { item: later });
+  const videoItem = withLater.items.find((item) => item.trackId === videoTrackId)!;
+
+  const next = rippleDeleteItems(withLater, { itemIds: [videoItem.id], allTracks: true });
+  // Video clip 0-120 thi; uske baad wali har clip 120 frame baayein aayegi.
+  assert.equal(itemById(next, later.id).startFrame, 280);
+});
+
+test("gaddhe ke beecho-beech padi clip chhui nahi jaati", () => {
+  const { doc, videoTrackId, audioTrackId } = buildFixture();
+  const videoItem = doc.items.find((item) => item.trackId === videoTrackId)!;
+  const audioItem = doc.items.find((item) => item.trackId === audioTrackId)!;
+
+  // Audio 0-300 hai, video 0-120. allTracks par bhi audio ka start gaddhe se
+  // pehle hai, isliye wo apni jagah rehti hai — chupchaap kaat dena data-loss hota.
+  const next = rippleDeleteItems(doc, { itemIds: [videoItem.id], allTracks: true });
+  assert.deepEqual(spanOf(next, audioItem.id), [0, 300]);
+});
+
+test("locked clip ripple delete nahi hoti", () => {
+  const { doc, ids } = chainFixture();
+  const locked = setItemProperty(doc, { itemId: ids[1]!, path: "locked", value: true });
+  throws(
+    () => rippleDeleteItems(locked, { itemIds: [ids[1]!] }),
+    /locked/,
+    "locked clip ripple delete",
+  );
+});
+
+section("overlap policy (8.9)");
+
+/** Do track wala doc: ek clip 0-100 par, doosri kahin bhi rakhi ja sakti hai. */
+function overlapFixture(): { doc: Doc; trackId: string; sitting: string; moving: string } {
+  const base = createEmptyProject({ name: "Overlap fixture" });
+  const trackId = base.tracks[0]!.id;
+
+  const sitting = createItem("image", {
+    fps: base.project.fps,
+    trackId,
+    name: "Baithi hui",
+    assetId: "as_sitting",
+    startFrame: 100,
+    durationInFrames: 100,
+  });
+  const moving = createItem("image", {
+    fps: base.project.fps,
+    trackId,
+    name: "Chalne wali",
+    assetId: "as_moving",
+    startFrame: 400,
+    durationInFrames: 60,
+  });
+
+  let doc = addItem(base, { item: sitting });
+  doc = addItem(doc, { item: moving });
+  return { doc, trackId, sitting: sitting.id, moving: moving.id };
+}
+
+test("overwrite: upar rakhi clip jeetati hai, neeche wali kat jaati hai", () => {
+  const { doc, sitting, moving } = overlapFixture();
+  // 400 -> 150: baithi hui (100-200) ke beech me ghus gayi.
+  const next = moveItems(doc, { itemIds: [moving], deltaFrames: -250, policy: "overwrite" });
+
+  assert.deepEqual(spanOf(next, moving), [150, 210]);
+  // Baithi hui ka daayan hissa kat gaya.
+  assert.deepEqual(spanOf(next, sitting), [100, 150]);
+});
+
+test("overwrite: beech me girne par neeche wali do tukde ho jaati hai", () => {
+  const { doc, trackId, sitting, moving } = overlapFixture();
+  // 400 -> 120: 120-180, jo 100-200 ke poore andar hai.
+  const next = moveItems(doc, { itemIds: [moving], deltaFrames: -280, policy: "overwrite" });
+
+  assert.deepEqual(trackSpans(next, trackId), [
+    [100, 120],
+    [120, 180],
+    [180, 200],
+  ]);
+  assert.deepEqual(spanOf(next, sitting), [100, 120]);
+});
+
+test("push: neeche wali kat'ti nahi, aage khisak jaati hai", () => {
+  const { doc, trackId, moving } = overlapFixture();
+  const next = moveItems(doc, { itemIds: [moving], deltaFrames: -250, policy: "push" });
+
+  assert.deepEqual(trackSpans(next, trackId), [
+    [150, 210],
+    [210, 310],
+  ]);
+  // Kuch mita nahi — dono clip abhi bhi hain, poori lambai ke saath.
+  assert.equal(next.items.length, 2);
+});
+
+test("reject: overlap hone hi nahi deta", () => {
+  const { doc, moving } = overlapFixture();
+  throws(
+    () => moveItems(doc, { itemIds: [moving], deltaFrames: -250, policy: "reject" }),
+    /overlap policy: reject/,
+    "reject policy",
+  );
+});
+
+test("bina overlap ke teeno policy ek jaisa nateeja deti hain", () => {
+  const { doc, trackId, moving } = overlapFixture();
+  const expected = [
+    [100, 200],
+    [250, 310],
+  ];
+  for (const policy of ["overwrite", "push", "reject"] as const) {
+    const next = moveItems(doc, { itemIds: [moving], deltaFrames: -150, policy });
+    assert.deepEqual(trackSpans(next, trackId), expected, `policy ${policy}`);
+  }
+});
+
+section("multi-item move (8.1 / 8.10 / 8.11)");
+
+test("group ki aapas ki doori bani rehti hai", () => {
+  const { doc, trackId, ids } = chainFixture();
+  const next = moveItems(doc, { itemIds: ids, deltaFrames: 50 });
+  assert.deepEqual(trackSpans(next, trackId), [
+    [50, 150],
+    [150, 250],
+    [250, 350],
+  ]);
+});
+
+test("0 par clamp poore group par lagta hai, ek clip par nahi", () => {
+  const { doc, trackId, ids } = chainFixture();
+  // -150 maanga, par pehli clip 0 par hai — poora group sirf 0 tak hi jaayega.
+  const next = moveItems(doc, { itemIds: ids, deltaFrames: -150 });
+  assert.deepEqual(
+    trackSpans(next, trackId),
+    [
+      [0, 100],
+      [100, 200],
+      [200, 300],
+    ],
+    "group ki shakl badal gayi — clamp har clip par alag laga hai",
+  );
+});
+
+test("nudge: 1 frame aur 1 second dono seedhe move hain", () => {
+  const { doc, ids } = chainFixture();
+  assert.equal(itemById(moveItems(doc, { itemIds: [ids[0]!], deltaFrames: 1 }), ids[0]!).startFrame, 1);
+  const oneSecond = secondsToFrames(1, doc.project.fps);
+  assert.equal(
+    itemById(moveItems(doc, { itemIds: [ids[0]!], deltaFrames: oneSecond }), ids[0]!).startFrame,
+    oneSecond,
+  );
+});
+
+test("track badalna sab-ya-kuch-nahi hai", () => {
+  const { doc, videoTrackId, audioTrackId } = buildFixture();
+  const image = doc.items.find((item) => item.trackId === videoTrackId)!;
+  const audio = doc.items.find((item) => item.trackId === audioTrackId)!;
+
+  // Dono ko ek row neeche le jao: image audio track par nahi ja sakti.
+  throws(
+    () => moveItems(doc, { itemIds: [image.id, audio.id], deltaFrames: 0, trackShift: 1 }),
+    /nahi ja sakta/,
+    "galat track par multi-move",
+  );
+
+  // Aur doc bilkul waisa ka waisa rehna chahiye — aadha move nahi hona chahiye.
+  assert.equal(itemById(doc, image.id).trackId, videoTrackId);
+  assert.equal(itemById(doc, audio.id).trackId, audioTrackId);
+});
+
+test("locked clip move nahi hoti", () => {
+  const { doc, ids } = chainFixture();
+  const locked = setItemProperty(doc, { itemId: ids[0]!, path: "locked", value: true });
+  throws(() => moveItems(locked, { itemIds: ids, deltaFrames: 10 }), /locked/, "locked multi-move");
+});
+
+section("trim ki hadd (8.3)");
+
+test("source ke ant se aage trim nahi hoti", () => {
+  const { doc, ids } = chainFixture();
+  // Source sirf 120 frame ka hai, par clip 100 frame ki hai aur +500 maanga.
+  const next = trimItemEnd(doc, {
+    itemId: ids[0]!,
+    deltaFrames: 500,
+    sourceDurationFrames: 120,
+  });
+  assert.equal(itemById(next, ids[0]!).durationInFrames, 120);
+});
+
+test("trimStartFrame source ki bachi hui lambai ghata deta hai", () => {
+  const { doc, ids } = chainFixture();
+  // Pehle baayan kinara 40 andar karo, phir daayein khinchne ki koshish.
+  let next = trimItemStart(doc, { itemId: ids[0]!, deltaFrames: 40 });
+  assert.equal(itemById(next, ids[0]!).trimStartFrame, 40);
+
+  next = trimItemEnd(next, { itemId: ids[0]!, deltaFrames: 500, sourceDurationFrames: 120 });
+  // Source me 120-40 = 80 frame bache the.
+  assert.equal(itemById(next, ids[0]!).durationInFrames, 80);
+});
+
+test("source na diya ho (image) to koi upar ki hadd nahi", () => {
+  const { doc, ids } = chainFixture();
+  const next = trimItemEnd(doc, { itemId: ids[0]!, deltaFrames: 500 });
+  assert.equal(itemById(next, ids[0]!).durationInFrames, 600);
+});
+
+test("2x speed par source aadha hi jaldi khatam hota hai", () => {
+  const { doc, ids } = chainFixture();
+  const fast = setItemProperty(doc, { itemId: ids[0]!, path: "playbackRate", value: 2 });
+  const next = trimItemEnd(fast, { itemId: ids[0]!, deltaFrames: 500, sourceDurationFrames: 120 });
+  // 120 source frames, 2x par timeline ke 60 frames.
+  assert.equal(itemById(next, ids[0]!).durationInFrames, 60);
+});
+
+section("split + keyframes (8.4)");
+
+test("split ke baad frames ka jod bilkul barabar rehta hai", () => {
+  const { doc, ids } = chainFixture();
+  const before = itemById(doc, ids[1]!);
+  const next = splitItemAtFrame(doc, { itemId: ids[1]!, frame: 140 });
+
+  const left = itemById(next, ids[1]!);
+  const right = next.items.find((item) => item.startFrame === 140 && item.id !== ids[1]!);
+  assert.ok(right, "daayan tukda nahi mila");
+
+  assert.equal(left.durationInFrames + right.durationInFrames, before.durationInFrames);
+  assert.equal(right.startFrame, left.startFrame + left.durationInFrames, "gap ya overlap");
+  assert.equal(right.trimStartFrame, before.trimStartFrame + 40);
+});
+
+test("keyframes sahi tukde par jaate hain aur item-local rehte hain", () => {
+  const { doc, ids } = chainFixture();
+  // Item-local frames: 10 (baayein), 90 (daayein). Clip 100-200 par hai.
+  const withKeys = setItemProperty(doc, {
+    itemId: ids[1]!,
+    path: "keyframes",
+    value: {
+      "transform.scale": [
+        { frame: 10, value: 1, easing: "linear" },
+        { frame: 90, value: 2, easing: "linear" },
+      ],
+    },
+  });
+
+  const next = splitItemAtFrame(withKeys, { itemId: ids[1]!, frame: 150 });
+  const left = itemById(next, ids[1]!);
+  const right = next.items.find((item) => item.startFrame === 150 && item.id !== ids[1]!)!;
+
+  assert.deepEqual(
+    left.keyframes["transform.scale"]?.map((kf) => kf.frame),
+    [10],
+    "baayein wale par sirf pehla keyframe",
+  );
+  // Daayein wala 90 tha; wo naye item me 90 - 50 = 40 par aana chahiye.
+  assert.deepEqual(
+    right.keyframes["transform.scale"]?.map((kf) => kf.frame),
+    [40],
+    "keyframe naye item ke apne start se ginna chahiye",
+  );
+});
+
+test("split ke baad dono tukde alag-alag edit hote hain", () => {
+  const { doc, ids } = chainFixture();
+  const split = splitItemAtFrame(doc, { itemId: ids[1]!, frame: 150 });
+  const right = split.items.find((item) => item.startFrame === 150 && item.id !== ids[1]!)!;
+
+  const moved = moveItems(split, { itemIds: [right.id], deltaFrames: 200 });
+  assert.deepEqual(spanOf(moved, ids[1]!), [100, 150], "baayan tukda apni jagah rehna chahiye");
+  assert.deepEqual(spanOf(moved, right.id), [350, 400]);
+});
+
+section("copy / paste (8.8)");
+
+test("usi project me paste playhead par girta hai", () => {
+  const { doc, trackId, ids } = chainFixture();
+  const fragment = copyItems(doc, [ids[0]!]);
+  const next = pasteItems(doc, { fragment, atFrame: 500 });
+
+  assert.equal(next.items.length, 4);
+  const pasted = next.items.find((item) => item.startFrame === 500)!;
+  assert.equal(pasted.durationInFrames, 100);
+  assert.notEqual(pasted.id, ids[0], "paste ki hui clip ka id naya hona chahiye");
+  assert.equal(pasted.trackId, trackId, "wahi track milna chahiye tha");
+});
+
+test("kai clips paste karne par aapas ki doori bani rehti hai", () => {
+  const { doc, ids } = chainFixture();
+  const fragment = copyItems(doc, [ids[0]!, ids[2]!]);
+  const next = pasteItems(doc, { fragment, atFrame: 500 });
+
+  const pasted = next.items
+    .filter((item) => item.startFrame >= 500)
+    .sort((a, b) => a.startFrame - b.startFrame);
+  assert.equal(pasted.length, 2);
+  // Original me doori 200 thi (0 aur 200) — paste ke baad bhi 200 honi chahiye.
+  assert.equal(pasted[1]!.startFrame - pasted[0]!.startFrame, 200);
+});
+
+test("24fps se 30fps me paste karne par lambai seconds me bani rehti hai", () => {
+  const source = createEmptyProject({ name: "24fps", fps: 24 });
+  const sourceTrack = source.tracks[0]!.id;
+  const item = createItem("image", {
+    fps: 24,
+    trackId: sourceTrack,
+    name: "Do second",
+    assetId: "as_x",
+    startFrame: 0,
+    durationInFrames: 48, // 24fps par theek 2 second
+  });
+  const sourceDoc = addItem(source, { item });
+  const fragment = copyItems(sourceDoc, [item.id]);
+
+  const target = createEmptyProject({ name: "30fps", fps: 30 });
+  const next = pasteItems(target, { fragment, atFrame: 0 });
+
+  const pasted = next.items[0]!;
+  // 30fps par 2 second = 60 frames. Frames waise ke waise chipkane par 48 aata,
+  // yaani clip 20% chhoti — aur wo galti dikhti nahi, sirf ajeeb lagti hai.
+  assert.equal(pasted.durationInFrames, 60);
+});
+
+test("original track na mile to compatible track par girta hai", () => {
+  const { doc } = chainFixture();
+  const item = doc.items[0]!;
+  const fragment = copyItems(doc, [item.id]);
+  // Ek naye project me paste jahan wo trackId hai hi nahi.
+  const target = createEmptyProject({ name: "Doosra project" });
+  const next = pasteItems(target, { fragment, atFrame: 0 });
+
+  assert.equal(next.items.length, 1);
+  const track = next.tracks.find((t) => t.id === next.items[0]!.trackId)!;
+  assert.equal(trackAccepts(track.type, "image"), true);
+});
+
+test("koi compatible track na ho to saaf error", () => {
+  const { doc } = chainFixture();
+  const audioOnly = createEmptyProject({ name: "Sirf audio" });
+  // Video track hata do — ab image ke liye jagah nahi bachi.
+  const stripped = removeTrack(audioOnly, { trackId: audioOnly.tracks[0]!.id, withItems: true });
+
+  const fragment = copyItems(doc, [doc.items[0]!.id]);
+  throws(
+    () => pasteItems(stripped, { fragment, atFrame: 0 }),
+    /koi track nahi hai/,
+    "bina compatible track ke paste",
+  );
+});
+
+test("copy doc ko chhuta tak nahi", () => {
+  const { doc, ids } = chainFixture();
+  const snapshot = JSON.stringify(doc);
+  copyItems(doc, ids);
+  assert.equal(JSON.stringify(doc), snapshot);
+});
+
+section("duration khud adjust hoti hai (8.14)");
+
+test("aakhri clip delete karne par project chhota ho jaata hai", () => {
+  const { doc, ids } = chainFixture();
+  const grown = recomputeDuration(doc, undefined as never);
+  assert.equal(grown.project.durationInFrames, 300);
+
+  const deleted = deleteItems(grown, { itemIds: [ids[2]!] });
+  const next = recomputeDuration(deleted, undefined as never);
+  assert.equal(next.project.durationInFrames, 200);
+});
+
+test("structural ops ki list me har badalne wala op maujood hai", () => {
+  // Ye test isliye hai ki naya structural op jodte waqt list me naam daalna
+  // bhool jaana bilkul aam hai — aur uska nateeja ye hota hai ki project ki
+  // lambai chupchaap purani padi rehti hai.
+  for (const name of [
+    "addItem",
+    "moveItems",
+    "trimItemEnd",
+    "splitItemAtFrame",
+    "deleteItems",
+    "rippleDeleteItems",
+    "cutRange",
+    "keepRange",
+    "pasteItems",
+  ]) {
+    assert.equal(isStructuralOp(name), true, `${name} structural list me nahi hai`);
+  }
+  assert.equal(isStructuralOp("setItemProperty"), false);
+  assert.equal(isStructuralOp("setTrackProperty"), false);
+});
+
+section("undo round-trip (8.13)");
+
+test("history no-op edit ko entry nahi banati", () => {
+  // Ye vyavhaar 8.13 ke liye zaroori hai: "30 ops = 30 undo" tabhi sach hai jab
+  // har op ne sach me kuch badla ho. Isi baat par pehle mera apna test phisla
+  // tha — ek cut aisi jagah lagayi thi jahan kuch tha hi nahi, aur history me
+  // uski entry bani hi nahi.
+  const { doc, ids } = chainFixture();
+  const history = createHistory<Doc>({ limit: 10 });
+
+  const moved = history.apply(
+    doc,
+    ((draft: Doc) =>
+      moveItems.recipe(draft as never, { itemIds: [ids[0]!], deltaFrames: 10 })) as never,
+    { label: "move" },
+  );
+  assert.notEqual(moved, doc);
+  assert.equal(history.canUndo(), true);
+
+  // 900-920 par kuch hai hi nahi — doc waisa ka waisa lautna chahiye.
+  const same = history.apply(
+    moved,
+    ((draft: Doc) =>
+      cutRange.recipe(draft as never, { fromFrame: 900, toFrame: 920 })) as never,
+    { label: "khaali cut" },
+  );
+  assert.equal(same, moved, "kuch nahi badla to wahi doc wapas aana chahiye");
+
+  history.undo(same);
+  assert.equal(history.canUndo(), false, "khaali cut ki entry nahi banni chahiye thi");
+});
+
+test("30 ops, 30 undo — doc bilkul shuruaati jaisa", () => {
+  const { doc, trackId, ids } = chainFixture();
+  const history = createHistory<Doc>({ limit: 100 });
+  const start = JSON.parse(JSON.stringify(doc)) as Doc;
+
+  let current = doc;
+  let count = 0;
+
+  /**
+   * Har op ke baad jaancha jaata hai ki doc sach me badla.
+   *
+   * ⚠️ Bina is jaanch ke ye test jhootha ho jaata hai: koi op kuch na badle to
+   * history uski entry banati hi nahi (upar wala test), aur "30 ops" me se ek
+   * chupchaap ghat jaata hai. Tab undo ki ginti mel nahi khaati aur wajah
+   * dhoondhne me der lagti hai.
+   */
+  const apply = (label: string, recipe: (draft: Doc) => void) => {
+    const before = current;
+    current = history.apply(current, recipe as never, { label });
+    assert.notEqual(current, before, `op "${label}" ne kuch badla hi nahi`);
+    count += 1;
+  };
+
+  // Har kism ka op — sirf move-move-move karne se undo ka asli imtihaan nahi hota.
+  for (let round = 0; round < 3; round += 1) {
+    apply("move", (draft) => moveItems.recipe(draft as never, { itemIds: ids, deltaFrames: 10 }));
+    apply("nudge", (draft) =>
+      moveItems.recipe(draft as never, { itemIds: [ids[0]!], deltaFrames: -5 }),
+    );
+    apply("trim start", (draft) =>
+      trimItemStart.recipe(draft as never, { itemId: ids[1]!, deltaFrames: 5 }),
+    );
+    apply("trim end", (draft) =>
+      trimItemEnd.recipe(draft as never, { itemId: ids[1]!, deltaFrames: 5 }),
+    );
+    apply("duplicate", (draft) => duplicateItems.recipe(draft as never, { itemIds: [ids[2]!] }));
+    apply("property", (draft) =>
+      setItemProperty.recipe(draft as never, {
+        itemId: ids[0]!,
+        path: "transform.opacity",
+        // Har round alag value — wahi value dobara set karna no-op hota.
+        value: 0.5 + round * 0.1,
+      }),
+    );
+    apply("track property", (draft) =>
+      setTrackProperty.recipe(draft as never, { trackId, path: "muted", value: round % 2 === 0 }),
+    );
+    apply("cut ripple", (draft) =>
+      // Shuruaat ke 5 frame kaato — yahan hamesha kuch hota hai, isliye ye op
+      // kabhi khaali nahi jaata.
+      cutRange.recipe(draft as never, { fromFrame: 0, toFrame: 5, ripple: true }),
+    );
+    apply("project property", (draft) =>
+      setProjectProperty.recipe(draft as never, { path: "name", value: `Round ${round}` }),
+    );
+    apply("delete duplicate", (draft) => {
+      const extra = draft.items.filter((item) => !ids.includes(item.id));
+      assert.ok(extra.length > 0, "duplicate ki hui clip milni chahiye thi");
+      deleteItems.recipe(draft as never, { itemIds: [extra[extra.length - 1]!.id] });
+    });
+  }
+
+  assert.equal(count, 30, "tees ops chalne chahiye the");
+  assert.notDeepEqual(current, start, "tees ops ke baad doc badla hua hona chahiye");
+
+  for (let i = 0; i < 30; i += 1) {
+    assert.equal(history.canUndo(), true, `undo ${i + 1} par history khaali ho gayi`);
+    current = history.undo(current);
+  }
+
+  assert.equal(history.canUndo(), false, "tees undo ke baad aur kuch nahi bachna chahiye");
+  assert.deepEqual(current, start, "undo round-trip ke baad doc shuruaati jaisa nahi hai");
+});
+
+test("redo bhi wapas wahi laata hai", () => {
+  const { doc, ids } = chainFixture();
+  const history = createHistory<Doc>({ limit: 50 });
+
+  let current = doc;
+  for (let i = 0; i < 5; i += 1) {
+    current = history.apply(
+      current,
+      ((draft: Doc) =>
+        moveItems.recipe(draft as never, { itemIds: [ids[0]!], deltaFrames: 10 })) as never,
+      { label: `move ${i}` },
+    );
+  }
+  const afterOps = JSON.parse(JSON.stringify(current)) as Doc;
+
+  for (let i = 0; i < 5; i += 1) current = history.undo(current);
+  for (let i = 0; i < 5; i += 1) current = history.redo(current);
+
+  assert.deepEqual(current, afterOps);
+});
+
+section("non-destructive (8.12 ka doc-level hissa)");
+
+test("koi bhi op assetId nahi badalta aur trimStartFrame kabhi negative nahi hota", () => {
+  const { doc, ids } = chainFixture();
+  const assetsBefore = new Set(doc.items.map((item) => item.assetId));
+
+  let current = doc;
+  current = moveItems(current, { itemIds: ids, deltaFrames: 37 });
+  current = trimItemStart(current, { itemId: ids[0]!, deltaFrames: 20 });
+  current = trimItemEnd(current, { itemId: ids[1]!, deltaFrames: -30 });
+  current = splitItemAtFrame(current, { itemId: ids[2]!, frame: 300 });
+  current = cutRange(current, { fromFrame: 50, toFrame: 90, ripple: true });
+  current = duplicateItems(current, { itemIds: [ids[0]!] });
+  current = pasteItems(current, { fragment: copyItems(current, [ids[1]!]), atFrame: 900 });
+
+  for (const item of current.items) {
+    assert.ok(
+      assetsBefore.has(item.assetId),
+      `naya assetId aa gaya: ${String(item.assetId)} — ops ko media banani nahi hai`,
+    );
+    assert.ok(item.trimStartFrame >= 0, `${item.name} ka trimStartFrame negative hai`);
+    assert.ok(item.durationInFrames >= 1, `${item.name} ki lambai 1 frame se kam hai`);
+    assert.ok(item.startFrame >= 0, `${item.name} timeline se pehle chala gaya`);
+  }
+});
+
+test("ops purana doc kabhi nahi badalte (immutability)", () => {
+  const { doc, ids } = chainFixture();
+  const before = JSON.stringify(doc);
+
+  moveItems(doc, { itemIds: ids, deltaFrames: 100 });
+  cutRange(doc, { fromFrame: 0, toFrame: 150, ripple: true });
+  keepRange(doc, { fromFrame: 100, toFrame: 200, ripple: true });
+  rippleDeleteItems(doc, { itemIds: [ids[0]!] });
+  pasteItems(doc, { fragment: copyItems(doc, ids), atFrame: 0 });
+
+  assert.equal(JSON.stringify(doc), before, "kisi op ne purana doc badal diya");
 });
 
 // ------------------------------------------------------------------ sample

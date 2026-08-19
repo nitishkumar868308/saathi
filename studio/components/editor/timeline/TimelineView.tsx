@@ -2,6 +2,7 @@
 
 import {
   EMPTY_SELECTION,
+  OVERLAP_POLICIES,
   clampFrame,
   createSelection,
   framesToTimecode,
@@ -9,15 +10,18 @@ import {
   selectSingle,
   toggleSelection,
   type Item,
+  type OverlapPolicy,
 } from "@reel/core";
 import clsx from "clsx";
-import { Crosshair, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
+import { Crosshair, Maximize2, Scissors, SquareDashedBottom, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Clip } from "@/components/editor/timeline/Clip";
 import { Ruler } from "@/components/editor/timeline/Ruler";
 import { TrackHeader } from "@/components/editor/timeline/TrackHeader";
-import { IconButton } from "@/components/ui/Button";
+import { useClipDrag } from "@/components/editor/timeline/useClipDrag";
+import { Button, IconButton } from "@/components/ui/Button";
+import { type DragMode } from "@/lib/clipEdit";
 import { usePlayback } from "@/lib/playback";
 import { useEditorStore, useEditorStoreApi } from "@/lib/store";
 import {
@@ -41,20 +45,20 @@ import {
 import { useElementSize } from "@/lib/useElementSize";
 
 /**
- * Timeline — dikhna, chunna, aur playhead. **Editing Phase 8 me.**
+ * Timeline — dikhna, chunna, playhead (Phase 7) aur ab editing (Phase 8).
  *
- * Poora naksha `lib/timeline.ts` ke pure functions se banta hai; yahan sirf DOM,
- * pointer aur scroll ka kaam hai. Yahi wajah hai ki ruler, clip, playhead aur
- * marquee chaaron ek hi `frameToX` par baithte hain — chaar jagah alag math
- * likhne par teen mil jaate hain aur chautha hamesha aadha pixel khisak kar
- * chalta hai.
+ * Poora naksha `lib/timeline.ts` ke pure functions se banta hai aur drag/trim ka
+ * ganit `lib/clipEdit.ts` se; yahan sirf DOM, pointer aur scroll ka kaam hai.
+ * Yahi wajah hai ki ruler, clip, playhead, ghost aur marquee — paanchon ek hi
+ * `frameToX` par baithte hain.
  *
  * ⚠️ **Playhead ka sach store me hai** (`playheadFrame`) — wahi jo Phase 6 ka
- * player padhta hai. Timeline ka scrub, ruler ka drag, transport ka bar, teeno
- * usi ek jagah likhte hain (7.10 / 6.6).
+ * player padhta hai (7.10 / 6.6).
  *
- * ⚠️ **Selection `uiSlice` me hai, doc me nahi** (7.9). Doc me daalne par har
- * click autosave chalata aur Ctrl+Z selection ko bhi ulta deta.
+ * ⚠️ **Selection `uiSlice` me hai, doc me nahi** (7.9).
+ *
+ * ⚠️ **Drag ke dauraan doc ko haath nahi lagta** — sirf ghost hilta hai, aur op
+ * drop par ek baar chalta hai (8.1 / 8.15).
  */
 export function TimelineView() {
   const store = useEditorStoreApi();
@@ -70,6 +74,9 @@ export function TimelineView() {
   const trackHeights = useEditorStore((state) => state.trackHeights);
   const inFrame = useEditorStore((state) => state.inFrame);
   const outFrame = useEditorStore((state) => state.outFrame);
+  const overlapPolicy = useEditorStore((state) => state.overlapPolicy);
+  const setOverlapPolicy = useEditorStore((state) => state.setOverlapPolicy);
+  const applyOp = useEditorStore((state) => state.applyOp);
   const playback = usePlayback();
 
   const { fps, durationInFrames } = doc.project;
@@ -218,25 +225,40 @@ export function TimelineView() {
     [contentX, pxPerFrame, setPlayhead, durationInFrames],
   );
 
+  const { drag, ghosts, beginDrag } = useClipDrag({ rows, pxPerFrame, contentX });
+  const draggingIds = new Set(drag?.itemIds ?? []);
+
+  /**
+   * Clip par pointer neeche — pehle selection, phir drag.
+   *
+   * Kram zaroori hai: drag hamesha **us selection par** chalti hai jo abhi tay
+   * hui hai. Ulta karne par Ctrl+click se chuni gayi doosri clip pehle drag me
+   * shaamil nahi hoti, aur pehla drag hamesha ek clip peeche chalta hai.
+   */
   const onClipPointerDown = useCallback(
-    (event: React.PointerEvent, item: Item) => {
-      // Clip par dabane se marquee shuru nahi hona chahiye.
+    (event: React.PointerEvent, item: Item, mode: DragMode) => {
       event.stopPropagation();
       const state = store.getState();
 
       if (event.ctrlKey || event.metaKey) {
         setSelection(toggleSelection(state.selection, item.id));
         anchorRef.current = item.id;
-        return;
-      }
-      if (event.shiftKey && anchorRef.current) {
+      } else if (event.shiftKey && anchorRef.current) {
         setSelection(selectRange(state.doc, anchorRef.current, item.id));
-        return;
+      } else if (!state.selection.itemIds.includes(item.id)) {
+        // Pehle se chuni hui clip par dabane se selection nahi tootni chahiye —
+        // warna kai clips ko ek saath ghaseetna namumkin ho jaata hai (8.11).
+        setSelection(selectSingle(item.id));
+        anchorRef.current = item.id;
       }
-      setSelection(selectSingle(item.id));
-      anchorRef.current = item.id;
+
+      // Ctrl/Shift se chunte waqt drag shuru nahi karte — wo chunne ka ishaara
+      // hai, sarkane ka nahi.
+      if (!event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        beginDrag(event, item, mode);
+      }
     },
-    [store, setSelection],
+    [store, setSelection, beginDrag],
   );
 
   /** Tab se clip par pahunch kar Enter dabana (7.13). */
@@ -296,6 +318,7 @@ export function TimelineView() {
 
   const range = visibleFrames({ scrollLeft, viewportWidth, pxPerFrame });
   const playheadX = frameToX(playheadFrame, pxPerFrame);
+  const hasRange = inFrame !== null && outFrame !== null && outFrame > inFrame;
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-ink-900">
@@ -312,6 +335,23 @@ export function TimelineView() {
         inFrame={inFrame}
         outFrame={outFrame}
         fps={fps}
+        overlapPolicy={overlapPolicy}
+        onOverlapPolicy={setOverlapPolicy}
+        hasRange={hasRange}
+        onCutRange={() =>
+          applyOp(
+            "cutRange",
+            { fromFrame: inFrame as number, toFrame: outFrame as number, ripple: true },
+            { label: "Cut selection" },
+          )
+        }
+        onKeepRange={() =>
+          applyOp(
+            "keepRange",
+            { fromFrame: inFrame as number, toFrame: outFrame as number, ripple: true },
+            { label: "Keep selection" },
+          )
+        }
       />
 
       <div className="flex min-h-0 flex-1">
@@ -343,6 +383,18 @@ export function TimelineView() {
               style={{ height: Math.max(lanesHeight, 1) }}
               onPointerDown={onLanesPointerDown}
             >
+              {/* In-Out ke beech ka hissa halka roshan — 8.5 wale dono button
+                  isi hisse par chalte hain, isliye wo dikhna chahiye. */}
+              {hasRange ? (
+                <div
+                  className="pointer-events-none absolute inset-y-0 bg-amber/10"
+                  style={{
+                    left: frameToX(inFrame as number, pxPerFrame),
+                    width: frameToX((outFrame as number) - (inFrame as number), pxPerFrame),
+                  }}
+                />
+              ) : null}
+
               {rows.map((row) => {
                 const onTrack = doc.items.filter((item) => item.trackId === row.track.id);
                 // Sirf dikh rahe clips DOM me jaate hain (7.7).
@@ -364,11 +416,30 @@ export function TimelineView() {
                         pxPerFrame={pxPerFrame}
                         fps={fps}
                         selected={selection.itemIds.includes(item.id)}
-                        onPointerDown={onClipPointerDown}
+                        dragging={draggingIds.has(item.id)}
+                        onBeginDrag={onClipPointerDown}
                         onKeyboardSelect={onKeyboardSelect}
                       />
                     ))}
                   </div>
+                );
+              })}
+
+              {/* Ghost — drop karne par kya hoga (8.1). Doc abhi chhua nahi gaya. */}
+              {ghosts.map((ghost) => {
+                const row = rows.find((entry) => entry.track.id === ghost.trackId);
+                if (!row) return null;
+                return (
+                  <div
+                    key={ghost.itemId}
+                    className="pointer-events-none absolute z-20 rounded border-2 border-amber bg-amber/20"
+                    style={{
+                      left: frameToX(ghost.startFrame, pxPerFrame),
+                      width: Math.max(2, frameToX(ghost.durationInFrames, pxPerFrame)),
+                      top: row.top + 2,
+                      height: row.height - 4,
+                    }}
+                  />
                 );
               })}
 
@@ -385,7 +456,15 @@ export function TimelineView() {
               ) : null}
             </div>
 
-            {/* In/Out (7.11) — abhi sirf dikhte hain, kaam Phase 8 me. */}
+            {/* Snap ki lakeer (8.2) — sirf tab jab snap sach me laga ho. */}
+            {drag?.snappedTo !== null && drag?.snappedTo !== undefined ? (
+              <div
+                className="pointer-events-none absolute inset-y-0 z-30 w-px bg-amber"
+                style={{ left: frameToX(drag.snappedTo, pxPerFrame) }}
+              />
+            ) : null}
+
+            {/* In/Out (7.11) */}
             {inFrame !== null ? (
               <Marker frame={inFrame} pxPerFrame={pxPerFrame} kind="in" />
             ) : null}
@@ -421,7 +500,7 @@ export function TimelineView() {
                 Timeline khaali hai — baayein Media library se koi file yahan drag karo
                 <br />
                 <span className="text-[11px] text-ink-500">
-                  (drag se clip banana Phase 8 me aayega)
+                  (drag se clip banana Phase 9 me aayega)
                 </span>
               </div>
             ) : null}
@@ -447,6 +526,11 @@ function Toolbar(props: {
   inFrame: number | null;
   outFrame: number | null;
   fps: number;
+  overlapPolicy: OverlapPolicy;
+  onOverlapPolicy(policy: OverlapPolicy): void;
+  hasRange: boolean;
+  onCutRange(): void;
+  onKeepRange(): void;
 }) {
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink-600 px-2 py-1">
@@ -479,13 +563,53 @@ function Toolbar(props: {
         {props.pxPerFrame.toFixed(2)} px/frame
       </span>
 
+      {/*
+       * Overlap policy (8.9) — ek hi jagah, aur har op yahi maanta hai.
+       * List `OVERLAP_POLICIES` se banti hai, yahan koi naam likha nahi hai.
+       */}
+      <select
+        value={props.overlapPolicy}
+        onChange={(event) => props.onOverlapPolicy(event.target.value as OverlapPolicy)}
+        title="Do clips ek jagah aa jaayein to kya ho"
+        className="rounded-md border border-ink-600 bg-ink-900 px-1 py-0.5 text-[11px] outline-none"
+      >
+        {OVERLAP_POLICIES.map((policy) => (
+          <option key={policy.id} value={policy.id} title={policy.hint}>
+            {policy.label}
+          </option>
+        ))}
+      </select>
+
       <span className="flex-1" />
 
-      {props.inFrame !== null || props.outFrame !== null ? (
-        <span className="font-mono text-[11px] text-amber">
-          In {props.inFrame === null ? "—" : framesToTimecode(props.inFrame, props.fps, { compact: true })} /
-          Out {props.outFrame === null ? "—" : framesToTimecode(props.outFrame, props.fps, { compact: true })}
-        </span>
+      {/*
+       * Cut / Keep sirf tab dikhte hain jab In aur Out dono lage hon.
+       * Bina range ke ye button kuch kar hi nahi sakte — aur jo button kuch
+       * nahi karta wo toota hua button hai (README rule 5).
+       */}
+      {props.hasRange ? (
+        <>
+          <span className="font-mono text-[11px] text-amber">
+            {framesToTimecode(props.inFrame as number, props.fps, { compact: true })} →{" "}
+            {framesToTimecode(props.outFrame as number, props.fps, { compact: true })}
+          </span>
+          <Button
+            icon={<Scissors size={12} />}
+            onClick={props.onCutRange}
+            title="In-Out ke beech ka hissa hatao (aage ka sab khisak jaayega)"
+            className="px-2 py-0.5 text-[11px]"
+          >
+            Cut
+          </Button>
+          <Button
+            icon={<SquareDashedBottom size={12} />}
+            onClick={props.onKeepRange}
+            title="Sirf In-Out ke beech ka hissa rakho"
+            className="px-2 py-0.5 text-[11px]"
+          >
+            Keep
+          </Button>
+        </>
       ) : null}
 
       <span className="text-[11px] text-chalk-500">

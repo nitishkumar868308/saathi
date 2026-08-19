@@ -1,15 +1,19 @@
 "use client";
 
 import {
+  DEFAULT_OVERLAP_POLICY,
   EMPTY_SELECTION,
   OPS,
   createHistory,
+  isStructuralOp,
   parseDoc,
   pruneSelection,
+  recomputeDuration,
   type Doc,
   type History,
   type Op,
   type OpName,
+  type OverlapPolicy,
   type Selection,
 } from "@reel/core";
 import { createContext, useContext, useState, type ReactNode } from "react";
@@ -103,9 +107,17 @@ export interface EditorState {
    * manager Phase 16 me hai, wahi iska sahi ghar hoga.
    */
   trackHeights: Record<string, number>;
-  /** In/Out markers (7.11) — abhi sirf dikhte hain, kaam Phase 8 me. */
+  /** In/Out markers (7.11) — inka asli kaam 8.5 me (`cutRange` / `keepRange`). */
   inFrame: number | null;
   outFrame: number | null;
+  /**
+   * Overlap policy (8.9) — do clips ek jagah aa jaayein to kya ho.
+   *
+   * Ye ek **editing preference** hai, doc ka data nahi: isse badalne se project
+   * me kuch nahi badalta, sirf agli edit ka vyavhaar badalta hai. Doc me daalne
+   * par Ctrl+Z is setting ko bhi ulta deta, jo bilkul galat lagta.
+   */
+  overlapPolicy: OverlapPolicy;
   mode: "beginner" | "advanced";
   leftPanelId: string;
 
@@ -134,6 +146,7 @@ export interface EditorState {
   markIn(frame: number): void;
   markOut(frame: number): void;
   clearInOut(): void;
+  setOverlapPolicy(policy: OverlapPolicy): void;
   setMode(mode: "beginner" | "advanced"): void;
   setLeftPanel(id: string): void;
   clearOpError(): void;
@@ -303,6 +316,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       trackHeights: {},
       inFrame: null,
       outFrame: null,
+      overlapPolicy: DEFAULT_OVERLAP_POLICY,
       mode: "advanced",
       leftPanelId: "media",
 
@@ -353,10 +367,32 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
         const doc = get().doc;
         const op = OPS[name] as Op<unknown>;
         try {
-          const next = history.apply(doc, (draft) => op.recipe(draft, args), {
-            label: options.label ?? name,
-            ...(options.coalesceKey === undefined ? {} : { coalesceKey: options.coalesceKey }),
-          });
+          const next = history.apply(
+            doc,
+            (draft) => {
+              op.recipe(draft, args);
+
+              /*
+               * Structural op ke baad project ki lambai dobara ginn lo (8.14).
+               *
+               * Ye **usi** history entry ke andar hota hai, alag op ki tarah
+               * nahi — warna ek clip delete karne par do baar Ctrl+Z dabana
+               * padta: ek duration wapas laane ko, ek clip wapas laane ko.
+               *
+               * ⚠️ Items khaali hon to lambai ko haath nahi lagate. Exact
+               * ginti wahan 1 frame deti hai, aur naya khaali project 1 frame
+               * ka ho jaana bilkul toota hua lagta — jabki user ne to sirf
+               * aakhri clip hataayi thi.
+               */
+              if (isStructuralOp(name) && draft.items.length > 0) {
+                recomputeDuration.recipe(draft, undefined as never);
+              }
+            },
+            {
+              label: options.label ?? name,
+              ...(options.coalesceKey === undefined ? {} : { coalesceKey: options.coalesceKey }),
+            },
+          );
           if (next === doc) return; // kuch nahi badla — history bhi gandi nahi hui
 
           set({ doc: next, selection: pruneSelection(next, get().selection), opError: null });
@@ -415,6 +451,9 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
       clearInOut() {
         set({ inFrame: null, outFrame: null });
+      },
+      setOverlapPolicy(overlapPolicy) {
+        set({ overlapPolicy });
       },
       setMode(mode) {
         set({ mode });

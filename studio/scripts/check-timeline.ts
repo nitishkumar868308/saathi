@@ -21,12 +21,28 @@ import {
   createEmptyProject,
   createItem,
   framesToTimecode,
+  itemEndFrame,
+  moveItems,
   requireTrackType,
   secondsToFrames,
   setTrackProperty,
+  trimItemEnd,
+  trimItemStart,
   type Doc,
+  type Item,
   type Track,
 } from "@reel/core";
+
+import {
+  SNAP_THRESHOLD_PX,
+  clampTrimEnd,
+  clampTrimStart,
+  ghostRects,
+  snapCandidates,
+  snapEdge,
+  snapMove,
+  snapThresholdFrames,
+} from "../lib/clipEdit";
 
 import {
   DEFAULT_PX_PER_FRAME,
@@ -508,6 +524,249 @@ test("id / type / order path se nahi badalte", () => {
       `${path} chup-chaap badal gaya`,
     );
   }
+});
+
+/* ------------------------------------------------------ Phase 8: drag/trim */
+
+section("snapping (8.2)");
+
+test("hadd pixel me hai, isliye zoom ke saath frames me badalti hai", () => {
+  // Zyada zoom = ek frame zyada pixel = utne hi pixel me kam frames.
+  assert.equal(snapThresholdFrames(1), SNAP_THRESHOLD_PX);
+  assert.equal(snapThresholdFrames(4), SNAP_THRESHOLD_PX / 4);
+  assert.equal(snapThresholdFrames(0), 0, "zoom 0 par snapping band honi chahiye");
+});
+
+test("candidates me playhead, project ka ant aur baaki clips ke dono kinare aate hain", () => {
+  const { doc } = fixture(30);
+  const first = doc.items[0] as Item;
+  const points = snapCandidates({
+    doc,
+    excludeIds: new Set([first.id]),
+    playheadFrame: 77,
+    inFrame: null,
+    outFrame: null,
+  });
+
+  assert.ok(points.includes(0), "track ka shuru");
+  assert.ok(points.includes(77), "playhead");
+  assert.ok(points.includes(doc.project.durationInFrames), "project ka ant");
+
+  // Jo clip khud hil rahi hai uske apne kinare candidate nahi ban sakte —
+  // warna clip apne aap par snap karke jam jaati hai aur hilti hi nahi.
+  const others = doc.items.filter((item) => item.id !== first.id);
+  assert.ok(points.includes(others[0]!.startFrame));
+  assert.ok(points.includes(itemEndFrame(others[0]!)));
+});
+
+test("in/out points par bhi snap lagta hai", () => {
+  const { doc } = fixture(30);
+  const points = snapCandidates({
+    doc,
+    excludeIds: new Set(),
+    playheadFrame: 0,
+    inFrame: 123,
+    outFrame: 456,
+  });
+  assert.ok(points.includes(123) && points.includes(456));
+});
+
+test("daayan kinara bhi snap karta hai, sirf baayan nahi", () => {
+  // Ye wo case hai jo sabse zyada chhoot'ta hai: clip ko doosri clip ke *baad*
+  // lagana ho to tumhara daayan kinara uske baayein kinare se milta hai.
+  const result = snapMove({
+    startFrame: 0,
+    endFrame: 100,
+    rawDelta: 97, // daayan kinara 197 par — 200 se 3 frame door
+    candidates: [200],
+    thresholdFrames: 5,
+  });
+  assert.equal(result.deltaFrames, 100, "daayan kinara 200 par baithna chahiye tha");
+  assert.equal(result.snappedTo, 200);
+});
+
+test("dono kinare ke paas ho to jo zyada paas hai wahi jeetta hai", () => {
+  const near = snapMove({
+    startFrame: 0,
+    endFrame: 100,
+    rawDelta: 48, // start 48 (50 se 2 door), end 148 (150 se 2 door)
+    candidates: [50, 150],
+    thresholdFrames: 5,
+  });
+  // Barabar khinchav — baayan kinara jeetta hai, kyunki wahi pakda hua hota hai.
+  assert.equal(near.snappedTo, 50);
+});
+
+test("hadd se door hone par snap nahi lagta", () => {
+  const result = snapMove({
+    startFrame: 0,
+    endFrame: 100,
+    rawDelta: 30,
+    candidates: [200],
+    thresholdFrames: 5,
+  });
+  assert.equal(result.deltaFrames, 30);
+  assert.equal(result.snappedTo, null, "door ki lakeer par indicator nahi dikhna chahiye");
+});
+
+test("Alt dabaye rakhne par snapping poori band", () => {
+  const result = snapMove({
+    startFrame: 0,
+    endFrame: 100,
+    rawDelta: 98,
+    candidates: [100],
+    thresholdFrames: 5,
+    disabled: true,
+  });
+  assert.equal(result.deltaFrames, 98);
+  assert.equal(result.snappedTo, null);
+});
+
+test("ek kinare ka snap (trim) bhi wahi hadd maanta hai", () => {
+  assert.deepEqual(snapEdge({ frame: 98, candidates: [100], thresholdFrames: 5 }), {
+    deltaFrames: 100,
+    snappedTo: 100,
+  });
+  assert.deepEqual(snapEdge({ frame: 80, candidates: [100], thresholdFrames: 5 }), {
+    deltaFrames: 80,
+    snappedTo: null,
+  });
+});
+
+section("ghost drop se mel khata hai (8.1 / 8.3)");
+
+/**
+ * Sabse chidhane wala bug: drag ke dauraan clip ek jagah dikhti hai aur chhodte
+ * hi doosri jagah chali jaati hai. Wo tabhi hota hai jab ghost aur op alag-alag
+ * ganit chalate hain. Yahan dono ka nateeja **milaya** jaata hai.
+ */
+function orderedTrackIds(doc: Doc): string[] {
+  return [...doc.tracks].sort((a, b) => a.order - b.order).map((track) => track.id);
+}
+
+test("move ka ghost wahi jagah dikhata hai jahan op rakhta hai", () => {
+  const { doc } = fixture(30);
+  const items = doc.items.filter((item) => item.trackId === doc.tracks[0]!.id);
+  const ids = items.map((item) => item.id);
+
+  const drag = { mode: "move" as const, itemIds: ids, deltaFrames: 45, trackShift: 0, snappedTo: null };
+  const ghosts = ghostRects({ doc, drag, orderedTrackIds: orderedTrackIds(doc) });
+  const applied = moveItems(doc, { itemIds: ids, deltaFrames: 45 });
+
+  for (const ghost of ghosts) {
+    const real = applied.items.find((item) => item.id === ghost.itemId)!;
+    assert.equal(ghost.startFrame, real.startFrame, `${real.name}: ghost aur op alag`);
+    assert.equal(ghost.durationInFrames, real.durationInFrames);
+    assert.equal(ghost.trackId, real.trackId);
+  }
+});
+
+test("0 par clamp ghost me bhi poore group par lagta hai", () => {
+  const { doc } = fixture(30);
+  const ids = doc.items.filter((item) => item.trackId === doc.tracks[0]!.id).map((i) => i.id);
+
+  const drag = { mode: "move" as const, itemIds: ids, deltaFrames: -500, trackShift: 0, snappedTo: null };
+  const ghosts = ghostRects({ doc, drag, orderedTrackIds: orderedTrackIds(doc) });
+  const applied = moveItems(doc, { itemIds: ids, deltaFrames: -500 });
+
+  for (const ghost of ghosts) {
+    const real = applied.items.find((item) => item.id === ghost.itemId)!;
+    assert.equal(ghost.startFrame, real.startFrame);
+  }
+  assert.equal(Math.min(...ghosts.map((g) => g.startFrame)), 0);
+});
+
+test("track badalne par ghost sahi row par jaata hai", () => {
+  const { doc } = fixture(30);
+  const tracks = orderedTrackIds(doc);
+  const item = doc.items.find((entry) => entry.trackId === tracks[0])!;
+
+  const drag = {
+    mode: "move" as const,
+    itemIds: [item.id],
+    deltaFrames: 0,
+    trackShift: 1,
+    snappedTo: null,
+  };
+  const ghost = ghostRects({ doc, drag, orderedTrackIds: tracks })[0]!;
+  assert.equal(ghost.trackId, tracks[1]);
+});
+
+test("track shift list ke bahar nahi jaata", () => {
+  const { doc } = fixture(30);
+  const tracks = orderedTrackIds(doc);
+  const item = doc.items.find((entry) => entry.trackId === tracks[0])!;
+
+  const up = ghostRects({
+    doc,
+    drag: { mode: "move", itemIds: [item.id], deltaFrames: 0, trackShift: -5, snappedTo: null },
+    orderedTrackIds: tracks,
+  })[0]!;
+  assert.equal(up.trackId, tracks[0], "sabse upar se aur upar nahi ja sakta");
+
+  const down = ghostRects({
+    doc,
+    drag: { mode: "move", itemIds: [item.id], deltaFrames: 0, trackShift: 99, snappedTo: null },
+    orderedTrackIds: tracks,
+  })[0]!;
+  assert.equal(down.trackId, tracks[tracks.length - 1]);
+});
+
+test("trim-start ka ghost aur op ek jaise", () => {
+  const { doc } = fixture(30);
+  const item = doc.items[0] as Item;
+  const delta = 20;
+
+  const ghost = ghostRects({
+    doc,
+    drag: { mode: "trim-start", itemIds: [item.id], deltaFrames: delta, trackShift: 0, snappedTo: null },
+    orderedTrackIds: orderedTrackIds(doc),
+  })[0]!;
+  const applied = trimItemStart(doc, { itemId: item.id, deltaFrames: delta });
+  const real = applied.items.find((entry) => entry.id === item.id)!;
+
+  assert.equal(ghost.startFrame, real.startFrame);
+  assert.equal(ghost.durationInFrames, real.durationInFrames);
+});
+
+test("trim-start ki hadd ghost aur op me ek jaisi hai", () => {
+  const { doc } = fixture(30);
+  const item = doc.items[0] as Item;
+
+  // Clip ki poori lambai se zyada trim maanga — kam se kam 1 frame bachna chahiye.
+  const delta = clampTrimStart(item, 99999);
+  assert.equal(delta, item.durationInFrames - 1);
+
+  const applied = trimItemStart(doc, { itemId: item.id, deltaFrames: 99999 });
+  assert.equal(applied.items.find((entry) => entry.id === item.id)!.durationInFrames, 1);
+});
+
+test("trim-end ki source wali hadd ghost aur op me ek jaisi hai", () => {
+  const { doc } = fixture(30);
+  const item = doc.items[0] as Item;
+  const source = item.durationInFrames + 25;
+
+  const delta = clampTrimEnd(item, 99999, source);
+  assert.equal(item.durationInFrames + delta, source, "source ke ant par rukna chahiye");
+
+  const applied = trimItemEnd(doc, {
+    itemId: item.id,
+    deltaFrames: 99999,
+    sourceDurationFrames: source,
+  });
+  assert.equal(applied.items.find((entry) => entry.id === item.id)!.durationInFrames, source);
+});
+
+test("source ka pata na ho to trim-end par upar ki hadd nahi lagti", () => {
+  const { doc } = fixture(30);
+  const item = doc.items[0] as Item;
+  assert.equal(clampTrimEnd(item, 500, null), 500);
+});
+
+test("trim-end clip ko 1 frame se chhota nahi hone deta", () => {
+  const { doc } = fixture(30);
+  const item = doc.items[0] as Item;
+  assert.equal(item.durationInFrames + clampTrimEnd(item, -99999, null), 1);
 });
 
 /* ------------------------------------------------------------------ end */
