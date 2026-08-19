@@ -1,6 +1,6 @@
 # Phase 0 — Toolchain + workspace skeleton
 
-**STATUS:** in progress — 0.3-0.14 done, **0.1/0.2 blocked on tumhare FFmpeg install**
+**STATUS:** COMPLETE (2026-08-19)
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 0 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding hain. Resume Protocol follow karo.
 **Depends on:** kuch nahi (ye pehla phase hai)
@@ -10,13 +10,12 @@ Koi feature nahi banega is phase me.
 
 ## Checklist
 
-- [ ] 0.1 FFmpeg check: `ffmpeg -version` chalao. Na mile to mujhe exact command do
+- [x] 0.1 FFmpeg check: `ffmpeg -version` chalao. Na mile to mujhe exact command do
       (`winget install Gyan.FFmpeg`) aur **ruk jao** — khud install mat karo.
-      → **BLOCKED.** `ffmpeg` PATH pe nahi mila (PowerShell + bash dono me). Command
-      user ko de di gayi: `winget install Gyan.FFmpeg` (winget me `Gyan.FFmpeg 9.0`
-      available hai — verified via `winget search Gyan.FFmpeg`). Install user karega.
-- [ ] 0.2 `ffprobe -version` bhi verify karo (dono chahiye).
-      → **BLOCKED.** Same install ke saath aayega (Gyan build me ffprobe bundled hai).
+      → User ne `winget install Gyan.FFmpeg` chalaya. `ffmpeg 9.0-full_build` mil gaya,
+      `libx264` + `libx265` + `aac` encoders aur `loudnorm` filter maujood.
+- [x] 0.2 `ffprobe -version` bhi verify karo (dono chahiye).
+      → `ffprobe 9.0-full_build` maujood, same bin folder me.
 - [x] 0.3 Root `package.json` banao: `"private": true`, `"workspaces": ["studio","packages/*","worker"]`.
       `web/` aur `app-mobile/` workspaces me **nahi** aayenge (wo apne alag installs pe chalte hain).
 - [x] 0.4 Root `tsconfig.base.json`: strict true, `moduleResolution: "bundler"`, path aliases
@@ -50,14 +49,28 @@ npm run dev:studio    # phir page open karke confirm
 ### Asli output (2026-08-19)
 
 ```
-$ ffmpeg -version
-bash: ffmpeg: command not found          <-- 0.1 BLOCKED
-$ ffprobe -version
-bash: ffprobe: command not found         <-- 0.2 BLOCKED
+$ ffmpeg -version | head -1
+ffmpeg version 9.0-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers
+$ ffprobe -version | head -1
+ffprobe version 9.0-full_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers
+# bin: %LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_..._8wekyb3d8bbwefmpeg-9.0-full_buildin
 
-$ winget search Gyan.FFmpeg
-FFmpeg                      Gyan.FFmpeg              9.0     winget
-FFmpeg (Essentials Build)   Gyan.FFmpeg.Essentials   8.1.1   winget
+$ ffmpeg -encoders | grep -E "libx264|libx265| aac "
+ V....D libx264    libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+ V....D libx265    libx265 H.265 / HEVC (codec hevc)
+ A....D aac        AAC (Advanced Audio Coding)
+$ ffmpeg -filters | grep loudnorm
+ .. loudnorm    A->A    EBU R128 loudness normalization
+
+# Smoke test — Section 3A ki asli spec pe 2s clip encode karke probe kiya:
+$ ffmpeg -f lavfi -i testsrc2=size=1080x1920:rate=30:duration=2          -f lavfi -i sine=frequency=440:sample_rate=48000:duration=2          -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 18 -preset medium -g 60          -c:a aac -b:a 192k -ac 2 -ar 48000 -movflags +faststart out.mp4
+encode OK
+$ ffprobe out.mp4
+codec_name=h264       profile=High      width=1080  height=1920
+pix_fmt=yuv420p       r_frame_rate=30/1
+codec_name=aac        profile=LC        sample_rate=48000  channels=2
+format_name=mov,mp4,m4a,3gp,3g2,mj2     duration=2.000000  size=2675151
+(test file scratchpad me tha, delete kar diya — repo me nahi hai)
 
 $ node -v && npm -v
 v20.20.1
@@ -103,8 +116,13 @@ repo me nahi hain.
 
 ## Known issues / decisions is phase se
 
-1. **FFmpeg install pending** — 0.1/0.2 tabhi tick honge. Ye Phase 3 (first MP4) tak
-   chahiye hi chahiye; Phase 1-2 iske bina chal jaate hain.
+1. **FFmpeg 9.0 install ho gaya** aur smoke-test pass hua — H.264 High / yuv420p /
+   CRF 18 / AAC-LC 48kHz stereo, yaani Section 3A ka quality bar is machine pe
+   sach me possible hai. Bonus: build me `--enable-whisper` hai (Phase 23 auto-captions
+   ke kaam aa sakta hai) aur `nvenc`/`amf` flags hain par is PC me NVIDIA GPU nahi hai,
+   isliye encode CPU (libx264) pe hi hoga — plan wahi maanta hai.
+   ⚠️ winget ne PATH badla hai, **purane khule terminals me ffmpeg nahi dikhega** —
+   naya terminal kholna padta hai. Phase 3 me worker isi PATH se ffmpeg dhoondhega.
 2. **`npm audit`: 2 high, next@14.2.35 par.** Fix ke liye `next@16` chahiye (breaking, plan
    se bahar). Studio locked decision ke hisaab se sirf **localhost** pe chalta hai, public
    deploy nahi hai — isliye Next 14 hi rakha, `web/` bhi ^14.2.35 par hi hai. Agar kabhi
@@ -120,10 +138,12 @@ repo me nahi hain.
 FFmpeg + ffprobe available, `npm run typecheck` bilkul clean, studio localhost pe khulta hai,
 aur teen packages (`reel-core`, `reel-remotion`, `worker`) import-able bane hue hain.
 
-→ Teen me se **teen** ho gaye. Sirf FFmpeg wala hissa baaki hai (user ka install).
+→ **Chaaron satisfy ho gaye.** FFmpeg + ffprobe available, typecheck clean, studio
+localhost pe khulta hai, teeno packages import-able hain (alias probe se verified).
 
 ## Progress log
 
 | Date | What was done | Verified by | Next |
 |---|---|---|---|
 | 2026-08-19 | 0.3-0.14 poore: workspace root, tsconfig.base + aliases, reel-core / reel-remotion / worker skeletons, Next 14 studio, .gitignore, env examples, root scripts. Commit `fa88d0b`. | `npm run typecheck` chaaron workspaces clean; `npm run build:studio` pass; `curl localhost:3000` → HTTP 200 + `<h1>AI Reel Studio</h1>`; worker `tsx` se chalke exit hua; alias probe import compile hua | 0.1/0.2 — user `winget install Gyan.FFmpeg` chalaye, phir `ffmpeg -version` / `ffprobe -version` verify karke tick karo, tab STATUS: COMPLETE |
+| 2026-08-19 | 0.1/0.2 bhi ho gaye — user ne `winget install Gyan.FFmpeg` chalaya. Phase 0 COMPLETE. | `ffmpeg -version` / `ffprobe -version` → 9.0-full_build; libx264+libx265+aac encoders + loudnorm filter maujood; asli 1080x1920 CRF18 + AAC 48kHz smoke encode kiya aur `ffprobe` ne h264/High/yuv420p/30fps + aac/LC/48000/2ch confirm kiya | Phase 1 — Project JSON schema + core types + registries |
