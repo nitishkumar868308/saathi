@@ -7,6 +7,7 @@ import {
 } from "../config/audio";
 import { getAnimationPreset } from "../config/animationPresets";
 import { findEffectPreset } from "../config/effectPresets";
+import { mergeCues, splitCue, type CaptionCue } from "../captions/cues";
 import { zoomPanKeyframes, type ZoomStep } from "../mockup/zoomPan";
 import { DEFAULT_EASING } from "../config/easing";
 import { splitEasing } from "../keyframes/easing";
@@ -19,6 +20,7 @@ import {
   clampTransitionFrames,
   createAnimation,
   createEffect,
+  getCaptionStyle,
   getItemType,
   getSceneType,
   requireItemType,
@@ -1797,6 +1799,177 @@ export const setMask = defineOp<SetMaskArgs>("setMask", (draft, args) => {
   }
 });
 
+// ---------------------------------------------------------------- captions
+
+function subtitleOf(item: Draft<Item>): NonNullable<Draft<Item>["subtitle"]> {
+  if (!item.subtitle) {
+    throw new TimelineOpError(`"${item.name}" caption item nahi hai`);
+  }
+  return item.subtitle;
+}
+
+export interface SetCuesArgs {
+  itemId: string;
+  cues: readonly CaptionCue[];
+}
+
+/** Poori cue list badlo — import ka raasta (19.4). */
+export const setCues = defineOp<SetCuesArgs>("setCues", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  // Kram hamesha frame se — UI list ko waise ka waisa dikhati hai, aur bina
+  // sort ke import ki hui file ka kram timeline se alag ho jaata hai.
+  subtitle.cues = clone([...args.cues].sort((a, b) => a.startFrame - b.startFrame)) as never;
+});
+
+export interface AddCueArgs {
+  itemId: string;
+  startFrame: number;
+  endFrame: number;
+  text?: string;
+}
+
+export const addCue = defineOp<AddCueArgs>("addCue", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  const startFrame = Math.max(0, Math.round(args.startFrame));
+  const endFrame = Math.max(startFrame + 1, Math.round(args.endFrame));
+
+  subtitle.cues.push({
+    id: createId("cue"),
+    startFrame,
+    endFrame,
+    text: args.text ?? "",
+    words: [],
+  } as never);
+  subtitle.cues.sort((a, b) => a.startFrame - b.startFrame);
+});
+
+export interface CueRefArgs {
+  itemId: string;
+  cueId: string;
+}
+
+export const deleteCue = defineOp<CueRefArgs>("deleteCue", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  const at = subtitle.cues.findIndex((cue) => cue.id === args.cueId);
+  if (at < 0) throw new TimelineOpError(`Cue ${args.cueId} nahi mila`);
+  subtitle.cues.splice(at, 1);
+});
+
+export interface SetCueArgs extends CueRefArgs {
+  startFrame?: number;
+  endFrame?: number;
+  text?: string;
+}
+
+export const setCue = defineOp<SetCueArgs>("setCue", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  const cue = subtitle.cues.find((entry) => entry.id === args.cueId);
+  if (!cue) throw new TimelineOpError(`Cue ${args.cueId} nahi mila`);
+
+  if (args.startFrame !== undefined) cue.startFrame = Math.max(0, Math.round(args.startFrame));
+  if (args.endFrame !== undefined) cue.endFrame = Math.round(args.endFrame);
+  if (args.text !== undefined) {
+    cue.text = args.text;
+    /*
+     * Text badalne par purana word timing bekaar ho jaata hai — usme wo shabd
+     * hain jo ab hain hi nahi. Use rakhne par karaoke ka highlight aise shabdon
+     * par chalta hai jo screen par dikh bhi nahi rahe.
+     */
+    cue.words = [] as never;
+  }
+
+  // Ulta cue nahi ban sakta — wo timeline par pakda hi nahi ja sakta.
+  if (cue.endFrame <= cue.startFrame) cue.endFrame = cue.startFrame + 1;
+  subtitle.cues.sort((a, b) => a.startFrame - b.startFrame);
+});
+
+export interface SplitCueArgs extends CueRefArgs {
+  /** Item-local frame. */
+  atFrame: number;
+}
+
+export const splitCueAt = defineOp<SplitCueArgs>("splitCueAt", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  const at = subtitle.cues.findIndex((cue) => cue.id === args.cueId);
+  if (at < 0) throw new TimelineOpError(`Cue ${args.cueId} nahi mila`);
+
+  const split = splitCue(subtitle.cues[at] as CaptionCue, Math.round(args.atFrame), () =>
+    createId("cue"),
+  );
+  if (!split) throw new TimelineOpError("Cue ke kinare par split nahi hota");
+
+  subtitle.cues.splice(at, 1, ...(clone(split) as unknown as never[]));
+});
+
+export interface MergeCuesArgs {
+  itemId: string;
+  cueIds: readonly string[];
+}
+
+export const mergeCuesOp = defineOp<MergeCuesArgs>("mergeCues", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  if (args.cueIds.length < 2) throw new TimelineOpError("Jodne ke liye do cue chahiye");
+
+  const chosen = subtitle.cues.filter((cue) => args.cueIds.includes(cue.id));
+  if (chosen.length !== args.cueIds.length) throw new TimelineOpError("Koi cue nahi mila");
+
+  const merged = chosen
+    .slice(1)
+    .reduce((acc, cue) => mergeCues(acc, cue as CaptionCue), chosen[0] as CaptionCue);
+
+  subtitle.cues = clone([
+    ...subtitle.cues.filter((cue) => !args.cueIds.includes(cue.id)),
+    merged,
+  ]).sort((a, b) => a.startFrame - b.startFrame) as never;
+});
+
+export interface SetCaptionStyleArgs {
+  itemId: string;
+  styleId?: string;
+  /** Sirf ye keys badalti hain; baaki waise ke waise. */
+  params?: Record<string, unknown>;
+}
+
+export const setCaptionStyle = defineOp<SetCaptionStyleArgs>("setCaptionStyle", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  const subtitle = subtitleOf(item);
+
+  if (args.styleId !== undefined) {
+    const entry = getCaptionStyle(args.styleId);
+    if (!entry) throw new TimelineOpError(`Caption style "${args.styleId}" nahi mila`);
+    subtitle.styleId = args.styleId;
+    /*
+     * Style badalne par purane params **jaate hain**. Rakhne par ek style ka
+     * `amount` doosre me chala jaata hai jahan uska matlab hi alag hai — aur
+     * nateeja ek ajeeb sa look hota jise user ne kabhi chuna hi nahi.
+     */
+    subtitle.params = clone(entry.defaults) as never;
+  }
+
+  if (args.params) {
+    subtitle.params = { ...(subtitle.params as Record<string, unknown>), ...clone(args.params) } as never;
+  }
+});
+
 // ------------------------------------------------------------------ mockup
 
 export interface SetMockupArgs {
@@ -3296,6 +3469,13 @@ export const OPS = {
   copyKeyframes,
   scaleKeyframes,
   setTransition,
+  setCues,
+  addCue,
+  deleteCue,
+  setCue,
+  splitCueAt,
+  mergeCues: mergeCuesOp,
+  setCaptionStyle,
   setMockup,
   applyZoomPan,
   setBrandPreset,

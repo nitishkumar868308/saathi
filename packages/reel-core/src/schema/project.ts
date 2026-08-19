@@ -367,6 +367,54 @@ export const TextSpecSchema = z.object({
   background: TextBackgroundSchema.nullable(),
 });
 
+/**
+ * Subtitle (19.1) — cues + style, ek item me.
+ *
+ * ⚠️ Cue ke frames **item-local** hain, doc ke nahi. Doc ke frames rakhne par
+ * subtitle item ko timeline par khiskane se saare cue apni jagah reh jaate aur
+ * caption video se alag ho jaati — aur wo galti aankh se hi pakdi jaati, wo bhi
+ * poori reel dekhne par.
+ *
+ * Text ka roop (font, size, rang) `text` field se aata hai — wahi jo text item
+ * use karta hai. Do jagah text ka style rakhne par ek din subtitle ka font
+ * update hona bhool jaata aur wo akela purana dikhta.
+ */
+export const SubtitleSchema = z
+  .object({
+    /** `CAPTION_STYLES` registry ka id. */
+    styleId: z.string().min(1).default("normal"),
+    /** Style ke apne params — registry ka schema inhe jaanchta hai. */
+    params: z.record(z.unknown()).default({}),
+    cues: z
+      .array(
+        z.object({
+          id: IdSchema,
+          startFrame: FrameSchema,
+          endFrame: FrameSchema,
+          text: z.string(),
+          words: z
+            .array(
+              z.object({
+                text: z.string(),
+                startFrame: FrameSchema,
+                endFrame: FrameSchema,
+              }),
+            )
+            .default([]),
+        }),
+      )
+      .default([]),
+    /**
+     * Kis bhasha ki caption (19.10).
+     *
+     * Do bhasha = do subtitle item, ek me do nahi. Ek hi item me do bhasha
+     * rakhne par har cue par "ye kaun si bhasha hai" ka sawaal aata aur
+     * on/off karna namumkin ho jaata.
+     */
+    language: z.string().default("hi"),
+  })
+  .nullable();
+
 export const ShapeSpecSchema = z.object({
   kind: z.enum(["rect", "ellipse", "line"]),
   fill: ColorSchema.nullable(),
@@ -458,6 +506,7 @@ export const ItemSchema = z.object({
 
   text: TextSpecSchema.nullable(),
   shape: ShapeSpecSchema.nullable(),
+  subtitle: SubtitleSchema.default(null),
 
   hidden: z.boolean(),
   locked: z.boolean(),
@@ -653,6 +702,7 @@ export type Mask = z.infer<typeof MaskSchema>;
 export type Marker = z.infer<typeof MarkerSchema>;
 export type Watermark = z.infer<typeof WatermarkSchema>;
 export type Mockup = z.infer<typeof MockupSchema>;
+export type Subtitle = z.infer<typeof SubtitleSchema>;
 export type Ducking = z.infer<typeof DuckingSchema>;
 export type MasterAudio = z.infer<typeof MasterAudioSchema>;
 export type BlendMode = (typeof BLEND_MODES)[number];

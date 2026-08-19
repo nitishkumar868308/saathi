@@ -88,7 +88,7 @@ export const BUILTIN_TRACK_TYPES: readonly TrackTypeEntry[] = [
     label: "Text",
     icon: "Type",
     kind: "visual",
-    accepts: ["text"],
+    accepts: ["text", "subtitle"],
     defaultHeight: 44,
     color: "#b07a34",
     defaultOrder: 3,
@@ -102,7 +102,14 @@ export const BUILTIN_TRACK_TYPES: readonly TrackTypeEntry[] = [
     label: "Subtitle",
     icon: "Captions",
     kind: "visual",
-    accepts: ["text"],
+    /*
+     * `subtitle` **aur** `text` dono — aur ye jaan-boojhkar hai (19.1).
+     *
+     * Captions ka apna item type hai, par ek aam text item bhi is track par
+     * baithna chahiye: aksar caption ke saath ek sthir line (naam, handle)
+     * chahiye hoti hai, aur uske liye alag track banwana bekaar ki mehnat hai.
+     */
+    accepts: ["subtitle", "text"],
     defaultHeight: 40,
     color: "#98603a",
     defaultOrder: 4,

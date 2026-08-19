@@ -62,6 +62,8 @@ export * from "./timeline/select";
  */
 export * from "./brand/overrides";
 export * from "./mockup/zoomPan";
+export * from "./captions/srt";
+export * from "./captions/cues";
 export * from "./templates/schema";
 export * from "./templates/apply";
 export * from "./templates/builtins";

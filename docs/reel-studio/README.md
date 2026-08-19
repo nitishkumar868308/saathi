@@ -275,7 +275,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 16 | in progress — tracks/shortcuts/markers/groups poore; hide render me bhi lagta hai (MP4 se naapa); 40 shortcuts bina takraav; browser wala hissa baaki | 2026-08-20 |
 | 17 | in progress — template engine + brand tokens poore, render se naape gaye (brand badalne par rang ka fasla 215.5); ek bada bug pakda (render tokens padhta hi nahi tha); SQL/browser baaki | 2026-08-20 |
 | 18 | in progress — phone frame + zoom-pan poore, MP4 se naape gaye (2x zoom par pixels me 1.99x); over-zoom par exact numbers; tap indicator jaan-boojhkar skip | 2026-08-20 |
-| 19 | not started | — |
+| 19 | in progress — captions poore (SRT/VTT round-trip exact, 7 styles); MP4 se naapa: karaoke ka highlight 272→533 px chala, Devanagari sahi bana; 19.3 (cue blocks) nahi bana | 2026-08-20 |
 | 20 | not started | — |
 | 21 | not started | — |
 | 22 | not started | — |

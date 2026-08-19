@@ -2,6 +2,7 @@ import type { Doc } from "../schema/project";
 import { ASSET_KINDS, BUILTIN_ASSET_KINDS } from "./assetKinds";
 import { BUILTIN_EXPORT_PRESETS, type ExportPresetEntry } from "./exportPresets";
 import { ANIMATIONS, BUILTIN_ANIMATIONS } from "./animations";
+import { BUILTIN_CAPTION_STYLES, CAPTION_STYLES } from "./captionStyles";
 import { BUILTIN_EFFECTS, EFFECTS } from "./effects";
 import { BUILTIN_ITEM_TYPES, type ItemTypeEntry } from "./itemTypes";
 import { BUILTIN_SCENE_TYPES, SCENE_TYPES } from "./sceneTypes";
@@ -129,6 +130,7 @@ export function registerBuiltins(): void {
   for (const entry of BUILTIN_ANIMATIONS) ANIMATIONS.register(entry);
   for (const entry of BUILTIN_TRANSITIONS) TRANSITIONS.register(entry);
   for (const entry of BUILTIN_EFFECTS) EFFECTS.register(entry);
+  for (const entry of BUILTIN_CAPTION_STYLES) CAPTION_STYLES.register(entry);
   for (const entry of BUILTIN_SCENE_TYPES) SCENE_TYPES.register(entry);
 }
 
@@ -138,6 +140,7 @@ export function resetRegistries(): void {
   TRACK_TYPES.clear();
   TRANSITIONS.clear();
   EFFECTS.clear();
+  CAPTION_STYLES.clear();
   ANIMATIONS.clear();
   SCENE_TYPES.clear();
   EXPORT_PRESETS.clear();
@@ -150,6 +153,7 @@ export function resetRegistries(): void {
 registerBuiltins();
 
 export * from "./animations";
+export * from "./captionStyles";
 export * from "./effects";
 export * from "./assetKinds";
 export * from "./exportPresets";

@@ -633,4 +633,85 @@ export const BUILTIN_ITEM_TYPES: readonly ItemTypeEntry[] = [
     ],
     keyframable: [...TRANSFORM_KEYFRAMABLE, "shape.widthPercent", "shape.heightPercent"],
   },
+
+  {
+    /*
+     * Subtitle — text item se **alag** item type (19.1).
+     *
+     * ⚠️ Text item me `cues` daal dena aasan lagta hai par galat hai: text item
+     * ki poori zindagi ek hi content par tiki hai (`text.content`), aur subtitle
+     * ki zindagi waqt ke saath badalne wale cues par. Ek hi type me dono rakhne
+     * par har jagah "cues hain ya nahi" poochhna padta — renderer me, panel me,
+     * validator me, har naye feature me.
+     *
+     * Roop (`text`) dono me ek hi schema se aata hai, isliye font/size/rang ka
+     * code do jagah nahi hai.
+     */
+    id: "subtitle",
+    label: "Captions",
+    icon: "Captions",
+    kind: "text",
+    componentKey: "SubtitleItem",
+    needsAsset: false,
+    hasVisual: true,
+    hasAudio: false,
+    supportsTrim: false,
+    defaultTrackType: "text",
+    defaultDurationSeconds: 10,
+    schema: z.object({ text: TextSpecSchema, subtitle: z.unknown() }),
+    defaults: {
+      text: {
+        ...DEFAULT_TEXT,
+        // Captions neeche baithti hain aur safe-area ke andar — Instagram ka
+        // apna UI neeche ka hissa dhak leta hai.
+        verticalAlign: "bottom" as const,
+        maxWidthPercent: 84,
+        fontWeight: 700,
+      },
+      subtitle: {
+        styleId: "normal",
+        params: {},
+        cues: [],
+        language: "hi",
+      },
+    },
+    controls: [
+      {
+        path: "subtitle.styleId",
+        control: "select",
+        label: "Style",
+        group: "Captions",
+        options: [],
+      },
+      { path: "text.fontFamily", control: "font", label: "Font", group: "Captions" },
+      {
+        path: "text.fontSize",
+        control: "number",
+        label: "Size",
+        group: "Captions",
+        min: 4,
+        step: 1,
+        unit: "px",
+        keyframable: true,
+      },
+      {
+        path: "text.color",
+        control: "color",
+        label: "Rang",
+        group: "Captions",
+      },
+      {
+        path: "text.maxWidthPercent",
+        control: "slider",
+        label: "Chaudai",
+        group: "Captions",
+        min: 30,
+        max: 100,
+        step: 1,
+        unit: "%",
+      },
+      ...TRANSFORM_CONTROLS,
+    ],
+    keyframable: [...TRANSFORM_KEYFRAMABLE, "text.fontSize"],
+  },
 ];

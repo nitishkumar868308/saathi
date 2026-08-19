@@ -155,6 +155,7 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
 
     text: null,
     shape: null,
+    subtitle: null,
 
     hidden: false,
     locked: false,

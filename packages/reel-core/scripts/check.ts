@@ -42,6 +42,26 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  activeWordIndex,
+  addCue,
+  cueAt,
+  cueProblems,
+  cuesFromParsed,
+  cuesToSeconds,
+  deleteCue,
+  estimateWords,
+  formatSubtitles,
+  listCaptionStyles,
+  mergeCuesOp as mergeCuesInItem,
+  parseSubtitles,
+  parseTimestamp,
+  requireCaptionStyle,
+  setCaptionStyle,
+  setCue,
+  setCues,
+  splitCueAt,
+  type CaptionCue,
+  type CaptionWord,
   BUILTIN_DEVICES,
   ZOOM_PRESETS,
   applyZoomPan,
@@ -474,8 +494,13 @@ test("setByPath missing objects banata hai par non-object par rota hai", () => {
 
 section("registries (1.7-1.10)");
 
-test("paanchon item types registered hain", () => {
-  assert.deepEqual([...ITEM_TYPES.ids()].sort(), ["audio", "image", "shape", "text", "video"]);
+test("saare item types registered hain", () => {
+  // Phase 19 me `subtitle` juda — wo text item se alag type hai (text ki zindagi
+  // ek content par tiki hai, subtitle ki waqt ke saath badalte cues par).
+  assert.deepEqual(
+    [...ITEM_TYPES.ids()].sort(),
+    ["audio", "image", "shape", "subtitle", "text", "video"],
+  );
 });
 
 test("saat track types registered hain (ginti nahi, kism)", () => {
@@ -5510,6 +5535,451 @@ test("mockup ka tilt hadd me rehta hai", () => {
   });
   // Schema hadd lagati hai — 90 degree par phone bilkul patla dikhta hai.
   assert.ok(!safeParseDoc(bad).success, "45 se zyada tilt ruk jaana chahiye");
+});
+
+
+// ------------------------------------------------------------- Phase 19
+
+section("SRT / VTT padhna (19.4)");
+
+const SAMPLE_SRT = [
+  "1",
+  "00:00:01,000 --> 00:00:03,500",
+  "Papa, pension ka kaam hua?",
+  "",
+  "2",
+  "00:00:03,500 --> 00:00:06,000",
+  "Teen baar gaya,",
+  "har baar naya kagaz.",
+  "",
+].join("\n");
+
+test("SRT padhi jaati hai aur do-line wala cue bhi bachta hai", () => {
+  const { cues, problems } = parseSubtitles(SAMPLE_SRT);
+  assert.deepEqual(problems, []);
+  assert.equal(cues.length, 2);
+  assert.equal(cues[0]?.startSeconds, 1);
+  assert.equal(cues[0]?.endSeconds, 3.5);
+  assert.ok(cues[1]?.text.includes("\n"), "do line wala cue ek hi cue rehna chahiye");
+});
+
+test("UTF-8 BOM se pehla cue gayab nahi hota", () => {
+  /*
+   * ⚠️ BOM Windows ke tools se aayi har doosri file me hota hai. Uske rehte
+   * pehli line "1" nahi rehti, `"\\ufeff1"` ho jaati hai — aur tab pehla cue
+   * chup-chaap gayab ho jaata hai. Ye galti sirf ginti karne par dikhti hai.
+   */
+  const { cues } = parseSubtitles(`﻿${SAMPLE_SRT}`);
+  assert.equal(cues.length, 2, "BOM ke saath bhi dono cue aane chahiye");
+});
+
+test("CRLF aur akela CR dono chalte hain", () => {
+  assert.equal(parseSubtitles(SAMPLE_SRT.replace(/\n/g, "\r\n")).cues.length, 2);
+  assert.equal(parseSubtitles(SAMPLE_SRT.replace(/\n/g, "\r")).cues.length, 2);
+});
+
+test("Devanagari text bina bigde padha jaata hai", () => {
+  const hindi = ["1", "00:00:00,500 --> 00:00:02,000", "आपका साथी — मुफ़्त में", ""].join("\n");
+  const { cues } = parseSubtitles(hindi);
+  assert.equal(cues.length, 1);
+  assert.equal(cues[0]?.text, "आपका साथी — मुफ़्त में");
+});
+
+test("VTT bhi wahi parser padhta hai (header, NOTE aur settings ke saath)", () => {
+  const vtt = [
+    "WEBVTT",
+    "",
+    "NOTE ye ek tippani hai",
+    "",
+    "00:00:01.000 --> 00:00:03.500 align:center line:90%",
+    "Pehla",
+    "",
+    "00:00:04.000 --> 00:00:05.000",
+    "Doosra",
+    "",
+  ].join("\n");
+
+  const { cues, problems } = parseSubtitles(vtt);
+  assert.deepEqual(problems, []);
+  assert.equal(cues.length, 2);
+  assert.equal(cues[0]?.text, "Pehla");
+});
+
+test("ghante ke bina wala timestamp bhi chalta hai", () => {
+  // Chhoti clip ke liye bahut se tools `01:23.456` likhte hain. Use na maanne
+  // par poori file "galat format" ban jaati hai jabki wo bilkul theek hai.
+  assert.equal(parseTimestamp("01:23.500"), 83.5);
+  assert.equal(parseTimestamp("00:01:23,500"), 83.5);
+  assert.equal(parseTimestamp("kuch bhi"), null);
+});
+
+test("ulta ya zero-lambai cue chhod diya jaata hai, par chup-chaap nahi", () => {
+  const bad = ["1", "00:00:05,000 --> 00:00:02,000", "ulta", ""].join("\n");
+  const { cues, problems } = parseSubtitles(bad);
+  assert.equal(cues.length, 0);
+  assert.equal(problems.length, 1, "wajah milni chahiye");
+});
+
+section("SRT / VTT likhna aur round-trip (19.5 / 19.12)");
+
+test("SRT round-trip me timing bilkul wahi rehti hai", () => {
+  const original = parseSubtitles(SAMPLE_SRT).cues;
+  const written = formatSubtitles(original, "srt");
+  const back = parseSubtitles(written).cues;
+
+  assert.equal(back.length, original.length);
+  for (let index = 0; index < original.length; index += 1) {
+    assert.ok(
+      Math.abs((back[index]?.startSeconds ?? 0) - (original[index]?.startSeconds ?? 0)) < 1e-9,
+      `cue ${index} ki shuruaat badal gayi`,
+    );
+    assert.ok(
+      Math.abs((back[index]?.endSeconds ?? 0) - (original[index]?.endSeconds ?? 0)) < 1e-9,
+      `cue ${index} ka ant badal gaya`,
+    );
+    assert.equal(back[index]?.text, original[index]?.text);
+  }
+});
+
+test("VTT round-trip bhi exact hai", () => {
+  const original = parseSubtitles(SAMPLE_SRT).cues;
+  const back = parseSubtitles(formatSubtitles(original, "vtt")).cues;
+  assert.deepEqual(back, original);
+});
+
+test("SRT ke numbers 1 se shuru hote hain", () => {
+  // Kuch players 0 se shuru hone par pehla caption chhod dete hain.
+  const written = formatSubtitles(parseSubtitles(SAMPLE_SRT).cues, "srt");
+  assert.ok(written.startsWith("1\n"), written.slice(0, 20));
+});
+
+test("VTT me header hota hai, SRT me nahi", () => {
+  const cues = parseSubtitles(SAMPLE_SRT).cues;
+  assert.ok(formatSubtitles(cues, "vtt").startsWith("WEBVTT"));
+  assert.ok(!formatSubtitles(cues, "srt").startsWith("WEBVTT"));
+});
+
+section("cues aur frames (19.1)");
+
+test("seconds -> frames me shuruaat neeche aur ant upar jaata hai", () => {
+  /*
+   * ⚠️ Dono ko `round` karne par do paas-paas cue ek hi frame par aa sakte hain
+   * aur ek chup-chaap gayab ho jaata hai. Neeche-upar karne se cue kabhi chhota
+   * nahi hota — zyada se zyada ek frame lamba, jo dikhta bhi nahi.
+   */
+  let counter = 0;
+  const cues = cuesFromParsed(parseSubtitles(SAMPLE_SRT).cues, {
+    fps: 30,
+    makeId: () => `cue_${(counter += 1)}`,
+  });
+
+  assert.equal(cues[0]?.startFrame, 30);
+  assert.equal(cues[0]?.endFrame, 105);
+  assert.equal(cues[1]?.startFrame, 105, "do cue bilkul jude hue rehne chahiye");
+});
+
+test("frames -> seconds wapas wahi deta hai", () => {
+  let counter = 0;
+  const cues = cuesFromParsed(parseSubtitles(SAMPLE_SRT).cues, {
+    fps: 30,
+    makeId: () => `cue_${(counter += 1)}`,
+  });
+  const back = cuesToSeconds(cues, { fps: 30 });
+
+  assert.ok(Math.abs((back[0]?.startSeconds ?? 0) - 1) < 1e-9);
+  assert.ok(Math.abs((back[0]?.endSeconds ?? 0) - 3.5) < 1e-9);
+});
+
+test("cue ki lambai kabhi zero nahi hoti", () => {
+  const cues = cuesFromParsed([{ startSeconds: 1, endSeconds: 1.001, text: "chhota" }], {
+    fps: 30,
+    makeId: () => "cue_1",
+  });
+  assert.ok((cues[0]?.endFrame ?? 0) > (cues[0]?.startFrame ?? 0));
+});
+
+test("kaun sa cue kis frame par dikhta hai", () => {
+  const cues: CaptionCue[] = [
+    { id: "a", startFrame: 0, endFrame: 30, text: "ek", words: [] },
+    { id: "b", startFrame: 30, endFrame: 60, text: "do", words: [] },
+  ];
+  assert.equal(cueAt(cues, 0)?.id, "a");
+  assert.equal(cueAt(cues, 29)?.id, "a");
+  assert.equal(cueAt(cues, 30)?.id, "b", "kinare par agla cue milna chahiye");
+  assert.equal(cueAt(cues, 60), null);
+});
+
+section("word timing ka andaaza (19.8)");
+
+test("shabd apni lambai ke hisaab se waqt paate hain", () => {
+  /*
+   * Har shabd ko barabar waqt dena kharab hota: "aur" aur "vyavastha" ko ek
+   * jitna waqt dene par highlight saaf peeche chalta dikhta hai.
+   */
+  const words = estimateWords({ text: "aur vyavastha", startFrame: 0, endFrame: 60 });
+  assert.equal(words.length, 2);
+
+  const first = (words[0] as CaptionWord).endFrame - (words[0] as CaptionWord).startFrame;
+  const second = (words[1] as CaptionWord).endFrame - (words[1] as CaptionWord).startFrame;
+  assert.ok(second > first, `lamba shabd zyada waqt le: ${first} vs ${second}`);
+});
+
+test("aakhri shabd theek cue ke ant par khatam hota hai", () => {
+  // Jodte-jodte aane wali rounding ki galti wahin sudharni padti hai — warna
+  // aakhri shabd ka highlight cue khatam hone se pehle hi hat jaata hai.
+  const words = estimateWords({ text: "ek do teen chaar paanch", startFrame: 10, endFrame: 97 });
+  assert.equal(words[words.length - 1]?.endFrame, 97);
+  assert.equal(words[0]?.startFrame, 10);
+});
+
+test("shabd kabhi ek doosre ke upar nahi chadhte", () => {
+  const words = estimateWords({ text: "a b c d e f g", startFrame: 0, endFrame: 20 });
+  for (let index = 1; index < words.length; index += 1) {
+    assert.ok(
+      (words[index] as CaptionWord).startFrame >= (words[index - 1] as CaptionWord).endFrame,
+      `shabd ${index} pichhle ke upar chadh gaya`,
+    );
+  }
+});
+
+test("active shabd sahi milta hai", () => {
+  const words = estimateWords({ text: "ek do teen", startFrame: 0, endFrame: 90 });
+  assert.equal(activeWordIndex(words, 0), 0);
+  assert.equal(activeWordIndex(words, 89), words.length - 1);
+  assert.equal(activeWordIndex(words, 200), -1);
+});
+
+section("caption styles (19.6)");
+
+test("har style ka schema apne defaults ko manzoor karta hai", () => {
+  for (const style of listCaptionStyles()) {
+    assert.ok(style.schema.safeParse(style.defaults).success, `${style.id} ke defaults galat`);
+  }
+});
+
+test("har style ka har control uske schema me hai", () => {
+  for (const style of listCaptionStyles()) {
+    const shape = (style.schema as unknown as { shape?: Record<string, unknown> }).shape ?? {};
+    for (const control of style.controls) {
+      assert.ok(control.path in shape, `${style.id}: control "${control.path}" schema me nahi`);
+    }
+  }
+});
+
+test("normal style har shabd ko waisa ka waisa chhodta hai", () => {
+  const entry = requireCaptionStyle("normal");
+  const out = entry.apply({
+    word: { index: 0, total: 3, active: true, past: false, progress: 0.5 },
+    params: {},
+  });
+  assert.deepEqual(out, {});
+});
+
+test("karaoke me bole hue aur aane wale shabd alag dikhte hain", () => {
+  const entry = requireCaptionStyle("karaoke");
+  const params = entry.defaults;
+
+  const past = entry.apply({
+    word: { index: 0, total: 3, active: false, past: true, progress: 1 },
+    params,
+  });
+  const upcoming = entry.apply({
+    word: { index: 2, total: 3, active: false, past: false, progress: 0 },
+    params,
+  });
+
+  assert.ok(past.color, "bole hue shabd rang me hone chahiye");
+  assert.ok((upcoming.opacity ?? 1) < 1, "aage wale halke hone chahiye");
+});
+
+test("pop ki uchhaal shabd ke shuru me sabse zyada hoti hai", () => {
+  /*
+   * Poore shabd bhar bade rehne par har shabd bada dikhta hai aur "pop" ka koi
+   * matlab hi nahi rehta — uchhaal ka matlab hi ek pal ka hona hai.
+   */
+  const entry = requireCaptionStyle("pop");
+  const start = entry.apply({
+    word: { index: 0, total: 2, active: true, past: false, progress: 0 },
+    params: entry.defaults,
+  });
+  const later = entry.apply({
+    word: { index: 0, total: 2, active: true, past: false, progress: 0.8 },
+    params: entry.defaults,
+  });
+
+  assert.ok((start.scale ?? 1) > 1);
+  assert.ok((later.scale ?? 1) <= (start.scale ?? 1));
+});
+
+test("typewriter aage wale shabd chhupata hai, hataata nahi", () => {
+  // Hatane par baaki shabd har frame par apni jagah badalte hain aur poori line
+  // kaanpti dikhti hai.
+  const entry = requireCaptionStyle("typewriter");
+  const upcoming = entry.apply({
+    word: { index: 3, total: 5, active: false, past: false, progress: 0 },
+    params: {},
+  });
+  assert.equal(upcoming.hidden, true);
+});
+
+test("word timing maangne wale styles saaf batate hain", () => {
+  const needing = listCaptionStyles().filter((style) => style.needsWordTiming).map((s) => s.id);
+  assert.ok(needing.includes("karaoke"));
+  assert.ok(needing.includes("typewriter"));
+  assert.ok(!needing.includes("normal"), "normal ko timing ki zaroorat nahi");
+});
+
+section("caption ops (19.2)");
+
+/** Ek subtitle item wala doc. */
+function captionFixture(): { doc: Doc; itemId: string } {
+  const base = createEmptyProject({ name: "Captions" });
+  const withTrack = addTrack(base, { typeId: "text" });
+  const trackId = withTrack.tracks[withTrack.tracks.length - 1]!.id;
+
+  const item = createItem("subtitle", {
+    fps: base.project.fps,
+    trackId,
+    name: "Captions",
+    startFrame: 0,
+    durationInFrames: 300,
+  });
+  return { doc: addItem(withTrack, { item }), itemId: item.id };
+}
+
+test("naya subtitle item khaali cues ke saath banta hai", () => {
+  const { doc, itemId } = captionFixture();
+  const item = itemById(doc, itemId);
+  assert.ok(item.subtitle, "subtitle field hona chahiye");
+  assert.deepEqual(item.subtitle?.cues, []);
+  assert.equal(item.subtitle?.styleId, "normal");
+  assert.ok(safeParseDoc(doc).success);
+});
+
+test("cue jodna, badalna aur hataana", () => {
+  const { doc, itemId } = captionFixture();
+  let next = addCue(doc, { itemId, startFrame: 30, endFrame: 90, text: "pehla" });
+  next = addCue(next, { itemId, startFrame: 0, endFrame: 30, text: "shuru" });
+
+  // Kram hamesha frame se — warna list timeline se alag dikhti hai.
+  assert.deepEqual(
+    itemById(next, itemId).subtitle?.cues.map((cue) => cue.text),
+    ["shuru", "pehla"],
+  );
+
+  const id = itemById(next, itemId).subtitle!.cues[0]!.id;
+  next = setCue(next, { itemId, cueId: id, text: "badla" });
+  assert.equal(itemById(next, itemId).subtitle?.cues[0]?.text, "badla");
+
+  next = deleteCue(next, { itemId, cueId: id });
+  assert.equal(itemById(next, itemId).subtitle?.cues.length, 1);
+  assert.ok(safeParseDoc(next).success);
+});
+
+test("text badalne par purana word timing hat jaata hai", () => {
+  /*
+   * Usme wo shabd hain jo ab hain hi nahi — rakhne par karaoke ka highlight
+   * aise shabdon par chalta hai jo screen par dikh bhi nahi rahe.
+   */
+  const { doc, itemId } = captionFixture();
+  let next = addCue(doc, { itemId, startFrame: 0, endFrame: 60, text: "ek do" });
+  const id = itemById(next, itemId).subtitle!.cues[0]!.id;
+
+  next = setCues(next, {
+    itemId,
+    cues: [
+      {
+        id,
+        startFrame: 0,
+        endFrame: 60,
+        text: "ek do",
+        words: [
+          { text: "ek", startFrame: 0, endFrame: 30 },
+          { text: "do", startFrame: 30, endFrame: 60 },
+        ],
+      },
+    ],
+  });
+  assert.equal(itemById(next, itemId).subtitle?.cues[0]?.words.length, 2);
+
+  next = setCue(next, { itemId, cueId: id, text: "teen chaar" });
+  assert.deepEqual(itemById(next, itemId).subtitle?.cues[0]?.words, []);
+});
+
+test("cue playhead par tut'ta hai — timing aur text dono", () => {
+  const { doc, itemId } = captionFixture();
+  let next = addCue(doc, { itemId, startFrame: 0, endFrame: 60, text: "ek do teen chaar" });
+  const id = itemById(next, itemId).subtitle!.cues[0]!.id;
+
+  next = splitCueAt(next, { itemId, cueId: id, atFrame: 30 });
+  const cues = itemById(next, itemId).subtitle!.cues;
+
+  assert.equal(cues.length, 2);
+  assert.equal(cues[0]?.endFrame, 30);
+  assert.equal(cues[1]?.startFrame, 30);
+  // Text bhi bata gaya — dono par poori line rehne par wo saaf galat lagta hai.
+  assert.notEqual(cues[0]?.text, cues[1]?.text);
+  assert.ok((cues[0]?.text.length ?? 0) > 0 && (cues[1]?.text.length ?? 0) > 0);
+});
+
+test("kinare par split mana hai", () => {
+  const { doc, itemId } = captionFixture();
+  const next = addCue(doc, { itemId, startFrame: 0, endFrame: 60, text: "ek do" });
+  const id = itemById(next, itemId).subtitle!.cues[0]!.id;
+  assert.throws(() => splitCueAt(next, { itemId, cueId: id, atFrame: 0 }), /kinare par/);
+});
+
+test("do cue jud jaate hain aur beech ka gap bhi jud jaata hai", () => {
+  const { doc, itemId } = captionFixture();
+  let next = addCue(doc, { itemId, startFrame: 0, endFrame: 30, text: "ek" });
+  next = addCue(next, { itemId, startFrame: 45, endFrame: 75, text: "do" });
+
+  const ids = itemById(next, itemId).subtitle!.cues.map((cue) => cue.id);
+  next = mergeCuesInItem(next, { itemId, cueIds: ids });
+
+  const cues = itemById(next, itemId).subtitle!.cues;
+  assert.equal(cues.length, 1);
+  assert.equal(cues[0]?.startFrame, 0);
+  assert.equal(cues[0]?.endFrame, 75);
+  assert.equal(cues[0]?.text, "ek do");
+});
+
+test("style badalne par purane params jaate hain", () => {
+  /*
+   * Rakhne par ek style ka `amount` doosre me chala jaata hai jahan uska matlab
+   * hi alag hai — aur nateeja ek ajeeb look hota jise user ne chuna hi nahi.
+   */
+  const { doc, itemId } = captionFixture();
+  let next = setCaptionStyle(doc, { itemId, styleId: "pop" });
+  next = setCaptionStyle(next, { itemId, params: { amount: 0.5 } });
+  assert.equal(itemById(next, itemId).subtitle?.params.amount, 0.5);
+
+  next = setCaptionStyle(next, { itemId, styleId: "karaoke" });
+  assert.equal(itemById(next, itemId).subtitle?.params.amount, undefined);
+  assert.ok(itemById(next, itemId).subtitle?.params.highlightColor, "karaoke ke apne defaults");
+});
+
+test("anjaan style ruk jaata hai", () => {
+  const { doc, itemId } = captionFixture();
+  assert.throws(() => setCaptionStyle(doc, { itemId, styleId: "nahi-hai" }), /nahi mila/);
+});
+
+test("caption item na ho to saaf error", () => {
+  const { doc } = buildFixture();
+  assert.throws(
+    () => addCue(doc, { itemId: doc.items[0]!.id, startFrame: 0, endFrame: 30 }),
+    /caption item nahi hai/,
+  );
+});
+
+section("cue ki lambai ki salah (19.2)");
+
+test("lambi line par chetavni aati hai, par rukavat nahi", () => {
+  // Batana aur rokna do alag cheezein hain — kabhi-kabhi lambi line hi sahi hoti
+  // hai, aur user ko rokna galat hoga.
+  assert.deepEqual(cueProblems({ text: "chhoti line" }), []);
+  assert.equal(cueProblems({ text: "ek\ndo\nteen" }).length, 1);
+  assert.equal(cueProblems({ text: "a".repeat(40) }).length, 1);
 });
 
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Captions,
   Clapperboard,
   FolderOpen,
   History,
@@ -13,6 +14,7 @@ import {
 import type { ComponentType } from "react";
 
 import { TemplatePanel } from "@/components/editor/panels/TemplatePanel";
+import { CaptionsPanel } from "@/components/editor/panels/CaptionsPanel";
 import { BrandPanel } from "@/components/editor/panels/BrandPanel";
 import { MasterAudioPanel } from "@/components/editor/panels/MasterAudioPanel";
 import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
@@ -66,6 +68,12 @@ export const LEFT_PANELS: readonly PanelEntry[] = [
     label: "Brand",
     icon: Palette,
     component: BrandPanel,
+  },
+  {
+    id: "captions",
+    label: "Captions",
+    icon: Captions,
+    component: CaptionsPanel,
   },
   {
     id: "renders",

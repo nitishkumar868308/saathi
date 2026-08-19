@@ -2,6 +2,7 @@ import { registerItemComponent } from "./components";
 import { AudioItem } from "./items/AudioItem";
 import { ImageItem } from "./items/ImageItem";
 import { ShapeItem } from "./items/ShapeItem";
+import { SubtitleItem } from "./items/SubtitleItem";
 import { TextItem } from "./items/TextItem";
 import { VideoItem } from "./items/VideoItem";
 
@@ -27,4 +28,5 @@ export function registerBuiltinItemComponents(): void {
   registerItemComponent("AudioItem", AudioItem);
   registerItemComponent("TextItem", TextItem);
   registerItemComponent("ShapeItem", ShapeItem);
+  registerItemComponent("SubtitleItem", SubtitleItem);
 }
