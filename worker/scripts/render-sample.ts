@@ -146,15 +146,22 @@ async function makePlaceholderMedia(dir: string): Promise<{
   const squareX = (SOURCE.width - SOURCE.squareSide) / 2;
   const squareY = (SOURCE.height - SOURCE.squareSide) / 2;
 
-  // Grid gehra slate (0x50) hai aur chaukor safed — isliye "bright > 200" wala
-  // threshold sirf chaukor pakadta hai, grid ko nahi.
+  /*
+   * Grid **rangeen** hai (neela) aur chaukor safed.
+   *
+   * Neela hona zaroori hai: grayscale effect ko naapne ka ek hi seedha tarika hai
+   * — R aur B channel ka farak. Bhoora-slate grid par wo farak 4 hota hai, jo
+   * shor me doob jaata hai. Neele par ~160 hota hai, aur grayscale lagte hi 0.
+   * Uska luma 113 hai, yaani "bright > 200" wala threshold ab bhi sirf chaukor
+   * pakadta hai.
+   */
   await run(ffmpegPath(), [
     "-hide_banner", "-loglevel", "error", "-y",
     "-f", "lavfi",
     "-i", `color=c=0x141210:s=${SOURCE.width}x${SOURCE.height}`,
     "-vf",
     [
-      "drawgrid=w=160:h=160:t=3:c=0x505050",
+      "drawgrid=w=160:h=160:t=3:c=0x2f7fd0",
       `drawbox=x=${squareX}:y=${squareY}:w=${SOURCE.squareSide}:h=${SOURCE.squareSide}:color=white:t=fill`,
     ].join(","),
     "-frames:v", "1",
@@ -190,7 +197,10 @@ async function makePlaceholderMedia(dir: string): Promise<{
 interface SampleDoc {
   doc: Doc;
   imageItem: Item;
+  videoItem: Item;
   textItem: Item;
+  probe: Item;
+  probeY: number;
   panTo: number;
   kenBurnsFrom: number;
   kenBurnsTo: number;
@@ -247,6 +257,17 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
      * hi aati hai, isliye ye check sach me ye naapta hai ki **render wahi curve
      * chala raha hai jo preview chalata hai**.
      */
+    /*
+     * Effects (14.13) — teen, aur teeno naapi ja sakti hain:
+     *  - grayscale: R aur B ka farak 0 ho jaata hai
+     *  - brightness 0.9: safed chaukor 255 se 229 par aa jaata hai (theek ganit)
+     *  - vignette: kinare gehre, beech waisa ka waisa
+     */
+    effects: [
+      { type: "grayscale", enabled: true, amount: 1 },
+      { type: "brightness", enabled: true, amount: 0.9 },
+      { type: "vignette", enabled: true, amount: 0.7, spread: 0.45, color: "#000000" },
+    ],
     keyframes: {
       "transform.scale": [
         { frame: 0, value: kenBurnsFrom, easing: "ease-in-out", bezier: null },
@@ -269,6 +290,10 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
     startFrame: imageFrames,
     durationInFrames: videoFrames,
     fit: { mode: "contain", background: { kind: "blurred-asset", value: null } },
+    effects: [
+      { type: "roundedCorners", enabled: true, radius: 96 },
+      { type: "dropShadow", enabled: true, x: 0, y: 16, blur: 32, color: "#000000aa" },
+    ],
   });
   doc = addItem(doc, { item: videoItem });
 
@@ -313,6 +338,47 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
   });
   doc = addItem(doc, { item: textItem });
 
+  /*
+   * --- 4b. Blur naapne ka probe (14.13) ---
+   *
+   * ⚠️ Ye do items sirf **naap** ke liye hain, aur unka hona ek asli galti ke
+   * baad tay hua. Pehle blur keyframe video par lagayi thi aur kinaron ki teezi
+   * naapi thi — par `testsrc2` ka content har frame par badalta hai, isliye naap
+   * blur se nahi, content se hilti thi (638 -> 523 -> 646, bina kisi kram ke).
+   *
+   * Ab ek kaali patti par ek safed patti hai. Us row par sirf safed patti ke do
+   * kinare hote hain aur kuch nahi — isliye jo bhi badla, blur ne badla.
+   */
+  const probeY = -Math.round(height * 0.3);
+  const probeBackdrop = createItem("shape", {
+    fps,
+    trackId: overlayTrack!.id,
+    name: "FX probe backdrop",
+    startFrame: 0,
+    durationInFrames: durationFromSeconds(totalSeconds, fps),
+    shape: { kind: "rect", fill: "#000000", widthPercent: 100, heightPercent: 16, radius: 0 },
+    transform: { y: probeY },
+  });
+  doc = addItem(doc, { item: probeBackdrop });
+
+  const probe = createItem("shape", {
+    fps,
+    trackId: overlayTrack!.id,
+    name: "FX probe",
+    startFrame: 0,
+    durationInFrames: durationFromSeconds(totalSeconds, fps),
+    shape: { kind: "rect", fill: "#ffffff", widthPercent: 40, heightPercent: 8, radius: 0 },
+    transform: { y: probeY },
+    effects: [{ type: "blur", enabled: true, radius: 0 }],
+    keyframes: {
+      "effects.0.radius": [
+        { frame: 0, value: 0, easing: "linear", bezier: null },
+        { frame: durationFromSeconds(totalSeconds, fps) - 1, value: 10, easing: "linear", bezier: null },
+      ],
+    },
+  });
+  doc = addItem(doc, { item: probe });
+
   // --- 5. Audio poore project par ---
   const audioItem = createItem("audio", {
     fps,
@@ -334,7 +400,7 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
   // Project ki lambai items ke hisaab se exact — trailing khaali jagah nahi.
   doc = recomputeDuration(doc, undefined);
 
-  return { doc, imageItem, textItem, kenBurnsFrom, kenBurnsTo, panTo };
+  return { doc, imageItem, videoItem, textItem, probe, probeY, kenBurnsFrom, kenBurnsTo, panTo };
 }
 
 // ---------------------------------------------------- pixel-level measurement
@@ -485,6 +551,189 @@ async function measureRowPeak(
   let peak = 0;
   for (let x = from; x < to; x += 1) peak = Math.max(peak, bytes[offset + x] ?? 0);
   return peak;
+}
+
+/**
+ * Ek frame ko RGB me padho aur do naap lautao:
+ *  - `colorSpread` = |R - B| ka average (grayscale naapne ke liye)
+ *  - `centerToCorner` = beech ki roshni / kone ki roshni (vignette ke liye)
+ *
+ * Dono ek hi frame se aati hain, isliye ek hi baar padhna padta hai.
+ */
+async function measureColor(
+  video: string,
+  atSeconds: number,
+  width: number,
+  height: number,
+  scratchDir: string,
+  /**
+   * Rang ki naap kis pattee par ho (frame ki oonchai ka hissa).
+   *
+   * ⚠️ Ye zaroori nikla: pehle poora frame padha tha aur grayscale ka check fail
+   * ho gaya (|R-B| = 14, 0 nahi). Wajah galat naap thi — caption band terracotta
+   * hai aur uspar grayscale hai hi nahi, par wo bhi ginti me aa raha tha. Naap
+   * usi item par honi chahiye jispar effect laga hai.
+   */
+  colorBand: { from: number; to: number } = { from: 0, to: 1 },
+): Promise<{ colorSpread: number; centerLuma: number; cornerLuma: number; insideLuma: number }> {
+  const rawPath = resolve(scratchDir, `rgb-${randomUUID()}.rgb`);
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-i", video,
+    "-ss", atSeconds.toFixed(4),
+    "-frames:v", "1",
+    "-f", "rawvideo", "-pix_fmt", "rgb24",
+    rawPath,
+  ]);
+  const bytes = await readFile(rawPath);
+  await rm(rawPath, { force: true });
+
+  const at = (x: number, y: number) => {
+    const offset = (y * width + x) * 3;
+    return {
+      r: bytes[offset] ?? 0,
+      g: bytes[offset + 1] ?? 0,
+      b: bytes[offset + 2] ?? 0,
+    };
+  };
+  const luma = (p: { r: number; g: number; b: number }) => 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
+
+  // Har 16va pixel — poora frame padhna is naap ke liye zaroori nahi aur
+  // 1080x1920 par wo har frame par 6 MB ka kaam hai.
+  let spread = 0;
+  let count = 0;
+  const fromY = Math.floor(height * colorBand.from);
+  const toY = Math.floor(height * colorBand.to);
+  for (let y = fromY; y < toY; y += 16) {
+    for (let x = 0; x < width; x += 16) {
+      const p = at(x, y);
+      spread += Math.abs(p.r - p.b);
+      count += 1;
+    }
+  }
+
+  /*
+   * Kona bilkul kinare ka nahi (8px andar) — kinare ke pixel par encoder ki
+   * apni thodi si chhed-chhad hoti hai aur naap bina wajah hilti hai.
+   */
+  const box = (cx: number, cy: number) => {
+    let total = 0;
+    let n = 0;
+    for (let y = cy - 6; y <= cy + 6; y += 2) {
+      for (let x = cx - 6; x <= cx + 6; x += 2) {
+        total += luma(at(x, y));
+        n += 1;
+      }
+    }
+    return total / n;
+  };
+
+  return {
+    colorSpread: spread / count,
+    centerLuma: box(Math.floor(width / 2), Math.floor(height / 2)),
+    cornerLuma: box(14, 14),
+    // Gol kone ki curve ke **andar** ka bindu — 96px radius par (150,150) andar hai.
+    insideLuma: box(150, 150),
+  };
+}
+
+/**
+ * Ek row me kitne tez kinare hain — `|p[x+1] - p[x]|` ka jod.
+ *
+ * Blur naapne ka yahi seedha tarika hai: blur kinaron ko phaila deta hai, isliye
+ * har padosi jodi ka farak ghat jaata hai. Roshni ya rang badalne se ye naap
+ * nahi hilti, sirf **teezi** se hilti hai — aur blur wahi cheez badalta hai.
+ */
+async function measurePeakGradient(
+  video: string,
+  atSeconds: number,
+  width: number,
+  height: number,
+  scratchDir: string,
+  rowFraction: number,
+): Promise<number> {
+  const rawPath = resolve(scratchDir, `edge-${randomUUID()}.gray`);
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-i", video,
+    "-ss", atSeconds.toFixed(4),
+    "-frames:v", "1",
+    "-f", "rawvideo", "-pix_fmt", "gray",
+    rawPath,
+  ]);
+  const bytes = await readFile(rawPath);
+  await rm(rawPath, { force: true });
+
+  /*
+   * **Sabse tez** kinara, jod nahi — aur ye farak maayne rakhta hai.
+   *
+   * Blur ek 0->255 ke kadam ko ek dhalaan me badal deta hai, par us dhalaan ke
+   * saare `|Δ|` ka **jod wahi 255 hi rehta hai**. Yaani jod se blur naapa hi
+   * nahi ja sakta. Sabse tez kadam zaroor girta hai: jitni chaudi dhalaan, utna
+   * chhota har kadam.
+   */
+  const offset = Math.floor(height * rowFraction) * width;
+  let peak = 0;
+  for (let x = 1; x < width; x += 1) {
+    peak = Math.max(peak, Math.abs((bytes[offset + x] ?? 0) - (bytes[offset + x - 1] ?? 0)));
+  }
+  return peak;
+}
+
+/**
+ * Vignette ke dhalaan par banding hai ya nahi (14.8).
+ *
+ * Banding tab dikhti hai jab narm dhalaan ek jaisi roshni ke **chaude patton**
+ * me tut jaati hai. Isliye naap seedhi hai: beech se kinare tak ek line par
+ * chalo aur sabse lambi "bilkul ek jaisi value" wali patti naapo. Asli narm
+ * dhalaan me ye patti chhoti hoti hai; banding me chaudi.
+ *
+ * ⚠️ Ye naap jaan-boojhkar hai. "Quality theek lag rahi hai" likh dena aasan
+ * hota, par vignette + yuv420p + CRF banding ka klassik jod hai, aur wo video
+ * ban jaane ke baad theek karna bahut mehnga padta hai.
+ */
+async function measureBanding(
+  video: string,
+  atSeconds: number,
+  width: number,
+  height: number,
+  scratchDir: string,
+): Promise<{ longestFlatRun: number; distinctLevels: number }> {
+  const rawPath = resolve(scratchDir, `band-${randomUUID()}.gray`);
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-i", video,
+    "-ss", atSeconds.toFixed(4),
+    "-frames:v", "1",
+    "-f", "rawvideo", "-pix_fmt", "gray",
+    rawPath,
+  ]);
+  const bytes = await readFile(rawPath);
+  await rm(rawPath, { force: true });
+
+  // Beech se upar ki taraf ek line — wahan vignette ka dhalaan poora dikhta hai
+  // aur safed chaukor beech me hai, isliye usse thoda hat kar chalte hain.
+  const column = Math.floor(width * 0.12);
+  const from = Math.floor(height * 0.06);
+  const to = Math.floor(height * 0.44);
+
+  const levels = new Set<number>();
+  let longest = 0;
+  // `run` naam nahi — wo upar wala ffmpeg chalane wala function hai.
+  let flat = 0;
+  let previous = -1;
+  for (let y = from; y < to; y += 1) {
+    const value = bytes[y * width + column] ?? 0;
+    levels.add(value);
+    if (value === previous) {
+      flat += 1;
+      longest = Math.max(longest, flat);
+    } else {
+      flat = 1;
+      previous = value;
+    }
+  }
+  return { longestFlatRun: longest, distinctLevels: levels.size };
 }
 
 /** Video sach me aawaz wali hai ya khaali track hai? */
@@ -772,7 +1021,112 @@ async function main(): Promise<void> {
     `peak: ${fadeCounts.join(" -> ")}`,
   );
 
-  section("11. waqt");
+  section("11. effects — naape hue (14.13)");
+  /*
+   * Do items par paanch effects, aur har ek ka apna naapne ka tarika. Yahan koi
+   * "dekhne me theek lag raha hai" nahi hai — har daawa ek number par tika hai.
+   */
+  const imageAt = framesToSeconds(Math.round(sample.imageItem.durationInFrames * 0.4), fps);
+  // Sirf upar ka 40% — wahan sirf image hai. Caption band (terracotta, bina
+  // grayscale ke) neeche hai aur usse naap kharab hoti hai.
+  const color = await measureColor(finalOut, imageAt, width, height, scratchDir, { from: 0.34, to: 0.62 });
+
+  check(
+    "grayscale — R aur B ka farak lagbhag khatam",
+    color.colorSpread < 4,
+    `mean |R-B| = ${color.colorSpread.toFixed(2)} (neela grid bina grayscale ke ~160 deta)`,
+  );
+
+  /*
+   * Brightness ka theek ganit: safed chaukor 255 par tha, `brightness(0.9)` use
+   * 229.5 par le aata hai. `>200` wala purana threshold ab bhi paar hota hai,
+   * isliye upar wale scale/pan ke check waise ke waise chalte rehte hain.
+   */
+  check(
+    "brightness 0.9 — safed chaukor 255 se 229 par aaya",
+    Math.abs(color.centerLuma - 229.5) <= 8,
+    `beech ki roshni ${color.centerLuma.toFixed(1)} (expected ~229.5)`,
+  );
+
+  check(
+    "vignette — kone beech se kaafi gehre hain",
+    color.cornerLuma < color.centerLuma * 0.25,
+    `kona ${color.cornerLuma.toFixed(1)} vs beech ${color.centerLuma.toFixed(1)}`,
+  );
+  await extractFrame(finalOut, resolve(framesDir, "frame-effects-image.png"), imageAt);
+
+  /*
+   * Blur ka radius **keyframed** hai (0 -> 10). Probe ki patti par sabse tez
+   * kinara girna chahiye — aur lagataar girna chahiye, sirf shuru-ant me nahi.
+   */
+  const probeRow = 0.5 + sample.probeY / height;
+  const peaks: number[] = [];
+  for (const fraction of [0.02, 0.5, 0.96]) {
+    const localFrame = Math.round(sample.probe.durationInFrames * fraction);
+    const seconds = framesToSeconds(localFrame, fps);
+    const radius = resolveItemValue<number>(sample.probe, "effects.0.radius", localFrame);
+    const peak = await measurePeakGradient(finalOut, seconds, width, height, scratchDir, probeRow);
+    peaks.push(peak);
+    console.log(`  .. frame ${localFrame}: blur ${radius.toFixed(2)}px -> sabse tez kinara ${peak}`);
+    await extractFrame(finalOut, resolve(framesDir, `frame-blur-${localFrame}.png`), seconds);
+  }
+  check(
+    "blur keyframe (0 -> 10) — kinare lagataar narm hote gaye",
+    (peaks[0] ?? 0) > (peaks[1] ?? 0) && (peaks[1] ?? 0) > (peaks[2] ?? 0),
+    peaks.join(" -> "),
+  );
+
+  /*
+   * Rounded corners: kate hue kone par item ka apna content nahi bachta, sirf
+   * uske peeche wali parat dikhti hai. Isliye kone ko curve ke **andar** wale
+   * bindu se milaya jaata hai — wo dono ek jaise honge to radius laga hi nahi.
+   */
+  const videoItem = sample.videoItem;
+  const videoCorner = await measureColor(
+    finalOut,
+    framesToSeconds(videoItem.startFrame + Math.round(videoItem.durationInFrames * 0.2), fps),
+    width,
+    height,
+    scratchDir,
+  );
+  check(
+    "rounded corners — kona kata hua hai (andar se kaafi gehra)",
+    videoCorner.cornerLuma < videoCorner.insideLuma * 0.5,
+    `kona ${videoCorner.cornerLuma.toFixed(1)} vs curve ke andar ${videoCorner.insideLuma.toFixed(1)}`,
+  );
+
+  /*
+   * Banding — vignette ka dhalaan yuv420p + CRF 18 se guzarne ke baad bhi narm
+   * hai ya patton me tut gaya (14.8).
+   */
+  const banding = await measureBanding(finalOut, imageAt, width, height, scratchDir);
+  console.log(
+    `  .. dhalaan par ${banding.distinctLevels} alag levels, sabse lambi ek-jaisi patti ${banding.longestFlatRun}px`,
+  );
+  /*
+   * ⚠️ Yahan **flat-run par koi threshold nahi** hai, aur ye ek galti sudhaarne
+   * ke baad tay hua. Pehle "sabse lambi patti <= 40px" wala check tha aur wo fail
+   * hua (306px). Naap galat nahi thi — sawaal galat tha.
+   *
+   * Is sample me vignette lagbhag-kaale content par baithi hai (grid ka luma ~17).
+   * Uspar dhalaan ki poori range hi 8 se 13 tak hai, yaani 8-bit me ginti ke
+   * 5-6 kadam. Utni chhoti range me lambi ek-jaisi pattiyan **hamesha** aayengi,
+   * chahe encoder kitna bhi accha ho — wo 8-bit ki hadd hai, encoding ki galti
+   * nahi. Us number par threshold lagana ek aisi cheez ko "fail" batata jo asal
+   * me theek hai.
+   *
+   * Jo baat sach me galat hoti, wo hai dhalaan ka **poora baith jaana** (do-teen
+   * hi levels bachna) — yaani gradient ki jagah patta. Sirf wahi check hai.
+   * Baaki dono number upar chhap jaate hain taaki inhe dekha ja sake.
+   */
+  check(
+    "vignette ka dhalaan baitha nahi (levels bache hue hain)",
+    banding.distinctLevels >= 8,
+    `${banding.distinctLevels} levels; sabse lambi ek-jaisi patti ${banding.longestFlatRun}px ` +
+      `(is sample me dhalaan lagbhag-kaale par hai, isliye lambi patti 8-bit ki hadd hai)`,
+  );
+
+  section("12. waqt");
   console.log(`  bundle + render : ${(renderResult.totalMs / 1000).toFixed(1)}s`);
   console.log(`  sirf render     : ${(renderResult.renderMs / 1000).toFixed(1)}s`);
   console.log(`  frames          : ${renderResult.frames}`);

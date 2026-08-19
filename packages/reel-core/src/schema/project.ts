@@ -148,6 +148,43 @@ export const EffectSchema = z
   })
   .passthrough();
 
+/**
+ * Mask — item ka kaunsa hissa dikhega (14.9).
+ *
+ * `null` = koi mask nahi, aur ye default hai. Mask hamesha item ke **apne dabbe**
+ * ke andar naapa jaata hai, frame ke nahi — isliye item ko khiskane par mask
+ * uske saath jaata hai, jo har editor me hota hai.
+ */
+export const MaskSchema = z
+  .object({
+    shape: z.enum(["rect", "rounded", "circle"]).default("rect"),
+    /** Chaaron taraf se andar — item ke chhote wale kinare ka percent. */
+    inset: z.number().min(0).max(49).default(0),
+    /** Sirf `rounded` ke liye — px me. */
+    radius: z.number().min(0).max(500).default(48),
+    /** Kinara kitna narm — 0 = bilkul saaf kata hua. */
+    feather: z.number().min(0).max(50).default(0),
+    /**
+     * Image mask ke liye jagah (spec §17).
+     *
+     * ⚠️ Schema me hai par UI me **koi button nahi** — kyunki abhi ye lagta nahi
+     * hai. Aadhi bani cheez ka button dikhana sabse bura hota hai: user use daba
+     * kar sochta hai ki usne kuch galat kiya.
+     */
+    assetId: IdSchema.nullable().default(null),
+  })
+  .nullable();
+
+/**
+ * Blend mode — item apne peeche wali parat ke saath kaise mile (14.10).
+ *
+ * List chhoti aur jaan-boojhkar chhoti hai: yahi chaar reel me sach me kaam aate
+ * hain. Baaki 12 CSS modes dene se dropdown bhar jaata hai aur faisla mushkil ho
+ * jaata hai.
+ */
+export const BLEND_MODES = ["normal", "multiply", "screen", "overlay"] as const;
+export const BlendModeSchema = z.enum(BLEND_MODES).default("normal");
+
 export const AudioSettingsSchema = z.object({
   /** 1 = jaisa hai. 1 se upar clipping ka khatra — Phase 20 validation warn karegi. */
   volume: z.number().min(0).max(4),
@@ -249,6 +286,8 @@ export const ItemSchema = z.object({
   animations: z.array(AnimationSchema),
   keyframes: KeyframesSchema,
   effects: z.array(EffectSchema),
+  mask: MaskSchema,
+  blendMode: BlendModeSchema,
   audio: AudioSettingsSchema,
 
   transitionIn: TransitionSchema,
@@ -388,6 +427,8 @@ export type Keyframe = z.infer<typeof KeyframeSchema>;
 export type Keyframes = z.infer<typeof KeyframesSchema>;
 export type Animation = z.infer<typeof AnimationSchema>;
 export type Effect = z.infer<typeof EffectSchema>;
+export type Mask = z.infer<typeof MaskSchema>;
+export type BlendMode = (typeof BLEND_MODES)[number];
 export type AudioSettings = z.infer<typeof AudioSettingsSchema>;
 export type Transition = z.infer<typeof TransitionSchema>;
 export type TextSpec = z.infer<typeof TextSpecSchema>;

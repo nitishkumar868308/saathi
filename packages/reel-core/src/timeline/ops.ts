@@ -1,6 +1,7 @@
 import { produce, type Draft } from "immer";
 
 import { getAnimationPreset } from "../config/animationPresets";
+import { findEffectPreset } from "../config/effectPresets";
 import { DEFAULT_EASING } from "../config/easing";
 import { splitEasing } from "../keyframes/easing";
 import { sampleKeyframes } from "../keyframes/interpolate";
@@ -11,6 +12,7 @@ import {
   assetKindForSlot,
   clampTransitionFrames,
   createAnimation,
+  createEffect,
   getItemType,
   getSceneType,
   requireItemType,
@@ -19,7 +21,7 @@ import {
   trackAccepts,
 } from "../registry/index";
 import { createTrack } from "../schema/factory";
-import { itemEndFrame, type Doc, type Item, type Keyframe, type Track } from "../schema/project";
+import { itemEndFrame, type Doc, type Item, type Keyframe, type Mask, type Track } from "../schema/project";
 import { assertFps, clampFrame } from "../time";
 
 /**
@@ -1567,6 +1569,184 @@ export const applyAnimationPreset = defineOp<ApplyAnimationPresetArgs>(
   },
 );
 
+// ------------------------------------------------------------------ effects
+
+/**
+ * Effect stack badalne par keyframe paths bhi saath khiskao (14.4 + 14.5).
+ *
+ * ⚠️ Ye function is poore tarike ki jaan hai. Effect params ke keyframes
+ * `effects.2.radius` jaise path par rehte hain — yaani **index** par. Stack me
+ * ek effect upar-neeche hote hi wahi path ab kisi doosre effect ko point karne
+ * lagta hai.
+ *
+ * Bina iske kya hota: user blur par 0 -> 8 ka keyframe lagata, phir stack me
+ * blur ko neeche khiskata, aur ab wo animation vignette ke `amount` par chalne
+ * lagti. Kuch toota nahi dikhta, error nahi aata — bas galat cheez animate hone
+ * lagti hai. Aisi galti dhoondhna bahut mushkil hota hai, isliye path badalna
+ * ops ke andar hi hota hai, UI par nahi chhoda gaya.
+ *
+ * `mapping` purane index se naye index par le jaata hai; `null` matlab wo effect
+ * hata diya gaya aur uske keyframes bhi jaane chahiye.
+ */
+function remapEffectKeyframes(
+  item: Draft<Item>,
+  mapping: ReadonlyMap<number, number | null>,
+): void {
+  const next: Record<string, Keyframe[]> = {};
+
+  for (const [path, list] of Object.entries(item.keyframes)) {
+    const match = /^effects\.(\d+)\.(.+)$/.exec(path);
+    if (!match) {
+      next[path] = list as Keyframe[];
+      continue;
+    }
+    const oldIndex = Number(match[1]);
+    const param = match[2] as string;
+    // Mapping me na ho to path waise ka waisa — wo effect hila hi nahi.
+    const target = mapping.has(oldIndex) ? mapping.get(oldIndex) : oldIndex;
+    if (target === null || target === undefined) continue;
+    next[`effects.${target}.${param}`] = list as Keyframe[];
+  }
+
+  item.keyframes = next as Draft<Item>["keyframes"];
+}
+
+export interface AddEffectArgs {
+  itemIds: readonly string[];
+  /** EFFECTS registry ka id. */
+  typeId: string;
+}
+
+/** Stack ke **ant me** naya effect. Kram maayne rakhta hai (14.4). */
+export const addEffect = defineOp<AddEffectArgs>("addEffect", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  const fresh = createEffect(args.typeId);
+
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    item.effects.push(clone(fresh) as Draft<Item>["effects"][number]);
+  }
+});
+
+export interface RemoveEffectArgs {
+  itemId: string;
+  index: number;
+}
+
+export const removeEffect = defineOp<RemoveEffectArgs>("removeEffect", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  if (args.index < 0 || args.index >= item.effects.length) {
+    throw new TimelineOpError(`Effect ${args.index} is item par hai hi nahi`);
+  }
+
+  item.effects.splice(args.index, 1);
+
+  // Hataye gaye ke baad wale sab ek kadam peeche — unke keyframes bhi.
+  const mapping = new Map<number, number | null>();
+  mapping.set(args.index, null);
+  for (let i = args.index + 1; i <= item.effects.length; i += 1) mapping.set(i, i - 1);
+  remapEffectKeyframes(item, mapping);
+});
+
+export interface ReorderEffectsArgs {
+  itemId: string;
+  from: number;
+  to: number;
+}
+
+export const reorderEffects = defineOp<ReorderEffectsArgs>("reorderEffects", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const count = item.effects.length;
+  if (args.from < 0 || args.from >= count) {
+    throw new TimelineOpError(`Effect ${args.from} is item par hai hi nahi`);
+  }
+  const to = Math.max(0, Math.min(count - 1, args.to));
+  if (to === args.from) return;
+
+  const [moved] = item.effects.splice(args.from, 1);
+  item.effects.splice(to, 0, moved as Draft<Item>["effects"][number]);
+
+  /*
+   * Mapping wahi hai jo splice ne kiya: hilne wala `from` se `to` par, aur beech
+   * wale sab ek kadam khisak jaate hain. Ise haath se ginana padta hai kyunki
+   * splice ke baad purane index kahin likhe nahi hote.
+   */
+  const mapping = new Map<number, number | null>();
+  mapping.set(args.from, to);
+  if (args.from < to) {
+    for (let i = args.from + 1; i <= to; i += 1) mapping.set(i, i - 1);
+  } else {
+    for (let i = to; i < args.from; i += 1) mapping.set(i, i + 1);
+  }
+  remapEffectKeyframes(item, mapping);
+});
+
+export interface SetEffectParamArgs {
+  itemId: string;
+  index: number;
+  /** `"enabled"` bhi chalta hai — aankh wala toggle isi se hota hai. */
+  param: string;
+  value: unknown;
+}
+
+export const setEffectParam = defineOp<SetEffectParamArgs>("setEffectParam", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const effect = item.effects[args.index];
+  if (!effect) throw new TimelineOpError(`Effect ${args.index} is item par hai hi nahi`);
+  (effect as Record<string, unknown>)[args.param] = args.value;
+});
+
+export interface ApplyEffectPresetArgs {
+  itemIds: readonly string[];
+  presetId: string;
+}
+
+/**
+ * Preset lagao — **stack poora badal jaata hai** (14.6).
+ *
+ * Preset ko purane stack ke upar jodna aasan lagta hai par nateeja bura hota
+ * hai: "B & W" ke upar "Vintage" lagane par do grayscale aur do vignette lag
+ * jaate aur tasveer kaali pad jaati. Preset ka matlab "aisa dikhna chahiye" hai,
+ * "aur ye bhi jod do" nahi.
+ */
+export const applyEffectPreset = defineOp<ApplyEffectPresetArgs>(
+  "applyEffectPreset",
+  (draft, args) => {
+    const preset = findEffectPreset(args.presetId);
+    if (!preset) throw new TimelineOpError(`Effect preset "${args.presetId}" nahi mila`);
+    const ids = new Set(args.itemIds);
+
+    for (const item of draft.items) {
+      if (!ids.has(item.id)) continue;
+      if (item.locked) continue;
+      item.effects = clone(preset.effects) as Draft<Item>["effects"];
+      // Purane stack ke keyframes ab kisi bhi cheez ko point nahi karte.
+      remapEffectKeyframes(item, new Map([...Array(64).keys()].map((i) => [i, null])));
+    }
+  },
+);
+
+export interface SetMaskArgs {
+  itemIds: readonly string[];
+  /** `null` = mask hata do. */
+  mask: Mask;
+}
+
+export const setMask = defineOp<SetMaskArgs>("setMask", (draft, args) => {
+  const ids = new Set(args.itemIds);
+  for (const item of draft.items) {
+    if (!ids.has(item.id)) continue;
+    if (item.locked) continue;
+    item.mask = args.mask === null ? null : (clone(args.mask) as Draft<Item>["mask"]);
+  }
+});
+
 export interface SetTransitionArgs {
   itemIds: readonly string[];
   side: "in" | "out";
@@ -2457,6 +2637,12 @@ export const OPS = {
   copyKeyframes,
   scaleKeyframes,
   setTransition,
+  addEffect,
+  removeEffect,
+  reorderEffects,
+  setEffectParam,
+  applyEffectPreset,
+  setMask,
   applyAutoFit,
   setProjectSize,
   setProjectFps,

@@ -42,6 +42,21 @@ import {
   copyKeyframes,
   deleteKeyframe,
   moveKeyframe,
+  EFFECTS,
+  EFFECT_PRESETS,
+  addEffect,
+  applyEffectPreset,
+  applyEffects,
+  effectParamPath,
+  effectsCost,
+  findEffectPreset,
+  listEffects,
+  maskCss,
+  removeEffect,
+  reorderEffects,
+  requireEffect,
+  setEffectParam,
+  setMask,
   setKeyframeEasing,
   resolveItemValue,
   sampleKeyframes,
@@ -3723,6 +3738,316 @@ test("scale + opacity + x teeno ek saath sahi values dete hain", () => {
   // frame 149 — lagbhag ant
   assert.ok(Math.abs(at(149, "transform.scale") - 1.1490) < 1e-3);
   assert.ok(Math.abs(at(149, "transform.x") + 89.4) < 0.1);
+});
+
+
+// ------------------------------------------------------------- Phase 14
+
+section("EFFECTS registry (14.1 / 14.2)");
+
+test("har built-in effect ka schema apne defaults ko manzoor karta hai", () => {
+  for (const entry of listEffects()) {
+    const parsed = entry.schema.safeParse(entry.defaults);
+    assert.ok(parsed.success, `${entry.id} ke defaults schema se nahi mile`);
+  }
+});
+
+test("har effect ka har control uske schema ke kisi field par hai", () => {
+  /*
+   * Control ka path schema me na ho to panel ek aisi cheez dikhata hai jo kabhi
+   * save hi nahi hoti — user slider ghumata hai, kuch nahi hota, aur koi error
+   * bhi nahi aata. Ye galti sirf aisi hi list-check se pakdi jaati hai.
+   */
+  for (const entry of listEffects()) {
+    const shape = (entry.schema as unknown as { shape?: Record<string, unknown> }).shape ?? {};
+    for (const control of entry.controls) {
+      assert.ok(control.path in shape, `${entry.id}: control "${control.path}" schema me nahi hai`);
+    }
+  }
+});
+
+test("keyframable params sach me schema me hain aur number hain", () => {
+  for (const entry of listEffects()) {
+    for (const param of entry.keyframable) {
+      const value = entry.defaults[param];
+      assert.equal(typeof value, "number", `${entry.id}.${param} number hona chahiye`);
+    }
+  }
+});
+
+test("neutral value par koi filter nahi likha jaata", () => {
+  // 0 par bhi `blur(0px)` likhne se browser layer ko GPU par le jaata hai aur
+  // render bina wajah dheema ho jaata hai.
+  const entry = requireEffect("brightness");
+  assert.deepEqual(entry.apply({ params: { amount: 1 }, frame: { width: 1080, height: 1920 } }), {});
+});
+
+test("hue-rotate CSS me `deg` ke saath jaata hai", () => {
+  /*
+   * ⚠️ Ye ek asli bug ka test hai. Pehle unit sirf `%` ke liye judti thi, to
+   * `hue-rotate(30)` bana — jo invalid CSS hai. Browser invalid filter ko
+   * **poora chhod deta hai**: effect chup-chaap gayab, koi error nahi.
+   */
+  const entry = requireEffect("hue-rotate");
+  const out = entry.apply({ params: { amount: 30 }, frame: { width: 1080, height: 1920 } });
+  assert.deepEqual(out.filters, ["hue-rotate(30deg)"]);
+});
+
+test("sharpen ka kernel jod 1 rakhta hai (roshni nahi badalti)", () => {
+  const entry = requireEffect("sharpen");
+  const out = entry.apply({ params: { amount: 0.8 }, frame: { width: 1080, height: 1920 } });
+  const sum = (out.svgFilter?.matrix ?? []).reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(sum - 1) < 1e-9, `kernel ka jod ${sum} hai, 1 hona chahiye`);
+});
+
+test("vignette filter nahi, overlay deti hai", () => {
+  const entry = requireEffect("vignette");
+  const out = entry.apply({ params: { amount: 0.5, spread: 0.6, color: "#000000" }, frame: { width: 1080, height: 1920 } });
+  assert.equal(out.filters, undefined, "vignette pixels nahi badalti");
+  assert.ok(out.overlay?.background.includes("radial-gradient"));
+});
+
+section("applyEffects — stack ka kram (14.3 / 14.4)");
+
+function itemWithEffects(effects: readonly Record<string, unknown>[]): Item {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = doc;
+  for (const effect of effects) {
+    next = addEffect(next, { itemIds: [id], typeId: String(effect.type) });
+    const index = itemById(next, id).effects.length - 1;
+    for (const [param, value] of Object.entries(effect)) {
+      if (param === "type") continue;
+      next = setEffectParam(next, { itemId: id, index, param, value });
+    }
+  }
+  return itemById(next, id);
+}
+
+const FX_FRAME = { width: 1080, height: 1920 };
+
+test("filters usi kram me jud'te hain jis kram me stack hai", () => {
+  /*
+   * `grayscale(1) sepia(1)` aur `sepia(1) grayscale(1)` do alag nateeje dete
+   * hain — pehla bhoora deta hai, doosra safed-kaala. Isliye kram ko "theek"
+   * karna galat hoga: user ne jo kram banaya wahi uska matlab hai.
+   */
+  const a = applyEffects(
+    itemWithEffects([{ type: "grayscale", amount: 1 }, { type: "sepia", amount: 1 }]),
+    0,
+    FRAME,
+  );
+  const b = applyEffects(
+    itemWithEffects([{ type: "sepia", amount: 1 }, { type: "grayscale", amount: 1 }]),
+    0,
+    FRAME,
+  );
+  assert.equal(a.filter, "grayscale(1) sepia(1)");
+  assert.equal(b.filter, "sepia(1) grayscale(1)");
+  assert.notEqual(a.filter, b.filter, "kram badalne par nateeja badalna chahiye");
+});
+
+test("band kiya hua effect chhod diya jaata hai", () => {
+  const item = itemWithEffects([{ type: "grayscale", amount: 1, enabled: false }, { type: "sepia", amount: 1 }]);
+  assert.equal(applyEffects(item, 0, FX_FRAME).filter, "sepia(1)");
+});
+
+test("anjaan effect chup-chaap chhod diya jaata hai", () => {
+  /*
+   * Purani file naye build me khulni chahiye, chahe usme koi effect ho jo ab hai
+   * hi nahi. Throw karna yahan sabse bura hota: poora project khulna band ho
+   * jaata ek aise effect ki wajah se jo shayad kabhi dikha bhi na ho.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const withUnknown = setItemProperty(doc, {
+    itemId: id,
+    path: "effects",
+    value: [{ type: "koi-purana-effect", enabled: true }, { type: "sepia", enabled: true, amount: 1 }],
+  });
+  assert.equal(applyEffects(itemById(withUnknown, id), 0, FX_FRAME).filter, "sepia(1)");
+});
+
+test("style aur overlay alag-alag nikalte hain", () => {
+  const item = itemWithEffects([
+    { type: "roundedCorners", radius: 24 },
+    { type: "vignette", amount: 0.4 },
+  ]);
+  const out = applyEffects(item, 0, FX_FRAME);
+  assert.equal(out.style.borderRadius, "24px");
+  assert.equal(out.style.overflow, "hidden", "radius ke saath overflow zaroori hai");
+  assert.equal(out.overlays.length, 1);
+});
+
+test("effectsCost band effects ko nahi ginta", () => {
+  const item = itemWithEffects([{ type: "blur", radius: 8 }, { type: "sepia", amount: 1, enabled: false }]);
+  assert.equal(effectsCost(item), 4);
+});
+
+section("effect params keyframable (14.5)");
+
+test("effect ka param keyframe se animate hota hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = addEffect(doc, { itemIds: [id], typeId: "blur" });
+  next = addKeyframe(next, { itemId: id, path: effectParamPath(0, "radius"), frame: 0, value: 0 });
+  next = addKeyframe(next, { itemId: id, path: effectParamPath(0, "radius"), frame: 30, value: 8 });
+  next = setKeyframeEasing(next, { itemId: id, path: effectParamPath(0, "radius"), frame: 0, easing: "linear" });
+
+  const item = itemById(next, id);
+  assert.equal(applyEffects(item, 0, FX_FRAME).filter, null, "0 par blur likha hi nahi jaata");
+  assert.equal(applyEffects(item, 15, FX_FRAME).filter, "blur(4px)");
+  assert.equal(applyEffects(item, 30, FX_FRAME).filter, "blur(8px)");
+});
+
+test("reorder karne par keyframes SAATH jaate hain", () => {
+  /*
+   * ⚠️ Yahi is poore tarike ka sabse patla dhaaga hai. Keyframe path me effect
+   * ka **index** hota hai (`effects.0.radius`). Stack me effect khiskane par wo
+   * path apne aap kisi doosre effect par point karne lagta hai.
+   *
+   * Bina remap ke: user blur par 0 -> 8 lagata, blur ko neeche khiskata, aur ab
+   * wo animation vignette ke amount par chalne lagti. Kuch toota nahi dikhta,
+   * error nahi aata — bas galat cheez animate hone lagti hai.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = addEffect(doc, { itemIds: [id], typeId: "blur" });
+  next = addEffect(next, { itemIds: [id], typeId: "vignette" });
+  next = addKeyframe(next, { itemId: id, path: "effects.0.radius", frame: 0, value: 0 });
+  next = addKeyframe(next, { itemId: id, path: "effects.0.radius", frame: 30, value: 8 });
+
+  next = reorderEffects(next, { itemId: id, from: 0, to: 1 });
+  const item = itemById(next, id);
+
+  assert.equal(item.effects[1]!.type, "blur", "blur neeche chala gaya");
+  assert.ok(item.keyframes["effects.1.radius"], "keyframes bhi blur ke saath khisakne chahiye");
+  assert.equal(item.keyframes["effects.0.radius"], undefined, "purane path par kuch nahi bachna chahiye");
+  assert.equal(applyEffects(item, 30, FX_FRAME).filter, "blur(8px)", "animation ab bhi blur par hi hai");
+});
+
+test("effect hataane par uske keyframes bhi jaate hain, baaki khisakte hain", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = addEffect(doc, { itemIds: [id], typeId: "blur" });
+  next = addEffect(next, { itemIds: [id], typeId: "brightness" });
+  next = addKeyframe(next, { itemId: id, path: "effects.0.radius", frame: 0, value: 2 });
+  next = addKeyframe(next, { itemId: id, path: "effects.1.amount", frame: 0, value: 1.5 });
+
+  next = removeEffect(next, { itemId: id, index: 0 });
+  const item = itemById(next, id);
+
+  assert.equal(item.effects.length, 1);
+  assert.equal(item.keyframes["effects.0.radius"], undefined, "hataye gaye effect ke keyframes jaane chahiye");
+  assert.ok(item.keyframes["effects.0.amount"], "brightness ke keyframes 1 se 0 par aane chahiye");
+});
+
+test("item ke apne transform ke keyframes effect reorder se nahi hilte", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = addEffect(doc, { itemIds: [id], typeId: "blur" });
+  next = addEffect(next, { itemIds: [id], typeId: "sepia" });
+  next = addKeyframe(next, { itemId: id, path: "transform.scale", frame: 0, value: 1 });
+
+  next = reorderEffects(next, { itemId: id, from: 0, to: 1 });
+  assert.ok(itemById(next, id).keyframes["transform.scale"], "transform ke keyframes chhoona nahi chahiye");
+});
+
+section("effect presets (14.6)");
+
+test("preset poora stack badal deta hai, jodta nahi", () => {
+  /*
+   * "B & W" ke upar "Vintage" jodne par do grayscale aur do vignette lag jaate
+   * aur tasveer kaali pad jaati. Preset ka matlab "aisa dikhna chahiye" hai,
+   * "aur ye bhi jod do" nahi.
+   */
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  let next = applyEffectPreset(doc, { itemIds: [id], presetId: "bw" });
+  const bwCount = itemById(next, id).effects.length;
+  next = applyEffectPreset(next, { itemIds: [id], presetId: "vintage" });
+
+  const item = itemById(next, id);
+  assert.equal(item.effects.length, findEffectPreset("vintage")!.effects.length);
+  assert.notEqual(item.effects.length, bwCount + findEffectPreset("vintage")!.effects.length);
+});
+
+test("har preset ke saare effects registry me maujood hain", () => {
+  for (const preset of EFFECT_PRESETS) {
+    for (const effect of preset.effects) {
+      assert.ok(EFFECTS.get(String(effect.type)), `${preset.id} me anjaan effect "${String(effect.type)}"`);
+    }
+  }
+});
+
+test("har preset ke params uske effect ke schema se milte hain", () => {
+  for (const preset of EFFECT_PRESETS) {
+    for (const effect of preset.effects) {
+      const entry = requireEffect(String(effect.type));
+      const { type: _type, enabled: _enabled, ...params } = effect;
+      assert.ok(
+        entry.schema.safeParse(params).success,
+        `${preset.id} -> ${String(effect.type)} ke params galat hain`,
+      );
+    }
+  }
+});
+
+section("mask (14.9) aur blend (14.10)");
+
+test("feather 0 par clip-path, feather par mask-image", () => {
+  /*
+   * `clip-path` narm kinara bana hi nahi sakta — wo har pixel ko poora rakhta
+   * hai ya poora hataata hai. Dono ek saath likhna galat hota: clip-path
+   * gradient ke narm kinare ko bhi seedha kaat deta aur feather dikhta hi nahi.
+   */
+  const crisp = maskCss({ shape: "rect", inset: 10, radius: 0, feather: 0, assetId: null });
+  assert.ok(crisp.clipPath?.startsWith("inset(10%"));
+  assert.equal(crisp.maskImage, undefined);
+
+  const soft = maskCss({ shape: "rect", inset: 10, radius: 0, feather: 8, assetId: null });
+  assert.equal(soft.clipPath, undefined);
+  assert.ok(soft.maskImage?.includes("linear-gradient"));
+  assert.equal(soft.maskComposite, "intersect", "kone sahi aane ke liye intersect chahiye");
+});
+
+test("rounded ka radius clip-path me jaata hai, circle ka nahi", () => {
+  const rounded = maskCss({ shape: "rounded", inset: 5, radius: 40, feather: 0, assetId: null });
+  assert.ok(rounded.clipPath?.includes("round 40px"));
+
+  const circle = maskCss({ shape: "circle", inset: 5, radius: 40, feather: 0, assetId: null });
+  assert.equal(circle.clipPath, "circle(45% at 50% 50%)");
+});
+
+test("mask null par khaali object", () => {
+  assert.deepEqual(maskCss(null), {});
+});
+
+test("setMask lagata aur hataata dono hai, aur undo-able hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const on = setMask(doc, { itemIds: [id], mask: { shape: "circle", inset: 4, radius: 0, feather: 0, assetId: null } });
+  assert.equal(itemById(on, id).mask?.shape, "circle");
+
+  const off = setMask(on, { itemIds: [id], mask: null });
+  assert.equal(itemById(off, id).mask, null);
+});
+
+test("naya item bina mask aur normal blend ke banta hai", () => {
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  assert.equal(item.mask, null);
+  assert.equal(item.blendMode, "normal");
+});
+
+test("blendMode schema sirf apni chaar values maanta hai", () => {
+  const { doc } = buildFixture();
+  const id = doc.items[0]!.id;
+  const ok = setItemProperty(doc, { itemId: id, path: "blendMode", value: "screen" });
+  assert.ok(safeParseDoc(ok).success, "screen chalna chahiye");
+
+  const bad = setItemProperty(doc, { itemId: id, path: "blendMode", value: "color-dodge" });
+  assert.ok(!safeParseDoc(bad).success, "list se bahar ka mode ruk jaana chahiye");
 });
 
 

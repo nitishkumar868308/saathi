@@ -14,6 +14,8 @@ export * from "./hash/sha256";
 
 // Config — sab data, koi magic number nahi
 export * from "./config/animationPresets";
+export * from "./config/effectPresets";
+export * from "./config/mask";
 export * from "./config/brand";
 export * from "./config/easing";
 export * from "./config/fit";

@@ -127,6 +127,8 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
     animations: [],
     keyframes: {},
     effects: [],
+    mask: null,
+    blendMode: "normal" as const,
     audio: { volume: 1, muted: false, fadeInFrames: 0, fadeOutFrames: 0 },
 
     transitionIn: { type: "none", durationInFrames: 0 },

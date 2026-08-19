@@ -1,5 +1,7 @@
 import {
+  applyEffects,
   composeAnimations,
+  maskCss,
   resolveItemValue,
   transitionOutputAt,
   type Item,
@@ -8,30 +10,51 @@ import type React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 
 /**
- * Transform lagane ki **ekmatra** jagah.
+ * Transform aur effects lagane ki **ekmatra** jagah.
  *
  * Har item component apna transform khud lagata to paanch jagah paanch thodi si
  * alag math hoti — aur wahi wajah hoti ki "text thoda hatt kar hai" jaisi cheezein
  * kabhi theek nahi hoti. Ek wrapper hone se sab bilkul ek jaise chalte hain.
  *
- * Yahan teen cheezein ek saath milti hain, aur isi kram me:
+ * Yahan paanch cheezein ek saath milti hain, aur isi kram me:
  *
  *  1. **Item ka apna transform** (`resolveItemValue` se, isliye har property
  *     keyframe se apne aap animate ho jaati hai)
  *  2. **Animations** (Phase 10) — `composeAnimations()` se
  *  3. **Transition** (Phase 10) — `transitionOutputAt()` se
+ *  4. **Effects** (Phase 14) — `applyEffects()` se
+ *  5. **Mask + blend mode** (Phase 14)
  *
  * ⚠️ Animation transform ke **upar** lagti hai, use badalti nahi (10.1). Scale
  * guna hoti hai, position judti hai. Agar animation `transform.scale` ko
  * overwrite karti, to user ka apna zoom aur uske keyframes chup-chaap gayab ho
  * jaate — aur wo galti "maine to scale set ki thi, lagi hi nahi" jaisi shikayat
  * bankar aati, jiski wajah dhoondhna bahut mushkil hai.
+ *
+ * ⚠️ Effects yahan hain, `ItemRenderer` me nahi — aur ye ek naap kar liya faisla
+ * hai. `ItemRenderer` ke paas item ka DOM nahi hota, wo sirf component chunta
+ * hai. Effects ko DOM chahiye (filter, mask, overlay), aur wo DOM yahi banata
+ * hai. Item components ko phir bhi effects ke bare me kuch nahi pata — 14.3 ki
+ * shart yahi hai, aur wo poori hai.
  */
 export const Transformed: React.FC<{
   item: Item;
   localFrame: number;
+  /**
+   * Item ki apni peeche wali parat (contain wala blurred background).
+   *
+   * ⚠️ Ye prop ek asli bug ke baad aaya, jo render ke pixels se pakda gaya.
+   * Pehle `<FitBackground>` `<Transformed>` ke **bahar** tha. Nateeja: rounded
+   * corners lagane par kone se blurred copy jhaank rahi thi — kona kata to tha,
+   * par uske peeche item ki hi doosri parat baithi thi. Isi tarah mask, blur aur
+   * vignette bhi sirf aadhe item par lagte the.
+   *
+   * Background item ka **hissa** hai, uske peeche ki koi alag cheez nahi. Isliye
+   * ab wo bhi wahi transform, wahi effects aur wahi mask khata hai.
+   */
+  background?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ item, localFrame, children }) => {
+}> = ({ item, localFrame, background, children }) => {
   const { width, height } = useVideoConfig();
   const frame = { width, height };
 
@@ -57,7 +80,21 @@ export const Transformed: React.FC<{
   const totalOpacity = opacity * animation.opacity * (transition?.opacity ?? 1);
   const totalBlur = animation.blur + (transition?.blur ?? 0);
 
-  const [anchorX, anchorY] = item.transform.anchor;
+  const effects = applyEffects(item, localFrame, frame);
+  const mask = maskCss(item.mask);
+
+  /*
+   * Filter ki ek hi lambi string banti hai, aur kram maayne rakhta hai:
+   * pehle animation/transition ka blur, phir user ka stack usi kram me jaisa
+   * usne banaya. SVG filter (sharpen) sabse aakhir me, kyunki wo pixels par
+   * kaam karta hai aur usse pehle rang tay ho jaana chahiye.
+   */
+  const filterParts: string[] = [];
+  if (totalBlur > 0) filterParts.push(`blur(${totalBlur}px)`);
+  if (effects.filter) filterParts.push(effects.filter);
+  effects.svgFilters.forEach((_, index) => {
+    filterParts.push(`url(#${svgFilterId(item.id, index)})`);
+  });
 
   return (
     <AbsoluteFill
@@ -66,15 +103,70 @@ export const Transformed: React.FC<{
         // phir translate. Isliye position rotation se prabhavit nahi hoti —
         // jo wahi behaviour hai jo har editor me hota hai.
         transform: `translate(${totalX}px, ${totalY}px) rotate(${totalRotation}deg) scale(${totalScale})`,
-        transformOrigin: `${anchorX * 100}% ${anchorY * 100}%`,
+        transformOrigin: `${item.transform.anchor[0] * 100}% ${item.transform.anchor[1] * 100}%`,
         opacity: totalOpacity,
-        // 0 par bhi `blur(0px)` likhne se browser layer ko GPU par le jaata hai
-        // aur render dheema ho jaata hai — isliye zaroorat par hi lagta hai.
-        ...(totalBlur > 0 ? { filter: `blur(${totalBlur}px)` } : {}),
+        // "normal" likhna bhi browser ko naya stacking context banwa deta hai,
+        // isliye zaroorat par hi likhte hain.
+        ...(item.blendMode !== "normal" ? { mixBlendMode: item.blendMode } : {}),
         ...(transition?.clipPath ? { clipPath: transition.clipPath } : {}),
       }}
     >
-      {children}
+      {effects.svgFilters.length > 0 ? (
+        <svg width={0} height={0} style={{ position: "absolute" }} aria-hidden>
+          <defs>
+            {effects.svgFilters.map((filter, index) => (
+              <filter
+                key={svgFilterId(item.id, index)}
+                id={svgFilterId(item.id, index)}
+                // `sRGB` zaroori hai: default `linearRGB` par sharpen ke kinare
+                // par safed halo aa jaata hai aur wo turant nakli lagta hai.
+                colorInterpolationFilters="sRGB"
+              >
+                <feConvolveMatrix
+                  order="3"
+                  preserveAlpha="true"
+                  divisor={filter.divisor ?? 1}
+                  kernelMatrix={filter.matrix.join(" ")}
+                />
+              </filter>
+            ))}
+          </defs>
+        </svg>
+      ) : null}
+
+      <AbsoluteFill
+        style={{
+          ...effects.style,
+          ...(filterParts.length > 0 ? { filter: filterParts.join(" ") } : {}),
+          ...mask,
+        }}
+      >
+        {background}
+        {children}
+      </AbsoluteFill>
+
+      {/*
+       * Overlays (vignette) item ke **upar** aati hain par mask ke andar nahi —
+       * warna vignette ka gehra kinara mask se kat jaata aur uska poora matlab
+       * hi khatam ho jaata.
+       */}
+      {effects.overlays.map((overlay, index) => (
+        <AbsoluteFill
+          key={`overlay-${index}`}
+          style={{
+            background: overlay.background,
+            ...(overlay.opacity !== undefined ? { opacity: overlay.opacity } : {}),
+            ...(overlay.blendMode ? { mixBlendMode: overlay.blendMode as "normal" } : {}),
+            ...mask,
+            pointerEvents: "none",
+          }}
+        />
+      ))}
     </AbsoluteFill>
   );
 };
+
+/** Har item ke apne filter ids — do items ke filter aapas me na takrayein. */
+function svgFilterId(itemId: string, index: number): string {
+  return `reel-fx-${itemId}-${index}`;
+}

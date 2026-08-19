@@ -24,32 +24,35 @@ export const VideoItem: React.FC<ItemComponentProps> = ({ item, track, assets, l
   if (!src) return <MissingAsset item={item} />;
 
   return (
-    <>
-      <FitBackground
-        item={item}
-        // Video ki apni dhundhli copy peeche. Ye ek aur decode hai (thoda mehnga),
-        // par 16:9 footage ko 9:16 reel me daalne par yahi cheez sabse zyada kaam
-        // aati hai — aur iske bina peeche chupchaap kaali patti aa jaati thi.
-        blurLayer={
-          <OffthreadVideo
-            src={src}
-            trimBefore={item.trimStartFrame}
-            playbackRate={item.playbackRate}
-            // Peeche wali copy chup rehni chahiye, warna awaaz do baar bajegi.
-            muted
-            style={BLUR_LAYER_STYLE}
-          />
-        }
-      />
-      <Transformed item={item} localFrame={localFrame}>
-        <OffthreadVideo
-          src={src}
-          trimBefore={item.trimStartFrame}
-          playbackRate={item.playbackRate}
-          volume={itemVolume(item, track)}
-          style={{ width: "100%", height: "100%", objectFit: objectFitFor(item) }}
+    <Transformed
+      item={item}
+      localFrame={localFrame}
+      background={
+        <FitBackground
+          item={item}
+          // Video ki apni dhundhli copy peeche. Ye ek aur decode hai (thoda mehnga),
+          // par 16:9 footage ko 9:16 reel me daalne par yahi cheez sabse zyada kaam
+          // aati hai — aur iske bina peeche chupchaap kaali patti aa jaati thi.
+          blurLayer={
+            <OffthreadVideo
+              src={src}
+              trimBefore={item.trimStartFrame}
+              playbackRate={item.playbackRate}
+              // Peeche wali copy chup rehni chahiye, warna awaaz do baar bajegi.
+              muted
+              style={BLUR_LAYER_STYLE}
+            />
+          }
         />
-      </Transformed>
-    </>
+      }
+    >
+      <OffthreadVideo
+        src={src}
+        trimBefore={item.trimStartFrame}
+        playbackRate={item.playbackRate}
+        volume={itemVolume(item, track)}
+        style={{ width: "100%", height: "100%", objectFit: objectFitFor(item) }}
+      />
+    </Transformed>
   );
 };

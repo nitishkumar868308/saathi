@@ -16,6 +16,7 @@ import clsx from "clsx";
 import { useState } from "react";
 
 import { AnimationSection } from "@/components/editor/properties/AnimationSection";
+import { EffectsSection } from "@/components/editor/properties/EffectsSection";
 import { controlComponent } from "@/components/controls";
 import { KeyframeButton } from "@/components/controls/KeyframeButton";
 import { NumberField } from "@/components/controls/NumberField";
@@ -88,6 +89,7 @@ export function PropertiesPanel() {
       <TimingSection items={items} />
       <FitSection items={items} />
       <AnimationSection items={items} />
+      <EffectsSection items={items} localFrame={playheadFrame - first.startFrame} />
 
       {groups.map((group) => (
         <section key={group.group}>

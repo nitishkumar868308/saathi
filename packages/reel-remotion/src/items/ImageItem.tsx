@@ -19,11 +19,12 @@ export const ImageItem: React.FC<ItemComponentProps> = ({ item, assets, localFra
   if (!src) return <MissingAsset item={item} />;
 
   return (
-    <>
-      <FitBackground item={item} blurLayer={<Img src={src} style={BLUR_LAYER_STYLE} />} />
-      <Transformed item={item} localFrame={localFrame}>
-        <Img src={src} style={{ width: "100%", height: "100%", objectFit: objectFitFor(item) }} />
-      </Transformed>
-    </>
+    <Transformed
+      item={item}
+      localFrame={localFrame}
+      background={<FitBackground item={item} blurLayer={<Img src={src} style={BLUR_LAYER_STYLE} />} />}
+    >
+      <Img src={src} style={{ width: "100%", height: "100%", objectFit: objectFitFor(item) }} />
+    </Transformed>
   );
 };
