@@ -17,10 +17,15 @@ Preview aur export me farak nahi hona chahiye.
 - **`- [ ]` + `→ code maujood hai, browser me chalaya nahi`** — likha hua hai aur
   compile/bundle bhi hota hai, par uska asli imtihaan sirf chalti hui app me hai.
 
-**Kyun ruka hua hai (2026-08-19):** `studio/.env.local` nahi hai, isliye dev server uth
-nahi sakta; aur `ffmpeg`/`ffprobe` bhi is machine par nahi hain, isliye 6.13 ka
-render-vs-preview frame comparison nahi ho sakta. Dono aate hi baaki boxes ek hi
-baithak me nipat jaayenge.
+**Kyun ruka hua hai (2026-08-19, doosri baithak):** ffmpeg **aa gaya**, aur uske saath
+6.13 ka **render wala aadha hissa saabit ho chuka hai** — `npm run render:sample` →
+`ALL PASS: 29 checks, 0 fail`, asli MP4 (h264 High / yuv420p / 1080×1920@30 / aac 48kHz
+2ch), aur frames bhi `render-out/samples/frames-reel-30fps/` me pade hain, tulna karne ke
+liye taiyaar.
+
+Ab **sirf `studio/.env.local`** ki kami hai. Uske bina dev server uth nahi sakta, isliye
+6.13 ka doosra aadha (preview ka screenshot) aur baaki saare browser wale box abhi
+unticked hain.
 
 ---
 
@@ -147,8 +152,13 @@ baithak me nipat jaayenge.
 - [ ] 6.13 Test: Phase 3 ka sample doc DB me daalo, preview me chalao, aur usi doc ka render
       karke **same frame numbers** ke 2 frames compare karo (preview screenshot vs rendered
       frame). Farak ho to batao — chhupao nahi.
-      → **nahi hua.** `studio/.env.local` nahi hai (dev server nahi uthta) aur ffmpeg bhi
-      nahi hai (render nahi hoga).
+      → **aadha ho gaya.** Render wala hissa chal chuka hai: `npm run render:sample` →
+      `ALL PASS: 29 checks, 0 fail`, aur naapi hui frames
+      `render-out/samples/frames-reel-30fps/` me maujood hain (Ken Burns ka safed chaukor
+      frame 15/75/135 par 312/360/408 px — expected 312.0/360.0/408.0, farak 0px).
+      **Preview wala hissa baaki hai** kyunki dev server ke liye `studio/.env.local` chahiye.
+      Ye box tabhi tick hoga jab dono taraf ke ek hi frame number ki tasveer milakar dekhi
+      jaayegi — aadhe par tick karna wahi jhooth hoga jisse Resume Protocol bachne ko kehta hai.
 
 - [ ] 6.14 `npm run typecheck` clean. Commit: "reel-studio: phase 6 — preview player".
       → typecheck **clean hai** (6 workspaces, exit 0) aur `npm run build:studio` bhi pass.
@@ -178,3 +188,4 @@ aur preview vs render frame comparison mel khata hai.
 |---|---|---|---|
 | 2026-08-19 | 6.1-6.12 ka poora code. `@remotion/player` install; `PreviewPlayer` wahi `ReelComposition` chalata hai jo render karti hai. Naya: `packages/reel-core/src/config/safeArea.ts` (guides = data), `studio/lib/preview.ts` (zoom/fit ka ganit, seek throttle, stutter watch, shared-audio-tags), `studio/lib/playback.tsx` (playback ka control — playhead **iske andar nahi**), `studio/lib/assetMap.ts`, `useElementSize`, `PreviewPlayer` + `TransportBar` + `ScrubBar` + `GuidesOverlay`. Shortcut registry me transport ki 7 key judi (space / ←→ / shift+←→ / Home / End) aur `run()` ab `{editor, playback}` context leta hai. TimelineStrip me wahi `<ScrubBar>` lagi taaki 6.7 ka "dono jagah ek frame" structure se hi sach ho. | `npm run check --workspace @reel/studio` → `ALL PASS: 32 tests, 0 fail` (preview layout 8, draft 2, seek throttle 4, stutter 4, audio tags 3, safe area 5, shortcuts 6); `npm run typecheck` → 6 workspaces exit 0; `npm run build:studio` → `✓ Compiled successfully`, `/project/[id]` 4.16 kB → **115 kB** (player sach me bundle me) | 6.13 — `studio/.env.local` + ffmpeg aate hi dev server par play/scrub dekhna aur render se frame compare karna. Phir 6.2/6.4/6.5/6.6/6.7/6.8/6.9/6.11 bhi tick honge. |
 | 2026-08-19 | Apne hi Phase 6 code ko dobara padha aur **ek asli bug pakda**: pehle render par `size` null hoti hai (ResizeObserver abhi bola nahi), isliye `<Player>` mount hi nahi hota aur teeno effect `playerRef.current === null` dekh kar laut jaate the — naap aane par Player to mount ho jaata, par effects ki dependency nahi badalti thi, matlab **frameupdate/play/pause ke listener kabhi lagte hi nahi**. Screen par sab theek dikhta: preview chalti, par playhead kahin update nahi hota. Ab `playerMounted` har effect ki dependency me hai. Saath me teen aur: `initialFrame` ab jamaaya hua (har frame par badalta hua nahi), guides ka `boxShadow: 0 0 0 9999px` ab `overflow-hidden` se frame ke andar kata hai (warna poore editor par kaali chaadar), aur timeline ki playhead lakeer ScrubBar ke saath `px-3` par align hui. | `npm run check --workspace @reel/studio` → `ALL PASS: 32 tests, 0 fail`; `npm run typecheck --workspace @reel/studio` exit 0; `npm run build:studio` → `✓ Compiled successfully`, `/project/[id]` 115 kB | Wahi — 6.13 ke liye env + ffmpeg ka intezaar |
+| 2026-08-19 | ffmpeg aane ke baad Phase 3 ka poora render dobara chalaya — ye zaroori regression check tha, kyunki Phase 5 me `worker/src/ffmpeg.ts` uthkar `@reel/media` me chala gaya tha aur wahi file render bhi chalati hai. 6.13 ka render wala aadha hissa ab saabit hai; preview wala aadha `studio/.env.local` par ruka hai. | `npm run render:sample` → `ALL PASS: 29 checks, 0 fail`; ffprobe: h264 / High / yuv420p / 1080×1920 / 30fps / aac 48000Hz 2ch, duration 10.048s (doc 10.000s); audio khaali nahi (mean_volume -37.4 dB); Ken Burns 312→360→408 px (expected 312.0/360.0/408.0); render 46.5s, 300 frames, 6.5 fps | 6.13 ka preview wala aadha — `studio/.env.local` aate hi |

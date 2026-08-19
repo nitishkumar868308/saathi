@@ -21,11 +21,13 @@ likhe gaye hain, taaki agla chat bina dhokha khaye aage badh sake:
   hai, par ye raasta **browser/DB me kabhi chala nahi**. Isko ticked maan lena wahi galti
   hai jisse README ka Resume Protocol bachne ko kehta hai.
 
-**Kyun ruka hua hai (2026-08-19):** is machine par (a) `ffmpeg`/`ffprobe` maujood nahi hai
-(`npm run check --workspace @reel/media` toolchain par hi ENOENT deta hai), aur (b)
-`studio/.env.local` nahi hai (STUDIO_PASSWORD + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY),
-isliye studio dev server uth hi nahi sakta. Dono aate hi 5.4, 5.5 aur 5.12 turant verify ho
-jaayenge — command neeche "Verify" me hain.
+**Kyun ruka hua hai (2026-08-19, doosri baithak):** ~~ffmpeg~~ **ho gaya** — user ne
+`winget install Gyan.FFmpeg` chalaya, `ffmpeg 9.0-full_build` aa gaya, aur usi se 5.4 aur
+5.5 verify ho kar tick ho chuke hain. Ab **sirf ek** cheez baaki hai: `studio/.env.local`
+(STUDIO_PASSWORD + SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY). Uske bina studio dev server
+uth hi nahi sakta, isliye 5.2, 5.3, 5.10, 5.11, 5.12 — jo sab browser/DB me hi saabit ho
+sakte hain — abhi bhi unticked hain. (`supabase/reel-studio-assets.sql` user chala chuka
+hai; uska asar bhi tabhi dikhega jab pehla upload hoga.)
 
 **⚠️ Remotion ka bundled ffmpeg iska vikalp NAHI hai.** `node_modules/@remotion/
 compositor-win32-x64-msvc/` me `ffmpeg.exe` aur `ffprobe.exe` dono padte hain (n7.1), aur
@@ -72,24 +74,31 @@ ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — 
       Browser ke bina iska koi matlab nahi — Node me mock karke test karna sirf apne aap ko
       dhokha dena hota.
 
-- [ ] 5.4 Worker-side asli probe (`POST /api/assets/[id]/probe` → job ya direct ffprobe agar
+- [x] 5.4 Worker-side asli probe (`POST /api/assets/[id]/probe` → job ya direct ffprobe agar
       local): codec, bitrate, sample rate, channels, pixel format, rotation metadata.
       **A1 quality:** ye asli numbers hone chahiye, guess nahi.
-      → code maujood hai, chalaya nahi — **ffprobe missing**.
-      [packages/reel-media/src/probe.ts](../../../packages/reel-media/src/probe.ts) +
+      → **chalaya gaya.** `npm run check --workspace @reel/media` → `ALL PASS: 10 tests,
+      0 fail` (ffprobe 9.0-full_build ke saath). Us check me mock kuch nahi hai — test
+      files khud ffmpeg se banti hain aur phir asli ffprobe se naapi jaati hain:
+      video ke 640×480 / 25fps / ~2000ms / h264 / yuv420p / aac / 48000Hz / 2ch sab exact
+      mile; **phone-jaisa rotated video** (display matrix 90) par stored 640×480 rehta hai
+      par dikhne wala 480×640 aata hai — yahi DB me jaana chahiye, warna 9:16 frame me
+      portrait footage landscape samajh kar galat crop hota; audio-only file par
+      width/height `null`; aur `parseFrameRate` `30000/1001` ko 29.97 padhta hai.
+      Code: [packages/reel-media/src/probe.ts](../../../packages/reel-media/src/probe.ts) +
       [studio/lib/assetProbe.ts](../../../studio/lib/assetProbe.ts) +
       [studio/app/api/assets/\[id\]/probe/route.ts](../../../studio/app/api/assets/%5Bid%5D/probe/route.ts).
-      Iska asli test pehle se likha hua hai (`packages/reel-media/scripts/check.ts` — asli
-      ffmpeg, asli files, phone-jaisa rotation case bhi). Bas
-      `npm run check --workspace @reel/media` chalna baaki hai.
 
-- [ ] 5.5 Thumbnail/poster generate: image ke liye resize, video ke liye 1 frame,
+- [x] 5.5 Thumbnail/poster generate: image ke liye resize, video ke liye 1 frame,
       audio ke liye waveform PNG (ffmpeg `showwavespic`). Storage me `temp/thumbs/` nahi —
       `permanent/thumbs/` (chhote hain).
-      → code maujood hai, chalaya nahi — **ffmpeg missing**.
-      [packages/reel-media/src/thumbnails.ts](../../../packages/reel-media/src/thumbnails.ts);
-      key `permanent/thumbs/<assetId>.jpg` (`assetThumbKey`). Upscale ki rok bhi test me hai
-      ("chhoti image badi nahi ki jaati").
+      → **chalaya gaya**, usi `npm run check --workspace @reel/media` run me: 1280×720
+      image ka thumbnail theek 512×288 bana (aspect waisa ka waisa), 120×90 ki chhoti image
+      **120×90 hi rahi** (upscale ki rok sach me lagti hai — Section 3A ka wahi jhooth jisse
+      bachna hai), video ka poster ek frame se 512×384, audio ki waveform 640×180
+      (`showwavespic`), aur `"none"` par kuch nahi banta par wo error bhi nahi hai.
+      Code: [packages/reel-media/src/thumbnails.ts](../../../packages/reel-media/src/thumbnails.ts);
+      key `permanent/thumbs/<assetId>.jpg` (`assetThumbKey`).
 
 - [x] 5.6 `lifecycle` set karo: user-uploaded = `permanent`. Generated (TTS/lipsync/render temp)
       = `temporary` + `expires_at` (config se, default 7 din).
@@ -155,15 +164,16 @@ ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — 
 ## Verify (asli output paste karna)
 
 ```
-# 1. Pehle ye do — abhi yahi ruka hua hai:
-winget install Gyan.FFmpeg                        # naya terminal kholna padta hai
-cp studio/.env.local.example studio/.env.local    # aur asli values bharo
-# Supabase SQL editor me: supabase/reel-studio-assets.sql chalao (meta jsonb + tags[])
-
-# 2. Phir 5.4 / 5.5 apne aap saabit ho jaate hain:
+# 5.4 / 5.5 — ye ab chalti hain aur pass hain:
 npm run check --workspace @reel/media
 
-# 3. Aur 5.12:
+# ⚠️ winget ne PATH badla hai, par pehle se khule terminal me wo nahi dikhta.
+# Naya terminal kholo, ya ek baar ke liye override do:
+#   REEL_FFMPEG_PATH=...fmpeg.exe REEL_FFPROBE_PATH=...fprobe.exe npm run check ...
+#   (bin: %LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_*fmpeg-9.0-full_buildin)
+
+# 5.12 ke liye abhi bhi ye chahiye:
+cp studio/.env.local.example studio/.env.local    # aur asli values bharo
 npm run dev:studio
 # upload karke:
 select kind,filename,width,height,duration_ms,fps,bytes,lifecycle from reel_assets;
@@ -181,3 +191,4 @@ bante hain, duplicate detect hota hai, aur library me search/filter kaam karta h
 |---|---|---|---|
 | 2026-08-19 | 5.1-5.11 ka poora code: `ASSET_KINDS` + `LIBRARY_TABS` registry, streaming sha256, `assetQuality` helper, naya `@reel/media` package (ffmpeg/probe/thumbnails — `worker/src/ffmpeg.ts` yahan shift hua), 6 asset API routes, XHR uploader, browser probe, signed-URL cache, MediaPanel + AssetCard + AssetDetailDialog, aur `supabase/reel-studio-assets.sql` (meta jsonb + tags[] + 2 GIN index). Commit `3ec0f62` (WIP). | `npm run typecheck` exit 0 | 5.12 — asli upload test |
 | 2026-08-19 | **Audit (naya chat).** Har item code me verify kiya aur jo is machine par sach me chalaya ja sakta tha wo chalaya. Do rukawatein mili jo pichhle chat me nahi thi: is machine par `ffmpeg`/`ffprobe` maujood hi nahi (`%LOCALAPPDATA%\Microsoft\WinGet\Packages` folder tak nahi hai) aur `studio/.env.local` nahi hai. Isliye 5.2, 5.3, 5.4, 5.5, 5.10, 5.11, 5.12 **jaan-boojhkar unticked** — code likha hai par kabhi chala nahi. | `npm ci` (260 packages); `npm run typecheck` → chhah workspaces, exit 0; `npm run check --workspace @reel/core` → `ALL PASS: 85 assertions groups, 0 fail` (isme 5.1, 5.7, 5.8, 5.9 ke section shaamil hain); `npm run check --workspace @reel/media` → **FAIL**: `"ffmpeg" chala hi nahi (spawn ffmpeg ENOENT)` | User `winget install Gyan.FFmpeg` chala raha hai → phir `npm run check --workspace @reel/media` se 5.4/5.5 tick honge. 5.12 env aane par. |
+| 2026-08-19 | User ne `winget install Gyan.FFmpeg` chalaya. Uske baad **5.4 aur 5.5 sach me chalaye gaye aur tick hue** — dono ka test pehle se likha hua tha, bas chalane ko ffmpeg nahi tha. Saath me poora `npm run check` aur Phase 3 ka asli render dobara chalaya (ye regression check zaroori tha: Phase 5 me `worker/src/ffmpeg.ts` uthkar `@reel/media` me chala gaya tha, aur wahi file render bhi chalati hai). Bhatakne se bachne ke liye ek baat doc me likh di: Remotion apne saath jo ffmpeg bundle karta hai wo chhanta hua build hai (`showwavespic` aur `testsrc2` dono nahi) — wo system ffmpeg ka vikalp nahi hai. | `npm run check --workspace @reel/media` → `ALL PASS: 10 tests, 0 fail` (ffprobe 9.0-full_build; rotated video par 640×480 stored / 480×640 dikhne wala, waveform 640×180, 120×90 image upscale nahi hui); poora `npm run check` → core 85 groups + studio 8/9/32 + media 10, sab 0 fail; `npm run render:sample` → `ALL PASS: 29 checks, 0 fail`, asli MP4 h264 High / yuv420p / 1080×1920@30 / aac 48kHz 2ch, Ken Burns pixel se naapa (312→360→408, expected 312.0/360.0/408.0) | 5.2, 5.3, 5.10, 5.11, 5.12 — ab **sirf `studio/.env.local`** ka intezaar hai, aur kuch nahi |
