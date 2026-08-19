@@ -257,7 +257,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | Phase | Status | Last updated |
 |---|---|---|
 | 0 | complete | 2026-08-19 |
-| 1 | not started | — |
+| 1 | complete | 2026-08-19 |
 | 2 | not started | — |
 | 3 | not started | — |
 | 4 | not started | — |
