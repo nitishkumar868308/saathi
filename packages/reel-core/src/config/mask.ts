@@ -17,11 +17,39 @@ import type { Mask } from "../schema/project";
  * Dono ek saath likhna galat hota: `clip-path` gradient ke narm kinare ko bhi
  * seedha kaat deta, aur feather dikhta hi nahi.
  */
-export function maskCss(mask: Mask): Record<string, string> {
+export function maskCss(mask: Mask, maskImageUrl: string | null = null): Record<string, string> {
   if (!mask) return {};
 
   const inset = Math.max(0, Math.min(49, mask.inset));
   const feather = Math.max(0, Math.min(50, mask.feather));
+
+  /*
+   * Image mask (24.6) — sabse pehle, kyunki wo baaki sab par bhaari padta hai.
+   *
+   * ⚠️ `mask-mode: luminance` jaan-boojhkar hai. CSS ka default `alpha` hai,
+   * yaani PNG ka transparent hissa chhupta hai. Par log mask ke liye kaali-safed
+   * tasveer banate hain (safed = dikhega, kaala = chhupega) — aur wo `alpha` me
+   * poori ki poori dikhti hai, yaani mask lagta hi nahi. Wo galti "kuch nahi
+   * hua" jaisi dikhti hai aur uski wajah kabhi samajh nahi aati.
+   *
+   * ⚠️ `inset`/`feather` yahan **nahi** lagte. Tasveer khud hi poora naksha hai;
+   * uske upar ek aur mask lagane par do mask ek doosre ko kaatte hain aur
+   * nateeja kisi ko samajh nahi aata. Jise narm kinara chahiye, wo tasveer me
+   * hi narm kinara banaye.
+   */
+  if (mask.assetId && maskImageUrl) {
+    return {
+      maskImage: `url(${maskImageUrl})`,
+      WebkitMaskImage: `url(${maskImageUrl})`,
+      maskMode: "luminance",
+      maskSize: "100% 100%",
+      WebkitMaskSize: "100% 100%",
+      maskPosition: "center",
+      WebkitMaskPosition: "center",
+      maskRepeat: "no-repeat",
+      WebkitMaskRepeat: "no-repeat",
+    };
+  }
 
   if (feather <= 0) {
     if (mask.shape === "circle") {

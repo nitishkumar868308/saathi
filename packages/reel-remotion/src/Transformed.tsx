@@ -10,6 +10,7 @@ import {
 import type React from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 
+import { useAssetSrc } from "./assetsContext";
 import { PhoneFrame } from "./mockups/PhoneFrame";
 
 /**
@@ -84,7 +85,14 @@ export const Transformed: React.FC<{
   const totalBlur = animation.blur + (transition?.blur ?? 0);
 
   const effects = applyEffects(item, localFrame, frame);
-  const mask = maskCss(item.mask);
+  /*
+   * Image mask (24.6) — URL context se aata hai, prop se nahi. Wajah
+   * `assetsContext.tsx` me likhi hai: mask kisi bhi item par lag sakta hai aur
+   * `<Transformed>` un sab ke beech baitha hai, par usse `assets` kabhi nahi
+   * milta tha.
+   */
+  const maskImageUrl = useAssetSrc(item.mask?.assetId ?? null);
+  const mask = maskCss(item.mask, maskImageUrl);
   const crop = cropCss(item.transform.crop);
 
   /*

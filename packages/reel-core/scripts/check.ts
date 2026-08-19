@@ -77,6 +77,12 @@ import {
   cuesToSeconds,
   deleteCue,
   estimateWords,
+  bpmFromTimes,
+  detectBeats,
+  nearestBeatFrame,
+  snapItemsToBeats,
+  speechTrimRange,
+  trimItemToSourceRange,
   alignTranscript,
   alignWords,
   applyCaptionScript,
@@ -7231,6 +7237,160 @@ test("script auto/deva par text ko haath nahi lagta", () => {
 test("Devanagari hai ya nahi — pehchana jaata hai", () => {
   assert.equal(hasDevanagari("नमस्ते"), true);
   assert.equal(hasDevanagari("namaste"), false);
+});
+
+// ------------------------------------------------------------- Phase 24
+
+section("beat detection — energy ke ubhaar se (24.7)");
+
+/** 0.5s par ek "hit": 40ms tez, baaki chup. 25ms window. */
+function clickEnergy(count: number, gapSeconds = 0.5): { timeSeconds: number; db: number }[] {
+  const step = 0.025;
+  const total = Math.round((count * gapSeconds) / step);
+  const out: { timeSeconds: number; db: number }[] = [];
+  for (let index = 0; index < total; index += 1) {
+    const time = index * step;
+    const sinceBeat = time % gapSeconds;
+    out.push({ timeSeconds: time, db: sinceBeat < 0.04 ? -6 : -60 });
+  }
+  return out;
+}
+
+test("har hit par ek hi beat banta hai", () => {
+  /*
+   * ⚠️ Ek drum hit kai window tak tez rehti hai. Har tez window ko beat maan
+   * lene par ek hit ke paanch beat ban jaate hain — aur unpar lagaye gaye cut
+   * kaanpte hue dikhte hain.
+   */
+  const result = detectBeats(clickEnergy(8));
+  assert.equal(result.times.length, 8, result.times.join(", "));
+});
+
+test("file ke shuru wala beat bhi milta hai", () => {
+  /*
+   * ⚠️ Ye ek asli bug tha: tulna ke liye pichhle window chahiye the, isliye loop
+   * baad me shuru hota tha aur pehla beat chhoot jaata tha (8 me se 7). Naap se
+   * pakda gaya. Ab file se pehle uska apna sabse dheema hissa maan liya jaata hai.
+   */
+  const result = detectBeats(clickEnergy(4));
+  assert.equal(result.times[0], 0);
+});
+
+test("BPM median se nikalta hai", () => {
+  assert.equal(detectBeats(clickEnergy(8)).bpm, 120);
+  assert.equal(detectBeats(clickEnergy(8, 1)).bpm, 60);
+});
+
+test("ek chhooti hui beat BPM ko nahi bigaadti", () => {
+  // Median isliye — average me ek dugna gap poora hisaab kharab kar deta hai.
+  assert.equal(bpmFromTimes([0, 0.5, 1.5, 2, 2.5]), 120);
+});
+
+test("do se kam beat par BPM null", () => {
+  assert.equal(bpmFromTimes([1]), null);
+  assert.equal(detectBeats([]).bpm, null);
+});
+
+test("lagataar tez awaaz beat nahi banti", () => {
+  /*
+   * Sirf "tez awaaz" dekhna galat hota: lagataar tez baja hua gaana poora ka
+   * poora beat ban jaata. **Badhotri** hi beat hai.
+   */
+  const flat = Array.from({ length: 100 }, (_, index) => ({
+    timeSeconds: index * 0.025,
+    db: -6,
+  }));
+  assert.equal(detectBeats(flat).times.length, 0);
+});
+
+test("paas ka beat milta hai, door ka nahi", () => {
+  const beats = [0, 0.5, 1];
+  assert.equal(nearestBeatFrame(31, beats, { fps: 30 }), 30);
+  // ⚠️ Door ka beat null — warna user ka lagaya hua cut chup-chaap khisak jaata.
+  assert.equal(nearestBeatFrame(38, beats, { fps: 30, maxDistanceFrames: 3 }), null);
+  assert.equal(nearestBeatFrame(10, [], { fps: 30 }), null);
+});
+
+section("chuppi auto-trim (24.7)");
+
+test("shuru aur ant ki chuppi ka range nikalta hai", () => {
+  const range = speechTrimRange([{ startSeconds: 1, endSeconds: 3 }], { durationSeconds: 4 });
+  assert.ok(range);
+  // Pad — theek awaaz par kaatne se pehla akshar kat jaata hai.
+  assert.ok(Math.abs(range!.startSeconds - 0.92) < 1e-9, String(range!.startSeconds));
+  assert.ok(Math.abs(range!.endSeconds - 3.08) < 1e-9, String(range!.endSeconds));
+});
+
+test("kaatne ko kuch na ho to null", () => {
+  // Warna har baar ek bekaar ka undo step banta hai jo kuch badalta hi nahi.
+  assert.equal(speechTrimRange([{ startSeconds: 0, endSeconds: 3 }], { durationSeconds: 3 }), null);
+  assert.equal(speechTrimRange([], { durationSeconds: 3 }), null);
+});
+
+section("beat par snap aur source-range trim ke ops (24.7)");
+
+test("clip beat par khisakti hai, lambai wahi rehti hai", () => {
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  const moved = snapItemsToBeats(doc, {
+    itemIds: [item.id],
+    // 30fps par 0.5s = frame 15; item 0 par hai to 0 wala beat hi paas hai.
+    beatTimes: [0.5, 1.0],
+  });
+  const after = itemById(moved, item.id);
+  assert.equal(after.durationInFrames, item.durationInFrames, "lambai nahi badalni chahiye");
+});
+
+test("door ka beat clip ko nahi kheenchta", () => {
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  const moved = snapItemsToBeats(doc, {
+    itemIds: [item.id],
+    beatTimes: [50],
+    maxDistanceFrames: 3,
+  });
+  assert.equal(itemById(moved, item.id).startFrame, item.startFrame);
+});
+
+test("locked clip chhoot jaati hai, error nahi aati", () => {
+  /*
+   * ⚠️ Ye op kai clip par ek saath chalta hai. Ek locked clip par poora kaam rok
+   * dena galat hoga — user ne use lock hi isliye kiya tha ki wo na hile.
+   */
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  const locked = setItemProperty(doc, { itemId: item.id, path: "locked", value: true });
+  const moved = snapItemsToBeats(locked, { itemIds: [item.id], beatTimes: [0.5] });
+  assert.equal(itemById(moved, item.id).startFrame, item.startFrame);
+});
+
+test("source-range trim clip ko chhota karta hai, khiskata nahi", () => {
+  /*
+   * ⚠️ Shuru ki chuppi kaatne par clip ko aage khiskana zyada "sahi" lagta hai,
+   * par tab uske peeche wali har clip bhi khiskani padti — ek chhoti si safai
+   * poore timeline ki hulchal ban jaati.
+   */
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  const trimmed = trimItemToSourceRange(doc, {
+    itemId: item.id,
+    startSeconds: 1,
+    endSeconds: 2,
+  });
+  const after = itemById(trimmed, item.id);
+  assert.equal(after.startFrame, item.startFrame, "timeline par jagah wahi");
+  assert.equal(after.trimStartFrame, 30, "source ke andar 1s aage");
+  assert.equal(after.durationInFrames, 30, "1 second bacha");
+});
+
+test("locked clip par source-range trim saaf mana karta hai", () => {
+  const { doc } = buildFixture();
+  const item = doc.items[0]!;
+  const locked = setItemProperty(doc, { itemId: item.id, path: "locked", value: true });
+  assert.throws(
+    () => trimItemToSourceRange(locked, { itemId: item.id, startSeconds: 0, endSeconds: 1 }),
+    /locked/,
+  );
 });
 
 console.log(JSON.stringify(sample, null, 2));

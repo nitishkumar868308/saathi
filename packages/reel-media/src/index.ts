@@ -18,3 +18,4 @@ export * from "./thumbnails";
 export * from "./reverse";
 export * from "./voice";
 export * from "./transcribe";
+export * from "./energy";

@@ -12,6 +12,7 @@ import type React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 
 import type { AssetMap } from "./assets";
+import { AssetProvider } from "./assetsContext";
 import { BrandProvider } from "./brand";
 import { WatermarkLayer } from "./Watermark";
 import { ItemRenderer } from "./ItemRenderer";
@@ -83,7 +84,8 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, f
      * **default** brand par atak jaata tha — yaani preset badalna preview aur
      * MP4 dono me bekaar tha.
      */
-    <BrandProvider brand={doc.brand}>
+    <AssetProvider assets={assets}>
+      <BrandProvider brand={doc.brand}>
       <AbsoluteFill style={{ backgroundColor: resolveToken(doc.project.background, tokens) }}>
       {/*
        * Font ka CSS composition ke **andar** hai, bahar nahi. Render ke waqt
@@ -127,7 +129,8 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, f
         {/* Watermark sabse upar (17.12) — har parat ke upar. */}
         <WatermarkLayer brand={doc.brand} assets={assets} />
       </AbsoluteFill>
-    </BrandProvider>
+      </BrandProvider>
+    </AssetProvider>
   );
 };
 

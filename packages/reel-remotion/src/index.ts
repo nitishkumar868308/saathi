@@ -8,6 +8,7 @@
  */
 
 export * from "./assets";
+export * from "./assetsContext";
 export * from "./audio";
 export * from "./components";
 export * from "./FitLayer";

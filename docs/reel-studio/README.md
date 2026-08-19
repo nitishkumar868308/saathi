@@ -280,7 +280,7 @@ follow karega. Aur agar tum kuch specific chahte ho to line ke aage jod sakte ho
 | 21 | in progress — AI provider + mock + Gemini adapter + reviewable diff; zero-AI guard (10 edits, 0 calls) aur key-off dono sach me chalaye gaye; asli Gemini call GEMINI_API_KEY par ruki | 2026-08-20 |
 | 22 | in progress — cleanup chain data se banti hai (limiter zabardasti aakhir me), aur sach me chal kar naapi gayi: -45.3 -> -16.0 LUFS, chuppi 5.0s -> 2.40s, rumble awaaz ke muqable 12 dB neeche; teen mode ka model+UI taiyaar; TTS `pip install edge-tts` par ruka (koi jhootha Generate button nahi) | 2026-08-20 |
 | 23 | in progress — TTS wale raaste par whisper ki zaroorat nahi: alignment ki galti 1000ms se **0ms** (paanch tone par, jinka sach ganit se pata tha); cue banana, Hinglish likhawat aur low-confidence highlight sab chal rahe; do bug naap se pakde (segment seema par 500ms phisalna, "rahaa" wali likhawat). Job queue ka faisla: `kind` column, alag table nahi. whisper `pip install faster-whisper` par ruka | 2026-08-20 |
-| 24 | not started | — |
+| 24 | report done + jo free/local tha wo bana — is machine par render **4.5 fps** naapa (30s reel = ~3.3 min), aur usi par saare faisle tike hain; 24.6 image mask ban gaya aur MP4 se naapa (daayan aadha 255 -> 0); 24.7 beat detection + snap + chuppi-trim naape (8/8 beat, 0ms, BPM 120). Lip-sync ki sifaarish: skip. Batch / snippet library / hosting / multi-user par faisla tumhara | 2026-08-20 |
 
 ---
 

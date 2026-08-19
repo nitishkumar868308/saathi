@@ -18,7 +18,9 @@
     "cleanup": "tsx scripts/cleanup.ts",
     "validate:demo": "tsx scripts/validate-demo.ts",
     "tts:smoke": "tsx scripts/tts-smoke.ts",
-    "transcribe:smoke": "tsx scripts/transcribe-smoke.ts"
+    "transcribe:smoke": "tsx scripts/transcribe-smoke.ts",
+    "beats:smoke": "tsx scripts/beats-smoke.ts",
+    "render:mask": "tsx scripts/render-mask.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

@@ -7,6 +7,7 @@ import {
 } from "../config/audio";
 import { getAnimationPreset } from "../config/animationPresets";
 import { findEffectPreset } from "../config/effectPresets";
+import { nearestBeatFrame } from "../audio/beats";
 import { mergeCues, splitCue, type CaptionCue } from "../captions/cues";
 import { zoomPanKeyframes, type ZoomStep } from "../mockup/zoomPan";
 import { DEFAULT_EASING } from "../config/easing";
@@ -3440,6 +3441,107 @@ export function canPlaceItem(doc: Doc, itemTypeId: string, trackId: string): boo
 }
 
 /** Saare ops ek jagah — AI patches aur keyboard shortcuts isi map se resolve honge. */
+/* ==========================================================================
+ * Phase 24 — beat par snap, chuppi se trim (24.7)
+ * ========================================================================== */
+
+export interface SnapItemsToBeatsArgs {
+  itemIds: readonly string[];
+  /** Beat kab-kab hain (seconds). `detectBeats()` se aate hain. */
+  beatTimes: readonly number[];
+  /** Itne frame se door ka beat chhod diya jaata hai. */
+  maxDistanceFrames?: number;
+}
+
+/**
+ * Clip ki shuruaat sabse paas wale beat par le jao (24.7).
+ *
+ * ⚠️ Clip **khiskti** hai, uski lambai nahi badalti. Lambai badalne par saath
+ * lage doosre clip ke saath gap ya overlap ban jaata hai, aur wo galti timeline
+ * par dekhe bina pakdi nahi jaati.
+ *
+ * ⚠️ Door ke beat ko haath nahi lagta (`maxDistanceFrames`). Iske bina ye op har
+ * clip ko kisi na kisi beat par kheench leta hai, chahe wo do second door ho —
+ * aur user ka soch-samajh kar lagaya hua cut chup-chaap kahin aur chala jaata
+ * hai.
+ *
+ * ⚠️ Locked clip chhoot jaati hai, error nahi deti. Ye op ek saath kai clip par
+ * chalta hai; ek locked clip par poora kaam rok dena galat hoga — user ne use
+ * lock hi isliye kiya tha ki wo na hile.
+ */
+export const snapItemsToBeats = defineOp<SnapItemsToBeatsArgs>(
+  "snapItemsToBeats",
+  (draft, args) => {
+    if (args.beatTimes.length === 0) return;
+    const fps = draft.project.fps;
+
+    for (const itemId of args.itemIds) {
+      const item = findItem(draft, itemId);
+      if (item.locked) continue;
+
+      const target = nearestBeatFrame(item.startFrame, args.beatTimes, {
+        fps,
+        ...(args.maxDistanceFrames === undefined
+          ? {}
+          : { maxDistanceFrames: args.maxDistanceFrames }),
+      });
+      if (target === null || target === item.startFrame) continue;
+
+      item.startFrame = Math.max(0, target);
+    }
+  },
+);
+
+export interface TrimItemToSourceRangeArgs {
+  itemId: string;
+  /** Source (file) ke andar ka waqt — clip ka nahi. */
+  startSeconds: number;
+  endSeconds: number;
+}
+
+/**
+ * Clip ko source ke ek hisse par set karo — chuppi auto-trim ka aakhri kadam (24.7).
+ *
+ * ⚠️ Waqt **source ka** hai, timeline ka nahi. Chuppi file me hoti hai, isliye
+ * uska naap bhi file ke andar hi matlab rakhta hai. Timeline ka waqt bhejne par
+ * clip ko pehle se khiska hua ya 2x speed wala hona sab hisaab bigaad deta.
+ *
+ * Clip timeline par apni jagah se hilti **nahi** — sirf chhoti hoti hai. Shuru
+ * ki chuppi kaatne par aage khisak jaana zyada "sahi" lagta hai, par tab uske
+ * peeche wali har clip bhi khiskani padti — aur wo ek chhoti si safai ko poore
+ * timeline ki hulchal bana deta hai.
+ */
+export const trimItemToSourceRange = defineOp<TrimItemToSourceRangeArgs>(
+  "trimItemToSourceRange",
+  (draft, args) => {
+    const item = findItem(draft, args.itemId);
+    assertUnlocked(item);
+
+    const fps = draft.project.fps;
+    const rate = item.playbackRate;
+
+    const startSourceFrame = Math.max(0, Math.round(args.startSeconds * fps));
+    const endSourceFrame = Math.max(startSourceFrame + 1, Math.round(args.endSeconds * fps));
+
+    // Source ke frames -> timeline ke frames. 2x speed par source ke 60 frames
+    // timeline par 30 bharte hain.
+    const duration = Math.max(1, Math.round((endSourceFrame - startSourceFrame) / rate));
+
+    // Baayan kinara: keyframes bhi utne hi kaatne padte hain, warna clip ki
+    // shuruaati value achanak badal jaati hai.
+    const deltaFrames = Math.round((startSourceFrame - item.trimStartFrame) / rate);
+    if (deltaFrames > 0) {
+      item.keyframes = cutKeyframes(clone(item.keyframes), { at: deltaFrames, side: "after" });
+    }
+
+    item.trimStartFrame = startSourceFrame;
+    if (duration < item.durationInFrames) {
+      item.keyframes = cutKeyframes(clone(item.keyframes), { at: duration, side: "before" });
+    }
+    item.durationInFrames = duration;
+  },
+);
+
 export const OPS = {
   addItem,
   moveItem,
@@ -3518,6 +3620,8 @@ export const OPS = {
   setTrackProperty,
   recomputeDuration,
   setProjectProperty,
+  snapItemsToBeats,
+  trimItemToSourceRange,
   replaceDoc,
 } as const;
 

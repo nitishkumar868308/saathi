@@ -13,6 +13,7 @@ import {
 import clsx from "clsx";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 
+import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { controlComponent } from "@/components/controls";
 import { KeyframeButton } from "@/components/controls/KeyframeButton";
 import { IconButton } from "@/components/ui/Button";
@@ -327,7 +328,32 @@ function MaskRow({ item }: { item: Item }) {
 
       {mask ? (
         <div className="space-y-1.5 px-3 pb-2">
-          <div className="flex gap-1">
+          {/*
+           * Image mask (24.6). Ye schema me pehle se tha par lagta nahi tha,
+           * isliye iska koi button bhi nahi dikhaya jaata tha. Ab lagta hai.
+           *
+           * ⚠️ Tasveer lagne par shape/inset/feather **band** ho jaate hain, aur
+           * ye jaan-boojhkar hai: tasveer khud poora naksha hai. Uske upar ek aur
+           * mask lagane par do mask ek doosre ko kaatte hain aur nateeja kisi ko
+           * samajh nahi aata.
+           */}
+          <div className="flex items-center gap-2 text-[11px] text-chalk-500">
+            <span className="w-14 shrink-0">Tasveer</span>
+            <AssetPickerButton
+              kind="image"
+              assetId={mask.assetId}
+              onPick={(assetId) => set({ assetId })}
+            />
+          </div>
+
+          {mask.assetId ? (
+            <p className="text-[11px] text-chalk-500">
+              Tasveer se mask lag raha hai — safed hissa dikhega, kaala chhupega.
+              Shape aur narm kinara ab nahi lagte.
+            </p>
+          ) : null}
+
+          <div className={clsx("flex gap-1", mask.assetId ? "pointer-events-none opacity-40" : "")}>
             {MASK_SHAPES.map((shape) => (
               <button
                 key={shape.value}
@@ -345,11 +371,13 @@ function MaskRow({ item }: { item: Item }) {
             ))}
           </div>
 
-          <MaskSlider label="Andar" value={mask.inset} min={0} max={49} onChange={(v) => set({ inset: v })} unit="%" />
-          {mask.shape === "rounded" ? (
-            <MaskSlider label="Radius" value={mask.radius} min={0} max={500} onChange={(v) => set({ radius: v })} unit="px" />
-          ) : null}
-          <MaskSlider label="Narm kinara" value={mask.feather} min={0} max={50} onChange={(v) => set({ feather: v })} unit="%" />
+          <div className={clsx("space-y-1.5", mask.assetId ? "pointer-events-none opacity-40" : "")}>
+            <MaskSlider label="Andar" value={mask.inset} min={0} max={49} onChange={(v) => set({ inset: v })} unit="%" />
+            {mask.shape === "rounded" ? (
+              <MaskSlider label="Radius" value={mask.radius} min={0} max={500} onChange={(v) => set({ radius: v })} unit="px" />
+            ) : null}
+            <MaskSlider label="Narm kinara" value={mask.feather} min={0} max={50} onChange={(v) => set({ feather: v })} unit="%" />
+          </div>
         </div>
       ) : null}
     </section>

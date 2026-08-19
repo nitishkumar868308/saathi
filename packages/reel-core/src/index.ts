@@ -71,6 +71,7 @@ export * from "./captions/cues";
 export * from "./captions/transcript";
 export * from "./captions/align";
 export * from "./captions/translit";
+export * from "./audio/beats";
 export * from "./templates/schema";
 export * from "./templates/apply";
 export * from "./templates/builtins";
