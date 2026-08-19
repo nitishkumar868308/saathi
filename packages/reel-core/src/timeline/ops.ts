@@ -1,6 +1,9 @@
 import { produce, type Draft } from "immer";
 
 import { getAnimationPreset } from "../config/animationPresets";
+import { DEFAULT_EASING } from "../config/easing";
+import { splitEasing } from "../keyframes/easing";
+import { sampleKeyframes } from "../keyframes/interpolate";
 import { DEFAULT_OVERLAP_POLICY, type OverlapPolicy } from "../config/overlap";
 import { createId } from "../id";
 import { getByPath, setByPath } from "../path";
@@ -132,6 +135,142 @@ function shiftKeyframes(
   return out;
 }
 
+/**
+ * Keyframes ko ek cut par kaato — **aur kinare par value ko jamaa do** (13.6).
+ *
+ * ⚠️ Ye function ek asli bug ke baad likha gaya, aur wo bug test se pakda gaya.
+ * Pehle split/trim sirf keyframes **chhaante aur khiskate** the. Uska nateeja ye
+ * hota tha:
+ *
+ *   keyframes: local 0 par 1.0, local 100 par 2.0
+ *   frame 50 par split
+ *   -> daayan tukda: sirf ek keyframe (local 50 par 2.0)
+ *   -> uske pehle wala poora hissa "hold-first" par chala jaata, yaani 2.0
+ *
+ * Yaani cut se theek pehle value 1.81 thi aur cut ke turant baad 2.0 —
+ * animation ek **jhatka** khaati thi. Ye aankh se dikhta hai par sirf tab jab
+ * dhyan se dekho, aur render ke baad theek karna bahut mehnga hota hai.
+ *
+ * Isliye ab cut ke bindu par ek keyframe **banaya** jaata hai jiski value wahi
+ * hoti hai jo us frame par thi. Dono taraf ki value jud'ti hai, jhatka khatam.
+ */
+/**
+ * Cut se theek pehle wale keyframe ka easing.
+ *
+ * `findLast` yahan nahi use kiya — wo naye TS lib target maangta hai, aur is
+ * package ka target jaan-boojhkar purana rakha gaya hai (wahi code worker aur
+ * browser dono me chalta hai).
+ */
+function easingBefore(list: readonly Keyframe[], at: number): string {
+  const sorted = [...list].sort((a, b) => a.frame - b.frame);
+  let easing = (sorted[0] as Keyframe).easing;
+  for (const keyframe of sorted) {
+    if (keyframe.frame >= at) break;
+    easing = keyframe.easing;
+  }
+  return easing;
+}
+
+function cutKeyframes(
+  keyframes: Record<string, Keyframe[]>,
+  args: {
+    /** Item-local frame jahan kaatna hai. */
+    at: number;
+    /** `"before"` = is frame se pehle wala hissa rakho; `"after"` = baad wala. */
+    side: "before" | "after";
+  },
+): Record<string, Keyframe[]> {
+  const out: Record<string, Keyframe[]> = {};
+
+  for (const [path, list] of Object.entries(keyframes)) {
+    if (list.length === 0) continue;
+
+    const sorted = [...list].sort((a, b) => a.frame - b.frame);
+
+    // Cut ke theek us frame par value kya thi — yahi jamaani hai.
+    const boundary = sampleKeyframes({ [path]: sorted }, path, args.at);
+    const exact = sorted.find((kf) => kf.frame === args.at);
+
+    /*
+     * Cut jis segment ke beech me pada, uska curve **do me tod** kar dono
+     * tarafon ko dena padta hai.
+     *
+     * ⚠️ Ye doosri asli galti thi (pehli upar likhi hai). Boundary keyframe bana
+     * dene ke baad bhi value alag aa rahi thi — kyunki dono aadhon par wahi
+     * purana easing dobara lag raha tha. Ek ease-in-out ke do aadhe ease-in-out
+     * nahi hote; dobara lagane se cut ke aas-paas raftaar badal jaati hai.
+     * `splitEasing` curve ko sach me todta hai, isliye split ke pehle aur baad
+     * ki animation frame-dar-frame ek jaisi rehti hai.
+     */
+    let prev: Keyframe | null = null;
+    let next: Keyframe | null = null;
+    for (const kf of sorted) {
+      if (kf.frame < args.at) prev = kf;
+      else if (kf.frame > args.at && next === null) next = kf;
+    }
+    const halves =
+      prev && next && next.frame > prev.frame
+        ? splitEasing(prev.easing, prev.bezier, (args.at - prev.frame) / (next.frame - prev.frame))
+        : null;
+
+    if (args.side === "before") {
+      const kept = sorted.filter((kf) => kf.frame < args.at).map((kf) => ({ ...kf }));
+      // Aakhri bacha keyframe ab poora curve nahi, uska baayan aadha chalata hai.
+      const last = kept[kept.length - 1];
+      if (last && halves) applyBezier(last, halves.left);
+
+      if (kept.length > 0 || exact) {
+        kept.push(
+          exact
+            ? { ...exact }
+            : {
+                frame: args.at,
+                value: boundary,
+                // Aakhri keyframe ka easing aage kisi kaam ka nahi (uske baad
+                // kuch hai hi nahi), par kuch to hona chahiye.
+                easing: (sorted[sorted.length - 1] as Keyframe).easing,
+                bezier: null,
+              },
+        );
+      }
+      if (kept.length > 0) out[path] = kept;
+      continue;
+    }
+
+    const kept = sorted
+      .filter((kf) => kf.frame > args.at)
+      .map((kf) => ({ ...kf, frame: kf.frame - args.at }));
+
+    if (kept.length > 0 || exact) {
+      const head: Keyframe = exact
+        ? { ...exact, frame: 0 }
+        : {
+            frame: 0,
+            value: boundary,
+            // Curve ka daayan aadha yahan se aage chalta hai.
+            easing: easingBefore(sorted, args.at),
+            bezier: null,
+          };
+      if (!exact && halves) applyBezier(head, halves.right);
+      kept.unshift(head);
+    }
+    if (kept.length > 0) out[path] = kept;
+  }
+  return out;
+}
+
+/**
+ * Keyframe par toda hua curve chipka do.
+ *
+ * `bezier` chalta hai aur `easing` ka naam bhi wahi likh dete hain — taaki
+ * properties panel me jo dikhe wahi sach ho, aur dono kabhi alag na padein.
+ */
+function applyBezier(keyframe: Keyframe, bezier: [number, number, number, number]): void {
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  keyframe.bezier = [round(bezier[0]), round(bezier[1]), round(bezier[2]), round(bezier[3])];
+  keyframe.easing = `cubic-bezier(${keyframe.bezier.join(", ")})`;
+}
+
 /** Deep copy — draft ke andar se plain object nikaalne ka seedha tarika. */
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -232,8 +371,20 @@ export const trimItemStart = defineOp<TrimArgs>("trimItemStart", (draft, args) =
   item.startFrame += delta;
   item.durationInFrames -= delta;
   item.trimStartFrame = Math.max(0, item.trimStartFrame + Math.round(delta * rate));
-  // Keyframes item-local hain, isliye unhe bhi utna hi peeche khiskana padta hai.
-  item.keyframes = shiftKeyframes(clone(item.keyframes), -delta, () => true);
+
+  /*
+   * Keyframes item-local hain, isliye unhe bhi utna hi khiskana padta hai — par
+   * `cutKeyframes` se, sirf shift se nahi. Sirf shift karne par kinare se bahar
+   * gaye keyframes 0 par jam jaate the aur clip ki shuruaati value achanak
+   * badal jaati thi (upar `cutKeyframes` ka ⚠️ dekho).
+   *
+   * Clip ko lamba karne par (delta negative) kaatne ko kuch hai hi nahi — wahan
+   * seedha shift sahi hai, aur pehle keyframe se pehle value waise bhi rukti hai.
+   */
+  item.keyframes =
+    delta > 0
+      ? cutKeyframes(clone(item.keyframes), { at: delta, side: "after" })
+      : shiftKeyframes(clone(item.keyframes), -delta, () => true);
 });
 
 /**
@@ -256,6 +407,16 @@ export const trimItemEnd = defineOp<TrimArgs>("trimItemEnd", (draft, args) => {
   if (source !== undefined && source !== null && source > 0) {
     const left = Math.floor((source - item.trimStartFrame) / item.playbackRate);
     next = Math.max(1, Math.min(next, left));
+  }
+
+  /*
+   * Chhota karne par clip ke bahar chale gaye keyframes bhi sambhalne padte
+   * hain — warna wo doc me pade rehte hain aur clip dobara lambi karne par
+   * achanak wapas aa jaate hain. `cutKeyframes` unhe hata deta hai aur naye
+   * kinare par wahi value jamaa deta hai jo wahan thi.
+   */
+  if (next < item.durationInFrames) {
+    item.keyframes = cutKeyframes(clone(item.keyframes), { at: next, side: "before" });
   }
 
   item.durationInFrames = next;
@@ -307,11 +468,11 @@ function splitOne(draft: DocDraft, item: Draft<Item>, frame: number): void {
   right.trimStartFrame = item.trimStartFrame + sourceOffset;
   // Beech me transition nahi aani chahiye — wo cut ab andar wala cut hai.
   right.transitionIn = { type: "none", durationInFrames: 0 };
-  right.keyframes = shiftKeyframes(originalKeyframes, -leftDuration, (f) => f >= leftDuration);
+  right.keyframes = cutKeyframes(originalKeyframes, { at: leftDuration, side: "after" });
 
   item.durationInFrames = leftDuration;
   item.transitionOut = { type: "none", durationInFrames: 0 };
-  item.keyframes = shiftKeyframes(originalKeyframes, 0, (f) => f <= leftDuration);
+  item.keyframes = cutKeyframes(originalKeyframes, { at: leftDuration, side: "before" });
 
   const at = findItemIndex(draft, item.id);
   draft.items.splice(at + 1, 0, right as Draft<Item>);
@@ -1955,7 +2116,281 @@ export function isSceneCustomEdited(doc: Doc, sceneId: string): boolean {
   return false;
 }
 
+/* ==========================================================================
+ * Phase 13 — keyframes
+ * ========================================================================== */
+
+/**
+ * ⚠️ **Animation aur keyframe ka takraav — ek jagah likha hua niyam (13.12).**
+ *
+ * **Keyframe jeetta hai.** Animation base deti hai, keyframe uske upar likhta
+ * hai. Ye niyam `resolveItemValue()` me pehle se lagu hai (wo pehle keyframe
+ * dekhta hai, phir static value) aur `Transformed` me animation uske **upar**
+ * compose hoti hai.
+ *
+ * Wajah: animation ek preset hai jo aap ek click me lagate ho; keyframe wo cheez
+ * hai jo aapne khud, ek khaas frame par, haath se rakhi hai. Preset ka haath se
+ * rakhi cheez ko mitana hamesha galat lagta hai — aur us galti ki shikayat
+ * "maine keyframe lagaya tha, lagta hi nahi" bankar aati hai, jiski wajah
+ * dhoondhna sabse mushkil hota hai.
+ */
+export const KEYFRAME_BEATS_ANIMATION = true;
+
+function keyframeList(item: Draft<Item>, path: string): Draft<Keyframe>[] {
+  const existing = item.keyframes[path];
+  if (existing) return existing;
+  item.keyframes[path] = [];
+  return item.keyframes[path] as Draft<Keyframe>[];
+}
+
+/** Keyframes ko kram me rakho — sort ek hi jagah, har op ke ant me. */
+function tidyKeyframes(item: Draft<Item>, path: string): void {
+  const list = item.keyframes[path];
+  if (!list) return;
+  if (list.length === 0) {
+    delete item.keyframes[path];
+    return;
+  }
+  list.sort((a, b) => a.frame - b.frame);
+}
+
+export interface AddKeyframeArgs {
+  itemId: string;
+  /** `"transform.scale"` jaisa property path. */
+  path: string;
+  /** Item-local frame (0 = clip ka apna start). */
+  frame: number;
+  value: unknown;
+  easing?: string;
+}
+
+/**
+ * Keyframe lagao ya badlo (13.3).
+ *
+ * ⚠️ Usi frame par pehle se keyframe ho to **naya nahi banta, purana badalta
+ * hai**. Do keyframes ek hi frame par hone se interpolation ka koi matlab nahi
+ * bachta (span 0), aur wo doosra keyframe UI me chhupa reh jaata hai — user use
+ * dekh bhi nahi paata aur hata bhi nahi paata.
+ */
+export const addKeyframe = defineOp<AddKeyframeArgs>("addKeyframe", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const frame = Math.max(0, Math.round(args.frame));
+  const list = keyframeList(item, args.path);
+  const existing = list.find((keyframe) => keyframe.frame === frame);
+
+  if (existing) {
+    existing.value = args.value as never;
+    if (args.easing !== undefined) existing.easing = args.easing;
+  } else {
+    list.push({
+      frame,
+      value: args.value,
+      easing: args.easing ?? DEFAULT_EASING,
+      bezier: null,
+    } as Draft<Keyframe>);
+  }
+  tidyKeyframes(item, args.path);
+});
+
+export interface MoveKeyframeArgs {
+  itemId: string;
+  path: string;
+  fromFrame: number;
+  toFrame: number;
+}
+
+export const moveKeyframe = defineOp<MoveKeyframeArgs>("moveKeyframe", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const list = item.keyframes[args.path];
+  if (!list) throw new TimelineOpError(`"${args.path}" par koi keyframe nahi hai`);
+
+  const keyframe = list.find((entry) => entry.frame === args.fromFrame);
+  if (!keyframe) throw new TimelineOpError(`Frame ${args.fromFrame} par koi keyframe nahi hai`);
+
+  const to = Math.max(0, Math.round(args.toFrame));
+  if (to === args.fromFrame) return;
+
+  /*
+   * Doosre keyframe ke upar chhodne par wo **hat jaata hai**, aur ye soch kar
+   * hai: drag me ungli exact frame par nahi rukti, aur do keyframes ek frame par
+   * baith jaayein to unme se ek hamesha ke liye chhup jaata hai. Hatana dikhta
+   * hai, chhupna nahi — aur Ctrl+Z dono ko wapas laata hai.
+   */
+  const at = list.findIndex((entry) => entry.frame === to);
+  if (at !== -1) list.splice(at, 1);
+
+  keyframe.frame = to;
+  tidyKeyframes(item, args.path);
+});
+
+export interface DeleteKeyframeArgs {
+  itemId: string;
+  path: string;
+  frame: number;
+}
+
+export const deleteKeyframe = defineOp<DeleteKeyframeArgs>("deleteKeyframe", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const list = item.keyframes[args.path];
+  if (!list) return;
+
+  const at = list.findIndex((entry) => entry.frame === args.frame);
+  if (at === -1) return;
+  list.splice(at, 1);
+  tidyKeyframes(item, args.path);
+});
+
+export interface SetKeyframeEasingArgs {
+  itemId: string;
+  path: string;
+  frame: number;
+  easing?: string;
+  /** `[x1,y1,x2,y2]` — curve editor se. `null` = custom curve hata do. */
+  bezier?: [number, number, number, number] | null;
+}
+
+export const setKeyframeEasing = defineOp<SetKeyframeEasingArgs>(
+  "setKeyframeEasing",
+  (draft, args) => {
+    const item = findItem(draft, args.itemId);
+    assertUnlocked(item);
+
+    const keyframe = item.keyframes[args.path]?.find((entry) => entry.frame === args.frame);
+    if (!keyframe) throw new TimelineOpError(`Frame ${args.frame} par koi keyframe nahi hai`);
+
+    if (args.easing !== undefined) keyframe.easing = args.easing;
+    if (args.bezier !== undefined) keyframe.bezier = args.bezier as never;
+  },
+);
+
+export interface ClearKeyframesArgs {
+  itemId: string;
+  /** Khaali = is item ke **saare** keyframes. */
+  path?: string;
+}
+
+/**
+ * Keyframes hatao.
+ *
+ * ⚠️ Hatane se pehle **abhi ki value item par likh di jaati hai**. Iske bina
+ * property ek jhatke me apni purani static value par kood jaati hai — user ne
+ * scale 1 se 1.4 tak animate kiya hota hai, keyframes hataata hai, aur clip
+ * achanak 1 par wapas chali jaati hai. Wo "maine to sirf keyframes hataye the"
+ * wali hairaani sabse bekaar hai.
+ */
+export const clearKeyframes = defineOp<ClearKeyframesArgs>("clearKeyframes", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+
+  const paths = args.path ? [args.path] : Object.keys(item.keyframes);
+  for (const path of paths) {
+    const list = item.keyframes[path];
+    if (!list || list.length === 0) continue;
+
+    // Clip ke shuruaat wali value hi sabse kam chaunkane wali hai.
+    const value = sampleKeyframes(item.keyframes as Record<string, Keyframe[]>, path, 0);
+    if (value !== null && value !== undefined && !PROTECTED_PATHS.has(path.split(".")[0] ?? "")) {
+      setByPath(item, path, value);
+    }
+    delete item.keyframes[path];
+  }
+});
+
+export interface CopyKeyframesArgs {
+  fromItemId: string;
+  fromPath: string;
+  toItemId: string;
+  toPath: string;
+  /** `true` = pehle se maujood keyframes hata do. */
+  replace?: boolean;
+}
+
+/**
+ * Ek property ke keyframes doosri par chipka do (13.10).
+ *
+ * ⚠️ Value **waisi ki waisi** jaati hai, badalti nahi. `transform.x` ke pixels
+ * ko `transform.scale` par chipkane ka nateeja bekaar hoga — par usko rokna bhi
+ * galat hai, kyunki "opacity se volume" jaisi jodi bilkul kaam ki hoti hai. UI
+ * me dono paths dikhte hain; faisla user ka hai, aur Ctrl+Z saath me hai.
+ */
+export const copyKeyframes = defineOp<CopyKeyframesArgs>("copyKeyframes", (draft, args) => {
+  const from = findItem(draft, args.fromItemId);
+  const source = from.keyframes[args.fromPath];
+  if (!source || source.length === 0) {
+    throw new TimelineOpError(`"${args.fromPath}" par koi keyframe nahi hai`);
+  }
+
+  const to = findItem(draft, args.toItemId);
+  assertUnlocked(to);
+
+  const copied = clone(source) as Keyframe[];
+  if (args.replace !== false) {
+    to.keyframes[args.toPath] = copied as never;
+  } else {
+    const list = keyframeList(to, args.toPath);
+    for (const keyframe of copied) {
+      const at = list.findIndex((entry) => entry.frame === keyframe.frame);
+      if (at !== -1) list.splice(at, 1);
+      list.push(keyframe as Draft<Keyframe>);
+    }
+  }
+  tidyKeyframes(to, args.toPath);
+});
+
+export interface ScaleKeyframesArgs {
+  itemId: string;
+  /** Frames is gunak se badalte hain. 2 = animation dugni lambi. */
+  factor: number;
+}
+
+/**
+ * Keyframes ko waqt me kheencho/simeto (13.7).
+ *
+ * Speed badalne par ye zaroori hai: clip 2x tez chalegi to uski lambai aadhi ho
+ * jaayegi, aur keyframes wahin ke wahin rehne par aadhi animation clip ke bahar
+ * chali jaayegi — dikhegi hi nahi, aur wajah bilkul samajh nahi aayegi.
+ */
+export const scaleKeyframes = defineOp<ScaleKeyframesArgs>("scaleKeyframes", (draft, args) => {
+  const item = findItem(draft, args.itemId);
+  assertUnlocked(item);
+  if (!Number.isFinite(args.factor) || args.factor <= 0) {
+    throw new TimelineOpError(`Galat factor: ${args.factor}`);
+  }
+  if (args.factor === 1) return;
+
+  for (const path of Object.keys(item.keyframes)) {
+    const list = item.keyframes[path];
+    if (!list) continue;
+    for (const keyframe of list) {
+      keyframe.frame = Math.max(0, Math.round(keyframe.frame * args.factor));
+    }
+    /*
+     * Simatne par do keyframes ek hi frame par aa sakte hain. Dono rakhne se
+     * span 0 ka segment banta hai aur ek keyframe UI me chhupa reh jaata hai —
+     * isliye ek hi bachta hai (aakhri wala, jo baad ki value dikhata hai).
+     */
+    const seen = new Map<number, Draft<Keyframe>>();
+    for (const keyframe of list) seen.set(keyframe.frame, keyframe);
+    item.keyframes[path] = [...seen.values()].sort((a, b) => a.frame - b.frame) as never;
+  }
+});
+
+/** Item par kaun si properties keyframed hain — lane UI isse rows banata hai. */
+export function keyframedPaths(item: Item): string[] {
+  return Object.entries(item.keyframes)
+    .filter(([, list]) => list.length > 0)
+    .map(([path]) => path)
+    .sort();
+}
+
 export interface ReplaceDocArgs {
+
 
 
 
@@ -2014,6 +2449,13 @@ export const OPS = {
   reorderAnimations,
   setAnimationParam,
   applyAnimationPreset,
+  addKeyframe,
+  moveKeyframe,
+  deleteKeyframe,
+  setKeyframeEasing,
+  clearKeyframes,
+  copyKeyframes,
+  scaleKeyframes,
   setTransition,
   applyAutoFit,
   setProjectSize,

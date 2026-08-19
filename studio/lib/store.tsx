@@ -118,6 +118,16 @@ export interface EditorState {
    * par Ctrl+Z is setting ko bhi ulta deta, jo bilkul galat lagta.
    */
   overlapPolicy: OverlapPolicy;
+  /**
+   * Auto-keyframe (13.4) — on hone par property badalna playhead par keyframe
+   * banata hai, static value nahi.
+   *
+   * ⚠️ Ye default **off** hai aur ye soch kar hai: on rehne par har chhoti si
+   * edit ek keyframe chhod jaati hai, aur do din baad clip par bees keyframes
+   * hote hain jinme se pandrah user ne jaan kar nahi lagaye the. Us gandagi ko
+   * saaf karna keyframe lagane se zyada mehnat ka kaam hai.
+   */
+  autoKeyframe: boolean;
   mode: "beginner" | "advanced";
   leftPanelId: string;
 
@@ -147,6 +157,7 @@ export interface EditorState {
   markOut(frame: number): void;
   clearInOut(): void;
   setOverlapPolicy(policy: OverlapPolicy): void;
+  setAutoKeyframe(value: boolean): void;
   setMode(mode: "beginner" | "advanced"): void;
   setLeftPanel(id: string): void;
   clearOpError(): void;
@@ -317,6 +328,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       inFrame: null,
       outFrame: null,
       overlapPolicy: DEFAULT_OVERLAP_POLICY,
+      autoKeyframe: false,
       mode: readMode(project.id),
       leftPanelId: "media",
 
@@ -454,6 +466,9 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
       setOverlapPolicy(overlapPolicy) {
         set({ overlapPolicy });
+      },
+      setAutoKeyframe(autoKeyframe) {
+        set({ autoKeyframe });
       },
       setMode(mode) {
         set({ mode });

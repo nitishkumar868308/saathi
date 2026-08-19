@@ -118,6 +118,16 @@ export const KeyframeSchema = z.object({
   frame: FrameSchema,
   value: z.unknown(),
   easing: EasingSchema.default(DEFAULT_EASING),
+  /**
+   * Apna curve — `[x1, y1, x2, y2]`, bilkul CSS ke `cubic-bezier()` jaisa (13.2).
+   *
+   * ⚠️ Ye `easing` ki jagah nahi, uske **upar** hai: bezier diya ho to wahi
+   * chalta hai. Do alag fields isliye hain ki dropdown se chuna hua easing (jo
+   * 95% baar kaafi hota hai) padhne me saaf rahe, aur curve editor se banaya
+   * hua custom curve uske saath baith sake — bina har keyframe me chaar number
+   * bhare.
+   */
+  bezier: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable().default(null),
 });
 
 /** Key = property path (`"transform.scale"`), value = us path ke keyframes. */

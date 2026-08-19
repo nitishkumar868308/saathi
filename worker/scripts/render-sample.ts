@@ -37,6 +37,7 @@ import {
   storageKey,
   type Doc,
   type Item,
+  resolveItemValue,
 } from "@reel/core";
 import {
   createStorageDriver,
@@ -189,6 +190,8 @@ async function makePlaceholderMedia(dir: string): Promise<{
 interface SampleDoc {
   doc: Doc;
   imageItem: Item;
+  textItem: Item;
+  panTo: number;
   kenBurnsFrom: number;
   kenBurnsTo: number;
 }
@@ -211,7 +214,7 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
   });
 
   const [videoTrack, overlayTrack, textTrack, audioTrack] = doc.tracks;
-  const { fps, height } = doc.project;
+  const { fps, width, height } = doc.project;
 
   const imageSeconds = 5;
   const videoSeconds = 5;
@@ -222,6 +225,8 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
 
   const kenBurnsFrom = 1;
   const kenBurnsTo = 1.4;
+  // Pan chaudai ke hisaab se — dono orientation me chaukor frame ke andar rehta hai.
+  const panTo = Math.round(width * 0.06);
 
   // --- 1. Image + Ken Burns ---
   // Zoom `transform.scale` ke do keyframes hai, aur bas. Koi "kenburns feature"
@@ -233,12 +238,23 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
     assetId: assetIds.image,
     startFrame: 0,
     durationInFrames: imageFrames,
+    /*
+     * Do property ek saath keyframed hain, aur easing **ease-in-out** hai — linear
+     * nahi (13.13).
+     *
+     * Linear se check aasan ho jaata par wo saabit kuch nahi karta: seedhi line to
+     * bina engine ke bhi nikal aati hai. Ease-in-out par expected value engine se
+     * hi aati hai, isliye ye check sach me ye naapta hai ki **render wahi curve
+     * chala raha hai jo preview chalata hai**.
+     */
     keyframes: {
       "transform.scale": [
-        // Easing linear jaan-boojhkar: tab expected scale ek seedhi line hai
-        // aur naapa hua number theek se predict kiya ja sakta hai.
-        { frame: 0, value: kenBurnsFrom, easing: "linear" },
-        { frame: imageFrames, value: kenBurnsTo, easing: "linear" },
+        { frame: 0, value: kenBurnsFrom, easing: "ease-in-out", bezier: null },
+        { frame: imageFrames, value: kenBurnsTo, easing: "ease-in-out", bezier: null },
+      ],
+      "transform.x": [
+        { frame: 0, value: 0, easing: "ease-in-out", bezier: null },
+        { frame: imageFrames, value: panTo, easing: "ease-in-out", bezier: null },
       ],
     },
   });
@@ -286,6 +302,14 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
       letterSpacing: 2,
     },
     transform: { y: Math.round(height * 0.28) },
+    // Teesri keyframed property — aur teeno alag alag item par, taaki ye bhi
+    // saabit ho ki keyframes item-local hain (13.6).
+    keyframes: {
+      "transform.opacity": [
+        { frame: 0, value: 1, easing: "linear", bezier: null },
+        { frame: durationFromSeconds(totalSeconds - 2, fps), value: 0, easing: "linear", bezier: null },
+      ],
+    },
   });
   doc = addItem(doc, { item: textItem });
 
@@ -310,7 +334,7 @@ function buildSampleDoc(args: Args, assetIds: { image: string; video: string; au
   // Project ki lambai items ke hisaab se exact — trailing khaali jagah nahi.
   doc = recomputeDuration(doc, undefined);
 
-  return { doc, imageItem, kenBurnsFrom, kenBurnsTo };
+  return { doc, imageItem, textItem, kenBurnsFrom, kenBurnsTo, panTo };
 }
 
 // ---------------------------------------------------- pixel-level measurement
@@ -354,6 +378,47 @@ async function measureBrightRun(
 }
 
 /**
+ * Ek row me safed pixels ka **poora phaila hua hissa** — pehla, aakhri aur ginti.
+ *
+ * Sirf ginti se scale naap jaata hai; pehla/aakhri milne par uska **beech** bhi
+ * mil jaata hai, aur usse pan (transform.x) naapa ja sakta hai. Ek hi frame se
+ * do property, isliye render bhi ek hi baar padhna padta hai.
+ */
+async function measureBrightSpan(
+  video: string,
+  atSeconds: number,
+  width: number,
+  height: number,
+  scratchDir: string,
+  rowFraction = 0.5,
+): Promise<{ count: number; center: number | null }> {
+  const rawPath = resolve(scratchDir, `span-${randomUUID()}.gray`);
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-i", video,
+    "-ss", atSeconds.toFixed(4),
+    "-frames:v", "1",
+    "-f", "rawvideo", "-pix_fmt", "gray",
+    rawPath,
+  ]);
+  const bytes = await readFile(rawPath);
+  await rm(rawPath, { force: true });
+
+  const offset = Math.floor(height * rowFraction) * width;
+  let first = -1;
+  let last = -1;
+  let count = 0;
+  for (let x = 0; x < width; x += 1) {
+    if ((bytes[offset + x] ?? 0) > 200) {
+      if (first < 0) first = x;
+      last = x;
+      count += 1;
+    }
+  }
+  return { count, center: first < 0 ? null : (first + last) / 2 };
+}
+
+/**
  * Frame ke ek column ki average brightness. Blurred background hai ya kaali patti —
  * yahi ek number dono me farak kar deta hai.
  */
@@ -380,6 +445,46 @@ async function measureMeanBrightness(
   let total = 0;
   for (let y = 0; y < height; y += 1) total += bytes[y * width + column] ?? 0;
   return total / height;
+}
+
+/**
+ * Ek row ke **beech waale hisse** ka sabse chamakdaar pixel.
+ *
+ * Ginti (bright pixel count) fade naapne ke kaam nahi aayi: 200 ka threshold ek
+ * khai hai, aur opacity 0.5 par hi text uske neeche chala jaata hai — naap 277 se
+ * seedha 0 par kood jaati hai. Peak brightness dheere-dheere girti hai, isliye
+ * beech ke kadam bhi dikhte hain.
+ *
+ * Sirf beech ka 60% padha jaata hai — utna hissa caption band ke andar hai, aur
+ * band opaque hai. Kinare tak jaate to peeche ki image ka koi chamakdaar pixel
+ * naap me ghus jaata.
+ */
+async function measureRowPeak(
+  video: string,
+  atSeconds: number,
+  width: number,
+  height: number,
+  scratchDir: string,
+  rowFraction: number,
+): Promise<number> {
+  const rawPath = resolve(scratchDir, `peak-${randomUUID()}.gray`);
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-i", video,
+    "-ss", atSeconds.toFixed(4),
+    "-frames:v", "1",
+    "-f", "rawvideo", "-pix_fmt", "gray",
+    rawPath,
+  ]);
+  const bytes = await readFile(rawPath);
+  await rm(rawPath, { force: true });
+
+  const offset = Math.floor(height * rowFraction) * width;
+  const from = Math.floor(width * 0.2);
+  const to = Math.ceil(width * 0.8);
+  let peak = 0;
+  for (let x = from; x < to; x += 1) peak = Math.max(peak, bytes[offset + x] ?? 0);
+  return peak;
 }
 
 /** Video sach me aawaz wali hai ya khaali track hai? */
@@ -531,40 +636,69 @@ async function main(): Promise<void> {
     `mean_volume ${meanDb} dB`,
   );
 
-  section("8. Ken Burns — naapa hua, dekha hua nahi");
+  section("8. keyframes — naapa hua, dekha hua nahi (13.13)");
   /*
-   * Safed chaukor ki asli chaudai = 400 * coverScale * kenBurnsScale.
-   * coverScale = max(width, height) / 2560  (source square hai).
+   * Safed chaukor ki asli chaudai = 400 * coverScale * scale(frame),
+   * aur uska beech = frame ka center + x(frame).
+   *
+   * ⚠️ `expected` **engine se** aata hai (`resolveItemValue`), haath se likhe
+   * formula se nahi. Aur yahi is check ka poora matlab hai: agar render apna
+   * alag curve chalata, to pixel engine ki value se hat jaate. Isliye ye "preview
+   * = render" ka seedha saboot hai, sirf "kuch to hil raha hai" nahi.
    */
   const coverScale = Math.max(width, height) / SOURCE.width;
   const imageFrames = sample.imageItem.durationInFrames;
-  const samplesAt = [0.1, 0.5, 0.9];
-  const measured: number[] = [];
+  /*
+   * Aakhri frame se 10 peeche rukte hain — aur ye ek naapi hui zaroorat hai.
+   * `imageFrames - 1` par check fail hua tha: 4.967s par seek karne par ffmpeg
+   * agla frame de deta tha, jahan image khatam ho kar video item shuru ho chuka
+   * hai. Naap galat nahi thi, jagah galat thi.
+   */
+  const sampleFrames = [0, Math.round(imageFrames * 0.3), Math.round(imageFrames * 0.6), imageFrames - 10];
+  const measuredWidths: number[] = [];
 
   await mkdir(framesDir, { recursive: true });
 
-  for (const fraction of samplesAt) {
-    const localFrame = Math.round(imageFrames * fraction);
+  for (const localFrame of sampleFrames) {
     const seconds = framesToSeconds(localFrame, fps);
-    const kenBurns =
-      sample.kenBurnsFrom + (sample.kenBurnsTo - sample.kenBurnsFrom) * (localFrame / imageFrames);
-    const expected = SOURCE.squareSide * coverScale * kenBurns;
+    const scale = resolveItemValue<number>(sample.imageItem, "transform.scale", localFrame);
+    const panX = resolveItemValue<number>(sample.imageItem, "transform.x", localFrame);
 
-    const actual = await measureBrightRun(finalOut, seconds, width, height, scratchDir);
-    measured.push(actual);
+    const expectedWidth = SOURCE.squareSide * coverScale * scale;
+    const expectedCenter = width / 2 + panX;
+
+    const span = await measureBrightSpan(finalOut, seconds, width, height, scratchDir);
+    measuredWidths.push(span.count);
+
     check(
-      `frame ${localFrame} (${seconds.toFixed(2)}s): safed chaukor ${actual}px`,
-      Math.abs(actual - expected) <= 4,
-      `expected ${expected.toFixed(1)}px @ scale ${kenBurns.toFixed(3)}`,
+      `frame ${localFrame} (${seconds.toFixed(2)}s): scale -> chaukor ${span.count}px`,
+      Math.abs(span.count - expectedWidth) <= 4,
+      `expected ${expectedWidth.toFixed(1)}px @ scale ${scale.toFixed(4)}`,
+    );
+    check(
+      `frame ${localFrame}: pan -> chaukor ka beech ${span.center?.toFixed(1) ?? "—"}px`,
+      span.center !== null && Math.abs(span.center - expectedCenter) <= 4,
+      `expected ${expectedCenter.toFixed(1)}px @ x ${panX.toFixed(2)}`,
     );
 
     await extractFrame(finalOut, resolve(framesDir, `frame-${localFrame}.png`), seconds);
   }
 
+  /*
+   * Ease-in-out ka apna nishaan: shuruaat aur ant dheeme, beech tez. Yaani beech
+   * ke do samples ka farak kinaron ke farak se bada hona chahiye. Linear hota to
+   * teeno farak barabar aate — isliye ye check curve ki **shakl** pakadta hai,
+   * sirf "bada ho raha hai" nahi.
+   */
+  const steps = [
+    (measuredWidths[1] ?? 0) - (measuredWidths[0] ?? 0),
+    (measuredWidths[2] ?? 0) - (measuredWidths[1] ?? 0),
+    (measuredWidths[3] ?? 0) - (measuredWidths[2] ?? 0),
+  ];
   check(
-    "chaukor sach me bada ho raha hai (zoom chal raha hai)",
-    (measured[0] ?? 0) < (measured[1] ?? 0) && (measured[1] ?? 0) < (measured[2] ?? 0),
-    measured.join(" -> "),
+    "curve sach me ease-in-out hai (beech tez, kinare dheeme)",
+    (steps[1] ?? 0) > (steps[0] ?? 0) && (steps[1] ?? 0) > (steps[2] ?? 0),
+    `steps: ${steps.map((n) => n.toFixed(0)).join(" / ")}`,
   );
 
   section("9. blurred background (README 3B) sach me dikha?");
@@ -601,6 +735,42 @@ async function main(): Promise<void> {
   );
   check("caption row me text ke pixels mile", brightInTextRow > 0, `${brightInTextRow} bright px`);
   await extractFrame(finalOut, resolve(framesDir, "frame-text.png"), textFrameSeconds);
+
+  /*
+   * Teesri keyframed property: text ka `transform.opacity` 1 -> 0.
+   *
+   * Ise chaudai se nahi naapa ja sakta (text ki chaudai nahi badalti), isliye us
+   * row ka **sabse chamakdaar pixel** naapte hain. Opacity girte hi text peeche ke
+   * terracotta band me ghulta jaata hai aur peak brightness girti jaati hai.
+   *
+   * ⚠️ Pehle yahan row ki **average roshni** naapi gayi thi, aur wo galat tha —
+   * check fail hua (135 -> 123 -> 128, bina kisi kram ke). Wajah: aakhri sample
+   * 7.8s par hai jahan peeche image nahi, video item chal raha hai. Yaani row ka
+   * average opacity se kam aur background se zyada bata raha tha. Band opaque hai,
+   * isliye **band ke andar ke** safed pixels sirf text ke hote hain — unki ginti
+   * background se bilkul nahi hilti.
+   *
+   * Theek number ki jagah **ghatta hua kram** naapa gaya hai, aur ye bhi
+   * jaan-boojhkar: text anti-aliased hai, to "opacity 0.5 par exactly itne pixel"
+   * ka daawa jhootha hota.
+   */
+  const textItem = sample.textItem;
+  const fadeCounts: number[] = [];
+  for (const fraction of [0.1, 0.5, 0.9]) {
+    const localFrame = Math.round(textItem.durationInFrames * fraction);
+    const seconds = framesToSeconds(textItem.startFrame + localFrame, fps);
+    const opacity = resolveItemValue<number>(textItem, "transform.opacity", localFrame);
+    const peak = await measureRowPeak(
+      finalOut, seconds, width, height, scratchDir, textRowFraction,
+    );
+    fadeCounts.push(peak);
+    console.log(`  .. frame ${localFrame}: opacity ${opacity.toFixed(3)} -> peak ${peak}`);
+  }
+  check(
+    "text ka opacity keyframe sach me fade kar raha hai",
+    (fadeCounts[0] ?? 0) > (fadeCounts[1] ?? 0) && (fadeCounts[1] ?? 0) > (fadeCounts[2] ?? 0),
+    `peak: ${fadeCounts.join(" -> ")}`,
+  );
 
   section("11. waqt");
   console.log(`  bundle + render : ${(renderResult.totalMs / 1000).toFixed(1)}s`);

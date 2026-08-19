@@ -17,6 +17,7 @@ import { useState } from "react";
 
 import { AnimationSection } from "@/components/editor/properties/AnimationSection";
 import { controlComponent } from "@/components/controls";
+import { KeyframeButton } from "@/components/controls/KeyframeButton";
 import { NumberField } from "@/components/controls/NumberField";
 import { Button } from "@/components/ui/Button";
 import { useAssetDurations } from "@/lib/assetMeta";
@@ -44,6 +45,9 @@ export function PropertiesPanel() {
   const selection = useEditorStore((state) => state.selection);
   const applyOp = useEditorStore((state) => state.applyOp);
   const setSelection = useEditorStore((state) => state.setSelection);
+
+  const playheadFrame = useEditorStore((state) => state.playheadFrame);
+  const autoKeyframe = useEditorStore((state) => state.autoKeyframe);
 
   const items = doc.items.filter((item) => selection.itemIds.includes(item.id));
 
@@ -94,37 +98,92 @@ export function PropertiesPanel() {
             {group.controls.map((control) => {
               const Control = controlComponent(control.control);
               const value = commonValue(items, control.path);
+              // Playhead clip ke apne start se — keyframes item-local hote hain.
+              const localFrame = playheadFrame - first.startFrame;
 
               return (
-                <Control
+                <div
                   key={`${control.path}:${control.control}:${control.label}`}
-                  control={control}
-                  value={value}
-                  disabled={locked}
-                  onChange={(next) =>
-                    applyOp(
-                      "setItemsProperty",
-                      { itemIds: items.map((item) => item.id), path: control.path, value: next },
-                      {
-                        label: control.label,
-                        // Slider ghumate waqt har frame ki apni undo entry banane
-                        // se Ctrl+Z bekaar ho jaata hai — ek drag = ek entry.
-                        coalesceKey: `prop:${control.path}:${items.map((item) => item.id).join(",")}`,
-                      },
-                    )
-                  }
-                  onReset={() =>
-                    applyOp(
-                      "setItemsProperty",
-                      {
-                        itemIds: items.map((item) => item.id),
-                        path: control.path,
-                        value: defaultValue(first.type, control.path, doc.project.fps),
-                      },
-                      { label: `${control.label} reset` },
-                    )
-                  }
-                />
+                  className="flex items-start gap-1 pr-2"
+                >
+                  <span className="min-w-0 flex-1">
+                    <Control
+                      control={control}
+                      value={value}
+                      disabled={locked}
+                      onChange={(next) => {
+                        /*
+                         * Auto-keyframe (13.4): on ho aur property keyframable
+                         * ho to badlaav playhead par ek keyframe banta hai,
+                         * static value nahi.
+                         *
+                         * ⚠️ Ye sirf single selection me chalta hai. Multi-select
+                         * me har clip ka apna local frame hota hai (sab alag
+                         * jagah shuru hoti hain), aur ek hi frame number sab par
+                         * lagana galat keyframes bana deta — jo baad me
+                         * dhoondhna namumkin hota.
+                         */
+                        if (
+                          autoKeyframe &&
+                          control.keyframable &&
+                          items.length === 1 &&
+                          localFrame >= 0 &&
+                          localFrame < first.durationInFrames
+                        ) {
+                          applyOp(
+                            "addKeyframe",
+                            {
+                              itemId: first.id,
+                              path: control.path,
+                              frame: localFrame,
+                              value: next,
+                            },
+                            {
+                              label: `${control.label} keyframe`,
+                              coalesceKey: `kf:${first.id}:${control.path}:${localFrame}`,
+                            },
+                          );
+                          return;
+                        }
+
+                        applyOp(
+                          "setItemsProperty",
+                          { itemIds: items.map((item) => item.id), path: control.path, value: next },
+                          {
+                            label: control.label,
+                            // Slider ghumate waqt har frame ki apni undo entry
+                            // banane se Ctrl+Z bekaar ho jaata hai — ek drag =
+                            // ek entry.
+                            coalesceKey: `prop:${control.path}:${items.map((item) => item.id).join(",")}`,
+                          },
+                        );
+                      }}
+                      onReset={() =>
+                        applyOp(
+                          "setItemsProperty",
+                          {
+                            itemIds: items.map((item) => item.id),
+                            path: control.path,
+                            value: defaultValue(first.type, control.path, doc.project.fps),
+                          },
+                          { label: `${control.label} reset` },
+                        )
+                      }
+                    />
+                  </span>
+
+                  {/* Diamond sirf keyframable properties par — registry se (13.5). */}
+                  {control.keyframable && items.length === 1 ? (
+                    <span className="pt-1.5">
+                      <KeyframeButton
+                        item={first}
+                        path={control.path}
+                        value={isMixed(value) ? undefined : value}
+                        localFrame={localFrame}
+                      />
+                    </span>
+                  ) : null}
+                </div>
               );
             })}
           </div>

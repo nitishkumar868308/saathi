@@ -18,6 +18,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { Clip } from "@/components/editor/timeline/Clip";
 import { Ruler } from "@/components/editor/timeline/Ruler";
+import { KeyframeLanes } from "@/components/editor/timeline/KeyframeLane";
 import { TrackHeader } from "@/components/editor/timeline/TrackHeader";
 import { useClipDrag } from "@/components/editor/timeline/useClipDrag";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -75,6 +76,8 @@ export function TimelineView() {
   const inFrame = useEditorStore((state) => state.inFrame);
   const outFrame = useEditorStore((state) => state.outFrame);
   const overlapPolicy = useEditorStore((state) => state.overlapPolicy);
+  const autoKeyframe = useEditorStore((state) => state.autoKeyframe);
+  const setAutoKeyframe = useEditorStore((state) => state.setAutoKeyframe);
   const setOverlapPolicy = useEditorStore((state) => state.setOverlapPolicy);
   const applyOp = useEditorStore((state) => state.applyOp);
   const playback = usePlayback();
@@ -337,6 +340,8 @@ export function TimelineView() {
         fps={fps}
         overlapPolicy={overlapPolicy}
         onOverlapPolicy={setOverlapPolicy}
+        autoKeyframe={autoKeyframe}
+        onToggleAutoKeyframe={() => setAutoKeyframe(!autoKeyframe)}
         hasRange={hasRange}
         onCutRange={() =>
           applyOp(
@@ -353,6 +358,23 @@ export function TimelineView() {
           )
         }
       />
+
+      {/*
+        * Keyframe lanes (13.8) — sirf **ek** clip par. Multi-select me har clip
+        * ka apna local frame hota hai; unhe ek hi lane me dikhana matlab
+        * alag-alag paimane ki cheezein ek lakeer par rakhna, jo padhne me jhooth
+        * hota hai.
+        */}
+      {selection.itemIds.length === 1
+        ? (() => {
+            const only = doc.items.find((item) => item.id === selection.itemIds[0]);
+            return only ? (
+              <div className="max-h-32 shrink-0 overflow-auto">
+                <KeyframeLanes item={only} pxPerFrame={pxPerFrame} contentX={contentX} />
+              </div>
+            ) : null;
+          })()
+        : null}
 
       <div className="flex min-h-0 flex-1">
         {/* Headers ka column — scroll ke saath khud chalta hai (upar dekho). */}
@@ -528,6 +550,8 @@ function Toolbar(props: {
   fps: number;
   overlapPolicy: OverlapPolicy;
   onOverlapPolicy(policy: OverlapPolicy): void;
+  autoKeyframe: boolean;
+  onToggleAutoKeyframe(): void;
   hasRange: boolean;
   onCutRange(): void;
   onKeepRange(): void;
@@ -562,6 +586,30 @@ function Toolbar(props: {
       <span className="font-mono text-[11px] text-chalk-500">
         {props.pxPerFrame.toFixed(2)} px/frame
       </span>
+
+      {/*
+        * Auto-keyframe (13.4). Default off hai: on rehne par har chhoti edit ek
+        * keyframe chhod jaati hai, aur do din baad clip par bees keyframes hote
+        * hain jinme se pandrah user ne jaan kar nahi lagaye. Us gandagi ko saaf
+        * karna keyframe lagane se zyada mehnat ka kaam hai.
+        */}
+      <button
+        type="button"
+        onClick={() => props.onToggleAutoKeyframe()}
+        title={
+          props.autoKeyframe
+            ? "Auto-keyframe ON — property badalne par playhead par keyframe banega"
+            : "Auto-keyframe OFF — property seedhi badlegi (keyframe ke liye panel me diamond dabao)"
+        }
+        className={clsx(
+          "rounded-md border px-2 py-1 text-[11px] transition-colors",
+          props.autoKeyframe
+            ? "border-amber/50 bg-amber/15 text-amber"
+            : "border-ink-600 text-chalk-500 hover:bg-ink-700",
+        )}
+      >
+        Auto-KF
+      </button>
 
       {/*
        * Overlap policy (8.9) — ek hi jagah, aur har op yahi maanta hai.

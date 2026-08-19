@@ -1,5 +1,5 @@
 import { getByPath } from "../path";
-import { getEasingFunction } from "./easing";
+import { cubicBezier, getEasingFunction } from "./easing";
 import type { Item, Keyframe } from "../schema/project";
 
 /*
@@ -23,6 +23,67 @@ export * from "./easing";
  *    isliye koi bhi nayi property apne aap keyframable ho jaati hai
  */
 
+/* ------------------------------------------------------------ rang (13.1) */
+
+/** `#rgb`, `#rrggbb`, `#rrggbbaa` — teeno chalte hain. */
+export function parseHexColor(value: string): [number, number, number, number] | null {
+  const text = value.trim();
+  if (!text.startsWith("#")) return null;
+
+  const hex = text.slice(1);
+  const expand = (part: string): number => Number.parseInt(part.repeat(2), 16);
+
+  if (hex.length === 3 || hex.length === 4) {
+    const parts = hex.split("").map(expand);
+    if (parts.some((n) => Number.isNaN(n))) return null;
+    return [parts[0] as number, parts[1] as number, parts[2] as number, (parts[3] ?? 255) as number];
+  }
+  if (hex.length === 6 || hex.length === 8) {
+    const parts: number[] = [];
+    for (let i = 0; i < hex.length; i += 2) parts.push(Number.parseInt(hex.slice(i, i + 2), 16));
+    if (parts.some((n) => Number.isNaN(n))) return null;
+    return [parts[0] as number, parts[1] as number, parts[2] as number, (parts[3] ?? 255) as number];
+  }
+  return null;
+}
+
+function toHex(rgba: [number, number, number, number]): string {
+  const part = (n: number): string =>
+    Math.round(Math.min(255, Math.max(0, n)))
+      .toString(16)
+      .padStart(2, "0");
+  const [r, g, b, a] = rgba;
+  // Alpha 255 par usko likhna hi nahi — `#ff0000` padhne me `#ff0000ff` se
+  // behtar hai, aur CSS dono ko ek jaisa samajhta hai.
+  return a >= 255 ? `#${part(r)}${part(g)}${part(b)}` : `#${part(r)}${part(g)}${part(b)}${part(a)}`;
+}
+
+/**
+ * Do rangon ke beech ka rang (13.1).
+ *
+ * ⚠️ Ye **sRGB me** mila jaata hai, kisi behtar rang-space me nahi. Wajah
+ * imaandaari hai: browser ka CSS transition bhi sRGB me milata hai, aur preview
+ * (CSS) aur render (Chromium) dono ka nateeja bilkul ek hona chahiye. "Sahi"
+ * rang-space (Oklab) chun'ne par preview aur MP4 me halka sa farak aa jaata,
+ * aur wo farak sirf side-by-side dekh kar pakda jaata hai.
+ *
+ * ⚠️ Brand token (`brand.primary`) yahan interpolate **nahi** hota — wo render
+ * ke waqt asli rang banta hai. Aadha-token jaisi koi cheez hoti hi nahi, isliye
+ * aise me value jhatke se badalti hai.
+ */
+export function blendColors(from: string, to: string, t: number): string | null {
+  const a = parseHexColor(from);
+  const b = parseHexColor(to);
+  if (!a || !b) return null;
+
+  return toHex([
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+    a[3] + (b[3] - a[3]) * t,
+  ]);
+}
+
 /**
  * Do keyframes ke beech ka easing **baayen** keyframe se aata hai.
  *
@@ -34,14 +95,43 @@ export * from "./easing";
 function blend(a: Keyframe, b: Keyframe, frame: number): unknown {
   const span = b.frame - a.frame;
   const t = span <= 0 ? 1 : (frame - a.frame) / span;
-  const eased = getEasingFunction(a.easing)(Math.min(1, Math.max(0, t)));
+  const clamped = Math.min(1, Math.max(0, t));
+
+  /*
+   * Custom bezier `easing` ke **upar** chalta hai (13.2). Dono fields isliye
+   * hain ki dropdown wala easing (jo 95% baar kaafi hota hai) padhne me saaf
+   * rahe, aur curve editor ka custom curve uske saath baith sake.
+   */
+  const curve = a.bezier
+    ? cubicBezier(a.bezier[0], a.bezier[1], a.bezier[2], a.bezier[3])
+    : getEasingFunction(a.easing);
+  const eased = curve(clamped);
 
   if (typeof a.value === "number" && typeof b.value === "number") {
     return a.value + (b.value - a.value) * eased;
   }
-  // Number ke alawa (rang, string, boolean) abhi interpolate nahi hote — aadha
-  // rang dena aadha jhooth hota. Phase 13/14 me colour interpolation aayega;
-  // tab tak value jhatke se badalti hai, jo kam se kam imaandaar hai.
+
+  // Vector (anchor, crop ke kone) — har hissa alag se mila jaata hai.
+  if (Array.isArray(a.value) && Array.isArray(b.value) && a.value.length === b.value.length) {
+    const from = a.value as unknown[];
+    const to = b.value as unknown[];
+    if (from.every((n) => typeof n === "number") && to.every((n) => typeof n === "number")) {
+      return (from as number[]).map(
+        (value, index) => value + (((to as number[])[index] as number) - value) * eased,
+      );
+    }
+  }
+
+  if (typeof a.value === "string" && typeof b.value === "string") {
+    const color = blendColors(a.value, b.value, eased);
+    if (color !== null) return color;
+  }
+
+  /*
+   * Baaki sab (boolean, brand token, koi bhi string) jhatke se badalta hai.
+   * Aadha `true` ya aadha `brand.primary` jaisi koi cheez hoti hi nahi, aur
+   * kuch bana kar dena jhooth hoga.
+   */
   return eased >= 1 ? b.value : a.value;
 }
 
@@ -59,9 +149,7 @@ export function sampleKeyframes(
   const list = keyframes[path];
   if (!list || list.length === 0) return null;
 
-  // Doc me keyframes kabhi bhi bina order ke aa sakte hain (AI patch, template,
-  // haath se editing) — isliye har baar sort karke chalte hain.
-  const sorted = [...list].sort((a, b) => a.frame - b.frame);
+  const sorted = sortedKeyframes(list);
   const first = sorted[0] as Keyframe;
   const last = sorted[sorted.length - 1] as Keyframe;
 
@@ -71,12 +159,46 @@ export function sampleKeyframes(
   if (localFrame <= first.frame) return first.value;
   if (localFrame >= last.frame) return last.value;
 
-  for (let i = 0; i < sorted.length - 1; i += 1) {
-    const a = sorted[i] as Keyframe;
-    const b = sorted[i + 1] as Keyframe;
-    if (localFrame >= a.frame && localFrame <= b.frame) return blend(a, b, localFrame);
+  /*
+   * Binary search (13.11).
+   *
+   * ⚠️ Linear scan bilkul theek chalta hai — jab tak nahi chalta. 500 keyframes
+   * wale project me har frame par poori list chhaanni padti hai, aur wo kaam
+   * **har item ke har property par, har frame par** hota hai. 30fps ki 30s reel
+   * me wo lakhon comparison ban jaata hai aur playback hakla jaata hai. Binary
+   * search me wahi kaam ~9 kadam me ho jaata hai.
+   */
+  let low = 0;
+  let high = sorted.length - 1;
+  while (high - low > 1) {
+    const mid = (low + high) >> 1;
+    if ((sorted[mid] as Keyframe).frame <= localFrame) low = mid;
+    else high = mid;
   }
-  return last.value;
+  return blend(sorted[low] as Keyframe, sorted[high] as Keyframe, localFrame);
+}
+
+/**
+ * Keyframes ko kram me lao — **cache ke saath**.
+ *
+ * Doc me keyframes kabhi bhi bina order ke aa sakte hain (AI patch, template,
+ * haath se editing), isliye sort zaroori hai. Par har frame par sort karna
+ * binary search ka poora faayda kha jaata hai — sort O(n log n) hai aur search
+ * O(log n).
+ *
+ * ⚠️ Cache ki chaabi **array ka reference** hai (WeakMap), uski copy nahi. Immer
+ * har badlaav par nayi array deta hai, isliye purani entry apne aap bekaar ho
+ * jaati hai aur GC use utha leta hai — stale value dikhne ka koi raasta hi nahi.
+ */
+const sortCache = new WeakMap<readonly Keyframe[], Keyframe[]>();
+
+export function sortedKeyframes(list: readonly Keyframe[]): readonly Keyframe[] {
+  const cached = sortCache.get(list);
+  if (cached) return cached;
+
+  const sorted = [...list].sort((a, b) => a.frame - b.frame);
+  sortCache.set(list, sorted);
+  return sorted;
 }
 
 /**

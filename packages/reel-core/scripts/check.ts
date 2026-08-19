@@ -35,6 +35,18 @@ import {
   createHistory,
   ANIMATION_PRESETS,
   BUILTIN_FONTS,
+  KEYFRAME_BEATS_ANIMATION,
+  addKeyframe,
+  blendColors,
+  clearKeyframes,
+  copyKeyframes,
+  deleteKeyframe,
+  moveKeyframe,
+  setKeyframeEasing,
+  resolveItemValue,
+  sampleKeyframes,
+  scaleKeyframes,
+  type Keyframe,
   addScene,
   deleteScene,
   duplicateScene,
@@ -676,15 +688,30 @@ test("SPLIT keyframes dono hisson me baant deta hai", () => {
   const left = itemById(split, id);
   const right = split.items[split.items.indexOf(left) + 1]!;
 
+  /*
+   * Cut ke bindu par dono taraf ek **naya** keyframe banta hai (13.6). Isliye
+   * left me 30 aur right me 0 dikhta hai jo pehle nahi tha.
+   *
+   * Bina uske daayein tukde ki shuruaat 1.3 (agla keyframe) par ja rahi thi
+   * jabki cut se theek pehle value ~1.15 thi — yaani cut par ek jhatka. Ye extra
+   * keyframe hi wo jhatka rokta hai.
+   */
   assert.deepEqual(
     left.keyframes["transform.scale"]!.map((k) => k.frame),
-    [0, 20],
-    "left ke paas apne hisse ke keyframes",
+    [0, 20, 30],
+    "left ke paas apne hisse ke keyframes + cut par ek",
   );
   assert.deepEqual(
     right.keyframes["transform.scale"]!.map((k) => k.frame),
-    [30],
-    "right ke keyframes item-local ho jaate hain (60 - 30)",
+    [0, 30],
+    "right ke keyframes item-local ho jaate hain (60 - 30), aage cut par ek",
+  );
+  assert.ok(
+    Math.abs(
+      (right.keyframes["transform.scale"]![0]!.value as number) -
+        (left.keyframes["transform.scale"]![2]!.value as number),
+    ) < 1e-9,
+    "cut ke dono taraf value ek hi hai",
   );
 });
 
@@ -1590,15 +1617,16 @@ test("keyframes sahi tukde par jaate hain aur item-local rehte hain", () => {
   const left = itemById(next, ids[1]!);
   const right = next.items.find((item) => item.startFrame === 150 && item.id !== ids[1]!)!;
 
+  // 50 aur 0 wale cut ke keyframes hain — inhi se value cut par nahi kood'ti (13.6).
   assert.deepEqual(
     left.keyframes["transform.scale"]?.map((kf) => kf.frame),
-    [10],
-    "baayein wale par sirf pehla keyframe",
+    [10, 50],
+    "baayein wale par pehla keyframe aur cut par ek",
   );
   // Daayein wala 90 tha; wo naye item me 90 - 50 = 40 par aana chahiye.
   assert.deepEqual(
     right.keyframes["transform.scale"]?.map((kf) => kf.frame),
-    [40],
+    [0, 40],
     "keyframe naye item ke apne start se ginna chahiye",
   );
 });
@@ -3227,6 +3255,474 @@ test("anjaan scene type par shikayat aati hai", () => {
     ),
   };
   assert.ok(validateSceneIntegrity(broken).some((issue) => issue.kind === "unknown-type"));
+});
+
+
+// --------------------------------------------------- Phase 13 (keyframes)
+
+section("interpolation ke teeno kism (13.1)");
+
+/** Ek keyframe banane ka chhota helper. */
+function kf(frame: number, value: unknown, easing = "linear"): Keyframe {
+  return { frame, value, easing, bezier: null };
+}
+
+test("number beech me theek aadha milta hai", () => {
+  const list = [kf(0, 0), kf(100, 10)];
+  assert.equal(sampleKeyframes({ p: list }, "p", 50), 5);
+  assert.equal(sampleKeyframes({ p: list }, "p", 25), 2.5);
+});
+
+test("vector ka har hissa alag se milta hai", () => {
+  const list = [kf(0, [0, 100]), kf(10, [10, 0])];
+  assert.deepEqual(sampleKeyframes({ p: list }, "p", 5), [5, 50]);
+});
+
+test("rang sRGB me milta hai (browser ke CSS transition jaisa)", () => {
+  const list = [kf(0, "#000000"), kf(10, "#ffffff")];
+  assert.equal(sampleKeyframes({ p: list }, "p", 5), "#808080");
+
+  /*
+   * Chhota roop (`#f00`) bhi chalta hai — par sirf **beech** me. Kinare par
+   * value hold hoti hai aur waisi ki waisi lauti hai (`#00f`), normalize hokar
+   * nahi. Ye sahi hai: hold ka matlab hi "wahi value" hota hai, aur use badal
+   * kar dena ek chhota jhooth hota.
+   */
+  assert.equal(sampleKeyframes({ p: [kf(0, "#f00"), kf(10, "#00f")] }, "p", 5), "#800080");
+  assert.equal(sampleKeyframes({ p: [kf(0, "#f00"), kf(10, "#00f")] }, "p", 10), "#00f");
+});
+
+test("alpha wala rang bhi milta hai aur poora hone par alpha likha nahi jaata", () => {
+  assert.equal(blendColors("#ff000000", "#ff0000ff", 0.5), "#ff000080");
+  assert.equal(blendColors("#000000", "#ffffff", 1), "#ffffff", "alpha 255 par sirf 6 akshar");
+});
+
+test("brand token interpolate nahi hota — jhatke se badalta hai", () => {
+  // Aadha token jaisi koi cheez hoti hi nahi; kuch bana kar dena jhooth hoga.
+  const list = [kf(0, "brand.primary"), kf(10, "brand.accent")];
+  assert.equal(sampleKeyframes({ p: list }, "p", 4), "brand.primary");
+  assert.equal(sampleKeyframes({ p: list }, "p", 10), "brand.accent");
+});
+
+test("boolean bhi jhatke se badalta hai", () => {
+  const list = [kf(0, false), kf(10, true)];
+  assert.equal(sampleKeyframes({ p: list }, "p", 4), false);
+  assert.equal(sampleKeyframes({ p: list }, "p", 10), true);
+});
+
+test("range ke bahar value rukti hai, aage nahi badhti", () => {
+  // Extrapolate karne se Ken Burns clip ke bahar bhi zoom karta rehta aur
+  // transform bekaar bada ho jaata.
+  const list = [kf(10, 1), kf(20, 2)];
+  assert.equal(sampleKeyframes({ p: list }, "p", 0), 1);
+  assert.equal(sampleKeyframes({ p: list }, "p", 999), 2);
+});
+
+test("bina kram ke keyframes bhi sahi chalte hain", () => {
+  // AI patch, template ya haath ki editing kabhi bhi bina order ke keyframes
+  // de sakti hai.
+  const list = [kf(100, 10), kf(0, 0), kf(50, 5)];
+  assert.equal(sampleKeyframes({ p: list }, "p", 25), 2.5);
+  assert.equal(sampleKeyframes({ p: list }, "p", 75), 7.5);
+});
+
+test("500 keyframes par bhi sahi value milti hai (binary search)", () => {
+  const list = Array.from({ length: 500 }, (_, index) => kf(index * 2, index));
+  assert.equal(sampleKeyframes({ p: list }, "p", 0), 0);
+  assert.equal(sampleKeyframes({ p: list }, "p", 500), 250);
+  assert.equal(sampleKeyframes({ p: list }, "p", 501), 250.5, "do keyframes ke beech");
+  assert.equal(sampleKeyframes({ p: list }, "p", 998), 499);
+});
+
+test("custom bezier easing ke upar chalta hai (13.2)", () => {
+  const linear = [kf(0, 0, "linear"), kf(10, 10)];
+  const withCurve: Keyframe[] = [
+    { frame: 0, value: 0, easing: "linear", bezier: [0.42, 0, 0.58, 1] },
+    kf(10, 10),
+  ];
+  // ease-in-out beech me linear jaisa hi hota hai, par chauthai par nahi.
+  assert.notEqual(
+    sampleKeyframes({ p: withCurve }, "p", 2.5),
+    sampleKeyframes({ p: linear }, "p", 2.5),
+  );
+});
+
+section("keyframe ops (13.3)");
+
+test("addKeyframe usi frame par naya nahi banata, purana badalta hai", () => {
+  // Do keyframes ek hi frame par hone se interpolation ka matlab nahi bachta
+  // aur doosra UI me chhupa reh jaata hai.
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 1 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 2 });
+
+  const list = itemById(next, ids[0]!).keyframes["transform.scale"];
+  assert.equal(list?.length, 1);
+  assert.equal(list?.[0]?.value, 2);
+});
+
+test("keyframes hamesha kram me rehte hain", () => {
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 50, value: 2 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 1 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 30, value: 1.5 });
+
+  assert.deepEqual(
+    itemById(next, ids[0]!).keyframes["transform.scale"]?.map((entry) => entry.frame),
+    [10, 30, 50],
+  );
+});
+
+test("keyframe sarkane par doosre ke upar chhodne se wo hat jaata hai", () => {
+  // Drag me ungli exact frame par nahi rukti; do keyframes ek frame par baith
+  // jaayein to ek hamesha ke liye chhup jaata hai. Hatana dikhta hai.
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 1 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 20, value: 2 });
+  next = moveKeyframe(next, { itemId: ids[0]!, path: "transform.scale", fromFrame: 10, toFrame: 20 });
+
+  const list = itemById(next, ids[0]!).keyframes["transform.scale"];
+  assert.equal(list?.length, 1);
+  assert.equal(list?.[0]?.value, 1, "sarkaya hua keyframe bachna chahiye");
+});
+
+test("aakhri keyframe hatate hi path bhi hat jaata hai", () => {
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 1 });
+  next = deleteKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 10 });
+  assert.equal("transform.scale" in itemById(next, ids[0]!).keyframes, false);
+});
+
+test("clearKeyframes abhi ki value item par likh deta hai", () => {
+  /*
+   * Ye is op ka poora matlab hai. Iske bina property ek jhatke me apni purani
+   * static value par kood jaati hai — user ne scale 1 se 1.4 animate kiya, phir
+   * keyframes hataye, aur clip achanak 1 par wapas chali gayi.
+   */
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 0, value: 1.4 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 50, value: 2 });
+
+  assert.equal(itemById(next, ids[0]!).transform.scale, 1, "abhi tak static value 1 hai");
+  next = clearKeyframes(next, { itemId: ids[0]!, path: "transform.scale" });
+
+  assert.equal(itemById(next, ids[0]!).transform.scale, 1.4, "shuruaat wali value bachni chahiye");
+  assert.equal("transform.scale" in itemById(next, ids[0]!).keyframes, false);
+});
+
+test("copyKeyframes ek property se doosri par (13.10)", () => {
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.opacity", frame: 0, value: 0 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.opacity", frame: 30, value: 1 });
+
+  next = copyKeyframes(next, {
+    fromItemId: ids[0]!,
+    fromPath: "transform.opacity",
+    toItemId: ids[1]!,
+    toPath: "transform.opacity",
+  });
+
+  assert.deepEqual(
+    itemById(next, ids[1]!).keyframes["transform.opacity"]?.map((entry) => entry.frame),
+    [0, 30],
+  );
+  // Copy honi chahiye, wahi array nahi — warna ek ko badalne se doosri badalti.
+  next = moveKeyframe(next, {
+    itemId: ids[1]!,
+    path: "transform.opacity",
+    fromFrame: 30,
+    toFrame: 60,
+  });
+  assert.deepEqual(
+    itemById(next, ids[0]!).keyframes["transform.opacity"]?.map((entry) => entry.frame),
+    [0, 30],
+    "source ke keyframes chhune nahi chahiye the",
+  );
+});
+
+test("khaali path se copy karne par saaf error", () => {
+  const { doc, ids } = chainFixture();
+  throws(
+    () =>
+      copyKeyframes(doc, {
+        fromItemId: ids[0]!,
+        fromPath: "transform.scale",
+        toItemId: ids[1]!,
+        toPath: "transform.scale",
+      }),
+    /koi keyframe nahi hai/,
+    "khaali copy",
+  );
+});
+
+section("split / trim ke saath keyframes (13.6 — 8.4 ka pakka roop)");
+
+test("split ke baad har keyframe sahi tukde par aur sahi frame par hai", () => {
+  const { doc, ids } = chainFixture();
+  // Clip 100-200 par hai. Item-local 10, 40, 80 par keyframes.
+  let next = addKeyframe(doc, { itemId: ids[1]!, path: "transform.scale", frame: 10, value: 1 });
+  next = addKeyframe(next, { itemId: ids[1]!, path: "transform.scale", frame: 40, value: 1.5 });
+  next = addKeyframe(next, { itemId: ids[1]!, path: "transform.scale", frame: 80, value: 2 });
+
+  // Frame 150 par todo — item-local 50.
+  const split = splitItemAtFrame(next, { itemId: ids[1]!, frame: 150 });
+  const left = itemById(split, ids[1]!);
+  const right = split.items.find((item) => item.startFrame === 150 && item.id !== ids[1])!;
+
+  assert.deepEqual(
+    left.keyframes["transform.scale"]?.map((entry) => entry.frame),
+    [10, 40, 50],
+    "baayein wale par pehle do, aur cut par ek naya",
+  );
+  // 80 wala keyframe naye item ke apne start se 30 par aana chahiye,
+  // aur uske aage cut wala 0 par (neeche wala test isi ki value naapta hai).
+  assert.deepEqual(
+    right.keyframes["transform.scale"]?.map((entry) => entry.frame),
+    [0, 30],
+    "keyframe naye item ke start se ginna chahiye",
+  );
+});
+
+test("split ke baad poori curve wahi rehti hai, sirf ek point nahi", () => {
+  /*
+   * Ek point milna itna mushkil nahi — bech ka keyframe apne aap wahan sahi
+   * baith jaata hai. Asli sawaal ye hai ki **beech ke saare frames** bhi wahi
+   * rahein. Ek eased curve ke do aadhe dobara ease karne par shakl badal jaati
+   * hai, aur wo galti sirf poori curve naapne par pakdi jaati hai.
+   */
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[1]!, path: "transform.scale", frame: 0, value: 1 });
+  next = addKeyframe(next, { itemId: ids[1]!, path: "transform.scale", frame: 100, value: 2 });
+  next = setKeyframeEasing(next, {
+    itemId: ids[1]!,
+    path: "transform.scale",
+    frame: 0,
+    easing: "ease-in-out",
+  });
+
+  const original = itemById(next, ids[1]!);
+  const before: number[] = [];
+  for (let frame = 0; frame <= 100; frame += 1) {
+    before.push(resolveItemValue<number>(original, "transform.scale", frame));
+  }
+
+  // Local 50 par todo (doc frame 150 — clip 100 se shuru hoti hai).
+  const split = splitItemAtFrame(next, { itemId: ids[1]!, frame: 150 });
+  const left = itemById(split, ids[1]!);
+  const right = split.items.find((item) => item.startFrame === 150 && item.id !== ids[1])!;
+
+  let worst = 0;
+  let worstFrame = -1;
+  for (let frame = 0; frame <= 100; frame += 1) {
+    const after =
+      frame < 50
+        ? resolveItemValue<number>(left, "transform.scale", frame)
+        : resolveItemValue<number>(right, "transform.scale", frame - 50);
+    const gap = Math.abs(after - (before[frame] as number));
+    if (gap > worst) {
+      worst = gap;
+      worstFrame = frame;
+    }
+  }
+
+  // 1e-3 isliye ki bezier ke control points 3 dashamlav tak gol kiye jaate hain
+  // (taaki doc me lambe-lambe float na bharein).
+  assert.ok(worst < 1e-3, `curve badal gayi: frame ${worstFrame} par ${worst} ka farak`);
+});
+
+test("split ke baad dono tukdon ki value apni jagah wahi rehti hai", () => {
+  /*
+   * Ye asli sawaal hai: frame number sahi hona kaafi nahi, **dikhne wali value**
+   * bhi wahi honi chahiye. Warna cut ke baad animation ek jhatka khaati hai.
+   */
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[1]!, path: "transform.scale", frame: 0, value: 1 });
+  next = addKeyframe(next, { itemId: ids[1]!, path: "transform.scale", frame: 100, value: 2 });
+
+  const beforeAt70 = resolveItemValue<number>(itemById(next, ids[1]!), "transform.scale", 70);
+
+  const split = splitItemAtFrame(next, { itemId: ids[1]!, frame: 150 });
+  const right = split.items.find((item) => item.startFrame === 150 && item.id !== ids[1])!;
+  // Purana local 70 ab naye item ka local 20 hai.
+  const afterAt20 = resolveItemValue<number>(right, "transform.scale", 20);
+
+  assert.ok(
+    Math.abs(beforeAt70 - afterAt20) < 1e-9,
+    `split ke baad value kood gayi: ${beforeAt70} -> ${afterAt20}`,
+  );
+});
+
+test("trim start par keyframes peeche khiskte hain aur bahar wale gir jaate hain", () => {
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 5, value: 1 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 50, value: 2 });
+
+  // Baayan kinara 20 frame andar — 5 wala keyframe ab clip ke bahar hai.
+  const before = resolveItemValue<number>(itemById(next, ids[0]!), "transform.scale", 20);
+  const trimmed = trimItemStart(next, { itemId: ids[0]!, deltaFrames: 20 });
+
+  assert.deepEqual(
+    itemById(trimmed, ids[0]!).keyframes["transform.scale"]?.map((entry) => entry.frame),
+    [0, 30],
+    "50 - 20 = 30, aur naye kinare (0) par ek keyframe jama hona chahiye",
+  );
+
+  /*
+   * ⚠️ Yahi is jaanch ka asli matlab hai: 5 wala keyframe hat gaya, par clip ki
+   * **shuruaati value** wahi rehni chahiye jo trim se pehle us frame par thi.
+   * Sirf keyframes hata dene par value achanak badal jaati aur clip ki shuruaat
+   * me ek jhatka aata.
+   */
+  assert.ok(
+    Math.abs(resolveItemValue<number>(itemById(trimmed, ids[0]!), "transform.scale", 0) - before) <
+      1e-9,
+    "trim ke baad shuruaati value kood gayi",
+  );
+});
+
+section("speed ke saath keyframes (13.7)");
+
+test("scaleKeyframes waqt me kheenchta hai", () => {
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 1 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 20, value: 2 });
+
+  const stretched = scaleKeyframes(next, { itemId: ids[0]!, factor: 2 });
+  assert.deepEqual(
+    itemById(stretched, ids[0]!).keyframes["transform.scale"]?.map((entry) => entry.frame),
+    [20, 40],
+  );
+});
+
+test("simatne par ek frame par aa gaye keyframes me se ek hi bachta hai", () => {
+  // Do keyframes ek frame par hone se span 0 ka segment banta hai aur ek UI me
+  // chhupa reh jaata hai.
+  const { doc, ids } = chainFixture();
+  let next = addKeyframe(doc, { itemId: ids[0]!, path: "transform.scale", frame: 10, value: 1 });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 11, value: 2 });
+
+  const squished = scaleKeyframes(next, { itemId: ids[0]!, factor: 0.1 });
+  const list = itemById(squished, ids[0]!).keyframes["transform.scale"];
+  assert.equal(list?.length, 1);
+  assert.equal(list?.[0]?.value, 2, "baad wali value bachni chahiye");
+});
+
+test("galat factor par saaf error", () => {
+  const { doc, ids } = chainFixture();
+  throws(() => scaleKeyframes(doc, { itemId: ids[0]!, factor: 0 }), /Galat factor/, "factor 0");
+});
+
+section("animation vs keyframe (13.12 — keyframe jeetta hai)");
+
+test("keyframe animation ke upar likhta hai", () => {
+  /*
+   * Ye niyam ek jagah likha hua hai (`KEYFRAME_BEATS_ANIMATION`) aur do jagah
+   * lagu hota hai: `resolveItemValue` pehle keyframe dekhta hai, aur renderer
+   * animation ko uske **upar** compose karta hai (guna).
+   *
+   * Wajah: animation ek preset hai jo ek click me lagta hai; keyframe wo cheez
+   * hai jo user ne khud, ek khaas frame par, haath se rakhi hai.
+   */
+  assert.equal(KEYFRAME_BEATS_ANIMATION, true);
+
+  const { doc, ids } = chainFixture();
+  let next = addAnimation(doc, { itemIds: [ids[0]!], typeId: "kenburns" });
+  next = addKeyframe(next, { itemId: ids[0]!, path: "transform.scale", frame: 0, value: 3 });
+
+  const item = itemById(next, ids[0]!);
+  // Static value 1 hai par keyframe 3 kehta hai — keyframe jeetna chahiye.
+  assert.equal(item.transform.scale, 1);
+  assert.equal(resolveItemValue<number>(item, "transform.scale", 0), 3);
+});
+
+section("registry ka keyframable flag (13.5)");
+
+test("keyframable controls aur keyframable list ek doosre se milte hain", () => {
+  /*
+   * Do jagah likhi hui list ek din alag ho jaati hai: control par diamond dikhta
+   * hai par `keyframable[]` me naam nahi hota (ya ulta), aur tab keyframe lagta
+   * to hai par kisi aur jagah se dikhta nahi.
+   */
+  for (const entry of ITEM_TYPES.list()) {
+    const flagged = entry.controls.filter((control) => control.keyframable).map((c) => c.path);
+    for (const path of flagged) {
+      assert.ok(
+        entry.keyframable.includes(path),
+        `${entry.id}: control "${path}" keyframable hai par entry.keyframable me nahi`,
+      );
+    }
+  }
+});
+
+test("checklist ki zaroori properties keyframable hain", () => {
+  const image = ITEM_TYPES.require("image");
+  for (const path of [
+    "transform.x",
+    "transform.y",
+    "transform.scale",
+    "transform.rotation",
+    "transform.opacity",
+  ]) {
+    assert.ok(image.keyframable.includes(path), `image par ${path} keyframable nahi hai`);
+  }
+
+  const video = ITEM_TYPES.require("video");
+  assert.ok(video.keyframable.includes("audio.volume"), "volume keyframable hona chahiye");
+
+  const text = ITEM_TYPES.require("text");
+  assert.ok(text.keyframable.includes("text.fontSize"), "text size keyframable hona chahiye");
+});
+
+section("13.13 ka sequence — teen properties ek saath");
+
+test("scale + opacity + x teeno ek saath sahi values dete hain", () => {
+  /*
+   * Checklist 13.13 ka doc: ek image par teen keyframed properties.
+   * Yahan wahi values naapi jaati hain jo render ke waqt milengi — kyunki
+   * renderer bhi isi `resolveItemValue()` se poochhta hai.
+   */
+  const base = createEmptyProject({ name: "Teen properties" });
+  const item = createItem("image", {
+    fps: 30,
+    trackId: base.tracks[0]!.id,
+    name: "Poster",
+    assetId: "as_1",
+    startFrame: 0,
+    durationInFrames: 150,
+  });
+  let doc = addItem(base, { item });
+
+  // scale 1.0 -> 1.15 (0 se 150), linear taaki ginti seedhi rahe
+  doc = addKeyframe(doc, { itemId: item.id, path: "transform.scale", frame: 0, value: 1, easing: "linear" });
+  doc = addKeyframe(doc, { itemId: item.id, path: "transform.scale", frame: 150, value: 1.15 });
+  // opacity 0 -> 1 pehle 45 frames me
+  doc = addKeyframe(doc, { itemId: item.id, path: "transform.opacity", frame: 0, value: 0, easing: "linear" });
+  doc = addKeyframe(doc, { itemId: item.id, path: "transform.opacity", frame: 45, value: 1 });
+  // x 0 -> -90 poore clip me
+  doc = addKeyframe(doc, { itemId: item.id, path: "transform.x", frame: 0, value: 0, easing: "linear" });
+  doc = addKeyframe(doc, { itemId: item.id, path: "transform.x", frame: 150, value: -90 });
+
+  const at = (frame: number, path: string): number =>
+    resolveItemValue<number>(itemById(doc, item.id), path, frame);
+
+  // frame 0
+  assert.equal(at(0, "transform.scale"), 1);
+  assert.equal(at(0, "transform.opacity"), 0);
+  assert.equal(at(0, "transform.x"), 0);
+
+  // frame 45 — opacity poori ho chuki, scale 45/150 = 30%
+  assert.ok(Math.abs(at(45, "transform.scale") - 1.045) < 1e-9);
+  assert.equal(at(45, "transform.opacity"), 1);
+  assert.ok(Math.abs(at(45, "transform.x") + 27) < 1e-9);
+
+  // frame 90
+  assert.ok(Math.abs(at(90, "transform.scale") - 1.09) < 1e-9);
+  assert.equal(at(90, "transform.opacity"), 1, "45 ke baad hold");
+  assert.ok(Math.abs(at(90, "transform.x") + 54) < 1e-9);
+
+  // frame 149 — lagbhag ant
+  assert.ok(Math.abs(at(149, "transform.scale") - 1.1490) < 1e-3);
+  assert.ok(Math.abs(at(149, "transform.x") + 89.4) < 0.1);
 });
 
 
