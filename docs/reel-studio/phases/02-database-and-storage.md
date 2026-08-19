@@ -33,8 +33,9 @@
       koshishein poori hone par `failed`.
 - [x] 2.7 RLS: aathon tables par on, **zero policies** = sirf service_role. Queue ke dono
       functions `security definer` hain isliye unse anon/authenticated ka execute revoke kiya.
-- [x] 2.8 Apply karne ka tarika neeche likha hai. **SQL abhi APPLY NAHI kiya** — tumhare
-      confirm ka intezaar hai.
+- [ ] 2.8 SQL apply karne ka tarika (neeche "2.8" section me likha hai) — **khud apply
+      nahi kiya**, tumhare confirm ka intezaar hai. Apply hone aur verify queries ka
+      output aane par ye tick hoga.
 - [x] 2.9 `packages/reel-core/src/storage/types.ts` — `StorageDriver` interface
       (`putSigned`, `getSignedUrl`, `put`, `get`, `delete`, `exists`). Pure TS, koi Node import nahi.
 - [x] 2.10 `local` driver: files `<REEL_OUTPUT_DIR>/media` me; signed URL ki jagah studio ka
