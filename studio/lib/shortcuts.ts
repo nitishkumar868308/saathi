@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { usePlayback, type PlaybackApi } from "@/lib/playback";
 import { useEditorStoreApi, type EditorState } from "@/lib/store";
 
 /**
@@ -13,16 +14,27 @@ import { useEditorStoreApi, type EditorState } from "@/lib/store";
  * chalega.
  *
  * `mod` = Ctrl (Windows/Linux) ya Cmd (Mac) — dono ek hi entry se chalte hain.
+ *
+ * Entry ko poora context milta hai (`editor` + `playback`) kyunki transport ke
+ * shortcut ko player chahiye hota hai aur edit ke shortcut ko store. Do alag
+ * registry banane se ek hi key do jagah baith sakti thi aur takraav dikhta hi nahi.
  */
+
+export interface ShortcutContext {
+  editor: EditorState;
+  playback: PlaybackApi;
+}
 
 export interface ShortcutEntry {
   id: string;
-  /** `"mod+z"`, `"mod+shift+z"`, `"mod+s"` — chhote akshar me. */
+  /** `"mod+z"`, `"space"`, `"shift+arrowleft"` — chhote akshar me. */
   keys: string;
   label: string;
+  /** UI me grouping ke liye. */
+  group: "edit" | "transport";
   /** Input/textarea ke andar bhi chale? Default nahi (warna typing tootegi). */
   allowInInput?: boolean;
-  run(store: EditorState): void | Promise<void>;
+  run(context: ShortcutContext): void | Promise<void>;
 }
 
 export const SHORTCUTS: readonly ShortcutEntry[] = [
@@ -30,33 +42,94 @@ export const SHORTCUTS: readonly ShortcutEntry[] = [
     id: "undo",
     keys: "mod+z",
     label: "Undo",
-    run: (store) => store.undo(),
+    group: "edit",
+    run: ({ editor }) => editor.undo(),
   },
   {
     id: "redo",
     keys: "mod+shift+z",
     label: "Redo",
-    run: (store) => store.redo(),
+    group: "edit",
+    run: ({ editor }) => editor.redo(),
   },
   {
     // Windows ki purani aadat — Ctrl+Y bhi redo hi hai.
     id: "redo-alt",
     keys: "mod+y",
     label: "Redo",
-    run: (store) => store.redo(),
+    group: "edit",
+    run: ({ editor }) => editor.redo(),
   },
   {
     id: "save",
     keys: "mod+s",
     label: "Abhi save karo",
+    group: "edit",
     // Naam type karte waqt Ctrl+S dabana bilkul aam hai — browser ka "save page"
     // dialog wahan sabse zyada chidhata hai.
     allowInInput: true,
-    run: (store) => store.saveNow(),
+    run: ({ editor }) => editor.saveNow(),
+  },
+
+  /* ------------------------------------------------------------- transport */
+
+  {
+    id: "play-pause",
+    keys: "space",
+    label: "Play / pause",
+    group: "transport",
+    run: ({ playback }) => playback.toggle(),
+  },
+  {
+    id: "frame-back",
+    keys: "arrowleft",
+    label: "Ek frame peeche",
+    group: "transport",
+    run: ({ playback }) => playback.stepFrames(-1),
+  },
+  {
+    id: "frame-forward",
+    keys: "arrowright",
+    label: "Ek frame aage",
+    group: "transport",
+    run: ({ playback }) => playback.stepFrames(1),
+  },
+  {
+    id: "second-back",
+    keys: "shift+arrowleft",
+    label: "Ek second peeche",
+    group: "transport",
+    run: ({ playback }) => playback.stepSeconds(-1),
+  },
+  {
+    id: "second-forward",
+    keys: "shift+arrowright",
+    label: "Ek second aage",
+    group: "transport",
+    run: ({ playback }) => playback.stepSeconds(1),
+  },
+  {
+    id: "to-start",
+    keys: "home",
+    label: "Shuruaat me",
+    group: "transport",
+    run: ({ playback }) => playback.toStart(),
+  },
+  {
+    id: "to-end",
+    keys: "end",
+    label: "Ant me",
+    group: "transport",
+    run: ({ playback }) => playback.toEnd(),
   },
 ];
 
-/** Event ko `"mod+shift+z"` jaisi string me badlo. */
+/**
+ * Event ko `"mod+shift+z"` jaisi string me badlo.
+ *
+ * Space ko `" "` ki jagah `"space"` likha jaata hai — `"mod+ "` jaisi string
+ * padhne aur likhne dono me galti karwati hai.
+ */
 export function eventCombo(event: KeyboardEvent): string {
   const parts: string[] = [];
   if (event.ctrlKey || event.metaKey) parts.push("mod");
@@ -65,19 +138,37 @@ export function eventCombo(event: KeyboardEvent): string {
 
   const key = event.key.toLowerCase();
   // `Shift` khud ko key ki tarah bhi bhejta hai — usko combo me mat ginno.
-  if (!["control", "meta", "alt", "shift"].includes(key)) parts.push(key);
+  if (!["control", "meta", "alt", "shift"].includes(key)) {
+    parts.push(key === " " ? "space" : key);
+  }
   return parts.join("+");
 }
 
-function isTypingTarget(target: EventTarget | null): boolean {
+export function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   return ["input", "textarea", "select"].includes(target.tagName.toLowerCase());
 }
 
+/**
+ * Ye element khud is key ko sambhalta hai kya?
+ *
+ * Button par focus hote hue Space dabana usi button ko dabata hai. Uske upar se
+ * apna play/pause bhi chala dene par ek hi dabane me do cheezein hoti hain —
+ * jaise "Loop" dabao aur video bhi chalne lage. Isliye aise mauke par browser
+ * ko jeetne dete hain.
+ */
+export function nativeHandlesKey(target: EventTarget | null, combo: string): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (combo !== "space") return false;
+  const tag = target.tagName.toLowerCase();
+  return tag === "button" || tag === "a" || target.getAttribute("role") === "button";
+}
+
 /** Shortcuts ko window par chipka do. Editor shell ek hi baar bulata hai. */
 export function useShortcuts(): void {
   const store = useEditorStoreApi();
+  const playback = usePlayback();
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -87,24 +178,36 @@ export function useShortcuts(): void {
       for (const shortcut of SHORTCUTS) {
         if (shortcut.keys !== combo) continue;
         if (typing && !shortcut.allowInInput) continue;
+        if (nativeHandlesKey(event.target, combo)) continue;
 
         event.preventDefault();
-        void shortcut.run(store.getState());
+        void shortcut.run({ editor: store.getState(), playback });
         return;
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [store]);
+  }, [store, playback]);
 }
 
 /** UI me dikhane layak: `mod+shift+z` -> `Ctrl+Shift+Z` (Mac par `⌘`). */
 export function comboLabel(keys: string, isMac = false): string {
+  const NAMES: Record<string, string> = {
+    space: "Space",
+    arrowleft: "←",
+    arrowright: "→",
+    arrowup: "↑",
+    arrowdown: "↓",
+    home: "Home",
+    end: "End",
+  };
+
   return keys
     .split("+")
     .map((part) => {
       if (part === "mod") return isMac ? "⌘" : "Ctrl";
+      if (NAMES[part]) return NAMES[part] as string;
       if (part.length === 1) return part.toUpperCase();
       return part.charAt(0).toUpperCase() + part.slice(1);
     })

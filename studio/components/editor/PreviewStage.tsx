@@ -1,52 +1,50 @@
 "use client";
 
-import { aspectRatioLabel, framesToTimecode } from "@reel/core";
+import { aspectRatioLabel } from "@reel/core";
 
+import { PreviewPlayer } from "@/components/editor/preview/PreviewPlayer";
+import { TransportBar } from "@/components/editor/preview/TransportBar";
+import { useAssetMap } from "@/lib/assetMap";
 import { useEditorStore } from "@/lib/store";
 
 /**
- * Beech ka canvas — abhi khaali frame.
+ * Beech ka canvas — asli player + transport.
  *
- * Asli player Phase 6 me `@remotion/player` se aayega, aur wahi component render
- * ke waqt bhi chalega (Section E #4 — preview aur render me farak nahi hona
- * chahiye). Isliye yahan koi apna "chhota preview" nahi banaya gaya: wo do alag
- * dimaag ban jaate hain aur framing me farak hamesha aakhir me pakda jaata hai.
+ * Yahan sirf jodne ka kaam hai. Player khud `PreviewPlayer` me hai (wahi
+ * `ReelComposition` jo final MP4 banati hai), transport `TransportBar` me, aur
+ * asset ke URL `useAssetMap` me — teeno alag isliye hain ki inme se har ek ki
+ * apni wajah se badalne ki aadat hai.
  *
- * Frame ka naap project se aata hai — 1080/1920 kahin likha nahi hai.
+ * Frame ka naap kabhi yahan likha nahi jaata; sab kuch `doc.project` se aata hai.
  */
 export function PreviewStage() {
   const doc = useEditorStore((state) => state.doc);
-  const playheadFrame = useEditorStore((state) => state.playheadFrame);
+  const { assets, missing, loading } = useAssetMap(doc);
 
-  const { width, height, fps, durationInFrames, background } = doc.project;
+  const { width, height, fps } = doc.project;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-ink-950">
-      <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-        <div
-          className="relative max-h-full max-w-full border border-ink-600"
-          style={{
-            aspectRatio: `${width} / ${height}`,
-            // Landscape chaudai se bandha hai, portrait oonchai se — warna bada
-            // frame panel se bahar nikal jaata hai.
-            ...(width >= height ? { width: "100%" } : { height: "100%" }),
-            background,
-          }}
-        >
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center">
-            <span className="font-mono text-sm text-chalk-300">
-              {width}×{height} · {aspectRatioLabel(width, height)} · {fps}fps
-            </span>
-            <span className="text-xs text-chalk-500">Player Phase 6 me</span>
-          </div>
-        </div>
+      <div className="flex h-7 shrink-0 items-center gap-3 border-b border-ink-600 bg-ink-900 px-3 font-mono text-[11px] text-chalk-500">
+        <span>
+          {width}×{height} · {aspectRatioLabel(width, height)} · {fps}fps
+        </span>
+        {loading ? <span className="text-chalk-500">media load ho rahi hai…</span> : null}
+        {missing.length > 0 ? (
+          /*
+           * Missing asset ka card frame ke andar bhi aata hai (`<MissingAsset>`),
+           * par wo tabhi dikhta hai jab playhead usi item par ho. Ye line hamesha
+           * dikhti hai — warna 40 second wali reel me toota hua asset dhoondhne
+           * ke liye poori reel scrub karni padti (checklist 6.11).
+           */
+          <span className="text-red-300">
+            {missing.length} asset nahi mila — frame me gulaabi card us item par hai
+          </span>
+        ) : null}
       </div>
 
-      <div className="flex h-8 shrink-0 items-center justify-center gap-3 border-t border-ink-600 bg-ink-900 font-mono text-[11px] text-chalk-500">
-        <span>{framesToTimecode(playheadFrame, fps, { compact: true })}</span>
-        <span className="text-ink-500">/</span>
-        <span>{framesToTimecode(durationInFrames, fps, { compact: true })}</span>
-      </div>
+      <PreviewPlayer assets={assets} />
+      <TransportBar />
     </section>
   );
 }

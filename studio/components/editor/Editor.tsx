@@ -10,6 +10,7 @@ import { RightSidebar } from "@/components/editor/RightSidebar";
 import { TimelineStrip } from "@/components/editor/TimelineStrip";
 import { TopBar } from "@/components/editor/TopBar";
 import { useLayout } from "@/lib/layout";
+import { PlaybackProvider } from "@/lib/playback";
 import { useShortcuts } from "@/lib/shortcuts";
 import {
   EditorStoreProvider,
@@ -29,7 +30,14 @@ import {
 export function Editor({ project }: { project: LoadedProjectInput }) {
   return (
     <EditorStoreProvider project={project}>
-      <EditorShell />
+      {/*
+       * Playback provider store ke **andar** hai: uske commands (step, jump)
+       * doc ka fps aur duration padhte hain, aur playhead store me hi likhte hain.
+       * Bahar rakhne par usko doc alag se dena padta — do jagah ek hi sach.
+       */}
+      <PlaybackProvider>
+        <EditorShell />
+      </PlaybackProvider>
     </EditorStoreProvider>
   );
 }

@@ -17,6 +17,7 @@ export * from "./config/brand";
 export * from "./config/easing";
 export * from "./config/fit";
 export * from "./config/presets";
+export * from "./config/safeArea";
 
 // Registries — dynamic-first ka dil
 export * from "./registry/index";
