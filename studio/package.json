@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "description": "AI Reel Studio ka editor — localhost pe chalta hai. Ye web/ (live marketing site) se alag app hai, taaki Remotion/Chromium us site ke build me na ghusein.",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
