@@ -1,16 +1,4 @@
 {
-  // ⚠️ Ye file jaan-boojhkar **khud-mukhtiyar** hai — `extends` nahi karti.
-  //
-  // Pehle ye `../tsconfig.base.json` ko extend karti thi. Repo ke andar wo theek
-  // chalta hai, par deploy par wo ek chhupi hui nirbharta ban jaata hai: build us
-  // file par tika hota hai jo `studio/` ke bahar hai. Wo na mile to TypeScript
-  // config hi adhoori reh jaati hai, `paths` gayab ho jaate hain, aur **har**
-  // `@/...` import "Module not found" de deta hai — jabki asli wajah kahin nahi
-  // dikhti. Vercel par theek yahi hua.
-  //
-  // Keemat: base wali kuch settings yahan dobara likhi hui hain. Wo keemat
-  // jaan-boojhkar chukayi ja rahi hai — ek build jo apne folder se bahar kuch na
-  // maange, wo har jagah ek jaisa chalta hai.
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -27,9 +15,6 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
-
-    // `@/*` studio ke apne folder ka alias hai; `@reel/*` un packages ka jo
-    // source me hi rehte hain (koi build step nahi) — dono yahan ek saath.
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
