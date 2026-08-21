@@ -1,3 +1,9 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Is file ka apna folder — `studio/`. `@/` isi par tika hai. */
+const studioDir = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -5,6 +11,25 @@ const nextConfig = {
   // Ye workspace packages source TypeScript me rehte hain (koi build step nahi),
   // isliye Next inhe khud compile kare.
   transpilePackages: ["@reel/core", "@reel/media", "@reel/remotion", "@reel/storage"],
+
+  /**
+   * `@/` ka rasta yahan **khud** likha hai, jabki tsconfig ke `paths` me bhi
+   * wahi likha hai. Ye dohraav jaan-boojhkar hai.
+   *
+   * Next `@/` sirf tab samajhta hai jab wo `tsconfig.json` ko theek se padh le.
+   * Wo padhna kai wajahon se chup-chaap fail ho sakta hai — aur tab har
+   * `@/...` import "Module not found" ban jaata hai, jaise file hi na ho.
+   * (Neeche ka lamba note dekho: ek baar comments ki wajah se yahi ho chuka hai.)
+   *
+   * Webpack ka alias us poori nirbharta ko kaat deta hai: tsconfig padhi jaaye
+   * ya na jaaye, `@/` ka matlab hamesha `studio/` hi rahega.
+   *
+   * `"@"` sirf `@` aur `@/...` se milta hai — `@reel/core` ko chhoota nahi.
+   */
+  webpack: (config) => {
+    config.resolve.alias = { ...config.resolve.alias, "@": studioDir };
+    return config;
+  },
 };
 
 export default nextConfig;
