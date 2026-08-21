@@ -17,21 +17,28 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { TTS_PROVIDERS } from "@reel/core";
+
 import {
   MAX_REVERSE_SECONDS,
   TARGET_LUFS,
+  WHISPER_SCRIPT,
   audioStream,
   checkFfmpegAvailable,
   ffmpegPath,
   finalizeMp4,
+  getTtsAdapter,
   makeThumbnail,
   measureEbur128,
   measureLoudness,
   parseFrameRate,
+  parsePcmMime,
   probe,
   probeAsset,
+  requirePcmMime,
   reverseMedia,
   run,
+  synthesize,
   videoStream,
 } from "../src/index";
 
@@ -52,6 +59,29 @@ async function test(name: string, fn: () => Promise<void>): Promise<void> {
 
 function section(title: string): void {
   console.log(`\n${title}`);
+}
+
+/** Sync error ki jaanch — sirf phatna kaafi nahi, sahi wajah se phatna chahiye. */
+function throws(fn: () => unknown, pattern: RegExp, what: string): void {
+  try {
+    fn();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    assert.match(message, pattern, `${what}: galat wajah se phata`);
+    return;
+  }
+  assert.fail(`${what}: error aana chahiye tha, aaya nahi`);
+}
+
+async function throwsAsync(fn: () => Promise<unknown>, pattern: RegExp): Promise<void> {
+  try {
+    await fn();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    assert.match(message, pattern);
+    return;
+  }
+  assert.fail("error aana chahiye tha, aaya nahi");
 }
 
 const QUIET = ["-hide_banner", "-loglevel", "error", "-y"];
@@ -134,6 +164,24 @@ async function main(): Promise<void> {
       const result = await probeAsset(image);
       assert.equal(result.width, 1280);
       assert.equal(result.height, 720);
+    });
+
+    /*
+     * Still image par fps ek gadha hua number hai.
+     *
+     * ffprobe ek PNG ko `png_pipe` demuxer se padhta hai aur us stream ka
+     * `r_frame_rate` `25/1` bata deta hai — jabki tasveer me frame rate jaisi
+     * koi cheez hai hi nahi. Wahi 25 seedha `reel_assets.fps` me chala jaata tha,
+     * aur DB me baith kar wo asli naap jaisa dikhta tha.
+     *
+     * Yahi wo ek jhooth hai jiske khilaaf is file ka apna doc-comment chetavni
+     * deta hai: "ye numbers asli hone chahiye, andaaza nahi". `null` ka matlab
+     * "pata nahi" hota hai, aur tasveer ke fps ke liye wahi sach hai.
+     */
+    await test("still image ka fps null hai — 25 gadha hua nahi", async () => {
+      const result = await probeAsset(image);
+      assert.equal(result.fps, null, "image par fps null hona chahiye");
+      assert.equal(result.durationMs, null, "image ki koi lambai nahi hoti");
     });
 
     await test("parseFrameRate fraction samajhta hai", async () => {
@@ -393,6 +441,89 @@ async function main(): Promise<void> {
       await assert.rejects(
         () => reverseMedia(long, join(dir, "long-rev.mp4")),
         /Reverse .* tak hi hota hai/,
+      );
+    });
+
+    // ------------------------------------------------------------------ TTS
+
+    section("whisper ka output (23.4 — Devanagari)");
+
+    await test("whisper script stdout ko utf-8 par set karti hai", async () => {
+      /*
+       * Windows par Python ka `sys.stdout` default cp1252 hota hai, aur usme
+       * Devanagari likha hi nahi ja sakta. Bina is line ke Hindi transcription
+       * **hamesha** phatti thi:
+       *
+       *   UnicodeEncodeError: 'charmap' codec can't encode characters …
+       *
+       * Aur galti ka roop sabse gumrah karne wala tha: whisper poora chal chuka
+       * hota tha, shabd nikal chuke hote the, aur wo sirf unhe **likhte waqt**
+       * marta tha. English par ye kabhi nahi hota — yaani jis bhasha ke liye ye
+       * poora phase bana hai, thik wahi kaam nahi karti thi.
+       */
+      assert.match(
+        WHISPER_SCRIPT,
+        /sys\.stdout\.reconfigure\(\s*encoding\s*=\s*["']utf-8["']/,
+        "script me stdout utf-8 par set nahi hai — Devanagari likhte hi phategi",
+      );
+    });
+
+    section("TTS provider seam (22.4 / 22.x)");
+
+    /*
+     * Yahan network par kuch nahi jaata. Jo naapa ja raha hai wo wo hissa hai
+     * jo asli call se **pehle** galat ho sakta hai — aur aksar hota hai:
+     * kaun sa provider chuna gaya, key hai ya nahi, aur Gemini se aaya raw PCM
+     * kis naap ka hai. In teeno me se koi bhi galat ho to awaaz ya to banti hi
+     * nahi, ya bilkul ulti raftaar me bajti hai.
+     */
+
+    await test("har registry provider ka ek adapter maujood hai", async () => {
+      for (const entry of TTS_PROVIDERS) {
+        if (entry.kind === "manual") continue;
+        const provider = getTtsAdapter(entry.id);
+        assert.ok(provider, `provider "${entry.id}" ka adapter nahi mila`);
+        assert.equal(provider.id, entry.id);
+      }
+    });
+
+    await test("anjaan provider par saaf error", async () => {
+      await throwsAsync(
+        async () => { await synthesize({ providerId: "koi-aur", voiceId: "x", text: "hi", outPath: "x.wav", scratchDir: dir }); },
+        /nahi mila/i,
+      );
+    });
+
+    await test("Gemini bina key ke saaf mana karta hai (chup-chaap fail nahi hota)", async () => {
+      const before = process.env.GEMINI_API_KEY;
+      delete process.env.GEMINI_API_KEY;
+      try {
+        const check = await getTtsAdapter("gemini").available();
+        assert.equal(check.ok, false, "bina key ke ok:true dena jhooth hai");
+        assert.match(check.detail, /GEMINI_API_KEY/, "detail me env var ka naam hona chahiye");
+      } finally {
+        if (before !== undefined) process.env.GEMINI_API_KEY = before;
+      }
+    });
+
+    await test("Gemini ka PCM mime sach me padha jaata hai", async () => {
+      /*
+       * Gemini raw PCM lautata hai aur uska sample rate **sirf mime string me**
+       * hota hai: `audio/L16;codec=pcm;rate=24000`. Wo number ffmpeg ko batana
+       * padta hai. Galat number dene par awaaz bajti to hai — par galat raftaar
+       * par, aur suna jaaye tabhi pata chalta hai.
+       */
+      assert.deepEqual(parsePcmMime("audio/L16;codec=pcm;rate=24000"), { sampleRate: 24000, channels: 1 });
+      assert.deepEqual(parsePcmMime("audio/L16; codec=pcm; rate=16000"), { sampleRate: 16000, channels: 1 });
+      assert.equal(parsePcmMime("audio/mpeg"), null, "mp3 raw PCM nahi hai");
+      assert.equal(parsePcmMime(""), null);
+    });
+
+    await test("rate na milne par andaaza nahi lagta — saaf error", async () => {
+      throws(
+        () => requirePcmMime("audio/L16;codec=pcm"),
+        /rate/i,
+        "bina rate ke mime",
       );
     });
 

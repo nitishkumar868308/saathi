@@ -140,3 +140,4 @@ export * from "./transitions";
 export type { ItemTypeEntry } from "./itemTypes";
 export type { TrackTypeEntry } from "./trackTypes";
 export * from "./types";
+export * from "./ttsProviders";

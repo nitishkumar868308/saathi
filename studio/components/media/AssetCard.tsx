@@ -4,6 +4,8 @@ import { assetQuality, formatBytes, getAssetKind } from "@reel/core";
 import clsx from "clsx";
 
 import { Icon } from "@/components/ui/Icon";
+import { AudioPreview } from "@/components/media/AudioPreview";
+import { setAssetDragData } from "@/lib/assetDrag";
 import { useAssetUrl } from "@/lib/assetUrls";
 import { msToClock } from "@/lib/format";
 import type { Asset } from "@/lib/assets";
@@ -42,13 +44,40 @@ export function AssetCard({ asset, target, selected, view, onOpen }: AssetCardPr
   const { url } = useAssetUrl(asset.thumbKey ? asset.id : null, { thumb: true });
 
   const duration = asset.durationMs === null ? null : msToClock(asset.durationMs);
+  /*
+   * Awaaz wali file par sunne ka raasta hona hi chahiye. Pehle wo tha hi nahi —
+   * TTS se banti thi, upload ho jaati thi, timeline par lag bhi jaati thi, par
+   * bajaakar dekhne ke liye poori reel preview karni padti thi.
+   */
+  const isAudio = asset.kind === "audio";
+
+  /*
+   * Timeline par le jaane ke liye card khud draggable hai (16.3).
+   *
+   * ⚠️ Draggable **card** hai, koi alag "drag handle" nahi. Handle rakhne par
+   * user ko wo pehle dhoondhna padta hai, aur library me har card chhota hota
+   * hai — 8px ka handle ungli se to bhool hi jao, maus se bhi mushkil hai.
+   * Card ka `onClick` isse tootta nahi: browser click aur dragstart ko alag
+   * rakhta hai.
+   */
+  const dragProps = {
+    draggable: true,
+    onDragStart: (event: React.DragEvent) =>
+      setAssetDragData(event, {
+        assetId: asset.id,
+        kind: asset.kind,
+        filename: asset.filename,
+        durationMs: asset.durationMs,
+      }),
+  };
 
   if (view === "list") {
-    return (
+    const row = (
       <button
         type="button"
+        {...dragProps}
         onClick={() => onOpen(asset)}
-        title={`${asset.filename}\n${quality.detail}`}
+        title={`${asset.filename}\n${quality.detail}\n\nTimeline par ghaseet kar chhodo`}
         className={clsx(
           "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors",
           selected
@@ -69,15 +98,30 @@ export function AssetCard({ asset, target, selected, view, onOpen }: AssetCardPr
         </span>
       </button>
     );
+
+    /*
+     * Player card ke **bahar** hai, andar nahi — card khud ek `<button>` hai aur
+     * button ke andar button na theek HTML hai, na uska click theek se chalta
+     * (dono handler ek saath lag jaate).
+     */
+    return isAudio ? (
+      <div className="space-y-0.5">
+        {row}
+        <AudioPreview assetId={asset.id} className="px-2 pb-1" />
+      </div>
+    ) : (
+      row
+    );
   }
 
-  return (
+  const card = (
     <button
       type="button"
+      {...dragProps}
       onClick={() => onOpen(asset)}
-      title={`${asset.filename}\n${quality.detail}`}
+      title={`${asset.filename}\n${quality.detail}\n\nTimeline par ghaseet kar chhodo`}
       className={clsx(
-        "group flex flex-col overflow-hidden rounded-lg border text-left transition-colors",
+        "group flex flex-col cursor-grab overflow-hidden rounded-lg border text-left transition-colors active:cursor-grabbing",
         selected
           ? "border-terracotta bg-terracotta/10"
           : "border-ink-600 bg-ink-900 hover:border-ink-500",
@@ -93,6 +137,15 @@ export function AssetCard({ asset, target, selected, view, onOpen }: AssetCardPr
         </span>
       </span>
     </button>
+  );
+
+  return isAudio ? (
+    <div className="space-y-0.5">
+      {card}
+      <AudioPreview assetId={asset.id} className="px-1.5 pb-1" />
+    </div>
+  ) : (
+    card
   );
 }
 

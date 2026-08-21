@@ -294,6 +294,8 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
             : {
                 deviceId: DEFAULT_DEVICE_ID,
                 colorId: "graphite",
+                // Naye mockup par koi tap nahi (18.11) — nishaan user khud jodta hai.
+                taps: [],
                 widthPercent: 58,
                 shadow: true,
                 glare: false,

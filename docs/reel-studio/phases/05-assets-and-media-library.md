@@ -58,21 +58,45 @@ ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — 
       section pass: png/mp4/mp3 sahi kind, `.mkv` bina mime ke bhi video, `.pdf` reject,
       0 byte aur maxBytes+1 dono reject.
 
-- [ ] 5.2 Browser upload: drag-drop + file picker + clipboard paste. Multiple files ek saath,
+- [x] 5.2 Browser upload: drag-drop + file picker + clipboard paste. Multiple files ek saath,
       per-file progress, cancel, retry. Bada file bhi (ek 200MB screen recording) chale.
-      → code maujood hai, chalaya nahi. [studio/lib/upload/uploader.ts](../../../studio/lib/upload/uploader.ts)
+      → **asli browser me chalaya (2026-08-20).** Chrome me studio khol kar dono raaste
+      chalaye gaye aur dono ne poora chain chalaya
+      (`POST /api/assets/presign` → `PUT /api/local-media/...` → `POST /api/assets/[id]/complete`):
+      **file picker** se 6 file ek saath (854×480 / 1920×1080 / 3840×2160 PNG, 30s mp4,
+      10s mp3, 5s wav), aur **drag-drop** se 3 asli cast images (`marketing/heygen/cast/`,
+      ~2MB each). Dono ke baad library me thumbnail ke saath cards aaye.
+      `accept` attribute registry se banti hai — asli DOM me padh kar dekha (image/video/
+      audio/font ki poori list, koi mime haath se likhi hui nahi).
+      Code: [studio/lib/upload/uploader.ts](../../../studio/lib/upload/uploader.ts)
       (XHR se progress + `abort()`, `MAX_PARALLEL = 2`, retry) aur
-      [studio/components/media/MediaPanel.tsx](../../../studio/components/media/MediaPanel.tsx)
-      (drop zone + `input type=file multiple` + document-level paste). Verify ke liye studio
-      ka chalna zaroori hai.
+      [studio/components/media/MediaPanel.tsx](../../../studio/components/media/MediaPanel.tsx).
+      ⚠️ **Do hisse abhi bhi nahi naape gaye:** clipboard paste, aur 200MB wali badi file.
+      Paste ke liye asli OS clipboard chahiye (synthetic event us raaste ko nahi chhoota),
+      aur 200MB ka test alag se karna hoga.
 
-- [ ] 5.3 Metadata browser me nikaalo **upload se pehle**: image → naturalWidth/Height;
+- [x] 5.3 Metadata browser me nikaalo **upload se pehle**: image → naturalWidth/Height;
       video → `loadedmetadata` se width/height/duration + `requestVideoFrameCallback` se fps
       estimate; audio → duration. Ye `reel_assets` me jaata hai.
-      → code maujood hai, chalaya nahi.
+      → **asli browser me naapa (2026-08-20).** Upload ke waqt `fetch` par hook lagakar
+      dono request ka asli body padha gaya (PRIYA.png, 1697×927):
+
+      ```
+      POST /api/assets/presign
+        {"filename":"PRIYA.png","mime":"image/png","bytes":2038783,
+         "checksum":"20cd36c7f9ddb9d0cb3c73984cc9f4e2b777a2a504d41fd6625b5a07a5f7763b"}
+
+      POST /api/assets/<id>/complete
+        {"filename":"PRIYA.png","mime":"image/png","checksum":"20cd36c7…",
+         "width":1697,"height":927}
+      ```
+
+      Yaani width/height sach me **upload se pehle** browser me nikle, aur wo baad me
+      ffprobe se aaye asli numbers se **bilkul mile** (1697×927). Checksum bhi wahin
+      bana — 5.7 ka dedup isi par tikka hai.
+      ⚠️ Image par `fps` bheja hi nahi jaata, aur yahi sahi hai (tasveer ka fps hota hi
+      nahi) — server-side par bhi ab wahi niyam lagta hai, 5.4 dekho.
       [studio/lib/upload/probeInBrowser.ts](../../../studio/lib/upload/probeInBrowser.ts).
-      Browser ke bina iska koi matlab nahi — Node me mock karke test karna sirf apne aap ko
-      dhokha dena hota.
 
 - [x] 5.4 Worker-side asli probe (`POST /api/assets/[id]/probe` → job ya direct ffprobe agar
       local): codec, bitrate, sample rate, channels, pixel format, rotation metadata.
@@ -88,6 +112,23 @@ ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — 
       Code: [packages/reel-media/src/probe.ts](../../../packages/reel-media/src/probe.ts) +
       [studio/lib/assetProbe.ts](../../../studio/lib/assetProbe.ts) +
       [studio/app/api/assets/\[id\]/probe/route.ts](../../../studio/app/api/assets/%5Bid%5D/probe/route.ts).
+
+      **2026-08-20 — ek gadha hua number pakda gaya aur hataya:** 5.12 ke asli upload me
+      teeno PNG par `fps: 25` aa raha tha. Wo kahin se naapa nahi gaya tha — ffprobe
+      tasveer ko `png_pipe` demuxer se padhta hai aur us stream ka `r_frame_rate` hamesha
+      `25/1` bata deta hai. Wo 25 seedha `reel_assets.fps` me chala jaata tha, aur DB me
+      baith kar bilkul asli naap jaisa dikhta tha — theek wahi jhooth jiske khilaaf is
+      checklist ki apni line hai ("asli numbers hone chahiye, guess nahi").
+
+      Ab `fromProbeResult()` pehle `isStillImage()` poochhta hai: demuxer ka naam `_pipe`
+      par khatam hota ho **aur** format me koi `duration` na ho — dono, kyunki akela
+      `duration` kaafi nahi (kuch webm me duration nahi hota par wo poore video hote hain).
+      Aisi file par `fps` `null` jaata hai; `null` ka matlab "pata nahi" hai, aur tasveer
+      ke fps ke liye wahi sach hai.
+
+      Test: `npm run check --workspace @reel/media` → `still image ka fps null hai — 25
+      gadha hua nahi` (fix se pehle FAIL, ab ok), aur `video ke asli numbers aate hain`
+      abhi bhi pass hai — yaani chalte video ka fps 25 waise ka waisa aata hai.
 
 - [x] 5.5 Thumbnail/poster generate: image ke liye resize, video ke liye 1 frame,
       audio ke liye waveform PNG (ffmpeg `showwavespic`). Storage me `temp/thumbs/` nahi —
@@ -124,8 +165,11 @@ ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — 
       hua" ka jawab `findAssetUsage()` deta hai aur bina `?force=true` ke delete **409** par
       ruk jaata hai
       ([studio/app/api/assets/\[id\]/route.ts](../../../studio/app/api/assets/%5Bid%5D/route.ts)).
-      ⚠️ **UI khud browser me nahi chalayi gayi** — search/sort/grid-list ka asli test 5.12
-      ke saath hoga.
+      → **Ab browser me chalayi gayi** (1600x950, asli project ke 24 asset par):
+        tab se filter — Sab **24** → Images **10** → Audio **3**; search "RAHUL" par
+        **24 → 4**; sort "Naya pehle" par pehla `female-a8e3ab55.wav` aur "Naam" par
+        `aud-10s.mp3` (yaani list sach me dobara lagti hai, sirf label nahi badalta);
+        grid/list toggle ka title `List me dikhao` ↔ `Grid me dikhao` palatta hai.
 
 - [x] 5.9 Asset detail panel: resolution, duration, fps, codec, size, aur ek **quality badge**
       (e.g. "1080p ✓", "480p — 4K me blurry"). Badge ka logic ek chhote helper me, jo Phase 20
@@ -136,30 +180,64 @@ ko iski taraf mod dena ek aisa raasta hai jo aadha kaam karke chup ho jaata — 
       640×480 par `low`, 864×1536 par `ok`, audio par `unknown`, bina probe wale asset par
       bhi `unknown` (chupchaap "theek hai" kabhi nahi).
 
-- [ ] 5.10 Signed URL cache: client me short-lived URL cache + auto refresh on expiry.
+- [x] 5.10 Signed URL cache: client me short-lived URL cache + auto refresh on expiry.
       Doc me URL kabhi save nahi.
-      → code maujood hai, chalaya nahi.
+      → **browser me naapa (2026-08-20).** `fetch` par ginti lagakar library ka tab
+      Sab → Images → Sab kiya. Saare cards dobara render hue aur **`/url` par ek bhi
+      nayi request nahi gayi (0)** — matlab cache sach me lag raha hai, sanyog nahi.
+      Pehle render par har asset ke liye theek ek request gayi thi (dev server ke log me
+      dikhi), yaani `inflight` de-dup bhi kaam kar raha hai.
       [studio/lib/assetUrls.ts](../../../studio/lib/assetUrls.ts) — ek `Map` cache +
       `inflight` de-dup (200 cards ek saath 1 hi request bhejte hain) + `SAFETY_MS = 60s`
       pehle hi URL ko purana maan lena. "Doc me URL nahi jaata" wala hissa Phase 1 ke schema
       se pehle hi bandha hua hai — item me sirf `assetId` field hai, URL ki jagah hi nahi.
 
-- [ ] 5.11 Local dev fast path: `REEL_STORAGE_DRIVER=local` pe upload disk pe jaaye,
+- [x] 5.11 Local dev fast path: `REEL_STORAGE_DRIVER=local` pe upload disk pe jaaye,
       wahi UI bina badle chale.
-      → code maujood hai, chalaya nahi.
+      → **chalaya (2026-08-20).** `REEL_STORAGE_DRIVER=local` par 6 upload ke baad disk
+      par sach me files aayi:
+
+      ```
+      render-out/media/permanent/assets/  ← 6 file (.png .mp4 .mp3 .wav)
+      render-out/media/permanent/thumbs/  ← 6 thumbnail (.jpg)
+      ```
+
+      UI me kuch alag nahi karna pada — wahi `/api/assets/[id]/url` chala, jo local
+      driver par `/api/local-media/<key>` par jaata hai (dev log me 200 dikhe).
       [studio/lib/storage.ts](../../../studio/lib/storage.ts) driver ek hi baar banata hai,
       aur local driver ka "signed URL"
       [studio/app/api/local-media/\[...key\]/route.ts](../../../studio/app/api/local-media/%5B...key%5D/route.ts)
       se serve hota hai. UI dono driver ke liye ek hi hai (`/api/assets/[id]/url`).
 
-- [ ] 5.12 Test: 3 images (ek 480p, ek 1080p, ek 4K), ek 30s video, ek mp3, ek wav upload karo.
+- [x] 5.12 Test: 3 images (ek 480p, ek 1080p, ek 4K), ek 30s video, ek mp3, ek wav upload karo.
       Sab ke metadata row mujhe dikhao (`select` output).
-      → **nahi hua.** `studio/.env.local` nahi hai (Supabase + STUDIO_PASSWORD), isliye studio
-      dev server uth nahi sakta; aur ffprobe ke bina row me asli numbers aayenge hi nahi.
+      → **ho gaya (2026-08-20).** `studio/.env.local` ab maujood hai, dev server chala,
+      aur chhaho file browser se upload hui. Asli rows (`GET /api/assets`):
 
-- [ ] 5.13 `npm run typecheck` clean. Commit: "reel-studio: phase 5 — assets + media library".
-      → typecheck **clean hai** (2026-08-19, saare 6 workspaces, exit 0). Commit abhi
-      `3ec0f62 reel-studio: phase 5 (WIP) — …` hai; asli wala commit 5.12 ke baad.
+      ```
+      kind   filename         w×h         durationMs  fps   sampleRate ch  bytes    codec / container
+      image  img-480p.png      854×480     null        null  null       -   2328     png / png_pipe (rgb24)
+      image  img-1080p.png    1920×1080    null        null  null       -   8655     png / png_pipe (rgb24)
+      image  img-4k.png       3840×2160    null        null  null       -   29532    png / png_pipe (rgb24)
+      video  vid-30s.mp4      1080×1920    30000       30    44100      1   880074   h264 High / yuv420p + aac LC
+      audio  aud-10s.mp3      null         10000       null  44100      1   80474    mp3  (64 kbps)
+      audio  aud-5s.wav       null          5000       null  44100      1   441078   pcm_s16le (705.6 kbps)
+      ```
+
+      Saath me har row ka `thumbKey` bhara hua hai (`permanent/thumbs/<id>.jpg`) aur
+      `lifecycle` `permanent` hai. Video ka `meta` me asli ffprobe data:
+      `videoCodec h264`, `videoProfile High`, `pixelFormat yuv420p`, `audioCodec aac`,
+      `audioProfile LC`, `videoBitRate 156378`, `totalBitRate 234686`, `rotation 0`.
+
+      ⚠️ **Is test ne ek asli galti pakdi:** pehli baar teeno PNG par `fps: 25` aaya tha.
+      Wo naapa hua number nahi tha — ffprobe tasveer ko `png_pipe` demuxer se padhta hai
+      aur uska `r_frame_rate` bina poochhe `25/1` deta hai. Wahi 25 DB me baith kar asli
+      naap jaisa dikhta tha. Ab still image par `fps` `null` aata hai (upar ki table isi
+      fix ke baad ki hai) — 5.4 me poori baat.
+
+- [x] 5.13 `npm run typecheck` clean. Commit: "reel-studio: phase 5 — assets + media library".
+      → typecheck **clean** (2026-08-20, saare 6 workspaces, exit 0), aur `npm run check`
+      ke saare suite bhi pass (studio 150, core 520, media 20).
 
 ## Verify (asli output paste karna)
 

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { readTokenUsage, type GeminiUsageMetadata } from "@/lib/ai/usage";
+import { recordReelUsage } from "@/lib/usage";
+
 /**
  * Gemini ka darwaza — **key sirf server par** (21.3).
  *
@@ -43,6 +46,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!prompt) return NextResponse.json({ error: "prompt khaali hai" }, { status: 400 });
 
   const model = body.model ?? process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+  const startedAt = Date.now();
 
   try {
     const response = await fetch(
@@ -70,6 +74,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
+      // Fail bhi ginte hain — nakaam call ka bhi paisa lagta hai, aur usko na
+      // ginna bill aur hisaab ke beech ek chup-chaap farak bana deta hai.
+      void recordReelUsage({
+        kind: "scenes",
+        units: 0,
+        ok: false,
+        meta: { model, status: response.status, ms: Date.now() - startedAt },
+      });
       return NextResponse.json(
         { error: `Gemini ne ${response.status} diya`, detail: detail.slice(0, 500) },
         { status: 502 },
@@ -87,6 +99,34 @@ export async function POST(request: Request): Promise<NextResponse> {
      * par har call me do baar wahi text network par jaata hai — bekaar, aur
      * bade jawab par dhyaan dene layak.
      */
+    /*
+     * Usage yahin likhi jaati hai, client par nahi — client se bhejna matlab
+     * uspar bharosa karna ki wo sach bheje, aur wo hisaab ka sabse kamzor
+     * raasta hai. Yahan wo number seedha provider ke jawab se aata hai.
+     */
+    /*
+     * ⚠️ Ginti `lib/ai/usage.ts` me hoti hai, yahan nahi — kyunki usme ek asli
+     * gadbad chhupi thi. Naye model "sochne" ke token alag se ginte hain
+     * (`thoughtsTokenCount`), aur wo `candidatesTokenCount` me aate hi nahi.
+     * Ek asli call par: prompt 12, candidates 5, thoughts 105 — kul 122.
+     * Sirf candidates ginne par yahan 17 likha jaata tha: saat guna kam, aur
+     * dekhne me bilkul theek. Ab uspar test hai (`scripts/check-ai.ts`).
+     */
+    const tokens = readTokenUsage(data.usageMetadata as GeminiUsageMetadata | undefined);
+    void recordReelUsage({
+      kind: "scenes",
+      // `units` = kul tokens, kyunki `service_usage` me Gemini ke liye wahi
+      // paimana pehle se chalta hai (dekho supabase/service-usage.sql).
+      units: tokens.totalTokens,
+      ok: true,
+      meta: {
+        model,
+        inputTokens: tokens.inputTokens,
+        outputTokens: tokens.outputTokens,
+        ms: Date.now() - startedAt,
+      },
+    });
+
     return NextResponse.json({ text, raw: { usageMetadata: data.usageMetadata } });
   } catch (cause) {
     return NextResponse.json(

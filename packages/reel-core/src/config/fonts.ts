@@ -17,7 +17,14 @@
  * apna font jodna do kadam ka kaam hai:
  *
  *   1. file `studio/public/fonts/` me rakho
- *   2. `studio/public/fonts/fonts.json` me ek entry jodo
+ *   2. `studio/public/fonts/fonts.json` me ek entry jodo — dono shakl chalti hain:
+ *
+ *      ```json
+ *      [{ "id": "Poppins", "label": "Poppins", "fallback": "sans-serif",
+ *        "files": [{ "file": "poppins-700.woff2", "weight": 700, "style": "normal" }],
+ *        "weights": [700] }]
+ *      ```
+ *      ya wahi list `{ "fonts": [ … ] }` ke andar.
  *
  * Uske baad wo font panel me apne aap dikhne lagta hai — code me kahin kuch
  * nahi badalta.
@@ -103,6 +110,100 @@ export function mergeFonts(extra: readonly FontEntry[] | null | undefined): Font
   return [...byId.values()];
 }
 
+/**
+ * `fonts.json` ko padho — **dono shakl chalti hain**.
+ *
+ * ⚠️ Ye ek asli jaal ka ilaaj hai (2026-08-21 me pakda). Loader pehle sirf
+ * `{ "fonts": [...] }` maanta tha, par jo likha hua tha wo bas itna tha —
+ * "`fonts.json` me ek entry jodo". Seedha padhne par aadmi ek **list** likhta
+ * hai (`[ { ... } ]`), aur tab kuch nahi hota: file parosti hai, JSON theek
+ * hota hai, koi error nahi aata, bas font dropdown me kabhi aata hi nahi.
+ * Ye us kism ki khaami hai jise dhoondhne me ghante lagte hain.
+ *
+ * Ab dono chalti hain, aur jo shakl samajh na aaye uspar `null` lautta hai —
+ * taaki bulane wala "file thi par bekaar thi" aur "file thi hi nahi" me farak
+ * kar sake, aur user ko saaf bata sake.
+ */
+export function parseFontsJson(raw: unknown): FontEntry[] | null {
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as { fonts?: unknown })?.fonts)
+      ? (raw as { fonts: unknown[] }).fonts
+      : null;
+  if (!list) return null;
+
+  const out: FontEntry[] = [];
+  for (const entry of list) {
+    const font = entry as Partial<FontEntry>;
+    /*
+     * ⚠️ Aadhi bhari hui entry chup-chaap chhod di jaati hai, poori file nahi.
+     * Ek galat entry ki wajah se baaki teen font gaayab kar dena ulta jawab hai.
+     */
+    if (typeof font.id !== "string" || !font.id.trim()) continue;
+    if (typeof font.label !== "string" || !font.label.trim()) continue;
+    out.push({
+      id: font.id,
+      label: font.label,
+      fallback: typeof font.fallback === "string" && font.fallback ? font.fallback : "sans-serif",
+      files: Array.isArray(font.files) ? font.files : [],
+      weights: Array.isArray(font.weights) && font.weights.length > 0 ? font.weights : [400],
+    });
+  }
+  return out;
+}
+
+
+/** `https://…`, `//…` ya `/api/…` — yaani jise base path ki zaroorat nahi. */
+function isAbsoluteUrl(value: string): boolean {
+  return /^(https?:)?\/\//.test(value) || value.startsWith("/");
+}
+
+/**
+ * Upload kiye hue font ki file se CSS family ka naam.
+ *
+ * `Poppins-Bold.woff2` → `Poppins-Bold`. Naam file se aata hai kyunki wahi
+ * ek cheez hai jo user ne khud chuni hai — asset id (`as_9f3c…`) picker me
+ * aur CSS me dono jagah bekaar dikhta hai.
+ */
+export function fontFamilyForFile(filename: string): string {
+  const base = filename.slice(filename.lastIndexOf("/") + 1);
+  const dot = base.lastIndexOf(".");
+  const stem = (dot > 0 ? base.slice(0, dot) : base).trim();
+  return stem || "Font";
+}
+
+export interface FontAssetInput {
+  id: string;
+  filename: string;
+  /** Jahan se file milegi — signed URL ya `publicDir` ke andar ka naam. */
+  src: string;
+  weight?: number;
+  style?: "normal" | "italic";
+}
+
+/**
+ * Upload kiye hue font asset se ek `FontEntry`.
+ *
+ * ⚠️ Ye wahi shape banata hai jo `fonts.json` wala raasta banata hai — isliye
+ * preview aur render dono me **wahi ek** `fontFaceCss()` chalta hai, aur "preview
+ * me dikha, MP4 me nahi" wali halat ban hi nahi sakti (Section E ka faisla #4).
+ *
+ * ⚠️ `weight` file se andaaza **nahi** lagaya jaata. `Poppins-Bold.woff2` dekh kar
+ * 700 maan lena aasan hota, par `Poppins-Semibold` par wo galat hota aur galti
+ * chup-chaap chalti — text thoda mota ya patla, aur wajah kahin nahi. Default 400
+ * hai aur user use badal sakta hai.
+ */
+export function fontEntryForAsset(asset: FontAssetInput): FontEntry {
+  const family = fontFamilyForFile(asset.filename);
+  return {
+    id: family,
+    label: family,
+    fallback: BUILTIN_FONTS[0]?.fallback ?? "sans-serif",
+    files: [{ file: asset.src, weight: asset.weight ?? 400, style: asset.style ?? "normal" }],
+    weights: [asset.weight ?? 400],
+  };
+}
+
 export function getFont(fonts: readonly FontEntry[], id: string): FontEntry | undefined {
   return fonts.find((font) => font.id === id);
 }
@@ -136,11 +237,19 @@ export function fontFaceCss(
   const blocks: string[] = [];
   for (const font of fonts) {
     for (const file of font.files) {
+      /*
+       * ⚠️ Poora URL ho to `basePath` **nahi** lagta. Upload kiye hue font ki
+       * file `public/fonts/` me nahi hoti — wo storage me hoti hai aur uska URL
+       * poora hota hai (`https://…` ya `/api/…`). Aage `basePath` chipka dene
+       * par URL `"/fonts/https://…"` ban jaata hai aur font chup-chaap load hi
+       * nahi hota — na error, na kuch; bas fallback lag jaata hai.
+       */
+      const src = isAbsoluteUrl(file.file) ? file.file : `${basePath}${file.file}`;
       blocks.push(
         [
           "@font-face {",
           `  font-family: ${quoteFamily(font.id)};`,
-          `  src: url("${basePath}${file.file}") format("${formatOf(file.file)}");`,
+          `  src: url("${src}") format("${formatOf(file.file)}");`,
           `  font-weight: ${file.weight};`,
           `  font-style: ${file.style};`,
           // `block` isliye ki text pehle kisi aur font me dikh kar phir badal

@@ -18,7 +18,9 @@
  */
 
 import { mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
+
+import { requireRepoRoot } from "@reel/storage";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -62,8 +64,22 @@ function parseArgs(argv: readonly string[]): { audio: string | null; lang: strin
   let lang = "hi";
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--audio" && argv[index + 1]) audio = argv[index + 1] as string;
+    // (path ka resolve neeche — repo root se, cwd se nahi)
     if (argv[index] === "--lang" && argv[index + 1]) lang = argv[index + 1] as string;
   }
+  /*
+   * ⚠️ Relative path **repo root se** khulta hai, cwd se nahi.
+   *
+   * `npm run transcribe:smoke --workspace @reel/worker` cwd `worker/` deta hai,
+   * par user hamesha repo root ka path likhta hai (`render-out/media/...`).
+   * cwd par bharosa karne se wo path chup-chaap galat jagah dhoondhta hai aur
+   * error ffmpeg ki gehrai se aata hai ("No such file") — jahan se ye samajhna
+   * bahut mushkil hai ki galti sirf cwd ki thi.
+   *
+   * Yahi niyam is folder ki har script me hai (`loadEnvFile` ka comment dekho).
+   */
+  if (audio && !isAbsolute(audio)) audio = resolve(requireRepoRoot(), audio);
+
   return { audio, lang };
 }
 

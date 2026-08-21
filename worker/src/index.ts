@@ -16,6 +16,7 @@
  * bhar chalta hai — serverless me wo timeout ho jaata.
  */
 
+import { existsSync } from "node:fs";
 import { mkdir, rm, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { hostname } from "node:os";
@@ -45,12 +46,14 @@ import {
 import {
   createStorageDriver,
   readStorageConfig,
+  requireRepoRoot,
   resolveAssets,
   withLocalFile,
   type StoredAsset,
 } from "@reel/storage";
 
 import { asJob, patch, readDbConn, rows, rpc, select, upsert, type DbConn, type RenderJobRow } from "./db";
+import { stageFontAssets, stageFonts } from "./fonts";
 import { RemotionRenderEngine } from "./engines/remotion";
 
 /* ------------------------------------------------------------------ config */
@@ -66,6 +69,32 @@ const POLL_INTERVAL_MS = Number(process.env.REEL_WORKER_POLL_MS ?? 2000);
  * itna likhna doosre worker ke claim ko bhi dheema kar deta hai. UI 2 second me
  * ek baar dekhta hai, isliye 2 second me ek baar likhna kaafi hai.
  */
+/**
+ * Remotion ek saath kitne frame banaye (`REEL_RENDER_CONCURRENCY`).
+ *
+ * ⚠️ Ye job wali concurrency se **alag** hai. `MAX_CONCURRENT` batata hai ki ek
+ * waqt me kitni **reel** ban rahi hain (1); ye batata hai ki ek reel ke andar
+ * kitne **frame** saath-saath bante hain (Remotion kai Chrome tab kholta hai).
+ *
+ * ⚠️ **Default jaan-boojhkar khaali hai — aur ye naap ke baad tay hua.** Ek
+ * 20-core machine par 375 frame ki reel teen setting par chalayi gayi:
+ *
+ *     concurrency 1   : render 28.8s
+ *     concurrency 8   : render 28.4-28.9s
+ *     concurrency 14  : render 22.8s (ek baar), 28s (doosri baar)
+ *
+ * Yaani **koi bharosemand farak nahi mila** — jitna antar dikha utna to do
+ * baar chalane par apne aap aa jaata hai (machine par doosre kaam chal rahe the).
+ * Aisi haalat me apna default thopna galat hoga: wo ek aisa number hota jise
+ * "tuning" kaha jaata par jiske peeche koi naap na hoti. Isliye Remotion apna
+ * hisaab lagata hai, aur ye knob sirf **escape hatch** hai — jab kisi machine
+ * par sach me farak dikhe, tab set kar dena.
+ */
+const RENDER_CONCURRENCY = (() => {
+  const raw = Number(process.env.REEL_RENDER_CONCURRENCY);
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : null;
+})();
+
 const PROGRESS_INTERVAL_MS = Number(process.env.REEL_WORKER_PROGRESS_MS ?? 2000);
 
 /** Heartbeat kitni der me (11.13). UI isse "worker offline" pehchanta hai. */
@@ -195,7 +224,7 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
     const stored: StoredAsset[] = [];
     for (const id of assetIds) {
       const list = rows(
-        await select(conn, `/reel_assets?id=eq.${id}&select=id,key,filename`),
+        await select(conn, `/reel_assets?id=eq.${id}&select=id,key:r2_key,filename`),
       );
       const row = list[0];
       if (!row) continue;
@@ -206,7 +235,45 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
       });
     }
 
+    const assetsStartedAt = Date.now();
     const assets = await resolveAssets(doc, stored, storage, { publicDir });
+    log(`  assets: ${stored.length} file ${Date.now() - assetsStartedAt}ms me utri`);
+
+    /*
+     * Fonts bhi wahin utarte hain jahan assets — aur unki list render me jaati hai.
+     *
+     * ⚠️ Ye pehle **hota hi nahi tha**, aur wo ek chup-chaap chalne wala bug tha:
+     * preview me `fonts.json` wala font dikhta tha aur MP4 me system font nikalta
+     * tha. Dekho `src/fonts.ts` ka note.
+     */
+    const staged = await stageFonts(publicDir);
+
+    /*
+     * Upload kiye hue font bhi — inhe `resolveAssets()` kabhi nahi utaarta,
+     * kyunki wo item par `assetId` se nahi lagte, `text.fontFamily` me naam se
+     * aate hain. Isi wajah se upload kiya hua font MP4 me nahi pahunchta tha.
+     */
+    const fontRows = rows(
+      await select(conn, `/reel_assets?kind=eq.font&select=id,key:r2_key,filename`),
+    ).map((row) => ({
+      id: String(row.id),
+      key: String(row.key),
+      filename: String(row.filename ?? ""),
+    }));
+    const stagedAssets = await stageFontAssets(publicDir, doc, fontRows, async (key) => {
+      try {
+        return await storage.get(key);
+      } catch {
+        return null;
+      }
+    });
+
+    const allFonts = [...staged.fonts, ...stagedAssets.fonts];
+    const copiedCount = staged.copied.length + stagedAssets.copied.length;
+    if (copiedCount > 0) {
+      log(`  fonts: ${copiedCount} file utri (${allFonts.length} entry)`);
+    }
+    for (const reason of [...staged.skipped, ...stagedAssets.skipped]) log(`  ⚠️ font: ${reason}`);
     if (cancelled) return { status: "cancelled" };
 
     /*
@@ -235,10 +302,13 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
 
     // 2. Render.
     const engine = new RemotionRenderEngine();
+    const renderCallStartedAt = Date.now();
     const result = await engine.render({
       doc,
       assets,
       publicDir,
+      ...(RENDER_CONCURRENCY ? { concurrency: RENDER_CONCURRENCY } : {}),
+      ...(allFonts.length > 0 ? { fonts: allFonts } : {}),
       outPath: rawPath,
       preset: job.preset,
       abortSignal: abort.signal,
@@ -292,6 +362,7 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
       // tasveer nahi dikhegi.
     }
 
+    log(`  render ke baad ka kaam (faststart + loudness + thumbnail + upload): ${Date.now() - renderCallStartedAt - result.renderMs - result.bundleMs}ms`);
     const { size } = await stat(finalPath);
     await updateJob(conn, job.id, {
       status: "completed",
@@ -306,6 +377,13 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
         ...job.meta,
         stage: "done",
         renderMs: result.renderMs,
+        /*
+         * Bundling ka waqt alag se — "render dheema hai" ka jawab andaaze se
+         * dena band. Cache lagne par ye 0 ke aas-paas rehta hai; naya bundle
+         * banne par 10-15s. Dono ka farak isi line se dikhta hai.
+         */
+        bundleMs: result.bundleMs,
+        bundleCached: result.bundleCached,
         frames: result.frames,
         preset: job.preset,
         video: {
@@ -380,7 +458,7 @@ async function runTranscribeJob(conn: DbConn, job: RenderJobRow): Promise<JobOut
   try {
     await mkdir(scratchDir, { recursive: true });
 
-    const list = rows(await select(conn, `/reel_assets?id=eq.${assetId}&select=id,key,filename`));
+    const list = rows(await select(conn, `/reel_assets?id=eq.${assetId}&select=id,key:r2_key,filename`));
     const row = list[0];
     if (!row) return { status: "failed", error: `asset ${assetId} nahi mili` };
 
@@ -462,11 +540,38 @@ async function runTranscribeJob(conn: DbConn, job: RenderJobRow): Promise<JobOut
 
 /* --------------------------------------------------------------- main loop */
 
+/**
+ * Repo root se `worker/.env` uthao — bilkul waise hi jaise har smoke script uthata hai.
+ *
+ * ⚠️ Ye is file me hona chahiye tha aur nahi tha, aur wo khaami sabse buri shakl
+ * me chhupi rahi: `worker/scripts/*` sab apna env khud load karte hain, isliye
+ * `db-verify`, `render:sample`, `cleanup` — sab chalte the aur sab pass hote the.
+ * Sirf **asli worker** (`npm run dev:worker`) shuru hote hi mar jaata tha, ye keh
+ * kar ki SUPABASE_URL nahi hai — jabki wo `worker/.env` me saamne likha tha.
+ *
+ * Isliye env yahin, `readDbConn()` se pehle. Ambient env (CI, systemd) pehle se
+ * set ho to `loadEnvFile` usko nahi girata — file sirf jo missing hai wahi bharti hai.
+ */
+function loadWorkerEnv(): void {
+  const root = requireRepoRoot();
+  for (const candidate of ["worker/.env", ".env"]) {
+    const path = resolve(root, candidate);
+    if (existsSync(path)) {
+      process.loadEnvFile(path);
+      return;
+    }
+  }
+}
+
 async function main(): Promise<void> {
+  loadWorkerEnv();
   const conn = readDbConn();
   const config = readStorageConfig();
 
-  log(`chalu — storage driver "${config.driver}", concurrency ${MAX_CONCURRENT}`);
+  log(
+    `chalu — storage driver "${config.driver}", ek waqt me ${MAX_CONCURRENT} reel, ` +
+      `frame concurrency: ${RENDER_CONCURRENCY ?? "Remotion ka apna hisaab"}`,
+  );
   log(`queue har ${POLL_INTERVAL_MS}ms dekhi jaayegi. Rokne ke liye Ctrl+C.`);
 
   let running = 0;

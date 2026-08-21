@@ -20,8 +20,42 @@ import { clampFrame, framesToTimecode, requireTrackType, type Item, type Track }
 
 /** Ruler ki oonchai (px). */
 export const RULER_HEIGHT = 26;
+
+/** Marker lane ki oonchai (px) — ruler ke theek neeche wali patti (16.x). */
+export const MARKER_LANE_HEIGHT = 12;
+
+/**
+ * Lanes ke upar jitni jagah chhup'ti hai — **headers ke column me utni hi chahiye**.
+ *
+ * ⚠️ Ye ek asli bug ka ilaaj hai (2026-08-21 me naapa gaya). Lanes wale column
+ * ke upar Ruler (26) **aur** MarkerLane (12) dono hain, par headers wale column
+ * me sirf `RULER_HEIGHT` ka spacer tha. Nateeja: har track ka header apni lane
+ * se **12px upar** khisak gaya tha — naapa hua: header top 797 vs lane top 809.
+ * Wo aankh se "thoda tirchha" lagta hai par pakda nahi jaata, aur oonchai ka
+ * handle bhi galat jagah mehsoos hota hai.
+ *
+ * Marker lane Phase 16 me jodi gayi thi aur spacer tab update nahi hua. Ab dono
+ * ek hi jod se aate hain, isliye agli patti jodne par bhi wo apne aap milte hain.
+ */
+export const LANES_TOP_OFFSET = RULER_HEIGHT + MARKER_LANE_HEIGHT;
+
 /** Baayein track headers ka column (px). */
 export const TRACK_HEADER_WIDTH = 148;
+
+/**
+ * Chhoti screen par wahi column — patla.
+ *
+ * ⚠️ 390px ki screen par 148px ka header aadhe se zyada jagah kha jaata tha aur
+ * timeline ke liye 200px bhi nahi bachte the. Yahan sirf pehchaan rehti hai
+ * (rang, icon, naam); baaki controls ek sheet me jaate hain — dekho TrackHeader.
+ */
+export const TRACK_HEADER_WIDTH_COMPACT = 124;
+/*
+ * 124 kyun: 104 par naam ke liye sirf 33px bachte the aur "Voice / Audio"
+ * jaisa naam "Vo…" ban jaata tha — yaani column tha par kaam ka nahi.
+ * 124 par naam ko ~53px milte hain aur timeline ko ab bhi 266px (390px ki
+ * screen par). Dono naap browser me naape gaye hain, andaaze se nahi.
+ */
 
 /* -------------------------------------------------------------------- zoom */
 

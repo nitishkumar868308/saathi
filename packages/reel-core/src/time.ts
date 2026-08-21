@@ -34,6 +34,29 @@ export function durationFromSeconds(seconds: number, fps: number): number {
   return Math.max(1, secondsToFrames(seconds, fps));
 }
 
+/**
+ * Awaaz ki lambai → frames, **hamesha upar ki taraf** (22.11).
+ *
+ * ⚠️ Ye `secondsToFrames()` se jaan-boojhkar alag hai, aur yahi is poore feature
+ * ka dil hai. Wo `Math.round` karta hai, jo aam timing ke liye theek hai — par
+ * awaaz par galat: 2.004 second ki voice 30fps par 60 frame ban jaayegi, aur
+ * aakhri 0.004 second — yaani aakhri akshar ki poonchh — kat jaayegi.
+ *
+ * Wo katna **sunai deta hai** ("…rakhein" ki jagah "…rakh") par **dikhta kahin
+ * nahi** — na timeline par, na kisi number me. Aur jo galti sirf kaan se pakdi
+ * jaati hai wo sabse der se pakdi jaati hai.
+ *
+ * Isliye voice hamesha upar chadhti hai: ek frame ki khaali jagah kisi ko pata
+ * nahi chalti, ek kata hua shabd sabko chalta hai.
+ */
+export function voiceFrames(seconds: number, fps: number): number {
+  assertFps(fps);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    throw new Error(`Awaaz ki lambai theek nahi: ${seconds}`);
+  }
+  return Math.max(1, Math.ceil(seconds * fps));
+}
+
 export interface TimecodeOptions {
   /** Ghanta 0 ho to `MM:SS:FF` de do (timeline ruler ke liye). */
   compact?: boolean;

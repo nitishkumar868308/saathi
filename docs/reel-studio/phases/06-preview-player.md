@@ -41,9 +41,24 @@ unticked hain.
       `npm run build:studio` pass; `/project/[id]` ka bundle 4.16 kB se **115 kB** ho gaya —
       yaani player sach me bundle me aaya, sirf import likha nahi gaya.
 
-- [ ] 6.2 inputProps = live doc + resolved asset URL map. Doc badle to player turant update ho
+- [x] 6.2 inputProps = live doc + resolved asset URL map. Doc badle to player turant update ho
       (remount ke bina, warna playback position khoyegi).
-      → code maujood hai, browser me chalaya nahi. `inputProps` har render par naya
+      → **playback ke beech me edit karke naapa (2026-08-20).** Space se playback chalayi,
+      phir chalte-chalte ek clip chun kar `→` se 1 frame khiskayi. Nateeja:
+
+      ```
+      play dabaya           frame 0
+      edit kiya             frame 13
+      2 second baad         frame 72   ← chalti rahi (72 > 13)
+      ```
+
+      Player **remount nahi hua** — position na to 0 par gayi, na ruki; wahin se aage
+      chalti rahi. Aur wo edit DB me pahunchi bhi (`PRIYA.png startFrame: 0 → 1`).
+      → **browser me chalakar dekha (2026-08-21).** Timeline se text clip chuni, properties
+      me uska text `"Scene 2 ka title"` se `"AUDIT LIVE TEXT"` kiya — preview ka DOM
+      turant wahi naya text dikhane laga, bina Player remount ke (playback ki jagah nahi
+      gayi). Ek Ctrl+Z par purana text wapas (poori typing ek hi history entry me thi).
+      `inputProps` har render par naya
       `{ doc, assets }` hai, aur `component` module-level const hai — isliye Player remount
       nahi hota. Asset URL
       [studio/lib/assetMap.ts](../../../studio/lib/assetMap.ts) se aate hain (doc me sirf
@@ -62,8 +77,33 @@ unticked hain.
       phir bhi oonchai se, khaali dabbe par scale 0, fit par aspect ≤1px farak,
       100% par theek 1080×1920, 50% par 540×960, anjaan zoom id par fit.
 
-- [ ] 6.4 Transport bar: play/pause (Space), 1 frame back/forward (←/→), 1 second jump
+- [x] 6.4 Transport bar: play/pause (Space), 1 frame back/forward (←/→), 1 second jump
       (Shift+←/→), start/end (Home/End), loop toggle, mute toggle, volume.
+      → **asli browser me har key dabayi (2026-08-20)**, aur har baar frame number padha:
+
+      | key | pehle | baad | matlab |
+      |---|---|---|---|
+      | `→` | frame 5 | frame 6 | theek 1 frame |
+      | `Shift+→` | frame 6 | frame 36 | theek 30 frame = 1 second @30fps |
+      | `End` | frame 36 | frame 449/450 | aakhri frame (0-indexed) |
+      | `Home` | 449 | 0 | shuruaat |
+      | `Space` | 0 | chalne lagi | playback |
+
+      Loop button `Loop band hai` → `Loop chalu hai`, mute `Mute` → `Awaaz on karo`,
+      volume `<input type=range>` 0–1. Sab chale.
+
+      ⚠️ **Is test ne ek chupi hui khaami pakdi.** `Ek frame peeche/aage` ke tooltip me
+      shortcut dikh hi nahi raha tha — sirf `Ek frame peeche`, `(←)` gayab. Wajah:
+      `TransportBar` `shortcutLabel("frame-back")` / `"frame-forward"` maangta tha, par
+      Phase 8 me arrow keys dohre kaam ki ho gayi aur registry me unke naam
+      `nudge-back` / `nudge-forward` ho gaye. `shortcutLabel()` na milne par **khaali
+      string** deta hai — isliye kuch toota nahi, koi error nahi, bas hint chup-chaap
+      gayab. Ab id sahi hain aur tooltip `Ek frame peeche (←)` / `Ek frame aage (→)`
+      dikhata hai (browser me padh kar dekha).
+
+      Taaki ye dobara na ho, ek test juda: `check-shortcuts.ts` ab har `shortcutLabel("…")`
+      call ko source se nikaal kar registry se milata hai — rename us din pakda jaayega
+      jis din wo hoga, mahine baad nahi.
       → UI + registry ban chuke
       ([TransportBar.tsx](../../../studio/components/editor/preview/TransportBar.tsx),
       [studio/lib/shortcuts.ts](../../../studio/lib/shortcuts.ts)), par **dabaya nahi gaya**.
@@ -74,22 +114,51 @@ unticked hain.
       Button ke `title` bhi usi registry se banate hain, haath se "Space" nahi likha —
       warna shortcut badalne par tooltip jhooth bolta.
 
-- [ ] 6.5 Timecode display: `HH:MM:SS:FF` + frame number, dono fps se derive (helper se).
-      → code maujood hai, browser me chalaya nahi. `framesToTimecode()` (reel-core) se
+- [x] 6.5 Timecode display: `HH:MM:SS:FF` + frame number, dono fps se derive (helper se).
+      → **browser me padha (2026-08-20).** Transport me `00:00:01:06 / 00:00:15:00 ·
+      frame 36/450` dikha. Ye ek hi naap ka do roop hai aur dono mile: frame 36 @30fps
+      = 1 second 6 frame, aur `End` par `00:00:14:29 · frame 449/450`. fps se derive
+      hone ka saboot yahi hai ki `Shift+→` (1 second) frame ko theek 30 badhata hai.
+      → **browser me naapa (2026-08-21):** shuru me `00:00:00:00` / `frame 0/375`, ek
+      frame aage dabate hi `00:00:00:01` / `frame 1/375` — dono ek saath aur ek hi
+      source se. `framesToTimecode()` (reel-core) se
       dono hisse, aur saath me `frame N/total`. Helper ka apna test `@reel/core` ke check
       me pehle se hai; yahan sirf uska istemaal hai — kahin `/ 30` nahi likha.
 
-- [ ] 6.6 Playhead single source of truth: store ka `uiSlice.playheadFrame`. Player aur
+- [x] 6.6 Playhead single source of truth: store ka `uiSlice.playheadFrame`. Player aur
       timeline dono isi ko padhein/likhein — do jagah state nahi.
-      → code maujood hai, browser me chalaya nahi. `PlaybackProvider` me **playhead hai hi
+      → **browser me ginn kar dekha (2026-08-20).** Transport se playhead 30 par le jaakar
+      timeline ke playhead ka asli CSS padha: `left: 120px`, aur us waqt zoom `4.00
+      px/frame` tha. 30 × 4 = 120 — theek. Do alag state hoti to ye do number sanyog se
+      hi milte; yahan wo ek hi `playheadFrame` se nikalte hain.
+      Isi tarah `Shift+→` transport se dabane par timeline ka playhead bhi utna hi khiska.
+      → **browser me dekha (2026-08-21):** Play dabaya to ~1.2s me playhead frame 0 → 7
+      gaya aur timecode, frame ginti aur player teeno saath chale; Pause par teeno ek hi
+      jagah ruke. `PlaybackProvider` me **playhead hai hi
       nahi** — sirf isPlaying/loop/volume/zoom/guides/draft. Har command
       ([studio/lib/playback.tsx](../../../studio/lib/playback.tsx)) `store.setPlayhead()`
       likhta hai; player usko padh kar seek karta hai aur apna `frameupdate` wapas usi me
       likhta hai (`fromPlayer` ref se chakkar rukta hai).
 
-- [ ] 6.7 Scrub: player par drag + timeline par drag, dono same frame set karein.
+- [x] 6.7 Scrub: player par drag + timeline par drag, dono same frame set karein.
       Scrub ke dauraan seek throttle (60fps se zyada nahi).
-      → code maujood hai, browser me chalaya nahi. Transport me
+      → **asli drag chalaya (2026-08-20)**, `<ScrubBar>` (`role=slider`, `aria-label=Playhead`)
+      par pointerdown → pointermove → pointerup:
+
+      | kahan dabaya/ghaseeta | mila frame | hona chahiye tha |
+      |---|---|---|
+      | 25% par pointerdown | 94 | 94 |
+      | 80% tak ghaseet kar chhoda | 299 | 299 |
+
+      Dono bilkul exact. Aur us waqt transport ka timecode bhi `frame 299` hi dikha —
+      yaani bar aur timecode ek hi `playheadFrame` se aa rahe hain (6.6).
+      Throttle ka ganit pehle se test me hai (4 test nakli ghadi par).
+      ⚠️ Test me `setPointerCapture` ko stub karna pada — banawati pointer id par wo
+      throw karta hai. Ye test ki hadd hai, product ki nahi; asli maus par capture wahi
+      cheez hai jo bar se bahar nikalne par drag ko chhootne nahi deti.
+      → **browser me naapa (2026-08-21):** ruler par pointer drag karke 60% par chhoda —
+      playhead `frame 225/375` par gaya, jo 375 ka theek 60% hai. Yaani drag ki jagah
+      seedhe waqt par girti hai, andaaze se nahi. Transport me
       [`<ScrubBar>`](../../../studio/components/editor/preview/ScrubBar.tsx) hai; timeline
       wali taraf **Phase 7 ne asli ruler de diya** (`TimelineView`), aur us waqt ki chhoti
       `TimelineStrip` hata di gayi — do jagah do alag scrub rakhna sirf uljhan hoti.
@@ -99,17 +168,36 @@ unticked hain.
       par: pehla seek turant, ek window me sirf **aakhri** frame, 1000ms me 200
       pointermove par bhi 61 se zyada seek nahi, aur `flush()` pending ko turant bhejta hai.
 
-- [ ] 6.8 Play/pause ke dauraan autosave block **nahi** hona chahiye, par save request
+- [x] 6.8 Play/pause ke dauraan autosave block **nahi** hona chahiye, par save request
       playback ko hakla na de — verify karke batao.
+      → **naap liya (2026-08-20).** 6.2 wale hi test me: playback chalte hue edit kiya,
+      aur wo edit **sach me save hui** — DB me `PRIYA.png startFrame` 0 se 1 ho gaya aur
+      `updated_at` theek usi waqt ka hai (06:48:58). Yaani autosave playback ke dauraan
+      ruki nahi.
+      Aur hakli bhi nahi: save ke aar-paar playback frame 13 → 72 gayi, yaani 2000ms me
+      59 frame = **29.5 fps** jabki target 30 hai. Ek save request ne playback se aadha
+      frame bhi nahi chheena.
       → **naapa nahi gaya.** Autosave ka scheduler playback se poori tarah alag hai (usme
       playback ka koi zikr hi nahi), isliye rukne ka koi raasta dikhta nahi — par ye
       dalil hai, naap nahi. Iska asli jawab dev server par playback ke dauraan edit karke
       hi milega.
 
-- [ ] 6.9 **A1 quality:** preview me image scaling smooth ho (`image-rendering` default,
+- [x] 6.9 **A1 quality:** preview me image scaling smooth ho (`image-rendering` default,
       CSS blur nahi), aur `<Player>` ka `numberOfSharedAudioTags` sahi set ho taaki
       audio glitch na kare. Preview resolution downscale ho sakta hai par **aspect aur
       framing bilkul final ke jaisa** ho.
+      → **CSS bhi browser me naapi (2026-08-21):** preview ke `<img>` par
+      `image-rendering: auto` (pixelated **nahi**) aur `object-fit: cover` —
+      yaani scaling smooth hai aur framing fit se aati hai.
+      → **ab aankh se bhi dekha aur naapa bhi (2026-08-20).** "Aspect aur framing bilkul
+      final ke jaisa" wala hissa 6.13 me ginn kar saabit hua: preview (319px chaudi) aur
+      final MP4 (1080px chaudi) ka **ek hi frame** milane par SSIM **0.950** aaya, aur
+      tasveer frame me theek usi jagah, usi naap me thi. Agar aspect ya framing zara bhi
+      alag hota to SSIM 0.95 tak pahunchta hi nahi.
+      Scaling smooth hai — preview me image ke kinare saaf hain, koi pixel-block nahi
+      (`image-rendering` jaan-boojhkar chhua nahi gaya; browser ka default scaling hi
+      final ke sabse kareeb hai).
+      `numberOfSharedAudioTags` ka ganit pehle se 3 test me pass hai.
       → `image-rendering` jaan-boojhkar chhua nahi (browser ka default smooth scaling hi
       final ke sabse kareeb hai). `numberOfSharedAudioTags` doc se **naapa** jaata hai —
       "shared audio tags (6.9)" ke 3 test pass: khaali doc par kam se kam 2, aage-peeche
@@ -132,9 +220,18 @@ unticked hain.
       ⚠️ Naap **andaaze** hain (Instagram koi official safe area publish nahi karta) — ye
       file me saaf likha hua hai.
 
-- [ ] 6.11 Missing asset handling: asset na mile to preview me saaf "Missing asset" card
+- [x] 6.11 Missing asset handling: asset na mile to preview me saaf "Missing asset" card
       dikhao (crash nahi, chup-chaap khaali bhi nahi).
-      → code maujood hai, browser me chalaya nahi. Do jagah: frame ke andar
+      → **aankh se dekha (2026-08-20).** Ek aise project me jiska asset DB me nahi tha,
+      preview ke beech me gulaabi card `ASSET NAHI MILA` + item ka naam + uski id dikhi,
+      aur upar ki patti par ginti: `1 asset nahi mila — frame me gulaabi card us item par
+      hai`. Na crash, na khaali frame. Dono hisse (card + upar ki ginti) wahi hain jo
+      is item me likhe the.
+      → **browser me dekha (2026-08-21).** Ek alag "AUDIT fixture" project banaya jisme
+      ek item ka `assetId` jaan-boojhkar aisa rakha jo hai hi nahi. Dono jagah jawab aaya:
+      upar patti par `1 asset nahi mila — frame me gulaabi card us item par hai`, aur us
+      item ke frame par card: `ASSET NAHI MILA / TOOTA HUA asset (image) / assetId: 0000…`.
+      Fixture project baad me mita diya gaya. Do jagah: frame ke andar
       `<MissingAsset>` ka gulaabi card (Phase 3 se), aur upar ki patti par ginti — kyunki
       card sirf tab dikhta hai jab playhead usi item par ho, aur 40 second ki reel me
       toota asset dhoondhne ke liye poori reel scrub karni padti.
@@ -152,7 +249,7 @@ unticked hain.
       raster/composite ka kaam ghatta hai. Yahi baat code ke comment aur button ke
       tooltip dono me likhi hai.
 
-- [ ] 6.13 Test: Phase 3 ka sample doc DB me daalo, preview me chalao, aur usi doc ka render
+- [x] 6.13 Test: Phase 3 ka sample doc DB me daalo, preview me chalao, aur usi doc ka render
       karke **same frame numbers** ke 2 frames compare karo (preview screenshot vs rendered
       frame). Farak ho to batao — chhupao nahi.
       → **aadha ho gaya.** Render wala hissa chal chuka hai: `npm run render:sample` →
@@ -160,12 +257,37 @@ unticked hain.
       `render-out/samples/frames-reel-30fps/` me maujood hain (Ken Burns ka safed chaukor
       frame 15/75/135 par 312/360/408 px — expected 312.0/360.0/408.0, farak 0px).
       **Preview wala hissa baaki hai** kyunki dev server ke liye `studio/.env.local` chahiye.
-      Ye box tabhi tick hoga jab dono taraf ke ek hi frame number ki tasveer milakar dekhi
-      jaayegi — aadhe par tick karna wahi jhooth hoga jisse Resume Protocol bachne ko kehta hai.
+      **2026-08-20 — dono taraf mila kar dekh liya.** Ab poora test asli project par hua
+      (12 clip, 3 track, asli cast images):
 
-- [ ] 6.14 `npm run typecheck` clean. Commit: "reel-studio: phase 6 — preview player".
-      → typecheck **clean hai** (6 workspaces, exit 0) aur `npm run build:studio` bhi pass.
-      Commit ho chuka hai; 6.13 ke baad phase COMPLETE hoga.
+      1. `studio` me project khola, playhead ko theek **frame 100** par le gaya
+         (transport me `frame 100/375` padha — andaaza nahi).
+      2. Player ke dabbe ka asli `getBoundingClientRect()` liya (319×567, DPR 1.25) aur
+         screenshot me se theek wahi hissa kaata.
+      3. Usi doc ka `high` par render karaya, aur MP4 me se `select=eq(n\,100)` se
+         **wahi frame 100** nikala.
+      4. Dono ko 270×480 par laakar naapa:
+
+      ```
+      SSIM    All: 0.950   (R 0.950  G 0.951  B 0.949)
+      PSNR    average: 32.54 dB
+      ```
+
+      Aankh se bhi dono ek jaise hain — tasveer frame me usi jagah, usi naap me.
+
+      **Farak kahan se aaya (chhupa nahi raha):** 0.95, 1.00 nahi hai, aur uski teen saaf
+      wajah hain — (a) preview 319px chaudi hai aur render 1080px, yaani screenshot ko
+      3.4x downscale kiya gaya; (b) MP4 h264 se compressed hai; (c) screenshot PNG browser
+      ke apne scaling se guzri hai. In teeno ke rehte 0.95 ka matlab "framing aur aspect
+      ek hi hai" hota hai. **Agar layout me zara sa bhi farak hota — clip thodi si khiski
+      hoti ya scale alag hoti — to SSIM 0.3 ke aas-paas girta.** Wo maine sach me dekha:
+      pehli koshish me galti se ek purana MP4 use ho gaya tha (us beech project landscape
+      hokar wapas aaya tha, jisse `refit` ne items chhote kar diye the) aur tab SSIM
+      **0.024** aayi thi. Yaani ye naap sach me farak pakadti hai.
+
+- [x] 6.14 `npm run typecheck` clean. Commit: "reel-studio: phase 6 — preview player".
+      → typecheck **clean** (2026-08-20, 6 workspaces, exit 0), aur `npm run check` ke
+      saare suite pass. 6.13 ho chuka hai, isliye phase ab COMPLETE hai.
 
 ## Verify (asli output paste karna)
 

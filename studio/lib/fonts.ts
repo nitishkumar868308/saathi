@@ -1,6 +1,16 @@
 "use client";
 
-import { BUILTIN_FONTS, mergeFonts, missingFonts, type Doc, type FontEntry } from "@reel/core";
+import {
+  BUILTIN_FONTS,
+  fontEntryForAsset,
+  mergeFonts,
+  missingFonts,
+  parseFontsJson,
+  type Doc,
+  type FontEntry,
+} from "@reel/core";
+
+import { getAssetUrl } from "@/lib/assetUrls";
 import { useEffect, useState } from "react";
 
 /**
@@ -11,10 +21,18 @@ import { useEffect, useState } from "react";
  * ke `inputProps.fonts` me jaati hai, aur composition uske `@font-face` khud
  * lagati hai — isliye preview aur render me **ek hi** font chalta hai.
  *
- * Apna font jodna do kadam ka kaam hai:
- *   1. file `studio/public/fonts/` me rakho
- *   2. `fonts.json` me ek entry jodo
- * Code me kahin kuch nahi badalta.
+ * Font jodne ke **do** raaste hain, aur dono ek hi list me milte hain:
+ *
+ *   1. **Upload** — library ke "Fonts" tab me `.woff2/.ttf/.otf` daalo. Wo asset
+ *      ban jaata hai aur font-picker me apne aap aa jaata hai. Aam user ke liye
+ *      yahi raasta hai.
+ *   2. **Repo me file** — `studio/public/fonts/` + `fonts.json`. Ye un fonts ke
+ *      liye hai jo har machine par saath chahiye (build me jaate hain).
+ *
+ * ⚠️ Upload wale font ka `@font-face` uske **signed URL** par banta hai, aur wahi
+ * entry `inputProps.fonts` me jaati hai. Render ke waqt worker usi file ko apne
+ * `publicDir` me utaar kar entry ka raasta badal deta hai (`worker/src/fonts.ts`)
+ * — isliye MP4 me bhi wahi font aata hai jo preview me dikha tha.
  *
  * ⚠️ `fonts.json` na ho to ye **error nahi** hai — repo me koi font file commit
  * nahi hai (font ki apni licensing hoti hai). Us halat me sirf system fonts
@@ -33,13 +51,52 @@ async function loadFonts(): Promise<FontEntry[]> {
     try {
       const response = await fetch("/fonts/fonts.json");
       if (response.ok) {
-        const data = (await response.json()) as { fonts?: FontEntry[] };
-        if (Array.isArray(data.fonts)) extra = data.fonts;
+        const parsed = parseFontsJson(await response.json());
+        if (parsed === null) {
+          /*
+           * File thi, JSON bhi theek tha — par shakl samajh nahi aayi. Isko
+           * chup-chaap chhod dena hi wo jaal hai jisme ghante jaate hain:
+           * dropdown me font nahi aata aur kahin kuch likha bhi nahi hota.
+           */
+          console.warn(
+            "[fonts] public/fonts/fonts.json padhi to gayi par usme font ki list nahi mili. " +
+              'Chahiye: [{ "id": "...", "label": "...", "files": [...] }] ya { "fonts": [ ... ] }.',
+          );
+        } else {
+          extra = parsed;
+        }
       }
     } catch {
       // fonts.json hai hi nahi — bilkul aam halat, upar wala ⚠️ dekho.
     }
-    cache = mergeFonts(extra);
+    /*
+     * Upload kiye hue font bhi usi list me. Ye fail ho jaye to sirf wo fonts
+     * nahi milte — baaki editor chalta rehna chahiye, isliye poora try/catch.
+     */
+    let uploaded: FontEntry[] = [];
+    try {
+      const response = await fetch("/api/assets?tab=fonts", { cache: "no-store" });
+      if (response.ok) {
+        const data = (await response.json()) as { assets?: { id: string; filename: string }[] };
+        const rows = data.assets ?? [];
+        uploaded = await Promise.all(
+          rows.map(async (row) =>
+            fontEntryForAsset({
+              id: row.id,
+              filename: row.filename,
+              src: await getAssetUrl(row.id),
+            }),
+          ),
+        );
+      }
+    } catch {
+      // Net gaya ya route nahi hai — system fonts se kaam chalta rahega.
+    }
+
+    // Kram maayne rakhta hai: baad wali entry pehli ko dhak deti hai
+    // (`mergeFonts`), aur upload kiya hua font `fonts.json` par bhaari hona
+    // chahiye — user ne use abhi chuna hai.
+    cache = mergeFonts([...extra, ...uploaded]);
     inflight = null;
     return cache;
   })();

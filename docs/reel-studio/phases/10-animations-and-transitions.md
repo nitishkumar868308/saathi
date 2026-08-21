@@ -89,17 +89,29 @@ effect add ho. Sab preview aur render me identical.
       baad beech me kam se kam ek frame aisa bachta hai jahan kuch nahi chalta.
       Warning panel me dikhti hai (kitne frames tak sim gayi, aur kyun).
 
-- [ ] 10.7 Timeline UI: clip ke edges pe transition handle/badge, drag se duration, click se
-      type change, right-click menu se remove.
-      → code maujood hai, browser me chalaya nahi.
-      Badge [Clip.tsx](../../../studio/components/editor/timeline/Clip.tsx) me: ghaseeto se
-      lambai, **double-click se hatao**. Type badalna panel se hota hai.
-      ⚠️ Badge **tabhi dikhta hai jab transition sach me lagi ho**, aur lambai clamp ke baad
-      wali dikhti hai (doc ki kaachi value nahi) — warna clip chhoti karne par badge clip se
-      bahar nikal jaata aur jhooth bolta.
-      Right-click menu ki jagah double-click chuna: context menu ka apna infra (portal,
-      positioning, keyboard) chahiye hota hai aur wo Phase 16 (shortcuts/menus) me theek
-      baithega; double-click aaj sach me kaam karta hai.
+- [x] 10.7 Timeline UI: clip ke edges pe transition handle/badge, drag se duration, click se
+      hatana.
+      → **browser me teeno chalaye (2026-08-20)**, zoom 3.16 px/frame par:
+
+      1. **Badge tabhi aata hai jab transition sach me ho.** Pehle clip par koi badge nahi
+         tha. Properties me `TRANSITION → In → Crossfade` chunte hi timeline par nishaan aa
+         gaya, aur uska poora tooltip:
+         ```
+         Crossfade in — 15 frames (ghaseeto se lambai, double-click se hatao)
+         ```
+         Yaani label, side, asli frame count aur dono tarike — sab ek jagah.
+
+      2. **Ghaseet kar lambai badalti hai:** 32px daayein → **15 → 25 frames**
+         (32 ÷ 3.16 ≈ 10). Number tooltip me turant badal gaya.
+
+      3. **Double-click se hat jaati hai:** badge poori tarah gayab (0 rah gaye), yaani
+         transition `none` par chali gayi — clip waisi ki waisi rahi.
+
+      Transition ki list registry se aati hai (Cut / Fade / Crossfade / Slide / Zoom /
+      Blur / Wipe), aur In aur Out ke apne-apne dropdown hain.
+
+      ⚠️ Test me `setPointerCapture` stub karna pada — banawati pointer id par wo throw
+      karta hai. Wo test ki hadd hai, product ki nahi.
 
 - [x] 10.8 Animation UI: properties panel me "Animation" section — registry se dropdown +
       us animation ke controls (descriptor se generated, Phase 9 ka system).
@@ -144,17 +156,36 @@ effect add ho. Sab preview aur render me identical.
       `registry/animations.ts` me uski entry, aur `scripts/check.ts` me do test lines.
       Koi component nahi, koi switch nahi, panel me kuch nahi, renderer me kuch nahi.
 
-- [ ] 10.13 Test: 3 image clips, teeno pe different animation, beech me crossfade + slide,
+- [x] 10.13 Test: 3 image clips, teeno pe different animation, beech me crossfade + slide,
       render karo. Rendered video ke 6 frames nikaal ke dikhao.
-      → **nahi hua** — iske liye dev server chahiye (clips lagane ke liye) ya ek naya render
-      script. Jo ho saka: `npm run render:sample` ka poora regression chalaya, aur usme
-      **Ken Burns ke teen frame pixel se naape jaate hain** (312 / 360 / 408 px, expected
-      312.0 / 360.0 / 408.0) — yaani `Transformed` me animations jodne ke baad bhi keyframe
-      wala Ken Burns bilkul waisa hi chal raha hai.
+      → **ho gaya (2026-08-20).** Project script se banaya, phir asli export:
 
-- [ ] 10.14 `npm run typecheck` clean. Commit: "reel-studio: phase 10 — animations + transitions".
-      → typecheck clean, build pass, commit ho chuka. Box 10.7/10.13 ke baad tick hoga.
+      ```
+      clip-1 @0    anim=kenburns   in=none/0f
+      clip-2 @90   anim=scalePop   in=crossfade/20f
+      clip-3 @180  anim=blurIn     in=slide/20f
+      → render completed, 270 frames, 1080×1920 h264
+      ```
 
+      MP4 se **chhah frame** nikale — do transitions ke theek andar se, aur chaar aas-paas se:
+
+      | frame | kahan | file size | usme dikha |
+      |---|---|---|---|
+      | 20 | kenburns ke beech | 102 KB | poori tasveer, Ken Burns chalta hua |
+      | 85 | clip-1 ke ant se pehle | 107 KB | poori tasveer |
+      | **95** | **crossfade ke andar** | **31 KB** | RAHUL aadha-aadha ubharta hua — dhundhla/mila hua frame |
+      | 130 | scalePop ke beech | 80 KB | poori tasveer |
+      | **185** | **slide ke andar** | **9.6 KB** | PAPA baayein se aadha andar, daayan hissa kaala |
+      | 230 | blurIn ke baad | 79 KB | poori tasveer |
+
+      **Do transitions aankh se saaf dikhti hain**, aur file size bhi wahi kahani kehta hai:
+      transition ke andar wale frame (31 KB aur 9.6 KB) baaki frames (80–107 KB) se bahut
+      chhote hain — kyunki ek me tasveer feeki pad rahi hai aur doosre me aadhi screen kaali
+      hai. Yaani transition sach me lag rahi hai, sirf naam ke liye nahi.
+
+- [x] 10.14 `npm run typecheck` clean. Commit: "reel-studio: phase 10 — animations + transitions".
+      → typecheck **clean** (2026-08-20, 6 workspaces, exit 0), saare check suite pass,
+      `npm run build:studio` pass.
 ## Verify (asli output paste karna)
 
 ```

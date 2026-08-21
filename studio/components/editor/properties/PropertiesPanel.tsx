@@ -28,6 +28,7 @@ import { NumberField } from "@/components/controls/NumberField";
 import { Button } from "@/components/ui/Button";
 import { useAssetDurations } from "@/lib/assetMeta";
 import { commonControls, commonValue, defaultValue, isMixed, resolutionReadout, visibleGroups } from "@/lib/properties";
+import { useFonts } from "@/lib/fonts";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -54,6 +55,9 @@ export function PropertiesPanel() {
 
   const playheadFrame = useEditorStore((state) => state.playheadFrame);
   const autoKeyframe = useEditorStore((state) => state.autoKeyframe);
+  // Font ki list yahin ek baar padhi jaati hai aur har control ko di jaati hai —
+  // control ke andar list import karne par `fonts.json` wahan pahunchti hi nahi (9.10).
+  const { fonts } = useFonts(doc);
 
   const items = doc.items.filter((item) => selection.itemIds.includes(item.id));
 
@@ -123,6 +127,7 @@ export function PropertiesPanel() {
                       control={control}
                       value={value}
                       disabled={locked}
+                      fonts={fonts}
                       onChange={(next) => {
                         /*
                          * Auto-keyframe (13.4): on ho aur property keyframable

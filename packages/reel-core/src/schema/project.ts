@@ -73,7 +73,34 @@ export const AudioSourceSchema = z
 
     /** `generate` / `both` — jo bolna hai. */
     text: z.string().default(""),
-    /** TTS voice ka id — `hi-IN-MadhurNeural` jaisa. */
+    /**
+     * Awaaz kahan se aayegi — `TTS_PROVIDERS` ka id ("gemini" / "edge").
+     *
+     * Khaali ka matlab "jo bhi chalne layak ho" — aur ye default jaan-boojhkar
+     * hai. Doc me `gemini` likh dene par wo doc kisi aisi machine par khulega
+     * jahan key hai hi nahi, aur wahan generate har baar fail karega bina wajah
+     * bataye. Khaali chhodne par system wahi chunta hai jo us machine par sach
+     * me chal sakta hai.
+     */
+    providerId: z.string().default(""),
+
+    /**
+     * Kaisi awaaz — `VOICE_CATEGORIES` ka id ("male" / "female" / "boy" …).
+     *
+     * ⚠️ Yahi wo cheez hai jo doc me rehni chahiye, provider ki apni voice id
+     * nahi. "male" har provider par kuch na kuch matlab rakhta hai; `Charon`
+     * sirf Gemini par rakhta hai. Provider badalte hi doc ka matlab khatam ho
+     * jaana sabse buri baat hoti.
+     */
+    categoryId: z.string().default(""),
+
+    /**
+     * Us provider ki apni voice id — `hi-IN-MadhurNeural` ya `Charon` jaisa.
+     *
+     * Ye **nateeja** hai, chunaav nahi: `categoryId` + `providerId` se nikalti
+     * hai aur sirf isliye likhi jaati hai ki baad me dekha ja sake ki asal me
+     * kaunsi voice bani thi.
+     */
     voiceId: z.string().default(""),
     rate: z.number().min(0.5).max(2).default(1),
     pitch: z.number().min(-12).max(12).default(0),
@@ -361,7 +388,11 @@ export const MaskSchema = z
      */
     assetId: IdSchema.nullable().default(null),
   })
-  .nullable();
+  .nullable()
+  // Mask Phase 24 me aayi, isliye usse purane har save me ye field hai hi nahi.
+  // Bina default ke wo saare docs parse par gir jaate hain aur project khulta hi
+  // nahi — `SCHEMA_VERSION` badhaye bina migration chain ko mauka bhi nahi milta.
+  .default(null);
 
 /**
  * Blend mode — item apne peeche wali parat ke saath kaise mile (14.10).
@@ -528,6 +559,28 @@ export const MockupSchema = z
     tiltY: z.number().min(-45).max(45).default(0),
     /** Screen ke andar media kaise baithe. */
     screenFit: z.enum(["cover", "contain"]).default("cover"),
+
+    /**
+     * Tap ke nishaan (18.11) — screen par ungli kahan padi.
+     *
+     * ⚠️ `frame` **item-local** hai (clip ke apne start se), aur `x`/`y` screen ke
+     * andar 0..1 me. Dono jaan-boojhkar aise hain: clip sarkane par nishaan saath
+     * sarakte hain, aur device ya frame ka naap badalne par bhi wo screen ki usi
+     * jagah par rehte hain. Pixel me rakhne par device badalte hi har nishaan
+     * apni jagah chhod deta.
+     *
+     * `.default([])` — ye field Phase 18 ke baad judi, aur uske bina har purana
+     * doc parse par gir jaata (wahi chot jo `mask` ne di thi).
+     */
+    taps: z
+      .array(
+        z.object({
+          frame: FrameSchema,
+          x: z.number().min(0).max(1),
+          y: z.number().min(0).max(1),
+        }),
+      )
+      .default([]),
   })
   .nullable();
 

@@ -30,7 +30,30 @@ aur wo chhoti cheezein jinke bina editor thakaa deta hai.
       → Hide/solo ka render wala hissa **MP4 se naapa gaya** (16.15).
 - [x] 16.3 Track type compatibility — registry se.
       → `trackAccepts()` pehle se tha; ab `removeTrack items: "move"` bhi wahi maanta hai.
-      → Galat drop par saaf feedback **browser me nahi dekha**.
+      → ⚠️ **Pehle "galat drop par feedback" ka koi raasta tha hi nahi (2026-08-21 me
+        pakda).** Poore studio me drag-drop sirf `MediaPanel` par tha, aur wo OS se file
+        upload ke liye hai — library ke asset ko timeline par daalne ka rasta banaya hi
+        nahi gaya tha. Yaani drop hi nahi hota tha, to feedback kis cheez par deta.
+      → **Ab dono ban gaye (usi din).** Faisla ek pure function me hai —
+        `planAssetDrop()` ([timeline/assetDrop.ts](../../../packages/reel-core/src/timeline/assetDrop.ts),
+        6 test) — aur wahi teeno jagah chalta hai: `dragover` par lane ka rang, `drop` par
+        item banega ya nahi, aur button wale raaste par track chunna. Teen jagah teen `if`
+        rakhne par ek din lane hari dikhti aur drop mana kar deta.
+      → **Mana karne ki wajah hamesha lautayi jaati hai**, sirf `false` nahi — aur usme
+        agla kadam bhi hota hai. Browser me naapa gaya jawab:
+        `Image ko "Voice / Audio" track par nahi rakh sakte — "Video" track par chhodo.`
+        Ye lane par hi laal dashed patti me dikhta hai, aur upar wali patti me bhi.
+      → **Do raaste, ek faisla:**
+        * ghaseet kar chhodo (`AssetCard` draggable → `TimelineView` ka lane)
+        * ya asset khol kar **"Timeline me jodo"** — track khud chun liya jaata hai
+          (`firstTrackFor`) aur clip playhead par aati hai. Ye phone/tablet ke liye
+          **zaroori** hai: wahan library aur timeline alag pane me hote hain, isliye ek se
+          doosre me ghaseetna namumkin hai.
+      → **Browser me chalakar dekha:** galat track par drop — clip **nahi** bani (ginti 3
+        hi rahi) aur wajah dikhi; sahi track par drop — `PRIYA.png` frame **55** par bani
+        (jahan chhoda: x=220 par 4 px/frame) 120 frame ki (4s default), aur wo DB me save
+        bhi hui. Undo se sab wapas — project apne 11 item par laut aaya.
+      → `trackAccepts()` ka faisla pehle se test me tha; ab uske upar UI bhi hai.
 - [x] 16.4 Layer order = track order (z-index).
       → `ReelComposition` `order` se sort karta hai (Phase 3 se). Yahan sirf verify kiya.
 - [x] 16.5 Keyboard shortcuts poore.
@@ -40,9 +63,11 @@ aur wo chhoti cheezein jinke bina editor thakaa deta hai.
       → J/K/L ke liye `<Player>` par koi speed prop hai hi nahi, isliye shuttle ka apna rAF
         loop hai jo playhead khiskata hai.
 - [x] 16.6 Cheat-sheet modal (`?`) — registry se auto-generated.
+      → **browser me khola (2026-08-21):** `Shift+/` par cheat-sheet aaya — "Keyboard
+        shortcuts / CHALANA / Play / pause `Space` / Ek frame peeche `←` …" — 42 row,
+        sab registry se.
       → `ShortcutsDialog.tsx`. List `SHORTCUTS` se banti hai; haath se likhi list ek din
         jhoothi ho jaati hai, aur jhoothi cheat-sheet na hone se buri hai.
-      → **browser me nahi dekha.**
 - [x] 16.7 Shortcut remap UI (localStorage me).
       → Key par click karo, nayi key dabao. Takraav **pehle hi** dikh jaata hai
         (`conflictingIds`), kyunki takraav ke baad ek key kabhi ek kaam karti hai kabhi doosra.
@@ -55,10 +80,12 @@ aur wo chhoti cheezein jinke bina editor thakaa deta hai.
 - [x] 16.9 Right-click context menu — clip par.
       → `ClipContextMenu.tsx`. Har entry **wahi op** chalati hai jo shortcut aur panel
         chalate hain; koi "menu wala raasta" alag se nahi hai.
+      → **browser me khola (2026-08-21):** clip par right-click karte hi menu aaya —
+        `Playhead par todo (S)`, `Copy (Ctrl+D)`, `Delete (Del)`,
+        `Ripple delete (Shift+Del)`, `Lock`, `Chhupao` — har item apne shortcut ke saath.
       → Track par aur khaali jagah par menu **nahi** bane — wahan jo cheezein chahiye wo
         track header aur toolbar me pehle se hain, aur khaali menu banana sirf list lambi
         karta hai.
-      → **browser me nahi dekha.**
 - [x] 16.10 Multi-select drag across tracks + group/ungroup.
       → `groupId` field + `groupItems` / `ungroupItems` / `expandSelectionToGroups`.
       → Group **move** par saath chalta hai, trim par nahi — group ka matlab "ek saath ek
@@ -81,7 +108,13 @@ aur wo chhoti cheezein jinke bina editor thakaa deta hai.
       → `lib/localDraft.ts` + `DraftRecovery.tsx`. Draft har edit par likhta hai — server
         wale save se **pehle**, aur uske natije ki parwah kiye bina.
       → Sawaal **sirf tab** poochha jaata hai jab sach me kuch bacha ho (`shouldOfferDraft`).
-      → **browser me nahi dekha** — IndexedDB Node me hai hi nahi.
+      → **browser me chalakar dekha (2026-08-21).** IndexedDB me `reel-studio` DB aur
+        uska `drafts` store maujood mila. Ek draft haath se likha (`baseUpdatedAt` = server
+        ka `updatedAt`, `at` = 45 second purana) aur page reload kiya — banner aaya:
+        **"Is project ka bina save kiya kaam mila (1 minute pehle). Wapas laayein?"** ek
+        "Wapas lao" button ke saath. Umar `draftAge()` se hi likhi thi.
+      → ⚠️ Jab sab kuch save ho chuka ho tab store **khaali** rehta hai (0 row) — draft
+        sirf tab tak bachta hai jab tak sach me kuch bacha ho.
 - [x] 16.15 Test: 6 tracks ka project, mute/hide/lock render me bhi.
       → `render:sample` ab **chhah tracks** ka hai aur usme ek **chhupi hui** track par ek
         poora-safed aayat hai. Naapa gaya (neeche).
@@ -89,6 +122,22 @@ aur wo chhoti cheezein jinke bina editor thakaa deta hai.
 - [x] 16.16 `npm run typecheck` clean. Commit.
 
 ## Jo galat nikla
+
+**0. Track ka header apni lane se 12px upar khisak gaya tha** (2026-08-21 me naapa).
+
+Lanes wale column ke upar **Ruler (26px) aur MarkerLane (12px)** dono hain, par headers
+wale column me spacer sirf `RULER_HEIGHT` ka tha. Nateeja: har track ka header apni lane
+se 12px upar. Naapa hua — header top **797**, lane top **809**.
+
+Marker lane isi phase me judi thi aur spacer tab update nahi hua. Ye us kism ki khaami hai
+jo aankh se "thoda tirchha" lagti hai par pakdi nahi jaati — aur oonchai ka handle bhi
+galat jagah mehsoos hota hai.
+
+Ilaaj: dono naap ab ek jod se aate hain (`LANES_TOP_OFFSET = RULER_HEIGHT +
+MARKER_LANE_HEIGHT`), aur uspar do test hain — taaki agli patti jodne par ye dobara na ho.
+Naap ke baad offset **0** hai.
+
+
 
 **1. Track ki oonchai do jagah thi.**
 Oonchai ek UI-only map (`trackHeights`) me thi, aur `track.heightPx` schema me nahi tha.

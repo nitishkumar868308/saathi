@@ -10,6 +10,7 @@ import {
 import clsx from "clsx";
 import { AlertTriangle } from "lucide-react";
 
+import { VoiceBatch } from "@/components/editor/panels/VoiceBatch";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -272,6 +273,9 @@ export function MasterAudioPanel() {
           </>
         )}
       </section>
+
+      {/* 22.12 — poore project ki baaki awaazein ek saath. */}
+      <VoiceBatch />
     </div>
   );
 }
@@ -317,6 +321,7 @@ function TrackPicker({
           );
         })}
       </div>
+
     </div>
   );
 }

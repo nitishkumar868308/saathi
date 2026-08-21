@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Render worker \u2014 tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
+  "description": "Render worker — tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
   "main": "./src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -20,7 +20,8 @@
     "tts:smoke": "tsx scripts/tts-smoke.ts",
     "transcribe:smoke": "tsx scripts/transcribe-smoke.ts",
     "beats:smoke": "tsx scripts/beats-smoke.ts",
-    "render:mask": "tsx scripts/render-mask.ts"
+    "render:mask": "tsx scripts/render-mask.ts",
+    "check": "tsx scripts/check-fonts.ts && tsx scripts/check-bundle-cache.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

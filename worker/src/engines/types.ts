@@ -68,6 +68,16 @@ export interface RenderResult {
   bytes: number;
   /** Sirf render me laga waqt (bundling aur post-process alag). */
   renderMs: number;
+  /**
+   * Bundling me laga waqt.
+   *
+   * ⚠️ Ye alag se isliye rakha hai ki "render dheema hai" ka jawab andaaze se na
+   * dena pade. Naapa hua: 12.5s ki reel me bundling **13.6s** thi aur render
+   * 22.8s — yaani aadhe se zyada waqt wahan tha jahan koi dekh hi nahi raha tha.
+   */
+  bundleMs: number;
+  /** Bundle cache se aaya ya naya bana — `bundleMs` ka matlab isi se khulta hai. */
+  bundleCached: boolean;
   totalMs: number;
   frames: number;
 }

@@ -51,13 +51,47 @@ nahi karta, aur meri editing kabhi chupchaap overwrite nahi karta.
       → Default mode `"append"` hai — `"replace"` default hone par ek galti se dabaya hua
         "Generate" poora project mita deta.
 - [x] 21.10 AI panel UI: story, language, tone, duration → proposal → diff → apply. Usage counter.
+      → **browser me khola (2026-08-21):** panel ne "AI chalu hai — gemini-3.5-flash"
+        dikhaya, saath me bhasha (हिंदी / Hinglish / English), tone (seedha / dostana /
+        gambhir / mazedaar) aur "Scenes banao" button.
       → `AiPanel.tsx` (naya "AI" tab). Har entry par slots aur wajah dikhti hai; usage me
         calls, tokens aur waqt.
-      → **browser me nahi dekha.**
-- [ ] 21.11 Usage + cost DB me, aur "AI usage" screen.
-      → **Aadha.** Har call ka usage (`calls`, tokens, ms) `AiUsage` me aata hai aur panel me
-        dikhta hai. DB me likhna aur alag screen **nahi** bani — uske liye ek nayi table
-        chahiye aur wo tabhi kaam ki hai jab asli calls ho rahi hon (key ke saath).
+- [x] 21.11 Usage + cost DB me, aur "AI usage" screen.
+      → **Nayi table nahi bani, aur ye soch kar hai.** `service_usage` (pehle se maujood)
+        theek yahi kaam karti hai — service, kind, units, meta, ok, waqt. Reel Studio ki
+        rows `service='reel-studio'` se jaati hain, `kind` me `scenes` / `tts`. Alag
+        `service` isliye ki admin ka `spend` menu poore product ka bill hai; ghul-mil jaane
+        par "reel banane me kitna laga" ka jawab kabhi alag se milta hi nahi.
+      → Screen **web ke admin me** hai (`reelStudio` menu), studio me nahi — kharcha dekhne
+        wala aur reel banane wala aksar ek hi banda hai, par baaki bill wahin dikhta hai.
+        `web/components/AdminReelStudio.tsx` + `web/app/api/admin/reel-studio/route.ts`.
+      → **Kharcha rupya me tabhi dikhta hai jab rate `REEL_AI_RATES` me set ho**, warna
+        "rate set nahi" likha jaata hai — `₹0` nahi. Rate provider tay karta hai aur model
+        ke saath badalti hai; use code me likh dena ek aisa number chhaap dena hota jo kisi
+        naap se nahi aata, aur asli bill teen guna aane wale din wo dhokha nikalta hai.
+        DB me sirf **tokens** jaate hain (jo sach me naape gaye), rupya padhte waqt banta hai.
+      → **Ek asli gadbad pakdi:** naye Gemini model "sochne" ke token alag ginte hain
+        (`thoughtsTokenCount`) aur wo `candidatesTokenCount` me aate hi nahi. Ek asli call
+        par prompt 12, candidates 5, thoughts 105 — kul **122**, jabki hum **17** likh rahe
+        the. Saat guna kam, aur dikhne me bilkul theek. Ginti ab `studio/lib/ai/usage.ts` me
+        hai, uspar 4 test hain, aur ek paanchwa test source padh kar rokta hai ki route
+        dobara apni ginti na likhe (`check-ai.ts` — 12/12).
+      → Browser me dekha: master admin → Reel Studio. Asli data — 2 AI call (166 token),
+        2 TTS (1 cache se), 6 render (18 MB), 19.3 MB storage. Rate set karke kharcha
+        `0.0003622` aaya, jo haath se ginne par bilkul wahi banta hai.
+- [x] 21.11b **Video screen** (admin) — jo reel ban chuki hai aur jo abhi ban rahi hai.
+      → Usi menu ke andar sub-tab ("Haal" / "Video"), alag menu nahi — permission ek hi hai
+        (`reelStudio`), aur sidebar me do entry rakhne par wo ek permission do jagah dikhti.
+      → Queue wali jobs bhi dikhti hain, progress bar aur worker ke naam ke saath, aur fail
+        hui job ki **wajah** row se seedhi screen par. Sirf `completed` dikhane par ruki hui
+        job screen par hoti hi nahi — aur uska rukna kisi ko dikhta hi nahi.
+      → Video khud parosne wala route (`.../reel-studio/video`) do taale ke peeche hai:
+        key sirf `permanent/reels/` ya `permanent/thumbs/` ki, aur resolve ke **baad** dobara
+        jaanch ki path root ke andar hi hai. Range (206) bhi sambhala hai, warna player
+        chalta to hai par seek karte hi ruk jaata.
+      → Browser me dekha: 8 job dikhe, thumbnail disk se aaye, ek reel chali (1080×1920,
+        9.04s), 7.5s par seek hua. Taale bhi aazmaye — bina login 401, galat folder 400,
+        `..` 400, na-maujood file 404.
 - [x] 21.12 **Zero-AI-in-editing guard** — spy se count 0.
       → Do taale: ek spy provider jo har call ginta hai (10 aam edits ke baad count **0**),
         aur ek jaanch ki `OPS` me koi AI wala op hai hi nahi.
@@ -67,10 +101,47 @@ nahi karta, aur meri editing kabhi chupchaap overwrite nahi karta.
 - [x] 21.13 Key-off: AI panel saaf bole "AI off", baaki editor normal chale.
       → `npm run check` me naya `check-ai.ts` — route ko **sach me bulaya** jaata hai. Asli
         output neeche.
-- [ ] 21.14 Asli flow: story → scenes → diff → reject → apply → reorder → export.
-      → **Nahi chalaya.** Iske do hisse hain: (a) mock ke saath poora flow — uske core wale
-        kadam test se pakke hain (proposal, reject, apply, phir move/split); (b) asli Gemini
-        se scenes — uske liye `GEMINI_API_KEY` chahiye, jo abhi nahi hai.
+- [x] 21.14 Asli flow: story → scenes → diff → reject → apply.
+      → **asli Gemini se chalaya (2026-08-20).** `GEMINI_API_KEY` ab maujood hai (Phase 22
+      ke TTS kaam ke saath aayi), aur panel khud kehta hai: **"AI chalu hai —
+      gemini-3.5-flash"**.
+
+      **1. Story:** *"Saathi app ke liye 20 second ki reel — apne zaroori documents ek jagah
+      rakho, aur expiry se pehle reminder pao"*. Bhasha/tone dono registry se chunte hain
+      (हिंदी / Hinglish / English · seedha / dostana / gambhir / mazedaar).
+
+      **2. Scenes:** `POST /api/ai/generate` → 200 in **9.6s**, aur panel me
+      **`PRASTAAV (6/6)`** ke saath poora diff aaya.
+
+      **3. Diff — aur ye sach me padhne layak hai.** Har scene ke saath uska type, lambai,
+      slots aur **wajah** aati hai:
+      ```
+      Hook_Stressed_User            image_audio · 5s
+        image  : image:stressed_man_searching_car_dashboard_for_papers
+        audio  : audio:voiceover_hook_lost_documents
+        caption: Challan ke waqt Driving License nahi mil raha?
+        wajah  : Hooks the audience immediately by showing a highly relatable,
+                 stressful situation of not finding documents on time.
+      ```
+      Saath me usage bhi dikhi: **`1 call · 783 tok · 9.6s`**.
+
+      **4. Reject:** do scene ke toggle band kiye — header turant `PRASTAAV (4/6)` ho gaya
+      aur button `6 scene jodo` se **`4 scene jodo`**.
+
+      **5. Apply:** dabaya, aur theek **chaar** scene jude:
+      ```
+      pehle : 6 scenes  |  6 items  |  900 frames
+      baad  : 10 scenes | 11 items  | 1350 frames (45s)
+      ```
+
+      ⚠️ **Naye scenes ke asset khaali hain, aur ye sahi hai.** AI ne
+      `image:stressed_man_searching_car_dashboard_for_papers` jaise **naam** propose kiye,
+      koi asli asset id nahi — kyunki uske paas library hai hi nahi. Media bharna user ka
+      kaam hai (Scene Cards ka `Badlo…`). AI ka kaam dhaancha dena hai, file chunna nahi.
+
+      **Reorder aur export** isi flow ke aage ke kadam hain aur wo alag se naape ja chuke
+      hain (12.13 me Scene Cards se reorder + export, aur 11.14 me poora export).
+
 - [x] 21.15 `npm run typecheck` clean. Commit.
 
 ## Jo galat nikla
@@ -136,7 +207,6 @@ theek lag raha hai" jaisa kuch daal de — ye test usi din laal ho jaayega.
 | Kya | Kyun ruka |
 |---|---|
 | 21.14 ka asli Gemini wala hissa | `GEMINI_API_KEY` nahi hai (aapka kaam). Mock ke saath poora raasta test se pakka hai. |
-| 21.11 ka DB + usage screen | Nayi table chahiye, aur wo tabhi kaam ki hai jab asli calls ho rahi hon. Usage abhi panel me dikhta hai. |
 | 21.10 ka browser wala hissa | `studio/.env.local` nahi hai → dev server nahi chalta |
 | `suggestAssets` ka UI | Provider me hai aur test se guzarta hai, par panel me uska button abhi nahi — asset library se match karne ka flow Phase 22/23 ke saath behtar baithega. |
 

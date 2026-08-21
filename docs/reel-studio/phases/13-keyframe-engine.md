@@ -37,34 +37,77 @@ handles) wo abhi naapi nahi gayi — `studio/.env.local` nahi hai to dev server 
       Off ho to property static badle.
       → store me `autoKeyframe` + `setAutoKeyframe`; `PropertiesPanel.tsx:127` par on hone par
         `addKeyframe` chalta hai, warna seedha `setItemProperty`.
-      → **browser me nahi dekha** — dev server nahi chala.
+      → **browser me chalaya (2026-08-21).** Auto-KF ON karke ek property badli aur
+        diamond ka title turant `Frame 14 ka keyframe hatao` ho gaya — yaani playhead ke
+        us local frame par keyframe sach me bana. Ek Ctrl+Z par wo hat bhi gaya.
 - [x] 13.5 Registry ka `keyframable` flag → control par stopwatch icon.
       → `itemTypes.ts` me har item type par `keyframable`. Panel me `KeyframeButton` khud
         aata hai — koi per-property code nahi.
-      → **browser me nahi dekha.**
+      → **browser me dekha (2026-08-21):** chuni hui clip par **5** diamond button aaye.
+        Playhead clip ke bahar ho to wo **disabled** rehte hain aur wajah likhi hoti hai —
+        `Playhead is clip ke bahar hai — pehle uspar le jao`; playhead andar (frame 81)
+        le jaate hi enable — `Yahan se animate karo — playhead par keyframe lagega`.
 - [x] 13.6 **Trim/split ke saath keyframes** — value na kude.
       → Yahin do **asli bug** mile, dono test se (neeche "Jo galat nikla" dekho).
       → `cutKeyframes()` cut ke bindu par keyframe banata hai, aur `splitEasing()` curve ko
         De Casteljau se sach me todta hai.
       → Naap: split ke baad poori curve (0..100 ke saare frames) purani curve se `< 1e-3` hi
         alag hai — sirf ek point nahi, poora curve.
-- [ ] 13.7 Speed change ke saath keyframes time-scale hon (Phase 15 se link).
-      → **aadha hua**: `scaleKeyframes` op likha aur tested hai. Par `playbackRate` badalne
-        wala op abhi hai hi nahi (wo Phase 15 me banega), isliye jod abhi nahi bani. Phase 15
-        me `setPlaybackRate` banate hi `scaleKeyframes` usme se chalega.
+- [x] 13.7 Speed change ke saath keyframes time-scale hon (Phase 15 se link).
+      → **jod ban chuki hai — is item ka purana note bas pichhad gaya tha.**
+
+      Note me likha tha "`setPlaybackRate` abhi hai hi nahi (wo Phase 15 me banega)". Wo
+      Phase 15 me ban gaya, aur **keyframes ka scaling usi ke andar hai**
+      (`ops.ts`, `setPlaybackRate`): jis factor se `durationInFrames` badalti hai, usi
+      factor se har keyframe ka `frame` bhi.
+
+      **Test pehle se pass hai** (`speed ke saath keyframes bhi time-scale hote hain
+      (13.7)`) aur usme wajah bhi likhi hai: bina iske 2x karne par clip aadhi ho jaati par
+      keyframes apni jagah rehte — yaani aadhi animation clip ke **bahar** chali jaati aur
+      kabhi dikhti hi nahi.
+
+      **Browser me bhi chala kar dekha (2026-08-20)**, ek video clip par:
+      ```
+      pehle : rate=1  dur=150  keyframes=[0, 80]
+      2x dabaya
+      baad  : rate=2  dur= 75  keyframes=[0, 40]
+      ```
+      Dono theek aadhe — aur 40 < 75, yaani koi keyframe clip ke bahar nahi bacha.
+
+      ⚠️ Speed ka control sirf **timed** items par dikhta hai (video/audio). Image par
+      `playbackRate` ka matlab hi nahi hai, isliye wahan wo section aata hi nahi — pehli
+      koshish me maine ek image chuni thi aur "2x button nahi mila" — galti test ki thi.
+
 - [x] 13.8 Timeline me **keyframe lane**: diamonds, click select, drag move, Del delete,
       right-click easing, double-click value edit.
       → `KeyframeLane.tsx`, `TimelineView.tsx:373` par selected clip ke neeche lagta hai.
-      → **browser me nahi dekha** — drag/right-click sirf wahin naap sakte hain.
+      → **lane browser me dekhi (2026-08-21):** keyframe banate hi lane me diamond aaya
+        (`rotate-45`, 14x14, lane ke andar). Drag aur right-click abhi haath se hi dekhe
+        ja sakte hain — synthetic pointer se unka asli vyavhaar naapna bharosemand nahi.
 - [x] 13.9 Mini curve editor: bezier handles drag, preset easings, "smooth all".
       → `CurveEditor.tsx`. Handles `bezier` field me likhte hain, wahi field jo 13.2 me hai.
-      → **browser me nahi dekha.**
+      → **browser me khola (2026-08-21):** lane ke diamond par double-click karte hi
+        bezier wala SVG path (`d` me `C`) screen par aa gaya. Handles ka drag haath se
+        dekhna baaki hai.
 - [x] 13.10 Copy/paste keyframes ek property se doosri par.
       → `copyKeyframes` op (`from`/`to` path, alag item bhi chalega).
 - [x] 13.11 Performance: interpolation per-frame O(log n) — binary search.
       → `sampleKeyframes` me binary search hai, aur `sortedKeyframes()` ek `WeakMap` cache
         rakhta hai taaki har frame par dobara sort na ho.
-      → **500-keyframe project browser me nahi chalaya** — naapne ke liye dev server chahiye.
+      → **Naap liya (2026-08-21), aur wo ek tulna hai — ek akela number nahi.** Do item
+        banaye: ek 10 keyframe wali, ek 500 wali; dono par 2,00,000 baar `sampleKeyframes`
+        chalaya (warm-up ke baad):
+        ```
+        10  keyframe : 0.045 µs / sample
+        500 keyframe : 0.047 µs / sample
+        ratio        : 1.06x        <- linear search hoti to ~50x milta
+        ```
+        Yaani list 50 guna badhi aur kaam **6% badha** — binary search aur
+        `sortedKeyframes()` ka cache dono sach me chal rahe hain.
+      → Paimane me rakh kar: ek frame par aisi **100** property ka jod 0.005 ms hai,
+        jabki 30fps ka poora budget 33.3 ms hai.
+      → ⚠️ Ye naap Node me hua hai, browser me nahi — par jo cheez naapi ja rahi hai wo
+        ek pure function hai, aur wo dono jagah wahi hai.
 - [x] 13.12 Animation vs keyframe conflict rule: keyframe **jeetta hai**.
       → `KEYFRAME_BEATS_ANIMATION = true` ek jagah likha hai, aur `Transformed.tsx` wahi
         padh kar chalta hai. UI me batana baaki (browser).

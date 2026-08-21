@@ -33,6 +33,7 @@ import {
   Shield,
   Send,
   CheckCircle2,
+  Clapperboard,
 } from "lucide-react";
 import SaathiLogo from "@/components/SaathiLogo";
 import Loader from "@/components/Loader";
@@ -56,6 +57,7 @@ import AdminSeo from "@/components/AdminSeo";
 import AdminBlog from "@/components/AdminBlog";
 import AdminRenewals from "@/components/AdminRenewals";
 import AdminPlanExpiry from "@/components/AdminPlanExpiry";
+import AdminReelStudio from "@/components/AdminReelStudio";
 import AdminDeleteRequests from "@/components/AdminDeleteRequests";
 import AdminSupport from "@/components/AdminSupport";
 import AdminTeam from "@/components/AdminTeam";
@@ -122,6 +124,9 @@ const NAV: { key: Section; icon: typeof Gift }[] = [
   // Team sabse neeche — ye roz ka kaam nahi hai, aur ye aksar sirf master ke
   // paas hota hai.
   { key: "team", icon: Shield },
+  // Reel Studio sabse neeche — ye product ka alag hissa hai, roz ka admin kaam
+  // nahi. Aur uski permission bhi alag hi di jaati hai.
+  { key: "reelStudio", icon: Clapperboard },
 ];
 
 /* ------------------------------ helpers ------------------------------ */
@@ -563,6 +568,7 @@ function Dashboard({
               {section === "blog" && <AdminBlog />}
               {section === "renewals" && <AdminRenewals />}
               {section === "planExpiry" && <AdminPlanExpiry />}
+              {section === "reelStudio" && <AdminReelStudio />}
               {section === "deleteRequests" && <AdminDeleteRequests />}
               {section === "team" && <AdminTeam meEmail={session.email} />}
               {section === "contacts" && (

@@ -193,6 +193,15 @@ export interface EditorState {
   setMode(mode: "beginner" | "advanced"): void;
   setLeftPanel(id: string): void;
   clearOpError(): void;
+  /**
+   * Upar wali laal patti me apna message dikhao.
+   *
+   * ⚠️ Ye ops ke apne error se **alag** raasta hai, aur uski zaroorat hai:
+   * kuch rok op tak pahunchne se pehle lagti hain (jaise galat track par
+   * asset girana — 16.3), aur wahan message zyada kaam ka hota hai kyunki
+   * usme agla kadam bhi likha ja sakta hai.
+   */
+  setOpError(message: string): void;
 
   saveNow(): Promise<void>;
   saveVersion(label: string): Promise<{ ok: boolean; message?: string }>;
@@ -559,6 +568,10 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       setLeftPanel(leftPanelId) {
         set({ leftPanelId });
       },
+      setOpError(message: string) {
+        set({ opError: message });
+      },
+
       clearOpError() {
         set({ opError: null });
       },

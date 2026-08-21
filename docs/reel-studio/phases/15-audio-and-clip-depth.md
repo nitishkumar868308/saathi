@@ -31,15 +31,19 @@ advanced ops aa jaayein. Voice quality par samjhauta nahi.
         vertical drag se base volume badalta hai.
       → Keyframes lage hon to drag **band** — warna ek drag chup-chaap poori automation ko ek
         sthir value se badal deta.
-      → **browser me nahi dekha** — drag wahin naapa ja sakta hai.
+      → **lakeer browser me dikhi (2026-08-21)** — clip ke upar volume wali line render
+        hoti hai. Uska vertical drag synthetic pointer se bharosemand nahi naapa ja
+        sakta; wo haath se dekhna baaki hai.
 - [x] 15.3 Audio ducking: rule-based, project settings me; envelope preview aur render dono me ek.
       → `DuckingSchema` project par; `duckEnvelope()` + `itemGainAt()` core me. Preview aur
         render **dono** wahi function chalate hain.
       → Naapa gaya: render me music **17.30 dB** neeche gaya (target 18). Neeche asli output.
 - [x] 15.4 Ducking UI: on/off, target slider, attack/release, timeline par envelope dikhe.
+      → **browser me dekha (2026-08-21):** Audio panel me **DUCKING** ka poora hissa —
+        "Voice chale to music apne aap neeche. On karke batao kaun si track…" — MASTER
+        (volume, `-14 LUFS` target, limiter `-1 dBTP`) ke theek neeche.
       → `MasterAudioPanel.tsx` (naya "Audio" tab). Envelope alag se draw nahi karna pada —
         `VolumeLine` `itemGainAt()` se banti hai, isliye ducking usme apne aap dikhti hai.
-      → **browser me nahi dekha.**
 - [x] 15.5 A1 audio rules: koi clipping nahi, true-peak -1 dBTP, mix 48kHz, final AAC 192-320k,
       clip kar raha ho to warning + auto-gain suggestion.
       → Render me naapa gaya: sample peak **-10.49 dBFS**, true peak **-10.50 dBTP**, audio

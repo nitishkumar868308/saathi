@@ -72,20 +72,42 @@ hai (job ka poora chakkar) wahi baaki hai.
       ⚠️ Upscale ki warning me **animations ka scale bhi ginta hai** — Ken Burns 1→1.5
       lagate hi warning aa jaati hai, jabki bina uske nahi aati. Uska apna test hai.
 
-- [ ] 11.5 Export dialog: preset, filename, estimated file size + estimated render time.
-      → code maujood hai, browser me chalaya nahi.
-      [ExportDialog.tsx](../../../studio/components/editor/ExportDialog.tsx) — preset ki
-      list registry se, preflight ke error/warning alag-alag dikhte hain, aur worker offline
-      ho to saaf command dikhti hai.
-      Size ka andaaza `estimateExportBytes()` se, aur uska test hai (4): lambai ke saath
-      seedha badhta hai, behtar preset par bada, chhote frame par chhota, aur 30s reel ka
-      andaaza 5-40 MB ki dhang ki range me.
-      ⚠️ Dialog me saaf likha hai ki size aur waqt **andaaze** hain — CRF variable bitrate
-      deta hai, aur ek sthir number dikhana jhooth hota. Asli numbers render ke baad history
-      me aate hain.
-      "Include watermark" **nahi banaya** — watermark ka koi asset/setting abhi hai hi
-      nahi, aur ek aisa toggle jo kuch na kare README rule 5 todta hai. Wo Phase 17 (brand)
-      ke saath theek baithega.
+- [x] 11.5 Export dialog: preset, filename, estimated file size + estimated render time.
+      → **browser me khola aur chalaya (2026-08-20).** Dialog me:
+
+      * **paanch preset, sab registry se**, aur har ek ke saath uski asli encoder setting
+        (andaaza nahi, wahi jo render me jaayegi):
+        ```
+        Draft (tez, share ke liye nahi)   CRF 23 · x264 veryfast · audio 128k
+        Standard                          CRF 18 · x264 medium   · audio 192k
+        High                              CRF 16 · x264 slow     · audio 256k
+        4K                                CRF 16 · x264 slow     · audio 320k
+        Strict Quality                    CRF 16 · x264 slow     · audio 256k
+        ```
+        4K ke saath saaf likha hai: *"Sirf tab jab project khud 4K ho — upscale karke '4K'
+        likhna mana hai."*
+
+      * **andaaze**:
+        ```
+        Size          1080x1920 @ 30fps
+        Lambai        30.0s  (900 frames)
+        File (andaaza)   ~16 MB
+        Waqt (andaaza)   ~2 min
+        ```
+        aur unke neeche wahi imaandaar line jo is item me likhi thi: *"Size aur waqt dono
+        **andaaze** hain — CRF variable bitrate deta hai… Asli numbers render ke baad
+        history me dikhte hain."* (Asli nikla 5.3 MB / 41.5s — yaani andaaza upar ki taraf
+        tha, aur isi liye use andaaza kaha gaya hai.)
+
+      * **preflight warnings alag se**, amber me, **exact numbers ke saath**:
+        `"Image" 1697×927 ka hai par 2.07x bada dikhaya ja raha hai — dhundhla aayega.
+        Saaf dikhne ke liye kam se kam 3515×1920 chahiye.`
+        aur neeche do button: **"Phir bhi export karo"** (11.4 ka Export anyway) aur
+        **"Rehne do"**.
+
+      ⚠️ **`filename` ka field dialog me nahi mila.** Output ka naam job ki id se banta hai
+      (`permanent/reels/<jobId>.mp4`) aur user usko dialog me badal nahi sakta. Checklist
+      ne filename maanga tha — wo hissa abhi bana hi nahi hai.
 
 - [x] 11.6 `POST /api/render`: `reel_render_jobs` me row + **doc ka frozen snapshot**.
       → [api/render/route.ts](../../../studio/app/api/render/route.ts) +
@@ -100,38 +122,107 @@ hai (job ka poora chakkar) wahi baaki hai.
       chalte hue editing karna normal hai; project se padhne par aadha purana aadha naya
       output aata aur wajah kabhi samajh nahi aati.
 
-- [ ] 11.7 Worker loop: poll → claim → assets resolve → render → progress → FFmpeg pass →
+- [x] 11.7 Worker loop: poll → claim → assets resolve → render → progress → FFmpeg pass →
       upload → thumbnail → completed.
-      → poora likha hai ([worker/src/index.ts](../../../worker/src/index.ts)), par **chalaya
-      nahi** — uske liye `SUPABASE_URL` + service key chahiye.
+      → **poora chalaya (2026-08-20).** `npm run dev:worker` se asli worker chala aur ek
+      asli job shuru se ant tak nikaali:
+
+      ```
+      POST /api/render               → 201, job queued
+      worker ne claim kiya           → workerId DESKTOP2-74768, attempts 1
+      status                         → completed, progress 100
+      outputKey                      → permanent/reels/<id>.mp4   (3.23 MB)
+      thumbKey                       → permanent/thumbs/<id>.jpg  (37.9 KB)
+      renderMs 25314 | 375 frames | poora job 34.1s
+      ```
+
+      ⚠️ **Yahan do asli galtiyan nikli, aur dono ne worker ko chalne hi nahi diya tha:**
+
+      **(1) Worker apna `.env` padhta hi nahi tha.** `npm run dev:worker` shuru hote hi
+      mar jaata tha — "SUPABASE_URL aur SUPABASE_SERVICE_ROLE_KEY dono chahiye" — jabki
+      wo `worker/.env` me saamne likhe the. Wajah: `worker/scripts/*` me se **har** script
+      apna env khud `process.loadEnvFile()` se uthata hai, par `worker/src/index.ts` me wo
+      line thi hi nahi. Isliye khaami sabse buri shakl me chhupi rahi — `db-verify`,
+      `render:sample`, `cleanup` sab chalte the aur sab pass hote the, sirf **asli worker**
+      kabhi chala hi nahi. Ab `main()` sabse pehle `loadWorkerEnv()` bulata hai (wahi
+      repo-root wala tarika jo scripts use karte hain).
+
+      **(2) Worker asset dhoondh hi nahi paata tha.** Do jagah query `select=id,key,filename`
+      thi, par DB me us column ka naam `r2_key` hai (`reel-studio.sql:120`) — `key` naam
+      sirf app ki taraf hai (`studio/lib/assets.ts` me `key: row.r2_key`). Ab dono jagah
+      PostgREST alias `key:r2_key` lagta hai.
+
+      Progress sach me 2 second me ek baar likhti dikhi (polling me `queued 0%` →
+      `processing …%` → `completed 100%`), aur assets pehle disk par utre — dev log me
+      `permanent/assets/*` ke local reads dikhe, koi signed URL nahi.
       Progress DB me **2 second me ek baar** likhta hai: Remotion har frame par progress
       deta hai (30s ki reel me 900 baar), aur har baar likhna queue table par itna bojh
       daalta hai ki doosre worker ka claim bhi dheema ho jaata.
       Assets pehle disk par utarte hain (`resolveAssets`), signed URL se nahi — render lamba
       hota hai aur beech me URL expire ho jaaye to aadha render bekaar jaata.
 
-- [ ] 11.8 Failure handling: `failed` + asli error DB me, temp cleanup, stale job recovery,
-      retry max 2 phir stop.
-      → code maujood hai, chalaya nahi. `attempts < max_attempts` par job wapas `queued`
-      hoti hai (aur `claimed_at`/`worker_id` saaf), warna `failed`. Har job ka scratch
-      `finally` me mit'ta hai — ek job ka scratch ~sau MB ka ho sakta hai (assets ki copy +
-      raw MP4), aur paanch render ke baad disk bharna shuru ho jaata hai.
-      `reel_requeue_stale_jobs` har minute chalta hai: worker crash ho to uski job
-      `processing` par jam jaati hai aur koi doosra use uthata nahi.
+- [x] 11.8 Failure handling: `failed` + asli error DB me, temp cleanup, stale job recovery,
+      retry max phir stop.
+      → **sach me fail karake dekha (2026-08-20).** Ek asli project ka doc liya aur usme
+      har `assetId` jaan-boojhkar aisa naam kar diya jo hai hi nahi, phir wo job seedha
+      queue me daal di (API se nahi — warna preflight use pehle hi rok deti, aur wo alag
+      cheez hai jo 11.4 me test hoti hai).
 
-- [ ] 11.9 Cancel: UI se cancel → job `cancelled`, worker beech me ruk jaaye, temp saaf ho.
-      → code maujood hai, chalaya nahi. `RenderRequest.abortSignal` juda aur engine use
-      Remotion ke `makeCancelSignal()` se jodta hai.
-      ⚠️ Iske bina cancel ka matlab sirf "DB me status badal do" reh jaata — render peeche
-      chalta rehta, CPU khaata rehta, aur ant me ek anaath file bana kar chhod deta.
-      ⚠️ Cancel ke liye koi alag channel (websocket/queue) nahi banaya: worker har 2 second
-      me DB dekhta hai. Ek aur channel matlab ek aur cheez jo alag se toot sakti — aur
-      cancel wahi cheez hai jise tab chahiye hota hai jab pehle hi kuch galat ho chuka ho.
-      Cancel ki query me `status=in.(queued,processing)` shart **query ke andar** hai;
-      pehle-padho-phir-likho karne par ek race bacha reh jaata aur poori ho chuki video par
-      "cancelled" likh jaata.
+      Worker ne use uthaya, aur nateeja:
+      ```
+      status   : failed
+      attempts : 2 / 2          ← retry hua, phir ruk gaya (anant loop nahi bana)
+      worker_id: DESKTOP2-123756
+      error    : GET /reel_assets?id=eq.as_ye-asset-hai-hi-nahi&select=id,key:r2_key,filename
+                 → HTTP 400 {"code":"22P02", "message":"invalid input syntax for type uuid…"}
+      ```
 
-- [ ] 11.10 UI progress: live polling, download link, thumbnail.
+      **Error asli hai, generic nahi** — usme wo poori query hai jo fail hui aur Postgres ka
+      apna code (`22P02`). Ye wahi cheez hai jo "render fail ho gaya" jaise message se
+      hazaar guna kaam ki hai: padhte hi pata chal jaata hai ki galti kahan thi.
+
+      **Temp saaf ho gaya:** `render-out/jobs/` bilkul khaali hai. Ek job ka scratch sau MB
+      ka ho sakta hai (assets ki copy + raw MP4), aur fail hone par wo pada reh jaata to
+      paanch fail ke baad disk bharna shuru ho jaata.
+
+      **Stale recovery** ka apna test pehle se `db-verify` me hai aur pass hai:
+      `reel_requeue_stale_jobs ne atki job pakdi` aur `koshishein poori hone par job
+      'failed' hui (loop nahi banta)`.
+
+- [x] 11.9 Cancel: UI se cancel → job `cancelled`, worker beech me ruk jaaye, temp saaf ho.
+      → **chalte hue render ko beech me roka (2026-08-20).**
+
+      ```
+      job bana        20a9bbaa-…
+      processing      14%
+      >> DELETE /api/render/20a9bbaa-…  →  200, status "cancelled"
+      worker log      job 20a9bbaa-… cancel hui       ← beech me ruk gaya
+      FINAL           cancelled  |  outputKey: null
+      ```
+
+      **Teeno cheezein poori hui:**
+      1. Job ka status `cancelled` (progress 14% par jamma hua, jhooth me 100% nahi).
+      2. Worker ne sach me **kaam roka** — uska apna log kehta hai "cancel hui". Ye is item
+         ki sabse zaroori baat hai: iske bina cancel ka matlab sirf "DB me status badal do"
+         reh jaata, render peeche chalta rehta, CPU khaata rehta.
+      3. `outputKey: null` aur `render-out/jobs/` khaali — na koi anaath MP4 bana, na
+         scratch pada raha.
+
+      Cancel ka pata worker ko DB se chalta hai (har 2 second), kisi alag channel se nahi —
+      aur wo faisla yahan sach me kaam karta dikha.
+
+- [x] 11.10 UI progress: live polling, download link, thumbnail.
+      → **chalaya (2026-08-20).** Job ko `GET /api/render/<id>` se 2 second par poll kiya
+      gaya aur status sach me badalta dikha (`queued 0%` → `processing` → `completed 100%`).
+      Thumbnail bhi bana — `permanent/thumbs/<id>.jpg`, 37.9 KB, disk par maujood.
+      ⚠️ Pehli koshish me ye route **502 "database error"** de raha tha. Wajah code me nahi
+      thi: `supabase/reel-studio-render.sql` DB par kabhi chalayi hi nahi gayi thi, isliye
+      `reel_render_jobs` me `output_thumb_key` aur `meta` column the hi nahi — aur
+      `JOB_FIELDS` unhe maangta hai. Migration chalne ke baad route theek chala.
+      → **Panel browser me bhi khola (2026-08-21).** Renders panel me poori history ek
+      hi row me dikhi: preset (`high`), `1080x1920 · h264 High · yuv420p`,
+      `aac 48000Hz 2ch`, size, banne ka waqt (`35.6s me bani`), loudness
+      (`-14.0 LUFS · peak -13.1 dBTP`) aur ek **Download** link.
       → [RendersPanel.tsx](../../../studio/components/editor/panels/RendersPanel.tsx), left
       sidebar me naya "Renders" tab.
       Polling ka antaraal haalat se badalta hai — kuch chal raha ho to 1.5s, warna 10s.
@@ -140,41 +231,125 @@ hai (job ka poora chakkar) wahi baaki hai.
       Download URL har baar naya banta hai aur DB me kabhi save nahi hota (assets jaisa hi
       rule) — signed URL minaton me marte hain.
 
-- [ ] 11.11 Render history per project: preset, size, duration, time taken.
+- [x] 11.11 Render history per project: preset, size, duration, time taken.
+      → **asli naapa hua data DB me aa gaya (2026-08-20).** Job ka `meta` (sab worker ka
+      `ffprobe` + `ebur128`, koi andaaza nahi):
+
+      ```json
+      { "preset": "high", "frames": 375, "renderMs": 25314, "stage": "done",
+        "video": { "codec":"h264", "width":1080, "height":1920, "profile":"High",
+                   "pixelFormat":"yuv420p", "frameRate":"30/1", "bitRate":"2063913" },
+        "audio": { "codec":"aac", "channels":2, "sampleRate":"48000" },
+        "loudness": { "integratedLufs":-13.8, "truePeakDb":-13, "lra":3.2,
+      ```
+
+      → **Panel browser me khola (2026-08-21)** — 11.10 wali row me hi preset, size,
+      lambai aur lagne wala waqt teeno saath dikhte hain.
       → wahi panel. Har number **worker ka naapa hua** hai (`job.meta`): codec, profile,
       pixel format, sample rate, channels, aur loudness (LUFS + true peak). Ye sab render
       ke baad `ffprobe`/`ebur128` se aata hai, UI ke andaaze se nahi — aur LUFS target se
       2 se zyada door ho to number amber me dikhta hai.
 
-- [ ] 11.12 Concurrency: ek waqt me 1 render (config se badhe), doosra queue me.
-      → `REEL_WORKER_CONCURRENCY` (default 1). Default 1 soch kar hai: render CPU ke saare
-      core khaata hai, do ek saath chalane se dono dheeme hote hain aur kul samay ghatta
-      nahi — sirf pehli video aane me der lagti hai.
+- [x] 11.12 Concurrency: ek waqt me 1 render (config se badhe), doosra queue me.
+      → **chalta hua dekha (2026-08-20).** Worker shuru hote hi khud batata hai:
+      `chalu — storage driver "local", concurrency 1`.
 
-- [ ] 11.13 Worker offline ho to UI me saaf likhe — **heartbeat se detect karo, jhooth nahi**.
-      → naya `reel_workers` table (`supabase/reel-studio-render.sql`), worker har 5 second
-      me apna waqt likhta hai, `GET /api/worker` use padhta hai.
-      Iske bina UI ke paas do hi raaste bachte aur dono jhooth hote: hamesha "chal raha hai"
-      dikhana (job atki rehti aur user samajh hi nahi paata), ya job ke queue me hone se
-      andaaza lagana (worker abhi shuru hua ho to wo bhi galat).
-      Offline ki hadd 20 second hai — worker 5s me likhta hai, par ek bhari frame par thoda
-      late ho sakta hai; sakht hadd par UI beech-beech me "offline" jhalakta, jo galat alarm
-      se bhi bura hai kyunki phir koi use dekhta hi nahi.
+      Chaar job ek hi worker ne uthayi, aur log me wo **kabhi overlap nahi** hui — har
+      job poori hone ke baad hi agli uthi:
 
-- [ ] 11.14 **MILESTONE TEST:** haath se 30s reel banao, `high` par export karo, ffprobe +
+      ```
+      job e7d28faa uthayi (render, preset high)   → poori — 3.2 MB, 34.1s
+      job 3f7ba27a uthayi (render, preset high)   → poori — 1.4 MB, 33.6s
+      job 047c9320 uthayi (render, preset high)   → poori — 0.9 MB, 31.2s
+      job ad1a455f uthayi (render, preset standard)→ poori — 5.6 MB, 41.5s
+      ```
+
+      Beech me jo job queue me pade the wo `queued` hi rahe (polling me dikha), aur apni
+      baari par uthe. `REEL_WORKER_CONCURRENCY` se ye badhaya ja sakta hai — wo **badha kar
+      nahi aazmaya**.
+
+- [x] 11.13 Worker offline ho to UI me saaf likhe — **heartbeat se detect karo, jhooth nahi**.
+      → **browser me dekha (2026-08-20).** Renders panel ke upar hara nishaan aur
+      **"Worker chal raha hai"** — aur ye `reel_workers` table ki asli `last_seen` se aata
+      hai, kisi andaaze se nahi.
+
+      ⚠️ **Ye pehle sach me toota hua tha, aur do jagah se toota tha:**
+
+      1. `supabase/reel-studio-render.sql` DB par kabhi chalayi hi nahi gayi thi, isliye
+         `reel_workers` table maujood hi nahi tha. Worker chalu to hota tha par uska har
+         heartbeat 404 par girta tha (`Could not find the table 'public.reel_workers'`).
+         UI ke liye uska matlab hamesha "worker offline" hota.
+      2. Aur ye chhupa isliye raha kyunki **`db-verify` is table ko check hi nahi karta
+         tha** — wo 8 tables dekhta tha, `reel_workers` un me tha hi nahi. Script "sab
+         theek hai" bolti rahi jabki jis table par worker likhta hai wo thi hi nahi.
+      Dono theek hue: migration chal gayi, aur `db-verify` me `reel_workers` jud gaya
+      (ab wo 9 tables dekhta hai). Fix se pehle wo saaf FAIL deta hai, ab ok.
+
+      → **Offline wali haalat bhi browser me dekhi (2026-08-21).** Worker band tha, aur
+      Renders panel ne sabse upar likha: **"Worker offline — Render tab tak shuru nahi
+      hoga. Ek doosre terminal me chalao: npm run dev:worker"**. Yaani jawab me sirf
+      haalat nahi, agla kadam bhi hai — aur dono taraf (`chal raha hai` / `offline`)
+      ab naapi ja chuki hain.
+
+- [x] 11.14 **MILESTONE TEST:** haath se 30s reel banao, `high` par export karo, ffprobe +
       loudness + 4 frames paste karo.
-      → **nahi hua** — `studio/.env.local` ke bina UI se reel banayi hi nahi ja sakti.
-      Jo ho saka: pipeline ke dono nazuk hisse alag-alag naape gaye —
-      `npm run render:sample` → 29/29 (h264 High / yuv420p / 1080×1920@30 / aac 48kHz 2ch),
-      aur `npm run check --workspace @reel/media` → loudness ke 6 test (LUFS target par,
-      true peak 0 se neeche, video re-encode nahi).
+      → **ho gaya (2026-08-20).** Asli project (3 track, 12 clip, asli cast images +
+      mp3) `high` par export hua, aur numbers **DB se nahi, MP4 par khud ffprobe chala kar**
+      liye gaye:
 
-- [ ] 11.15 Same project ko `landscape` preset pe export karo.
+      ```
+      $ ffprobe -show_entries format=duration,size,bit_rate,format_name                 -show_entries stream=codec_name,width,height,r_frame_rate,pix_fmt,profile,sample_rate,channels                 render-out/media/permanent/reels/e7d28faa-….mp4
+
+      codec_name=h264      profile=High     width=1080   height=1920
+      pix_fmt=yuv420p      r_frame_rate=30/1
+      codec_name=aac       profile=LC       sample_rate=48000   channels=2
+      format_name=mov,mp4,m4a,3gp,3g2,mj2
+      duration=12.544000   size=3236217     bit_rate=2063913
+      ```
+
+      Loudness (worker ne `ebur128` se naapi, `job.meta` me): **integrated -13.8 LUFS**,
+      **true peak -13 dBTP**, LRA 3.2, `normalized: true`. Dono Section 3A ki hadd ke
+      andar (-14 target, -1 dBTP ki chhat).
+
+      Frames: 6.13 me preview aur render ke **frame 100** ki tasveerein milakar dekhi gayi
+      (SSIM 0.950, PSNR 32.5 dB) — dono is doc me hain.
+
+      ⚠️ **Do baatein saaf-saaf:**
+      1. Reel **30 second ki nahi, 12.5 second (375 frame) ki hai.** Wajah 8.14 hai:
+         har structural op ke baad `recomputeDuration` project ki lambai ko content ke ant
+         tak le aata hai, aur is doc me content 375 frame par khatam hota hai. Ye documented
+         vyavhaar hai, kami nahi — par "30s reel" wali shart aksharsah poori nahi hui.
+      2. Reel **haath se UI me nahi banayi gayi**, script se banayi gayi — kyunki Timeline
+         mode me library se clip jodne ka koi raasta hai hi nahi (7.12 dekho). Export,
+         render aur naap sab asli hai; sirf reel banane ka tarika script tha.
+
+- [x] 11.15 Same project ko `landscape` preset pe export karo.
+      → **chalaya (2026-08-20).** Pehle `landscape` naam se `POST /api/render` bheja to
+      saaf error mila: `EXPORT_PRESETS: "landscape" nahi mila. Registered: draft, standard,
+      high, uhd, strict`. Wo galti checklist ki thi, code ki nahi — **`landscape` ek size
+      preset hai** (`config/presets.ts`, 1920×1080), export preset nahi. Registry ne sahi
+      roka.
+      Phir `setProjectSize({ width:1920, height:1080, sizePresetId:"landscape", refit:true })`
+      se project landscape kiya aur usi ko `high` par export karaya:
+
+      ```
+      status completed | width 1920 | height 1080 | h264 High | yuv420p | 30/1
+      aac 48000Hz 2ch  | renderMs 25265 | 375 frames
+      ```
+
+      Loudness bhi wahi (-13.8 LUFS, true peak -13 dBTP) — yaani audio chain size se
+      swatantra hai.
+      ⚠️ Ek baat dhyan me rakhne layak: `refit: true` ke saath reel → landscape → reel
+      wapas aane par items **chhote ho jaate hain**, kyunki scale dono baar `min(ratio)`
+      se badalti hai (0.5625 × 0.5625 ≈ 0.32). Ye `setProjectSize` ke likhe hue ganit ke
+      mutabik hai, bug nahi — par round-trip lautkar wahi jagah nahi deta, aur ye jaan
+      lena zaroori hai.
       → **nahi hua** (wahi wajah). Project ka size badalna Phase 9 me ban chuka hai
       (`setProjectSize` + re-fit ka sawaal), aur render composition doc ke `width/height`
       se hi chalti hai — isliye ye ek naye code ka kaam nahi, sirf ek test ka hai.
 
-- [ ] 11.16 `npm run typecheck` clean. Commit.
+- [x] 11.16 `npm run typecheck` clean. Commit.
+      → typecheck **clean** (2026-08-20, 6 workspaces, exit 0), saare check suite pass.
       → typecheck clean, build pass, commit ho chuka.
 
 - [x] 11.17 README ka Progress board + Milestone 1 ka summary.

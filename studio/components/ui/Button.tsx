@@ -38,6 +38,8 @@ export function Button({
       {...rest}
       className={clsx(
         "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm",
+        // Wahi wajah jo IconButton me likhi hai — ungli wale device par poora naap.
+        "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-4",
         "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60",
         "disabled:cursor-not-allowed disabled:opacity-40",
         VARIANTS[variant],
@@ -63,6 +65,17 @@ export function IconButton({
       {...rest}
       className={clsx(
         "inline-flex h-8 w-8 items-center justify-center rounded-md border",
+        /*
+         * ⚠️ Ungli wale device par 44px — aur ye **screen ki chaudai se nahi,
+         * pointer se** tay hota hai. Chaudai galat sawaal hai: touchscreen
+         * laptop par bhi ungli hi chalti hai, aur maus wale chhote window me
+         * 44px ka button bekaar jagah khaata hai. `pointer: coarse` seedha yahi
+         * poochhta hai — "is device par ishaara motha hai kya?".
+         *
+         * 44px Apple ka aur 48px Google ka naap hai; 32px (h-8) dono se aadha
+         * hai aur phone par uspar ungli rakhna kismat ka khel ban jaata hai.
+         */
+        "[@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11",
         "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber/60",
         "disabled:cursor-not-allowed disabled:opacity-40",
         VARIANTS[variant],

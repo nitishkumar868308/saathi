@@ -42,7 +42,9 @@ zoom-pan, rounded corners, shadow.
         `transform.x/y` ke **wahi keyframes** bante hain jo user haath se laga sakta tha —
         isliye zoom par undo, curve editor aur keyframe lane sab apne aap chalte hain.
       → Render se naapa gaya: 2x zoom par safed chaukor **1.99x** bada hua.
-      → **browser me nahi dekha** — chaukor kheenchna wahin naapa ja sakta hai.
+      → **button browser me chalaya (2026-08-21):** image clip ke ZOOM wale hisse me
+        button ne apna roop badla — `chaukor se zoom` → `chaukor kheencho`. Chaukor
+        **kheenchna** synthetic pointer se naapna bharosemand nahi; wo haath se baaki hai.
 - [x] 18.7 Zoom presets — sirf param sets.
       → `ZOOM_PRESETS` (4). Preset bhi usi `applyZoomPan` op se guzarta hai; do alag raaste
         hone par ek din preset wala zoom keyframes ke bina lagta aur uspar undo kaam nahi karta.
@@ -62,9 +64,44 @@ zoom-pan, rounded corners, shadow.
 - [x] 18.10 Rounded corners + border + shadow raw recordings ke liye — Phase 14 effects reuse.
       → Naya code nahi: `roundedCorners`, `border`, `dropShadow` effects pehle se hain aur
         raw recording par waise ke waise lagte hain.
-- [ ] 18.11 Touch/tap indicator overlay.
-      → **Nahi bana, aur koi button bhi nahi dikhaya.** Checklist khud kehti hai "agar time na
-        ho to skip karo par button mat dikhao" — wahi kiya.
+- [x] 18.11 Touch/tap indicator overlay.
+      → **ban gaya (2026-08-20).** Screen recording dekhne wale ko bilkul pata nahi chalta
+      ki ungli **kahan** padi — screen achanak badal jaati hai aur wo ek jump jaisa lagta
+      hai. Ab ek chhota gola tap ki jagah par phail kar gayab hota hai, aur us jump ko
+      wajah mil jaati hai.
+
+      **Core:** `mockup/taps.ts` — `TAP_SECONDS = 0.4` aur `visibleTaps(taps, localFrame,
+      fps)` (7 test). Poora hissa ek pure function par khada hai aur wo jaan-boojhkar core
+      me hai: renderer **aur** preview dono isi ko bulate hain. Do jagah ye ganit likhne
+      par ek din preview me tap dikhta aur MP4 me nahi.
+
+      ⚠️ Window **seconds me** naapi jaati hai, frames me nahi. Fix frame count (jaise "12
+      frame") rakhne par 60fps ke project me wahi nishaan aadhe waqt ka ho jaata — aur wo
+      farak sirf saath-saath dekhne par pakda jaata. Uska apna test hai.
+
+      **Schema:** `mockup.taps` — `frame` item-local, `x`/`y` 0..1 screen ke andar, aur
+      `.default([])` (wahi seekh jo `mask` se mili thi). Pixel me rakhne par device badalte
+      hi har nishaan apni jagah chhod deta.
+
+      **UI:** MockupSection me "Playhead par tap jodo" — playhead clip ke bahar ho to button
+      dabta hi nahi aur tooltip wajah batata hai. Har nishaan list me apne frame aur jagah
+      ke saath dikhta hai, hatane ke button ke saath.
+
+      **Render me sach me dikhta hai** — `npm run render:mockup` me naya check, jo **ek hi
+      timestamp par do render** milata hai (ek tap ke saath, ek bina): `20.903 vs 20.741`
+      aausat roshni. Ek hi video ke do samay milana galat hota, kyunki us doc me zoom bhi
+      chalti hai aur wo naap ko dabaa deti.
+
+      ⚠️ **Is test ne do baar jhoothi khabar di, aur dono baar galti naap ki thi, code ki
+      nahi** — likh dena zaroori hai:
+      1. Pehle tap 1.0s par rakha tha. Wahan zoom itna chadh chuka hota hai ki phone frame
+         hi screen se bahar nikal jaata hai — naapne ko kuch bachta hi nahi.
+      2. Phir tap screen ke **beech** me tha, aur test wali recording ka safed chaukor bhi
+         theek wahin hai. Safed nishaan safed ke upar padkar roshni bilkul nahi badalta.
+         Ye tab pakda gaya jab gole ko asthayi roop se **laal** kar ke dekha — roshni badal
+         gayi (20.442), yaani render hamesha theek tha. Ab tap gehre hisse par (y 0.85)
+         lagta hai.
+
 - [x] 18.12 Test: recording → phone frame → do zoom step → render, aur 2.5x par warning.
       → `npm run render:mockup` — 11 checks, sab pass. Asli output neeche.
 - [x] 18.13 `npm run typecheck` clean. Commit.

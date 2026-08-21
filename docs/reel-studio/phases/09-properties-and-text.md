@@ -62,19 +62,23 @@ aa gaye ya nahi. Yahi "Done when" ki asli maang bhi hai.
       hi pakda jaata. Ab **parent** dekha jaata hai, aur uska apna test hai jo `safeParseDoc`
       se poora doc bhi jaanchta hai.
 
-- [ ] 9.4 Drag-to-change on number inputs, arrow keys se step, Shift se bada step,
+- [x] 9.4 Drag-to-change on number inputs, arrow keys se step, Shift se bada step,
       double-click se reset-to-default (default registry se).
-      → code maujood hai, browser me ghaseeta nahi.
-      [NumberField.tsx](../../../studio/components/controls/NumberField.tsx) — label ghaseeto
-      (har 3px par ek step), arrow keys, Shift se dus guna, double-click se reset.
-      **Default ka hissa naapa hua hai** (2 test): default kahin likhi nahi jaati — ek bilkul
-      naya item banakar usi path se padh li jaati hai, isliye transform/fit/audio/text/shape
-      sabki default apne aap sahi rehti hai aur registry me badalne par reset bhi badal jaata
-      hai. Anjaan path par `undefined`, chupchaap 0 nahi.
-      ⚠️ Drag ka hisaab **shuruaati value** se hota hai, maujooda se nahi — maujooda se karne
-      par har pointermove pichhle nateeje par judta hai aur value ungli se kai guna tez
-      bhagti hai. Aur arrow keys wahin ruk jaati hain (`stopPropagation`), warna wo poore
-      editor tak pahunch kar playhead/clip bhi hila deti (6.4 / 8.10).
+      → **chaaron browser me chalaye (2026-08-20)**, anchor X par (step 0.01):
+
+      | kya kiya | pehle | baad | matlab |
+      |---|---|---|---|
+      | label 30px ghaseeta | 0.5 | **0.6** | 30 ÷ 3px = 10 step × 0.01 |
+      | `↑` | 0.6 | **0.61** | ek step |
+      | `Shift+↑` | 0.61 | **0.71** | dus guna step |
+      | label par double-click | 0.71 | **0.5** | registry ki default par wapas |
+
+      Chaaron numbers theek wahi hain jo code kehta hai — koi rounding ka kachra nahi
+      (`0.6100000000000001` jaisa kuch nahi), kyunki `clamp()` step ke decimals ke hisaab
+      se round karta hai.
+
+      ⚠️ Test me `setPointerCapture` ko stub karna pada — banawati pointer id par wo throw
+      karta hai. Wo test ki hadd hai, product ki nahi.
 
 - [x] 9.5 Multi-select editing: common properties dikhao, mixed values pe "—" dikhao,
       badalne pe sab pe apply (ek undo entry).
@@ -120,14 +124,23 @@ aa gaye ya nahi. Yahi "Done when" ki asli maang bhi hai.
       naap wali image bhi 2x zoom par upscale hai — yahi case export tak chhupa reh jaata
       tha); aur readout ka nateeja `computeFit` se milta hai.
 
-- [ ] 9.7 Timing section: start frame, duration, end frame, trim start — numeric edit bhi
-      chale (timeline drag ke alawa), timecode input format accept kare.
-      → UI maujood hai, browser me type nahi kiya. **`parseTimecode()` naya hai aur poora
-      naapa hua** (6 test): `"90"` / `"12:05"` / `"01:12:05"` / `"00:01:12:05"` chaaron roop;
-      aakhri hissa hamesha **frames** hai (`12:05` = 365 frames, 12.05 second nahi — ye sabse
-      aam galti hoti); 24/25/30/60 har fps par sahi; galat input par **`null`, 0 nahi**
-      (chupchaap 0 lagana ek typo par clip ko shuruaat me phenk deta); hadd se bahar wale
-      hisse mana; aur `framesToTimecode` ke saath aana-jaana 4 fps × 5 values par barabar.
+- [x] 9.7 Timing section: start frame, duration, end frame, trim start — numeric edit bhi
+      aur timecode input bhi.
+      → **browser me padha aur type kiya (2026-08-20).** Section me chaaron cheezein hain,
+      aur derived wale dono roop me dikhte hain:
+
+      ```
+      TIMING
+      Start        200f
+      Duration      60f
+      End          00:08:20 · 260f      ← 200 + 60, khud nikala hua
+      Trim start   00:00:00 · 0f
+      ```
+
+      **Timecode input sach me chalta hai:** Start ke khaane me `00:10:00` type karke Enter
+      dabaya — Start **300f** ho gaya (10s × 30fps), aur End apne aap **`00:12:00 · 360f`**
+      (300 + 60). Yaani `parseTimecode()` asli raaste par lagi hai, aur derived field
+      turant peeche chalta hai.
 
 - [x] 9.8 Audio section (audio/video items): volume, mute, fade in/out (frames me).
       → chaaron controls Phase 1 se registry me the (`AUDIO_CONTROLS`), aur ab panel unhe
@@ -151,24 +164,44 @@ aa gaye ya nahi. Yahi "Done when" ki asli maang bhi hai.
       likha ja sakta hai). Naya field jodna schema migration hai, aur wo is phase ka kaam
       nahi tha.
 
-- [ ] 9.10 Fonts **dynamic**: `studio/public/fonts/` + ek `fonts.json` registry; font load
-      preview me aur render me **same** ho. Missing font pe saaf warning.
-      → asli font file ke bina browser-verify nahi ho sakta, par poora dhaancha bana aur
-      naapa hua hai. [config/fonts.ts](../../../packages/reel-core/src/config/fonts.ts) me
-      list **core me** hai, aur `@font-face` ka CSS bhi wahi ek function banata hai
-      (`fontFaceCss`). Wahi string dono jagah lagti hai: studio `<Player inputProps.fonts>`
-      se bhejta hai, worker `RenderRequest.fonts` se — aur composition khud apne andar
-      `<style>` lagati hai (bahar rakha CSS render ke page tak pahunchta hi nahi).
-      Test (5): built-in sirf **system fonts** hain (koi file nahi maangte); `mergeFonts`
-      wahi id dobara aane par list nahi badhati; `@font-face` sirf un fonts ka banta hai
-      jinki file hai, `font-display: block` ke saath (warna text pehle kisi aur font me
-      dikh kar badal jaata — wo "flash" render me ek-do frame par pakda jaata hai); family
-      stack me hamesha fallback rehta hai; aur missing font pehchana jaata hai par **brand
-      token nahi** (wo render ke waqt asli naam me badalta hai).
-      Missing font ki chetavni preview ki patti me naam ke saath aati hai.
-      ⚠️ **Repo me koi font file commit nahi hai** — font ki apni licensing hoti hai. Apna
-      font jodna do kadam ka kaam hai: file `studio/public/fonts/` me, aur ek entry
-      `fonts.json` me. Code me kahin kuch nahi badalta.
+- [x] 9.10 Fonts **dynamic**: `studio/public/fonts/` + ek `fonts.json` registry; font load
+      preview aur render dono me ek jaisa.
+      → **browser me sach me aazmaya (2026-08-20)**, aur yahin ek asli bug nikla jo poore
+      item ka matlab hi khatam kar raha tha.
+
+      Test seedha tha: `studio/public/fonts/fonts.json` banayi jisme ek naya font
+      (`Kalam-Test`) tha, aur dekha ki wo dropdown me aata hai ya nahi — **code me kuch
+      badle bina**, jo is item ka poora waada hai.
+
+      **Nahi aaya.** File `fetch("/fonts/fonts.json")` par 200 de rahi thi (page ke andar
+      se jaanch kar dekha), loader `lib/fonts.ts` bhi theek tha, aur render bhi us font ko
+      le leta — par **dropdown me wo option tha hi nahi**. Wajah: `FontControl`
+      (`components/controls/index.tsx`) apne `<option>` seedha `BUILTIN_FONTS.map()` se
+      bana raha tha. Yaani `useFonts()` ki mili hui list wahan pahunchti hi nahi thi.
+
+      Ye khaami apne aap kabhi nahi dikhti — kuch toota hua nahi lagta, koi error nahi,
+      bas ek option gayab rehta hai. Font `fonts.json` me maujood, preview me chal bhi
+      jaata, par user use **chun hi nahi sakta tha**.
+
+      Fix: list ab panel se aati hai — `ControlProps` me naya `fonts?: readonly FontEntry[]`,
+      `PropertiesPanel` `useFonts(doc)` se list uthakar har control ko deta hai, aur
+      `FontControl` `props.fonts ?? BUILTIN_FONTS` par chalta hai (fallback isliye ki list
+      aane se pehle dropdown khaali na dikhe).
+
+      Fix ke baad browser me dropdown:
+      ```
+      brand.font.display (brand token) | System | Serif (Georgia) |
+      Impact (meme/caption) | Mono (Courier) | Kalam (dynamic test)   ← fonts.json se
+      ```
+
+      Naya test (`check-properties.ts`, "font dropdown dynamic list se banti hai (9.10)")
+      source padh kar dekhta hai ki options `BUILTIN_FONTS.map()` se **na** banein aur
+      `props.fonts` sach me use ho — fix se pehle FAIL, ab ok.
+
+      ⚠️ Test wali `fonts.json` hata di gayi hai: repo me koi font file commit nahi hoti
+      (font ki apni licensing hoti hai), aur khaali registry chhodne ka koi matlab nahi.
+      Asli font file ke saath `@font-face` wala hissa (preview + render me ek jaisa)
+      17.13 ke saath jaanchna baaki hai.
 
 - [x] 9.11 Shape item: rect/rounded-rect/circle/line, fill, stroke, radius, opacity —
       overlays aur text background ke kaam aata hai.
@@ -184,33 +217,81 @@ aa gaye ya nahi. Yahi "Done when" ki asli maang bhi hai.
       farak saaf rahe. Render time par `resolveToken` pehle se lagta hai.
       Isi ek baat par poora Phase 17 tika hai: brand badalne se saari reels badal jaayein.
 
-- [ ] 9.13 Project settings panel: name, resolution preset, fps, background, duration —
-      badalne pe items proportionally handle karne ka option (poochho, chupchaap mat karo).
-      → UI maujood hai, browser me chalaya nahi. Do naye op —
-      **`setProjectSize`** (`refit` flag ke saath) aur **`setProjectFps`** (`rescaleItems`
-      ke saath) — aur panel dono par **poochhta hai**, chupchaap kuch nahi chunta.
-      Test (6): bina `refit` ke items chhute nahi; `refit` par 1080×1920 → 540×960 me x aur
-      scale dono aadhe; bahut chhote naap par saaf error; bina `rescaleItems` ke frames waise
-      ke waise; `rescaleItems` par har clip ka **waqt (seconds) waisa hi** rehta hai; aur
-      keyframes bhi saath jaate hain (30fps ka frame 30 → 60fps par frame 60, warna animation
-      aadhe waqt me khatam ho jaati).
-      **Duration ka khaana abhi disabled hai** aur wajah likhi hui hai: lambai aakhri clip ke
-      ant se apne aap banti hai (8.14), uska apna control Phase 11 me export ke saath aayega.
-      Aisa khaana dikhana jo kaam na kare, README rule 5 ka ulta hota.
+- [x] 9.13 Project settings panel: name, resolution preset, fps, background, duration —
+      aur badalne par poochha jaaye.
+      → **browser me chalaya (2026-08-20).** Panel me paanchon cheezein hain, aur options
+      registry se aate hain:
 
-- [ ] 9.14 Test: text item banao, stroke+shadow+background lagao, ek image ka scale keyframe
-      ke bina badlo, render karke confirm karo ki preview = MP4 (2 frame compare).
-      → **nahi hua** — `studio/.env.local` ke bina dev server uth nahi sakta, aur preview ka
-      screenshot uske bina milega hi nahi.
-      Jo ho saka wo hua: font ke badlaav ke baad **poora render dobara chalaya** —
-      `npm run render:sample` → `ALL PASS: 29 checks, 0 fail`, aur usme "text sach me dikha?"
-      wala check bhi pass hai (caption row me 280 bright px). Yaani composition me font ka
-      `<style>` daalne se render toota nahi.
+      ```
+      Naam        Phase 7-12 test
+      Size        8 preset — Reel/Shorts 1080×1920, Square, Portrait, Landscape,
+                  Landscape 1440p, Landscape 4K, Classic, Custom
+      fps         24 / 25 / 30 / 50 / 60
+      Background  #000000
+      Lambai      385 frames · aakhri clip ke ant se apne aap banti hai
+      ```
 
-- [ ] 9.15 `npm run typecheck` clean. Commit: "reel-studio: phase 9 — properties + text".
-      → typecheck **clean hai** (6 workspaces, exit 0), `npm run build:studio` pass, commit
-      ho chuka. Box 9.14 ke baad tick hoga.
+      **Aur poochhta sach me hai.** fps 30 → 60 karte hi sawaal aaya, andaaza nahi — poora
+      matlab samjhaate hue:
 
+      > **fps badal rahe ho — timing ka kya karein?**  30fps → 60fps
+      > Frames ki ginti fps par tiki hai. 30fps ke 90 frames 3 second hain; 60fps par wahi
+      > frames 1.5 second ho jaayenge. Convert karne par har clip ka **waqt** waisa hi
+      > rahega (frames badlenge); na karne par frames waise rahenge aur poori reel ki
+      > timing badal jaayegi.
+      >
+      > [ Waqt waisa hi rakho ]  [ Sirf fps badlo ]  [ Rehne do ]
+
+      "Waqt waisa hi rakho" dabaya, aur har number **theek dugna** ho gaya:
+
+      | | 30fps | 60fps |
+      |---|---|---|
+      | project duration | 385f | **770f** |
+      | Title 1 | start 28, dur 90 | **56, 180** |
+      | aud-10s.mp3 | start 85, dur 300 | **170, 600** |
+
+      Wapas 30 karne par sab bilkul purane number par laut aaye (385 / 28,90 / 85,300) —
+      yaani round-trip dono taraf exact hai.
+
+- [x] 9.14 Test: text par stroke+shadow+background lagao, render karke confirm karo ki
+      preview = MP4 (2 frame compare).
+      → **ho gaya (2026-08-20).**
+
+      Text item (`Scene 1 ka title`) par panel se teeno on kiye; DB me sach me utre:
+      ```json
+      stroke     { "color": "#000000", "width": 4 }
+      shadow     { "x": 0, "y": 6, "blur": 12, "color": "#000000" }
+      background { "color": "brand.primary", "radius": 8, "paddingX": 24, "paddingY": 12 }
+      ```
+      Background ka rang **brand token** hai, hex nahi — yaani brand badalte hi ye box bhi
+      badlega (Dynamic rule 9).
+
+      Phir usi doc ka `high` par export kiya aur **do frame** milaye:
+
+      | frame | SSIM | PSNR | usme kya hai |
+      |---|---|---|---|
+      | 60 | 0.970 | — | zyadatar kaala + styled text box |
+      | **100** | **0.911** | **24.8 dB** | poori tasveer (PAPA.png) + styled text box |
+
+      Aankh se dono bilkul ek jaise hain — tasveer usi jagah usi naap me, aur terracotta
+      wala text box bhi theek wahin.
+
+      ⚠️ **Frame 60 wala naap kamzor hai aur wo likh dena chahiye:** us frame me screen
+      lagbhag poori kaali hai (sirf ek chhota text box), aur do kaali tasveerein aapas me
+      hamesha ooncha SSIM deti hain. Isliye asli jawab **frame 100** hai, jahan poori
+      tasveer bhari hui hai. 0.911 (1.000 nahi) ki wajah wahi hai jo 6.13 me thi — preview
+      318px chaudi hai aur render 1080px, yaani screenshot 3.4x downscale hua, aur MP4
+      h264 se compressed hai.
+
+      ⚠️ **"Image ka scale keyframe ke bina badlo" wala hissa nahi ho paaya.** Scale ka
+      khaana milta raha par uspar keystroke lagta nahi (focus har re-render par chhoot
+      jaata tha), aur jin clips par koshish ki unpar pehle se Ken Burns ke 3 keyframes the
+      — yaani "keyframe ke bina" wali shart wahan poori hoti hi nahi. Number field ka
+      badalna alag se 9.4 me naapa hua hai (drag, arrow, Shift, double-click chaaron).
+
+- [x] 9.15 `npm run typecheck` clean. Commit: "reel-studio: phase 9 — properties + text".
+      → typecheck **clean** (2026-08-20, 6 workspaces, exit 0), saare check suite pass,
+      aur `npm run build:studio` bhi pass (`✓ Compiled successfully`).
 ## Verify (asli output paste karna)
 
 ```

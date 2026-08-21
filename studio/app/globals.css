@@ -12,3 +12,49 @@ body {
   background: #0b0b0d;
   color: #e8e6e3;
 }
+
+/* ---------------------------------------------------------------------------
+   Ungli wale device — har control kam se kam 44px.
+
+   ⚠️ Ye niyam **ek hi jagah** hai, aur wahi iska poora point hai. Studio me
+   sau se zyada button hain aur unme se aadhe kisi panel ke andar `px-2 py-1`
+   likhe hue chhote button hain — 25px lambe. Maus par wo bilkul theek hain;
+   ungli par unhe dabana kismat ka khel hai. Har call site par jaakar naap
+   badalna ek baar ka kaam hota, par agla naya button phir chhota hi bantaa —
+   aur wo kisi ko dikhta bhi nahi.
+
+   ⚠️ Faisla `pointer: coarse` se hota hai, screen ki chaudai se nahi. Chaudai
+   galat sawaal hai: touchscreen laptop par bhi ungli chalti hai, aur maus wale
+   chhote window me 44px ke button bekaar jagah khaate hain.
+
+   ⚠️ Timeline ki clip aur uske trim handle is niyam se **bahar** hain
+   (`[data-touch-exempt]`). Wahan naap doc se aati hai — ek 6-frame ki clip 12px
+   chaudi hi honi chahiye, warna wo timeline par jhooth bolegi. Unhe pakadne ka
+   asli ilaaj zoom hai, naap badalna nahi.
+--------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  button:not([data-touch-exempt]),
+  select:not([data-touch-exempt]),
+  [role="button"]:not([data-touch-exempt]) {
+    min-height: 44px;
+    /* Chaudai bhi — sirf oonchai badhane par icon wala button 20px chauda aur
+       44px lamba ban jaata hai, jo ungli ke liye utna hi bura hai. Text wale
+       button waise bhi isse chaude hote hain, unpar iska koi asar nahi. */
+    min-width: 44px;
+  }
+
+  /* Range ka pakadne wala hissa element ki apni oonchai jitna hota hai — 4px
+     wali patti maus se to chalti hai, ungli se nahi. */
+  input[type="range"]:not([data-touch-exempt]) {
+    min-height: 44px;
+  }
+
+  /* Likhne wale khaane bhi — 26px ke input par ungli rakhna utna hi mushkil
+     hai jitna chhote button par, aur galti se paas wala khaana khul jaata hai.
+     Checkbox/radio bahar hain: unka apna naap browser tay karta hai aur unhe
+     kheenchna dikhne me toota hua lagta hai. */
+  input:not([type="checkbox"]):not([type="radio"]):not([data-touch-exempt]),
+  textarea:not([data-touch-exempt]) {
+    min-height: 44px;
+  }
+}

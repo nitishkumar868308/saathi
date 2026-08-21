@@ -17,5 +17,6 @@ export * from "./probe";
 export * from "./thumbnails";
 export * from "./reverse";
 export * from "./voice";
+export * from "./tts/providers";
 export * from "./transcribe";
 export * from "./energy";

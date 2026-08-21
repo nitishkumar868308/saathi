@@ -17,6 +17,7 @@ import {
 
 import { ScrubBar } from "@/components/editor/preview/ScrubBar";
 import { IconButton } from "@/components/ui/Button";
+import { useScreen } from "@/lib/breakpoint";
 import { usePlayback } from "@/lib/playback";
 import { ZOOM_LEVELS, effectiveGuideId } from "@/lib/preview";
 import { SHORTCUTS, comboLabel } from "@/lib/shortcuts";
@@ -38,6 +39,19 @@ function shortcutLabel(id: string): string {
 }
 
 export function TransportBar() {
+  /*
+   * ⚠️ Chhoti screen par ye patti **lipatti nahi, khiskati hai**.
+   *
+   * Naapa hua: 390px par `flex-wrap` ise teen line ka bana deta tha (~150px), aur
+   * uske baad preview ke liye 20px bachte the — player poori 1080x1920 par
+   * render hokar ek patli si jhalak dikhata tha. Yaani transport ne wo cheez kha
+   * li jiske liye wo bani hai.
+   *
+   * Ek line me sab kuch thoons dena bhi galat hai (har button 20px ka ho jaata,
+   * ungli se dabana namumkin). Isliye line ek hi rehti hai aur **daayein khiskti**
+   * hai — jaise phone ke har app me hoti hai.
+   */
+  const compact = useScreen() !== "desktop";
   const doc = useEditorStore((state) => state.doc);
   const playheadFrame = useEditorStore((state) => state.playheadFrame);
   const setPlayhead = useEditorStore((state) => state.setPlayhead);
@@ -80,7 +94,14 @@ export function TransportBar() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+      <div
+        className={clsx(
+          "flex items-center gap-2 px-3 py-2",
+          compact
+            ? "flex-nowrap overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden"
+            : "flex-wrap",
+        )}
+      >
         <IconButton
           onClick={playback.toggle}
           title={`${playback.isPlaying ? "Pause" : "Play"}${shortcutLabel("play-pause")}`}
@@ -100,14 +121,14 @@ export function TransportBar() {
           </IconButton>
           <IconButton
             onClick={() => playback.stepFrames(-1)}
-            title={`Ek frame peeche${shortcutLabel("frame-back")}`}
+            title={`Ek frame peeche${shortcutLabel("nudge-back")}`}
             aria-label="Ek frame peeche"
           >
             <ChevronLeft size={14} />
           </IconButton>
           <IconButton
             onClick={() => playback.stepFrames(1)}
-            title={`Ek frame aage${shortcutLabel("frame-forward")}`}
+            title={`Ek frame aage${shortcutLabel("nudge-forward")}`}
             aria-label="Ek frame aage"
           >
             <ChevronRight size={14} />
@@ -125,11 +146,19 @@ export function TransportBar() {
         <span className="font-mono text-xs text-chalk-300">
           {framesToTimecode(playheadFrame, fps)}
         </span>
-        <span className="font-mono text-[11px] text-chalk-500">
-          / {framesToTimecode(durationInFrames, fps)} · frame {playheadFrame}/{durationInFrames}
-        </span>
+        {/*
+          Poora hisaab (kul lambai + frame ginti) sirf badi screen par. Phone par
+          ye ek hi line me itni jagah leta hai ki play button hi kinare se bahar
+          chala jaata hai — aur frame ki ginti chalte-firte kabhi nahi chahiye.
+        */}
+        {compact ? null : (
+          <span className="font-mono text-[11px] text-chalk-500">
+            / {framesToTimecode(durationInFrames, fps)} · frame {playheadFrame}/{durationInFrames}
+          </span>
+        )}
 
-        <span className="flex-1" />
+        {/* Khiskne wali patti me `flex-1` ka koi matlab nahi — wo sab kinare par thel deta hai. */}
+        {compact ? null : <span className="flex-1" />}
 
         <IconButton
           onClick={() => playback.setLoop(!playback.loop)}
@@ -158,7 +187,13 @@ export function TransportBar() {
             onChange={(event) => playback.setVolume(Number(event.target.value))}
             title={`Volume ${Math.round(playback.volume * 100)}%`}
             aria-label="Volume"
-            className="h-1 w-20 accent-terracotta"
+            /*
+             * ⚠️ Ungli wale device par patti moti. `<input type=range>` ka pakadne
+             * wala hissa element ki apni oonchai jitna hota hai — 4px (h-1) par
+             * wo maus se to chalta hai, par ungli se use pakadna lagbhag namumkin
+             * hai. Dikhne wali lakeer waise bhi patli hi rehti hai.
+             */
+            className="h-1 w-20 accent-terracotta [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-24"
           />
         </div>
 
@@ -177,7 +212,7 @@ export function TransportBar() {
               value={guideId}
               onChange={(event) => playback.setGuideId(event.target.value)}
               title="Kaunsi safe area"
-              className="rounded-md border border-ink-600 bg-ink-900 px-1 py-1 text-[11px] outline-none"
+              className="rounded-md border border-ink-600 bg-ink-900 px-1 py-1 text-[11px] outline-none [@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-2"
             >
               {guides.map((guide) => (
                 <option key={guide.id} value={guide.id} title={guide.hint}>
@@ -198,6 +233,8 @@ export function TransportBar() {
               title={level.hint}
               className={clsx(
                 "px-2 py-1 text-[11px] transition-colors first:rounded-l-md last:rounded-r-md",
+                // Ungli wale device par poora naap — wajah Button.tsx me likhi hai.
+                "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px] [@media(pointer:coarse)]:px-3",
                 level.id === playback.zoomId
                   ? "bg-terracotta/20 text-chalk-100"
                   : "text-chalk-500 hover:bg-ink-700",
@@ -214,6 +251,7 @@ export function TransportBar() {
           title="Preview ko aadhe naap par banao — raster ka kaam ghatta hai. Final render par koi asar nahi."
           className={clsx(
             "rounded-md border px-2 py-1 text-[11px] transition-colors",
+            "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:px-3",
             playback.draft
               ? "border-amber/50 bg-amber/15 text-amber"
               : "border-ink-600 text-chalk-500 hover:bg-ink-700",

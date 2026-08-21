@@ -24,17 +24,26 @@ import {
 import { MarkerLane } from "@/components/editor/timeline/MarkerLane";
 import { Ruler } from "@/components/editor/timeline/Ruler";
 import { SnapMenu } from "@/components/editor/timeline/SnapMenu";
+import { CaptionLane } from "@/components/editor/timeline/CaptionLane";
 import { KeyframeLanes } from "@/components/editor/timeline/KeyframeLane";
 import { TrackHeader } from "@/components/editor/timeline/TrackHeader";
 import { AddTrackButton } from "@/components/editor/timeline/TrackMenu";
 import { useClipDrag } from "@/components/editor/timeline/useClipDrag";
 import { Button, IconButton } from "@/components/ui/Button";
+import { createItem, planAssetDrop } from "@reel/core";
 import { type DragMode } from "@/lib/clipEdit";
+import {
+  assetKindFromDrag,
+  readAssetDrag,
+} from "@/lib/assetDrag";
+import { useScreen } from "@/lib/breakpoint";
 import { usePlayback } from "@/lib/playback";
 import { useEditorStore, useEditorStoreApi } from "@/lib/store";
 import {
   RULER_HEIGHT,
+  LANES_TOP_OFFSET,
   TRACK_HEADER_WIDTH,
+  TRACK_HEADER_WIDTH_COMPACT,
   ZOOM_STEP,
   clampPxPerFrame,
   contentWidth,
@@ -70,6 +79,13 @@ import { useElementSize } from "@/lib/useElementSize";
  */
 export function TimelineView() {
   const store = useEditorStoreApi();
+  /*
+   * Header ka column chhoti screen par patla — wajah `lib/timeline.ts` me likhi
+   * hai. Naap yahan tay hota hai aur ek hi jagah se aata hai, isliye header ka
+   * dabba aur uske andar ka content kabhi alag naap par nahi ja sakte.
+   */
+  const headerWidth =
+    useScreen() === "desktop" ? TRACK_HEADER_WIDTH : TRACK_HEADER_WIDTH_COMPACT;
   const doc = useEditorStore((state) => state.doc);
   const selection = useEditorStore((state) => state.selection);
   const setSelection = useEditorStore((state) => state.setSelection);
@@ -95,6 +111,8 @@ export function TimelineView() {
 
   const { ref: scroller, size } = useElementSize<HTMLDivElement>();
   const headersRef = useRef<HTMLDivElement>(null);
+  // Lanes ka apna ref — drop ke waqt pointer ki Y se track dhoondhne ke liye.
+  const lanesRef = useRef<HTMLDivElement>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [marquee, setMarquee] = useState<Rect | null>(null);
 
@@ -314,6 +332,97 @@ export function TimelineView() {
     [setSelection],
   );
 
+  /* ------------------------------------------- library se asset girana (16.3) */
+
+  /*
+   * ⚠️ Ye poora hissa isliye hai ki **pehle library se timeline par kuch daalne
+   * ka raasta hi nahi tha** — content sirf Scene Cards se aata tha. 16.3 "galat
+   * drop par saaf feedback" maangta hai, par jab drop hi na ho to feedback kis
+   * cheez par de? (Audit 2026-08-21 me yahi pakda gaya.)
+   *
+   * Faisla `planAssetDrop()` karta hai — core me, apne test ke saath. Yahan sirf
+   * DOM ka kaam hai: kis track par pointer hai, kaunsa frame hai, aur user ko
+   * kya dikh raha hai.
+   */
+  const [dropHint, setDropHint] = useState<
+    { trackId: string; ok: boolean; reason: string } | null
+  >(null);
+
+  /** Pointer ki Y se track — wahi `rows` jo lanes bhi banati hain. */
+  const trackAtY = useCallback(
+    (clientY: number): (typeof rows)[number] | null => {
+      const box = lanesRef.current?.getBoundingClientRect();
+      if (!box) return null;
+      const y = clientY - box.top;
+      return rows.find((row) => y >= row.top && y < row.top + row.height) ?? null;
+    },
+    [rows],
+  );
+
+  const onLanesDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const kind = assetKindFromDrag(event);
+      if (!kind) return; // hamara drag nahi — browser ko uska kaam karne do
+      const row = trackAtY(event.clientY);
+      if (!row) return;
+
+      const plan = planAssetDrop({ assetKind: kind, track: row.track });
+      /*
+       * `preventDefault` dono halat me — theek par isliye ki drop ho sake, aur
+       * galat par isliye ki hum apna laal nishaan dikha saken. Bina iske browser
+       * apna "mana hai" wala cursor dikhata hai aur **wajah kahin nahi dikhti**,
+       * jo bilkul wahi cheez hai jo 16.3 maang raha tha.
+       */
+      event.preventDefault();
+      event.dataTransfer.dropEffect = plan.ok ? "copy" : "none";
+      setDropHint({
+        trackId: row.track.id,
+        ok: plan.ok,
+        reason: plan.ok ? `${row.track.name} par aa jayega` : plan.reason,
+      });
+    },
+    [trackAtY],
+  );
+
+  const onLanesDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const payload = readAssetDrag(event);
+      setDropHint(null);
+      if (!payload) return;
+      event.preventDefault();
+
+      const row = trackAtY(event.clientY);
+      if (!row) return;
+
+      const plan = planAssetDrop({ assetKind: payload.kind, track: row.track });
+      if (!plan.ok) {
+        // Chup-chaap chhod dena sabse bura jawab hai — user ko lagta hai drag
+        // hi nahi hua. Wahi wajah upar ki patti me dikh jaati hai.
+        store.getState().setOpError(plan.reason);
+        return;
+      }
+
+      /*
+       * Lambai asset se aati hai jahan wo pata ho (video/awaaz), warna 4 second.
+       * Andaaza lagana yahan theek hai aur badalna aasan bhi — par 0 lambai ki
+       * clip banana bilkul galat hota: wo timeline par dikhti hi nahi.
+       */
+      const seconds = payload.durationMs === null ? 4 : payload.durationMs / 1000;
+      const item = createItem(plan.itemType, {
+        fps,
+        trackId: row.track.id,
+        name: payload.filename,
+        assetId: payload.assetId,
+        startFrame: Math.max(0, xToFrame(contentX(event.clientX), pxPerFrame)),
+        durationInFrames: Math.max(1, Math.round(seconds * fps)),
+      });
+
+      applyOp("addItem", { item }, { label: `${payload.filename} joda` });
+      setSelection(selectSingle(item.id));
+    },
+    [applyOp, contentX, fps, pxPerFrame, setSelection, store, trackAtY],
+  );
+
   /** Khaali jagah par drag = rubber band (7.8). */
   const onLanesPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -411,6 +520,8 @@ export function TimelineView() {
             const only = doc.items.find((item) => item.id === selection.itemIds[0]);
             return only ? (
               <div className="max-h-32 shrink-0 overflow-auto">
+                {/* 19.3 — subtitle clip par har cue ka apna block. */}
+                <CaptionLane item={only} pxPerFrame={pxPerFrame} contentX={contentX} />
                 <KeyframeLanes item={only} pxPerFrame={pxPerFrame} contentX={contentX} />
               </div>
             ) : null;
@@ -421,9 +532,18 @@ export function TimelineView() {
         {/* Headers ka column — scroll ke saath khud chalta hai (upar dekho). */}
         <div
           className="shrink-0 overflow-hidden border-r border-ink-600"
-          style={{ width: TRACK_HEADER_WIDTH }}
+          style={{ width: headerWidth }}
         >
-          <div className="border-b border-ink-600 bg-ink-900" style={{ height: RULER_HEIGHT }} />
+          {/*
+            ⚠️ Yahan `LANES_TOP_OFFSET` hai, `RULER_HEIGHT` nahi. Lanes ke upar
+            ruler ke saath marker lane bhi hai; sirf ruler ki oonchai lene par
+            har header apni lane se 12px upar khisak jaata hai. Wo bug ho chuka
+            hai — wajah `lib/timeline.ts` me likhi hai.
+          */}
+          <div
+            className="border-b border-ink-600 bg-ink-900"
+            style={{ height: LANES_TOP_OFFSET }}
+          />
           <div ref={headersRef}>
             {rows.map((row) => (
               <TrackHeader key={row.track.id} track={row.track} height={row.height} />
@@ -448,10 +568,56 @@ export function TimelineView() {
             </div>
 
             <div
-              className="relative"
+              ref={lanesRef}
+              /*
+               * ⚠️ `touch-none` — yahin marquee aur clip drag shuru hote hain.
+               * Bina iske phone par ungli rakhte hi browser ise scroll samajh
+               * leta hai, pointermove aana band ho jaata hai, aur timeline par
+               * kuch bhi kheencha nahi ja sakta. Maus par ye kabhi nahi dikhta.
+               */
+              className="relative touch-none"
               style={{ height: Math.max(lanesHeight, 1) }}
               onPointerDown={onLanesPointerDown}
+              onDragOver={onLanesDragOver}
+              onDragLeave={() => setDropHint(null)}
+              onDrop={onLanesDrop}
             >
+              {/*
+                Drop ka nishaan — hara matlab "yahan aa jayega", laal matlab
+                "yahan nahi", aur **wajah usi lane par** likhi hoti hai.
+
+                ⚠️ Wajah dikhana hi is poore hisse ka maqsad hai (16.3). Sirf
+                laal kar dena user ko dobara wahi koshish karne bhejta hai;
+                "Awaaz ko Video track par nahi rakh sakte — Audio track par
+                chhodo" padh kar wo sahi jagah chala jaata hai.
+              */}
+              {dropHint
+                ? (() => {
+                    const row = rows.find((entry) => entry.track.id === dropHint.trackId);
+                    if (!row) return null;
+                    return (
+                      <div
+                        className={clsx(
+                          "pointer-events-none absolute inset-x-0 z-20 flex items-center justify-center border-2 border-dashed",
+                          dropHint.ok
+                            ? "border-sage bg-sage/10"
+                            : "border-red-400 bg-red-500/10",
+                        )}
+                        style={{ top: row.top, height: row.height }}
+                      >
+                        <span
+                          className={clsx(
+                            "rounded px-2 py-0.5 text-[11px]",
+                            dropHint.ok ? "bg-sage/80 text-ink-900" : "bg-red-500/90 text-white",
+                          )}
+                        >
+                          {dropHint.reason}
+                        </span>
+                      </div>
+                    );
+                  })()
+                : null}
+
               {/* In-Out ke beech ka hissa halka roshan — 8.5 wale dono button
                   isi hisse par chalte hain, isliye wo dikhna chahiye. */}
               {hasRange ? (
@@ -549,7 +715,13 @@ export function TimelineView() {
               style={{ left: playheadX }}
             >
               <span
-                className="pointer-events-auto absolute -left-1.5 top-0 h-3 w-3 cursor-ew-resize rounded-b bg-terracotta"
+                /*
+                 * Playhead ka pakadne wala sira. Dikhne me 12px hai par ungli ke
+                 * liye uske chaaron taraf 12px ka khaali ghera bhi chhua ja sakta
+                 * hai (`before:` wala hissa) — warna phone par ise pakadna kismat
+                 * ka khel ban jaata hai.
+                 */
+                className="pointer-events-auto absolute -left-1.5 top-0 h-3 w-3 cursor-ew-resize touch-none rounded-b bg-terracotta before:absolute before:-inset-3 before:content-['']"
                 title="Playhead"
                 onPointerDown={(event) => {
                   event.stopPropagation();
@@ -564,13 +736,27 @@ export function TimelineView() {
             </div>
 
             {doc.items.length === 0 ? (
-              // 7.12 — naye project me saaf hint. Khaali kaali patti dekh kar
-              // pehla sawaal hamesha "ab kya karun" hota hai.
+              /*
+               * 7.12 — naye project me saaf hint. Khaali kaali patti dekh kar
+               * pehla sawaal hamesha "ab kya karun" hota hai.
+               *
+               * ⚠️ Hint wahi kehta hai jo **aaj** kaam karta hai. Pehle yahan
+               * likha tha "Media library se koi file yahan drag karo (drag se
+               * clip banana Phase 9 me aayega)" — aur wo do tarah se jhooth ho
+               * chuka tha: library se timeline par drag abhi bana hi nahi hai,
+               * aur Phase 9 kab ka poora ho gaya. Yaani hint user ko ek aisa
+               * kaam karne bhejta tha jo hota hi nahi, aur ek aise phase ka
+               * naam leta tha jo guzar chuka hai.
+               *
+               * Jo raasta aaj sach me chalta hai wo Scenes hai (`addScene`),
+               * isliye hint wahi bhejta hai.
+               */
               <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-xs text-chalk-500">
-                Timeline khaali hai — baayein Media library se koi file yahan drag karo
+                Timeline abhi khaali hai
                 <br />
                 <span className="text-[11px] text-ink-500">
-                  (drag se clip banana Phase 9 me aayega)
+                  Upar <strong>Scenes</strong> par jaakar scene jodo — clips yahan apne aap
+                  aa jaayenge
                 </span>
               </div>
             ) : null}
@@ -604,9 +790,27 @@ function Toolbar(props: {
   onCutRange(): void;
   onKeepRange(): void;
 }) {
+  /*
+   * ⚠️ Chhoti screen par ye patti **lipatti nahi, khiskati hai** — wahi wajah jo
+   * TransportBar me likhi hai. 390px par `flex-wrap` ise teen line ka bana deta
+   * tha (~150px), aur timeline ke lanes ke liye utni hi jagah kam ho jaati thi.
+   */
+  const compact = useScreen() !== "desktop";
+
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink-600 px-2 py-1">
-      <span className="text-xs uppercase tracking-wide text-chalk-500">Timeline</span>
+    <div
+      className={clsx(
+        "flex shrink-0 items-center gap-2 border-b border-ink-600 px-2 py-1",
+        compact
+          ? "flex-nowrap overflow-x-auto [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden"
+          : "flex-wrap",
+      )}
+    >
+      {/* "TIMELINE" ka label chhoti screen par nahi — pane ka naam neeche patti
+          me pehle se likha hai, aur yahan wo sirf jagah khaata hai. */}
+      {compact ? null : (
+        <span className="text-xs uppercase tracking-wide text-chalk-500">Timeline</span>
+      )}
 
       <IconButton onClick={props.onZoomOut} title="Zoom out (-)" aria-label="Zoom out" className="h-6 w-6">
         <ZoomOut size={12} />

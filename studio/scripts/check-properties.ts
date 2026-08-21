@@ -15,6 +15,9 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   CONTROL_KINDS,
@@ -351,6 +354,50 @@ test("commonValue / visibleGroups padhne wale hain, likhne wale nahi", () => {
   defaultValue("text", "text.color", doc.project.fps);
 
   assert.equal(JSON.stringify(item), before, "kisi helper ne item badal diya");
+});
+
+section("font dropdown dynamic list se banti hai (9.10)");
+
+/**
+ * `FontControl` ki list `BUILTIN_FONTS` par jam nahi honi chahiye.
+ *
+ * 9.10 ka poora vaada do kadam ka hai: file `studio/public/fonts/` me rakho,
+ * `fonts.json` me entry jodo — code me kuch nahi badalta. Wo vaada tabhi sach
+ * hai jab **chunne wali dropdown** bhi usi mili hui list se bane.
+ *
+ * Ye test ek asli chot se aaya: loader (`lib/fonts.ts`) theek tha aur render
+ * bhi custom font le leta tha, par dropdown seedha `BUILTIN_FONTS` map karti
+ * thi. Nateeja — font `fonts.json` me maujood, preview me chal bhi jaata, par
+ * user use **chun hi nahi sakta tha**. Aisi khaami apne aap kabhi nahi dikhti:
+ * kuch toota hua nahi lagta, bas ek option gayab rehta hai.
+ *
+ * Source padha jaata hai kyunki `controls/index.tsx` React aur DOM par tikka
+ * hai — Node me import karna namumkin hai.
+ */
+test("FontControl props se aayi list par chalta hai, BUILTIN_FONTS par jama nahi", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(resolve(here, "../components/controls/index.tsx"), "utf8");
+
+  const from = source.indexOf("const FontControl");
+  assert.ok(from > 0, "FontControl nahi mila");
+  const to = source.indexOf("\n};", from);
+  assert.ok(to > from, "FontControl ka ant nahi mila");
+  const block = source.slice(from, to);
+
+  assert.ok(
+    /props\.fonts/.test(block),
+    "FontControl ko list props se milni chahiye (props.fonts)",
+  );
+  /*
+   * Asli shart yahi hai: `<option>` kis list se ban rahe hain.
+   * `props.fonts ?? BUILTIN_FONTS` wala fallback theek hai — list aane se pehle
+   * kuch to dikhna chahiye. Galat sirf tab hai jab options **seedhe**
+   * BUILTIN_FONTS se banein, kyunki tab props.fonts ka koi asar hi nahi hota.
+   */
+  assert.ok(
+    !/BUILTIN_FONTS\s*\.map\(/.test(block),
+    "options ab bhi seedhe BUILTIN_FONTS.map() se ban rahe hain — fonts.json ka font dropdown me aayega hi nahi",
+  );
 });
 
 /* ------------------------------------------------------------------ end */

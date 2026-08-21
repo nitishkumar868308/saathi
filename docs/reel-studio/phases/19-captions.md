@@ -23,14 +23,48 @@ Hamesha editable text rahe, kabhi burned-in asset nahi.
         saari cues apne aap saath chalti hain.
       → Roop (`text` field) dono me ek hi schema se — font/size/rang ka code do jagah nahi.
 - [x] 19.2 Caption editor: cue list, inline edit, timing, split at playhead, lambai ki hint.
+      → **browser me poora chalaya (2026-08-21).** Ek fixture project me 3 cue wala caption
+        item daala, aur panel me sab aaya: `AUDIT CAPTIONS · 3 CUE`, style ki list (Saada,
+        Mota, Shabd par rang, Karaoke, Pop, Typewriter, Dabbe me), SRT/VTT import, aur cue
+        ki timing (`0.00s → 1.00s`, `1.00s → 2.50s`, `2.50s → 4.00s`).
+      → **Lambai ki hint sach me chali:** pehli cue 33 akshar ki thi aur panel ne likha —
+        *"Ek line 33 akshar ki hai (32 tak theek)"* — par roka kuch nahi, jaisa item me
+        likha hai.
+      → Caption item na ho to panel agla kadam batata hai: "Timeline me ek Captions item
+        jodo — uske baad yahan cue banana, SRT import karna aur style badalna sab ho jaayega."
       → `CaptionsPanel.tsx` (naya "Captions" tab) + 7 ops.
       → Lambai ki hint **rukavat nahi** hai. Kabhi-kabhi lambi line hi sahi hoti hai; batana
         aur rokna do alag cheezein hain.
-      → **browser me nahi dekha.**
-- [ ] 19.3 Timeline par caption track: har cue ek chhota block, drag se timing.
-      → **Nahi bana.** Subtitle item timeline par ek clip ki tarah dikhta hai (jo sach hai),
-        par uske andar ke cues ke apne block nahi bane. Panel se timing badalna chalta hai.
-        Wajah neeche table me.
+- [x] 19.3 Timeline par caption track: har cue ek chhota block, drag se timing.
+      → **ban gaya (2026-08-20)** — `timeline/CaptionLane.tsx`. Subtitle clip chunte hi
+      uske neeche ek lane aata hai (`captions (3)`), aur usme har cue ka apna block hai.
+
+      ⚠️ **Cue ke frame item-local hain, absolute nahi** — bilkul keyframes ki tarah
+      (Phase 1 ka locked faisla). Isliye block ki jagah `clip ka start + cue ka frame` se
+      banti hai. Agar yahan absolute maan liye jaate to clip khiskate hi captions apni
+      jagah chhod deti — aur wo galti **sirf export dekhne par** pakdi jaati.
+
+      **Browser me dono tarah ka drag chalaya**, zoom 4.00 px/frame par:
+
+      | kya kiya | pehle | baad |
+      |---|---|---|
+      | poora block 60px daayein | `50 → 95 (45f)` | `65 → 110 (45f)` — theek **15 frames**, lambai wahi |
+      | daayan kinara 40px daayein | `0 → 45 (45f)` | `0 → 55 (55f)` — theek **10 frames**, start wahi |
+
+      Block par poora cue ka text tooltip me hai (`Doosra caption | 50 → 95 (45 frames)`),
+      kyunki chhote block me do-teen akshar hi samaate hain.
+
+      ⚠️ **Op chhodne par chalta hai, har pointermove par nahi** — warna ek drag se sau
+      history entry ban jaati aur Ctrl+Z bekaar ho jaata. Drag ke dauraan component apne
+      andar ek ghost rakhta hai; DB tak sirf aakhri jagah jaati hai.
+
+      ⚠️ Ulta cue (`end <= start`) na drag me ban sakta hai na op me — dono jagah 1 frame
+      ki hadd hai. Ulta cue timeline par pakda hi nahi ja sakta, isliye wo ek aisi haalat
+      hoti jisse nikalna namumkin ho jaata.
+
+      Lane sirf **ek** clip chunne par dikhta hai — multi-select me har clip ka apna local
+      paimana hota hai, aur do clips ke cue ek hi lakeer par rakhna padhne me jhooth hota.
+
 - [x] 19.4 SRT + VTT import; BOM aur Hindi text sambhalna.
       → Ek hi parser dono ke liye — do rakhne par ek din SRT me bug theek hota aur VTT me
         wahi bug pada rehta.

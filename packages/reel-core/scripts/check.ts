@@ -14,264 +14,284 @@ import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 
 import {
+  ANIMATION_PRESETS,
   AUTO_FIT_ACTIONS,
+  BUILTIN_DEVICES,
+  BUILTIN_FONTS,
+  BUILTIN_TEMPLATES,
+  CLEANUP_STEPS,
+  DEFAULT_BRAND_TOKENS,
+  DEFAULT_CLEANUP,
+  DEFAULT_DEVICE_ID,
   DEFAULT_FPS,
+  DEFAULT_LOUDNESS_LUFS,
   DEFAULT_SIZE_PRESET_ID,
   EASING_IDS,
+  EFFECTS,
+  EFFECT_PRESETS,
+  EXPORT_PRESETS,
+  FADE_SHAPES,
+  IDENTITY_ANIMATION,
   ITEM_TYPES,
-  SIZE_PRESETS,
-  TRACK_TYPES,
-  addItem,
-  addTrack,
-  aspectRatioLabel,
-  assetKindForFile,
-  assetQuality,
-  checkUpscale,
-  checkUploadable,
-  clampFrame,
-  computeFit,
-  createCountingIdFactory,
-  createEmptyProject,
-  createHistory,
-  ANIMATION_PRESETS,
-  BUILTIN_FONTS,
   KEYFRAME_BEATS_ANIMATION,
-  addKeyframe,
-  blendColors,
-  clearKeyframes,
-  copyKeyframes,
-  deleteKeyframe,
-  moveKeyframe,
-  CLEANUP_STEPS,
-  DEFAULT_CLEANUP,
-  VOICE_TARGET_LUFS,
-  cleanupFilterChain,
-  cleanupFilterString,
-  splitAtFrame,
+  LIBRARY_TABS,
+  LOW_RES_MESSAGE,
+  MIN_VOLUME_DB,
   MockAiProvider,
   OPS,
   SCENE_TYPES,
-  applyProposal,
-  buildProposal,
-  mockAiProvider,
-  resetRegistries,
-  sceneTypesForPrompt,
-  type AIProvider,
-  type AiScript,
-  findOrphans,
-  planCleanup,
-  referencedAssetIds,
-  LOW_RES_MESSAGE,
-  canExport,
-  maxEffectiveScale,
-  requiredSourcePixels,
-  validateAssetQuality,
-  validateExportSettings,
-  validateProjectQuality,
-  type AssetInfo,
+  SIZE_PRESETS,
+  Sha256,
+  TRACK_TYPES,
+  TTS_PROVIDERS,
+  VALIDATION_RULE_LIST,
+  VOICE_CATEGORIES,
+  VOICE_TARGET_LUFS,
+  ZOOM_PRESETS,
   activeWordIndex,
+  addAnimation,
   addCue,
+  addEffect,
+  addItem,
+  addKeyframe,
+  addMarker,
+  addScene,
+  addTrack,
+  alignTranscript,
+  alignWords,
+  animationsMaxScale,
+  applyAnimationPreset,
+  applyAutoFit,
+  applyCaptionScript,
+  applyEffectPreset,
+  applyEffects,
+  applyProposal,
+  applyTemplate,
+  applyZoomPan,
+  aspectRatioLabel,
+  assertKeyMatchesLifecycle,
+  assetKindForFile,
+  assetQuality,
+  blendColors,
+  bpmFromTimes,
+  brandOverrides,
+  brandTokensFor,
+  buildCues,
+  buildProposal,
+  canExport,
+  checkUploadable,
+  checkUpscale,
+  checkZoomUpscale,
+  clampFrame,
+  clampTransitionFrames,
+  cleanupFilterChain,
+  cleanupFilterString,
+  clearKeyframes,
+  composeAnimations,
+  computeFit,
+  copyItems,
+  copyKeyframes,
+  createCountingIdFactory,
+  createEmptyProject,
+  primarySceneItem,
+  parseFontsJson,
+  fontEntryForAsset,
+  fontFamilyForFile,
+  planAssetDrop,
+  firstTrackFor,
+  createHistory,
+  createItem,
+  cropCss,
   cueAt,
   cueProblems,
   cuesFromParsed,
   cuesToSeconds,
-  deleteCue,
-  estimateWords,
-  bpmFromTimes,
-  detectBeats,
-  nearestBeatFrame,
-  snapItemsToBeats,
-  speechTrimRange,
-  trimItemToSourceRange,
-  alignTranscript,
-  alignWords,
-  applyCaptionScript,
-  buildCues,
-  devanagariToLatin,
-  hasDevanagari,
-  isLowConfidence,
-  removeFillers,
-  syllableWeight,
-  wrapLines,
-  formatSubtitles,
-  listCaptionStyles,
-  mergeCuesOp as mergeCuesInItem,
-  parseSubtitles,
-  parseTimestamp,
-  requireCaptionStyle,
-  setCaptionStyle,
-  setCue,
-  setCues,
-  splitCueAt,
-  type CaptionCue,
-  type CaptionWord,
-  BUILTIN_DEVICES,
-  ZOOM_PRESETS,
-  applyZoomPan,
-  checkZoomUpscale,
-  deviceForAspect,
-  frameGeometry,
-  requireDevice,
-  setMockup,
-  zoomPanKeyframes,
-  DEFAULT_DEVICE_ID,
-  BUILTIN_TEMPLATES,
-  DEFAULT_BRAND_TOKENS,
-  applyTemplate,
-  brandOverrides,
-  brandTokensFor,
-  findBrandPreset,
-  findTemplate,
-  listSceneTypes,
-  overridesToTokens,
-  safeParseTemplate,
-  setBrandCta,
-  setBrandPreset,
-  setBrandToken,
-  setEndScreen,
-  setWatermark,
-  templateFromDoc,
-  tokenByColor,
-  validateTemplate,
-  type Template,
-  addMarker,
-  deleteMarker,
-  duplicateTrack,
-  expandSelectionToGroups,
-  groupItems,
-  nextMarkerFrame,
-  removeTrack,
-  replaceAsset,
-  setMarker,
-  setTrackProperty,
-  ungroupItems,
-  DEFAULT_LOUDNESS_LUFS,
-  FADE_SHAPES,
-  MIN_VOLUME_DB,
-  cropCss,
+  cutRange,
   dbToGain,
+  deleteCue,
+  deleteItems,
+  deleteKeyframe,
+  deleteMarker,
+  deleteScene,
+  detectBeats,
+  devanagariToLatin,
+  deviceForAspect,
   duckEnvelope,
-  estimateMixPeak,
-  fadeGain,
-  freezeFrame,
-  gainToDb,
-  itemGainAt,
-  setCrop,
-  setDucking,
-  setItemAudio,
-  setMasterAudio,
-  setPlaybackRate,
-  suggestedMasterVolume,
-  EFFECTS,
-  EFFECT_PRESETS,
-  addEffect,
-  applyEffectPreset,
-  applyEffects,
+  duplicateItems,
+  duplicateScene,
+  duplicateTrack,
   effectParamPath,
   effectsCost,
-  findEffectPreset,
-  listEffects,
-  maskCss,
-  removeEffect,
-  reorderEffects,
-  requireEffect,
-  setEffectParam,
-  setMask,
-  setKeyframeEasing,
-  resolveItemValue,
-  sampleKeyframes,
-  scaleKeyframes,
-  type Keyframe,
-  addScene,
-  deleteScene,
-  duplicateScene,
-  isSceneCustomEdited,
-  itemEndFrame,
-  missingRequiredSlots,
-  reorderScenes,
-  repairScenes,
-  requireSceneType,
-  setSceneDuration,
-  setSceneSlot,
-  validateSceneIntegrity,
-  EXPORT_PRESETS,
-  VALIDATION_RULE_LIST,
+  estimateAiCost,
   estimateExportBytes,
-  preflight,
-  requireExportPreset,
-  IDENTITY_ANIMATION,
-  addAnimation,
-  animationsMaxScale,
-  applyAnimationPreset,
-  applyAutoFit,
-  clampTransitionFrames,
-  composeAnimations,
-  getAnimation,
-  getAnimationPreset,
-  getEasingFunction,
-  listAnimations,
-  listTransitions,
-  parseCubicBezier,
-  reorderAnimations,
-  requireAnimation,
-  setAnimationParam,
-  setTransition,
-  transitionOutputAt,
-  copyItems,
-  createItem,
+  estimateMixPeak,
+  estimateWords,
+  expandSelectionToGroups,
+  fadeGain,
+  findBrandPreset,
+  findEffectPreset,
+  findOrphans,
+  findTemplate,
   fontFaceCss,
   fontFamilyCss,
-  isScaleUnchanged,
-  mergeFonts,
-  missingFonts,
-  parseTimecode,
-  setItemsProperty,
-  setProjectFps,
-  setProjectSize,
-  cutRange,
-  deleteItems,
-  duplicateItems,
-  isStructuralOp,
-  keepRange,
-  moveItems,
-  pasteItems,
-  rippleDeleteItems,
   formatBytes,
+  formatSubtitles,
+  frameGeometry,
   framesToSeconds,
   framesToTimecode,
+  freezeFrame,
+  gainToDb,
+  getAnimation,
+  getAnimationPreset,
   getByPath,
-  libraryTags,
-  listAssetKinds,
+  getEasingFunction,
+  groupItems,
+  hasDevanagari,
+  isLowConfidence,
+  isScaleUnchanged,
+  isSceneCustomEdited,
+  isStructuralOp,
+  isTemporaryKey,
   isValidDimension,
-  LIBRARY_TABS,
+  itemEndFrame,
+  itemGainAt,
+  itemsNeedingVoice,
+  keepRange,
+  libraryTags,
+  listAnimations,
+  listAssetKinds,
+  listCaptionStyles,
+  listEffects,
+  listSceneTypes,
+  listTransitions,
+  maskCss,
+  maxEffectiveScale,
+  mergeCuesOp as mergeCuesInItem,
+  mergeFonts,
   migrateDoc,
+  missingFonts,
+  missingRequiredSlots,
+  mockAiProvider,
   moveItem,
+  moveItems,
+  moveKeyframe,
+  nearestBeatFrame,
+  nextMarkerFrame,
   normalizeDimension,
+  overridesToTokens,
+  parseCubicBezier,
+  parseSubtitles,
+  parseTimecode,
+  parseTimestamp,
+  pasteItems,
+  planCleanup,
+  preflight,
   pruneSelection,
   recomputeDuration,
-  replaceDoc,
+  referencedAssetIds,
+  removeEffect,
+  removeFillers,
+  removeTrack,
+  reorderAnimations,
+  reorderEffects,
+  reorderScenes,
   reorderTracks,
+  repairScenes,
+  replaceAsset,
+  replaceDoc,
+  requireAnimation,
+  requireCaptionStyle,
+  requireDevice,
+  requireEffect,
+  requireExportPreset,
+  requireSceneType,
+  requireTtsProvider,
+  requireVoiceCategory,
+  requiredSourcePixels,
+  resetRegistries,
   resolutionName,
+  resolveItemValue,
   resolveSize,
+  rippleDeleteItems,
   safeParseDoc,
-  Sha256,
-  sha256Hex,
-  sha256HexFromStream,
+  safeParseTemplate,
+  sampleKeyframes,
+  scaleKeyframes,
+  sceneTypesForPrompt,
   secondsToFrames,
   selectByTrack,
   selectRange,
+  setAnimationParam,
+  setBrandCta,
+  setBrandPreset,
+  setBrandToken,
   setByPath,
+  setCaptionStyle,
+  setCrop,
+  setCue,
+  setCues,
+  setDucking,
+  setEffectParam,
+  setEndScreen,
   setIdFactory,
+  setItemAudio,
   setItemProperty,
+  setItemsProperty,
+  setKeyframeEasing,
+  setMarker,
+  setMask,
+  setMasterAudio,
+  setMockup,
+  setPlaybackRate,
+  setProjectFps,
   setProjectProperty,
+  setProjectSize,
+  setSceneDuration,
+  setSceneSlot,
+  setTrackProperty,
+  setTransition,
+  setWatermark,
+  sha256Hex,
+  sha256HexFromStream,
   snapFrame,
+  snapItemsToBeats,
+  speechTrimRange,
+  splitAtFrame,
+  splitCueAt,
   splitItemAtFrame,
+  storageKey,
   suggestFit,
+  suggestedMasterVolume,
+  syllableWeight,
+  syncDurationToVoice,
+  templateFromDoc,
+  tokenByColor,
   trackAccepts,
+  transitionOutputAt,
   trimItemEnd,
   trimItemStart,
+  trimItemToSourceRange,
+  ttsCacheKey,
+  type AIProvider,
+  type AiScript,
+  type AssetInfo,
+  type CaptionCue,
+  type CaptionWord,
   type Doc,
   type Item,
+  type Keyframe,
+  type Template,
+  ungroupItems,
+  validateAssetQuality,
+  validateExportSettings,
+  validateProjectQuality,
+  validateSceneIntegrity,
+  validateTemplate,
+  visibleTaps,
+  voiceFrames,
+  voiceIdFor,
+  wrapLines,
+  zoomPanKeyframes,
 } from "../src/index";
 
 // ------------------------------------------------------------- mini runner
@@ -702,6 +722,71 @@ test("bina version ke doc reject hota hai", () => {
   const { version: _drop, ...noVersion } = doc as unknown as Record<string, unknown>;
   throws(() => migrateDoc(noVersion), /valid "version" nahi/, "missing version");
   throws(() => migrateDoc("kuch bhi"), /object hona chahiye/, "non-object");
+});
+
+/**
+ * Purane save hue doc me wo fields hote hi nahi jo baad ke phases me judi.
+ *
+ * Ye test ek asli chot se aaya: DB me Phase 5 ka save kiya hua project Phase 24
+ * ke baad khulna hi band ho gaya, kyunki item me `mask` nahi tha aur schema use
+ * zaroori maanta tha. `SCHEMA_VERSION` tab bhi 1 hi tha, isliye migration chain
+ * ko chalne ka mauka hi nahi mila — bachav ki ekmatra jagah field ka default hai.
+ *
+ * Isliye har baad me judi field yahan se guzarti hai: field hatao, doc phir bhi
+ * khule. Naya optional field jodte waqt uska naam is list me daal do.
+ */
+test("audio source me baad me judi fields ke bina bhi doc khulta hai", () => {
+  /*
+   * `providerId` aur `categoryId` Phase 22 me judi. Unse purane har save me ye
+   * fields hain hi nahi — aur bina default ke wo saare docs parse par gir jaate.
+   * Ye theek wahi chot hai jo `mask` ne di thi; is baar pehle se rok di gayi.
+   */
+  const { doc } = buildFixture();
+  const raw = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  for (const item of raw.items as Record<string, unknown>[]) {
+    const audio = item.audio as Record<string, unknown> | undefined;
+    const source = audio?.source as Record<string, unknown> | undefined;
+    if (!source) continue;
+    delete source.providerId;
+    delete source.categoryId;
+  }
+  const migrated = migrateDoc(raw);
+  assert.equal(migrated.items.length, doc.items.length);
+});
+
+test("baad me judi fields ke bina purana doc phir bhi khulta hai", () => {
+  const { doc } = buildFixture();
+  // Ye wahi naam hain jo v1 ke pehle save hue docs me nahi the.
+  const laterFields = [
+    "mask",
+    "blendMode",
+    "mockup",
+    "subtitle",
+    "groupId",
+    "sourceDurationFrames",
+  ] as const;
+
+  for (const field of laterFields) {
+    const raw = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+    for (const item of raw.items as Record<string, unknown>[]) delete item[field];
+    const migrated = migrateDoc(raw);
+    assert.equal(
+      migrated.items.length,
+      doc.items.length,
+      `"${field}" hatane par doc khulna band ho gaya`,
+    );
+  }
+
+  // Aur sab ek saath gayab — asli purana doc aisa hi dikhta hai.
+  const old = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  for (const item of old.items as Record<string, unknown>[]) {
+    for (const field of laterFields) delete item[field];
+  }
+  const migrated = migrateDoc(old);
+  assert.equal(migrated.items[0]?.mask, null, "mask ka default null hona chahiye");
+  assert.equal(migrated.items[0]?.blendMode, "normal");
+  assert.equal(migrated.items[0]?.mockup, null);
+  assert.equal(migrated.items[0]?.groupId, null);
 });
 
 section("timeline ops (1.11)");
@@ -5540,6 +5625,7 @@ test("setMockup lagata aur hataata dono hai", () => {
     mockup: {
       deviceId: "phone-tall",
       colorId: "graphite",
+      taps: [],
       widthPercent: 60,
       shadow: true,
       glare: false,
@@ -5570,6 +5656,7 @@ test("mockup ka tilt hadd me rehta hai", () => {
     mockup: {
       deviceId: "phone-tall",
       colorId: "graphite",
+      taps: [],
       widthPercent: 60,
       shadow: true,
       glare: false,
@@ -7391,6 +7478,741 @@ test("locked clip par source-range trim saaf mana karta hai", () => {
     () => trimItemToSourceRange(locked, { itemId: item.id, startSeconds: 0, endSeconds: 1 }),
     /locked/,
   );
+});
+
+// ------------------------------------------------------------------- TTS
+
+section("key aur lifecycle ka mel (storage)");
+
+/*
+ * Ye test ek asli chot se aaya, aur chot bilkul wahi thi jiske khilaaf
+ * `storageKey` ka apna doc-comment chetavni deta hai: **upload ek key par gaya
+ * aur DB me doosri likhi gayi.**
+ *
+ * TTS ki awaaz `temp/tts/…` par chadhi, par row me `permanent/assets/…` likha
+ * gaya. Uske teen nateeje the, aur teeno chup-chaap:
+ *   1. asset kabhi play nahi hoti — URL us key se banta hai jo file hai hi nahi;
+ *   2. cleanup us permanent path ko dhoondhta hai, use nahi milta, aur wo maan
+ *      leta hai ki kaam ho gaya;
+ *   3. asli `temp/` wali file hamesha ke liye padi rehti hai.
+ *
+ * Isliye ab ye jodi **jaanchi** jaati hai, bharose par nahi chhodi jaati.
+ */
+
+test("temporary asset ki key temp/ me honi chahiye", () => {
+  assertKeyMatchesLifecycle("temp/tts/abc.wav", "temporary");
+  throws(
+    () => assertKeyMatchesLifecycle("permanent/assets/abc.wav", "temporary"),
+    /temporary/i,
+    "permanent key par temporary lifecycle",
+  );
+});
+
+test("permanent asset ki key permanent/ me honi chahiye", () => {
+  assertKeyMatchesLifecycle("permanent/assets/abc.png", "permanent");
+  throws(
+    () => assertKeyMatchesLifecycle("temp/tts/abc.wav", "permanent"),
+    /permanent/i,
+    "temp key par permanent lifecycle",
+  );
+});
+
+test("storageKey.tts() sach me temp/ me deta hai", () => {
+  const key = storageKey.tts("abc");
+  assert.ok(isTemporaryKey(key), `tts key temp/ me honi chahiye, mili: ${key}`);
+  assertKeyMatchesLifecycle(key, "temporary");
+});
+
+section("voice ki lambai se clip ki lambai (22.11)");
+
+/*
+ * Yahan ek hi faisla hai aur wo poore feature ka dil hai: **upar ki taraf
+ * round karo, neeche nahi.**
+ *
+ * `secondsToFrames()` `Math.round` karta hai, jo aam timing ke liye theek hai.
+ * Par awaaz par wo galat hai: 2.004 second ki voice 30fps par 60 frame ban
+ * jaayegi, aur aakhri 0.004 second — yaani aakhri akshar ka poonchh — kat
+ * jaayega. Wo katna sunai deta hai ("…rakhe" ki jagah "…rakh"), par dikhta
+ * kahin nahi. Isliye voice hamesha upar chadhti hai: ek frame ki khaali jagah
+ * kisi ko pata nahi chalti, ek kata hua shabd sabko chalta hai.
+ */
+
+test("voiceFrames upar ki taraf round karta hai", () => {
+  assert.equal(voiceFrames(2, 30), 60, "poore second par bilkul theek");
+  assert.equal(voiceFrames(2.004, 30), 61, "zara sa upar bhi ek poora frame maangta hai");
+  assert.equal(voiceFrames(2.99, 30), 90);
+  assert.equal(voiceFrames(0.5, 30), 15);
+});
+
+test("voiceFrames aur secondsToFrames ka farak sach me dikhta hai", () => {
+  // Yahi wo jagah hai jahan aam helper voice ko kaat deta.
+  assert.equal(secondsToFrames(2.004, 30), 60);
+  assert.equal(voiceFrames(2.004, 30), 61);
+});
+
+test("voiceFrames kam se kam 1 frame deta hai", () => {
+  assert.equal(voiceFrames(0, 30), 1, "0 frame wali clip kabhi dikhti hi nahi");
+  assert.equal(voiceFrames(0.001, 30), 1);
+});
+
+test("voiceFrames galat input par saaf error", () => {
+  throws(() => voiceFrames(-1, 30), /lambai/i, "negative lambai");
+  throws(() => voiceFrames(NaN, 30), /lambai/i, "NaN");
+});
+
+section("AI ka kharcha (21.11)");
+
+/*
+ * Yahan ek hi baat sabse zaroori hai: **rate pata na ho to number mat dikhao.**
+ *
+ * Kharche ka andaaza laga kar dikhana sabse aasan hota — ek default rate rakh do
+ * aur roz ka "₹12.40" chhap do. Par wo number kisi naap se nahi aata, aur user
+ * usi ke bharose plan banata hai. Jis din asli bill uska teen guna aata hai, us
+ * din ye number sirf galat nahi hota — wo dhokha nikalta hai.
+ *
+ * `null` ka matlab "pata nahi" hai, aur wo har jhoothe number se behtar hai.
+ */
+
+test("rate na ho to kharcha null hai — 0 nahi", () => {
+  const usage = { inputTokens: 1000, outputTokens: 500 };
+  assert.equal(estimateAiCost(usage, {}), null, "khaali rates par null");
+  assert.equal(
+    estimateAiCost(usage, { "koi-aur-model": { inputPerMillion: 1, outputPerMillion: 2 } }, "gemini-x"),
+    null,
+    "doosre model ka rate is model par nahi lagta",
+  );
+});
+
+test("rate ho to kharcha theek ginn'ta hai", () => {
+  const cost = estimateAiCost(
+    { inputTokens: 1_000_000, outputTokens: 500_000 },
+    { "m": { inputPerMillion: 10, outputPerMillion: 40 } },
+    "m",
+  );
+  // 1M input @10 = 10, 0.5M output @40 = 20 → 30
+  assert.equal(cost, 30);
+});
+
+test("aadhe tokens par bhi theek ganit", () => {
+  const cost = estimateAiCost(
+    { inputTokens: 250_000, outputTokens: 100_000 },
+    { "m": { inputPerMillion: 8, outputPerMillion: 24 } },
+    "m",
+  );
+  // 0.25 * 8 = 2, 0.1 * 24 = 2.4 → 4.4
+  assert.ok(Math.abs((cost ?? 0) - 4.4) < 1e-9, `mila ${cost}`);
+});
+
+test("token null hon to kharcha null — 0 maan lena jhooth hai", () => {
+  /*
+   * Provider kabhi-kabhi token count bhejta hi nahi. Use 0 maan lena matlab
+   * "is call ka kharcha kuch nahi hua" likhna — jo bilkul galat hai.
+   */
+  const rates = { "m": { inputPerMillion: 10, outputPerMillion: 40 } };
+  assert.equal(estimateAiCost({ inputTokens: null, outputTokens: 500 }, rates, "m"), null);
+  assert.equal(estimateAiCost({ inputTokens: 500, outputTokens: null }, rates, "m"), null);
+});
+
+test("0 token wali call ka kharcha 0 hai (null nahi)", () => {
+  // Ye alag baat hai: yahan naap **hai**, aur wo 0 hai.
+  const rates = { "m": { inputPerMillion: 10, outputPerMillion: 40 } };
+  assert.equal(estimateAiCost({ inputTokens: 0, outputTokens: 0 }, rates, "m"), 0);
+});
+
+section("tap indicator (18.11)");
+
+/*
+ * Tap ka nishaan ek hi sawaal ka jawab hai: "is frame par kaunsa tap, kitna
+ * phaila hua dikhna chahiye?"
+ *
+ * Do cheezein galat ho sakti hain aur dono chup-chaap:
+ *   - tap **dikhta hi na ho** (window ka hisaab galat) — render me kuch nahi
+ *     aata aur wajah kahin nahi likhi hoti;
+ *   - tap **hamesha dikhta rahe** (window band hi na ho) — poori reel par ek
+ *     jamma hua gola chipka rehta hai.
+ */
+
+test("tap apne frame par shuru hota hai", () => {
+  const taps = [{ frame: 30, x: 0.5, y: 0.5 }];
+  const live = visibleTaps(taps, 30, 30);
+  assert.equal(live.length, 1);
+  assert.equal(live[0]?.progress, 0, "shuru me progress 0");
+});
+
+test("tap beech me aadha phaila hota hai", () => {
+  const taps = [{ frame: 30, x: 0.5, y: 0.5 }];
+  // Default window 0.4s = 12 frame @30fps; aadha = 6 frame baad.
+  const live = visibleTaps(taps, 36, 30);
+  assert.equal(live.length, 1);
+  assert.ok(
+    Math.abs((live[0]?.progress ?? 0) - 0.5) < 0.01,
+    `aadhe raaste par progress ~0.5 honi chahiye, mili ${live[0]?.progress}`,
+  );
+});
+
+test("window khatam hone par tap gayab ho jaata hai", () => {
+  const taps = [{ frame: 30, x: 0.5, y: 0.5 }];
+  assert.deepEqual(visibleTaps(taps, 45, 30), [], "12 frame ke baad kuch nahi bachna chahiye");
+});
+
+test("tap se pehle kuch nahi dikhta", () => {
+  const taps = [{ frame: 30, x: 0.5, y: 0.5 }];
+  assert.deepEqual(visibleTaps(taps, 29, 30), []);
+});
+
+test("do tap ek saath bhi dikh sakte hain", () => {
+  const taps = [
+    { frame: 30, x: 0.2, y: 0.2 },
+    { frame: 34, x: 0.8, y: 0.8 },
+  ];
+  const live = visibleTaps(taps, 36, 30);
+  assert.equal(live.length, 2, "dono ki window abhi khuli hai");
+});
+
+test("fps badalne par window utne hi second ki rehti hai", () => {
+  const taps = [{ frame: 60, x: 0.5, y: 0.5 }];
+  // 60fps par 0.4s = 24 frame. 12 frame baad aadha hona chahiye, khatam nahi.
+  const live = visibleTaps(taps, 72, 60);
+  assert.equal(live.length, 1, "60fps par 12 frame baad tap abhi zinda hona chahiye");
+  assert.deepEqual(visibleTaps(taps, 85, 60), [], "24 frame ke baad khatam");
+});
+
+test("tap ki jagah 0..1 me clamp hoti hai", () => {
+  const live = visibleTaps([{ frame: 0, x: 2, y: -1 }], 0, 30);
+  assert.equal(live[0]?.x, 1, "1 se bada x screen ke bahar chala jaata");
+  assert.equal(live[0]?.y, 0);
+});
+
+section("batch generate — kise voice chahiye (22.12)");
+
+/*
+ * Batch ka poora sawaal ek hi hai: **kis-kis par kaam baaki hai?** Us list ka
+ * galat hona do tarah se mehnga hai:
+ *   - zyada items → wo awaazein dobara banti hain jo pehle se theek hain (paisa)
+ *   - kam items  → user "sab bana do" dabata hai aur kuch scene chup reh jaate hain,
+ *     aur wo baat export ke baad hi pata chalti hai
+ */
+
+/** Chhota helper — item par voice wala source laga do. */
+function withVoice(
+  item: Item,
+  source: { text: string; generatedAssetId?: string | null; generatedFromText?: string; mode?: string },
+): Item {
+  return {
+    ...item,
+    audio: {
+      ...item.audio,
+      source: {
+        mode: (source.mode ?? "generate") as never,
+        text: source.text,
+        providerId: "",
+        categoryId: "male",
+        voiceId: "",
+        rate: 1,
+        pitch: 0,
+        uploadedAssetId: null,
+        generatedAssetId: source.generatedAssetId ?? null,
+        primary: "generated",
+        generatedFromText: source.generatedFromText ?? "",
+        cleanup: { enabled: {}, params: {}, order: [] },
+      },
+    },
+  } as Item;
+}
+
+test("bina awaaz wale text par kaam baaki hai", () => {
+  const { doc } = buildFixture();
+  const next = { ...doc, items: [withVoice(doc.items[0] as Item, { text: "kaise ho" })] };
+  const pending = itemsNeedingVoice(next as never);
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0]?.text, "kaise ho");
+});
+
+test("jo awaaz ban chuki hai wo dobara nahi banti", () => {
+  const { doc } = buildFixture();
+  const next = {
+    ...doc,
+    items: [
+      withVoice(doc.items[0] as Item, {
+        text: "kaise ho",
+        generatedAssetId: "as_voice",
+        generatedFromText: "kaise ho",
+      }),
+    ],
+  };
+  assert.deepEqual(itemsNeedingVoice(next as never), [], "pehle se theek hai — chhodo");
+});
+
+test("text badal gaya ho to wo dobara banti hai (22.10 wali purani voice)", () => {
+  const { doc } = buildFixture();
+  const next = {
+    ...doc,
+    items: [
+      withVoice(doc.items[0] as Item, {
+        text: "ab kaise ho",
+        generatedAssetId: "as_voice",
+        generatedFromText: "kaise ho",
+      }),
+    ],
+  };
+  const pending = itemsNeedingVoice(next as never);
+  assert.equal(pending.length, 1, "purani voice wali item batch me aani chahiye");
+  assert.equal(pending[0]?.text, "ab kaise ho");
+});
+
+test("khaali text kabhi batch me nahi aata", () => {
+  const { doc } = buildFixture();
+  const next = { ...doc, items: [withVoice(doc.items[0] as Item, { text: "   " })] };
+  assert.deepEqual(itemsNeedingVoice(next as never), [], "khaali text par awaaz banti hi nahi");
+});
+
+test("sirf upload wale item batch me nahi aate", () => {
+  const { doc } = buildFixture();
+  const next = {
+    ...doc,
+    items: [withVoice(doc.items[0] as Item, { text: "kaise ho", mode: "upload" })],
+  };
+  assert.deepEqual(itemsNeedingVoice(next as never), [], "upload mode me generate ka matlab hi nahi");
+});
+
+test("bina source wale items chhoot jaate hain", () => {
+  const { doc } = buildFixture();
+  assert.deepEqual(itemsNeedingVoice(doc), [], "jinpar voice ka form hi nahi khula, wo batch me nahi");
+});
+
+section("syncDurationToVoice (22.11)");
+
+test("scene wali item par poora scene lamba hota hai", () => {
+  const { doc } = buildFixture();
+  const withScene = addScene(doc, {
+    typeId: "image",
+    slots: { image: doc.items[0]?.assetId ?? "as_x" },
+  });
+  const scene = withScene.scenes[0];
+  assert.ok(scene, "scene banna chahiye");
+
+  const item = withScene.items.find((it) => it.sceneId === scene.id);
+  assert.ok(item, "scene ka item milna chahiye");
+
+  const next = syncDurationToVoice(withScene, {
+    itemId: (item as { id: string }).id,
+    durationInFrames: 200,
+  });
+  const span = next.items
+    .filter((it) => it.sceneId === scene.id)
+    .reduce((acc, it) => Math.max(acc, it.startFrame + it.durationInFrames), 0);
+  const start = Math.min(
+    ...next.items.filter((it) => it.sceneId === scene.id).map((it) => it.startFrame),
+  );
+  assert.equal(span - start, 200, "scene ki poori lambai voice ke barabar honi chahiye");
+});
+
+test("bina scene wali item par sirf wahi item lambi hoti hai", () => {
+  const { doc } = buildFixture();
+  const item = doc.items[0];
+  assert.ok(item);
+  const id = (item as { id: string }).id;
+
+  const next = syncDurationToVoice(doc, { itemId: id, durationInFrames: 123 });
+  const after = next.items.find((it) => it.id === id);
+  assert.equal(after?.durationInFrames, 123);
+  // Baaki items ko haath nahi lagna chahiye.
+  assert.equal(next.items.length, doc.items.length);
+});
+
+test("anjaan item par saaf error", () => {
+  const { doc } = buildFixture();
+  throws(
+    () => syncDurationToVoice(doc, { itemId: "it_hai-hi-nahi", durationInFrames: 60 }),
+    /nahi mila/i,
+    "anjaan item",
+  );
+});
+
+test("0 ya negative lambai par saaf error", () => {
+  const { doc } = buildFixture();
+  const id = (doc.items[0] as { id: string }).id;
+  throws(
+    () => syncDurationToVoice(doc, { itemId: id, durationInFrames: 0 }),
+    /kam se kam/i,
+    "0 frame",
+  );
+});
+
+section("TTS cache key (22.x — wahi awaaz dobara nahi banwani)");
+
+/*
+ * Cache ka poora matlab ek hi sawaal me hai: "ye bilkul wahi maang hai jo pehle
+ * aa chuki hai?" Agar key zara si bhi dagmagayi to do me se ek nuksaan hota hai —
+ * ya to har baar naya API call jaata hai (paisa), ya do alag maangon ko ek maan
+ * kar galat awaaz lauta di jaati hai (usse bura kuch nahi).
+ */
+
+test("wahi maang par wahi key aati hai", () => {
+  const req = { providerId: "gemini", voiceId: "Kore", text: "Mera naam Nitish hai" };
+  assert.equal(ttsCacheKey(req), ttsCacheKey({ ...req }));
+});
+
+test("key 64 akshar ki hex hai (sha256)", () => {
+  const key = ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "kaise ho" });
+  assert.match(key, /^[0-9a-f]{64}$/);
+});
+
+test("text ka bekaar whitespace key nahi badalta", () => {
+  const a = ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "kaise ho" });
+  const b = ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "  kaise   ho  " });
+  const c = ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "kaise\nho" });
+  assert.equal(a, b, "aage-peeche ki jagah se key badalni nahi chahiye");
+  assert.equal(a, c, "beech ka newline bhi wahi ek space hai");
+});
+
+test("text badalne par key badalti hai", () => {
+  const a = ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "kaise ho" });
+  const b = ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "kaise hai" });
+  assert.notEqual(a, b);
+});
+
+test("voice ya provider badalne par key badalti hai", () => {
+  const base = { voiceId: "Kore", text: "kaise ho" };
+  const g = ttsCacheKey({ ...base, providerId: "gemini" });
+  const e = ttsCacheKey({ ...base, providerId: "edge" });
+  const other = ttsCacheKey({ providerId: "gemini", voiceId: "Puck", text: "kaise ho" });
+  assert.notEqual(g, e, "provider badla to awaaz bhi badlegi");
+  assert.notEqual(g, other, "voice badli to awaaz bhi badlegi");
+});
+
+test("rate aur pitch bhi key ka hissa hain", () => {
+  const base = { providerId: "gemini", voiceId: "Kore", text: "kaise ho" };
+  assert.notEqual(ttsCacheKey(base), ttsCacheKey({ ...base, rate: 1.2 }));
+  assert.notEqual(ttsCacheKey(base), ttsCacheKey({ ...base, pitch: 2 }));
+});
+
+test("default rate/pitch aur unka saaf likha hua roop ek hi key dete hain", () => {
+  const base = { providerId: "gemini", voiceId: "Kore", text: "kaise ho" };
+  assert.equal(ttsCacheKey(base), ttsCacheKey({ ...base, rate: 1, pitch: 0 }));
+});
+
+test("float ka kachra cache miss nahi karata", () => {
+  /*
+   * `0.1 + 0.2` JavaScript me 0.30000000000000004 hota hai. Slider se aaya hua
+   * yahi number agar seedha key me chala jaaye to wo kabhi cache hit nahi karega —
+   * har baar naya API call, aur wajah kabhi dikhegi nahi.
+   */
+  const base = { providerId: "gemini", voiceId: "Kore", text: "kaise ho" };
+  assert.equal(
+    ttsCacheKey({ ...base, rate: 0.1 + 0.2 }),
+    ttsCacheKey({ ...base, rate: 0.3 }),
+  );
+});
+
+test("khaali text par saaf error", () => {
+  throws(
+    () => ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text: "   " }),
+    /khaali/i,
+    "khaali text",
+  );
+});
+
+test("key upload ke checksum se alag duniya me rehti hai", () => {
+  /*
+   * Dono ek hi column me baithte hain. Agar TTS ki key kisi file ke sha256 ke
+   * barabar ho jaaye to upload ka dedup ek TTS asset lauta dega. Isliye hash se
+   * pehle ek namespace lagta hai — aur ye test usi ki nigrani karta hai.
+   */
+  const text = "kaise ho";
+  const plain = sha256Hex(new TextEncoder().encode(text));
+  assert.notEqual(ttsCacheKey({ providerId: "gemini", voiceId: "Kore", text }), plain);
+});
+
+section("TTS providers aur voice categories (22.x)");
+
+test("har provider ki entry poori hai", () => {
+  assert.ok(TTS_PROVIDERS.length >= 2, "kam se kam do provider hone chahiye");
+  for (const p of TTS_PROVIDERS) {
+    assert.ok(p.id, "id chahiye");
+    assert.ok(p.label, `${p.id}: label chahiye`);
+    assert.ok(p.hint, `${p.id}: hint chahiye`);
+    assert.ok(["cloud", "local", "manual"].includes(p.kind), `${p.id}: kind galat`);
+    if (p.needsApiKey) assert.ok(p.envKey, `${p.id}: key chahiye to envKey bhi likho`);
+  }
+});
+
+test("provider id ek hi baar aata hai", () => {
+  const ids = TTS_PROVIDERS.map((p) => p.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test("gemini cloud hai aur key maangta hai — ye chhupana nahi chahiye", () => {
+  const gemini = requireTtsProvider("gemini");
+  assert.equal(gemini.kind, "cloud");
+  assert.equal(gemini.needsApiKey, true);
+  assert.equal(gemini.envKey, "GEMINI_API_KEY");
+});
+
+test("anjaan provider par saaf error", () => {
+  throws(() => requireTtsProvider("koi-aur"), /nahi mila/i, "anjaan provider");
+});
+
+test("har voice category har cloud provider ke liye ek voice deti hai", () => {
+  assert.ok(VOICE_CATEGORIES.length >= 4, "male/female/bacche — kam se kam chaar");
+  for (const c of VOICE_CATEGORIES) {
+    assert.ok(c.id && c.label && c.hint, `${c.id}: adhoori entry`);
+    for (const p of TTS_PROVIDERS) {
+      if (p.kind === "manual") continue;
+      assert.ok(
+        c.providerVoices[p.id],
+        `category "${c.id}" ke paas provider "${p.id}" ki koi voice nahi — dropdown me wo khaali dikhega`,
+      );
+    }
+  }
+});
+
+test("category id ek hi baar aati hai", () => {
+  const ids = VOICE_CATEGORIES.map((c) => c.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test("category se provider ki asli voice id milti hai", () => {
+  const male = requireVoiceCategory("male");
+  assert.equal(voiceIdFor(male, "gemini"), male.providerVoices.gemini);
+  throws(() => requireVoiceCategory("kuch-bhi"), /nahi mili/i, "anjaan category");
+});
+
+
+/* -------------------------------------------------- scene ka primary item (12.11) */
+
+test("scene ka primary wahi hai jo screen par dikhta hai — awaaz nahi", () => {
+  /*
+   * `image_audio` scene: tasveer + awaaz + caption. Yahi wo haalat hai jiske
+   * dar se 12.11 itne din ruka tha — agar animation caption ya awaaz par lag
+   * jaye to user ko lagta hai kuch hua hi nahi.
+   */
+  const doc = addScene(createEmptyProject({ name: "Primary" }), {
+    typeId: "image_audio",
+    slots: { image: "as_image_1", audio: "as_audio_1", caption: "Namaste" },
+  });
+  const scene = doc.scenes[0]!;
+  const primary = primarySceneItem(doc, scene.id);
+  assert.ok(primary, "primary milna chahiye");
+  assert.equal(primary.type, "image", "tasveer hi primary hai, awaaz/caption nahi");
+});
+
+test("sirf text wale scene me text hi primary hai", () => {
+  const doc = addScene(createEmptyProject({ name: "Primary" }), {
+    typeId: "text",
+    slots: { text: "Sirf ek line" },
+  });
+  const primary = primarySceneItem(doc, doc.scenes[0]!.id);
+  assert.ok(primary);
+  assert.equal(primary.type, "text");
+});
+
+test("kram scene ke itemIds se aata hai, timeline ke kram se nahi", () => {
+  /*
+   * ⚠️ Ye test us galti ko rokta hai jo sabse aasan hai: `doc.items` me se pehla
+   * scene wala item utha lena. Timeline par clip khiskane se `doc.items` ka kram
+   * badal jaata hai — aur tab primary bhi chup-chaap badal jaata, jabki user ne
+   * sirf ek clip sarkayi thi.
+   */
+  const doc = addScene(createEmptyProject({ name: "Primary" }), {
+    typeId: "image_audio",
+    slots: { image: "as_i", audio: "as_a", caption: "Hi" },
+  });
+  const scene = doc.scenes[0]!;
+  const before = primarySceneItem(doc, scene.id);
+
+  // doc.items ko ulta kar do — scene.itemIds waisa hi rehta hai.
+  const flipped = { ...doc, items: [...doc.items].reverse() };
+  const after = primarySceneItem(flipped, scene.id);
+  assert.equal(after?.id, before?.id, "timeline ka kram primary nahi badalta");
+});
+
+test("jis scene me dikhne layak kuch nahi, wahan primary null hai", () => {
+  // Sirf awaaz — animate karne layak kuch hai hi nahi, aur `null` hi sach hai.
+  const doc = addScene(createEmptyProject({ name: "Primary" }), {
+    typeId: "audio",
+    slots: { audio: "as_only_audio" },
+  });
+  const scene = doc.scenes[0]!;
+  const primary = primarySceneItem(doc, scene.id);
+  assert.equal(primary, null, "0 nahi, khaali nahi — null");
+});
+
+test("anjaan scene id par primary null (throw nahi)", () => {
+  const doc = addScene(createEmptyProject({ name: "Primary" }), {
+    typeId: "image",
+    slots: { image: "as_x" },
+  });
+  assert.equal(primarySceneItem(doc, "sc_kuch-bhi"), null);
+});
+
+
+/* ------------------------------------------------ fonts.json ki shakl (17.13) */
+
+test("fonts.json dono shakl me chalti hai — list bhi, { fonts: [] } bhi", () => {
+  /*
+   * ⚠️ Ye ek asli jaal se aaya test. Loader pehle sirf `{ fonts: [...] }` maanta
+   * tha, jabki likha sirf itna tha ki "ek entry jodo" — aur seedha padhne par
+   * aadmi list likhta hai. Nateeja: file theek, JSON theek, koi error nahi, aur
+   * font dropdown me kabhi aata hi nahi.
+   */
+  const entry = {
+    id: "Poppins",
+    label: "Poppins",
+    fallback: "sans-serif",
+    files: [{ file: "poppins-700.woff2", weight: 700, style: "normal" }],
+    weights: [700],
+  };
+
+  const asList = parseFontsJson([entry]);
+  const asObject = parseFontsJson({ fonts: [entry] });
+  assert.deepEqual(asList, asObject, "dono shakl ka jawab ek hi hona chahiye");
+  assert.equal(asList?.length, 1);
+  assert.equal(asList?.[0]?.id, "Poppins");
+});
+
+test("samajh na aane wali shakl par null — khaali list nahi", () => {
+  /*
+   * `null` aur `[]` ka farak yahan asli hai: `[]` matlab "file thi aur usme koi
+   * font nahi", `null` matlab "file thi par uski shakl hi galat hai". Doosri
+   * halat me user ko batana zaroori hai, warna wahi ghante wali dhoondh shuru
+   * hoti hai.
+   */
+  assert.equal(parseFontsJson({ kuch: "aur" }), null);
+  assert.equal(parseFontsJson("string"), null);
+  assert.equal(parseFontsJson(null), null);
+  assert.deepEqual(parseFontsJson([]), []);
+});
+
+test("aadhi bhari entry chhoot jaati hai, poori file nahi", () => {
+  const out = parseFontsJson([
+    { label: "bina id" },
+    { id: "Theek", label: "Theek hai" },
+    { id: "bina-label" },
+  ]);
+  assert.equal(out?.length, 1, "sirf poori entry aani chahiye");
+  assert.equal(out?.[0]?.id, "Theek");
+  // Chhoote hue khaane bhar diye jaate hain taaki UI ko `undefined` na mile.
+  assert.equal(out?.[0]?.fallback, "sans-serif");
+  assert.deepEqual(out?.[0]?.weights, [400]);
+});
+
+
+/* ---------------------------------------- asset ko timeline par daalna (16.3) */
+
+section("asset drop ka faisla (16.3)");
+
+function trackOf(type: string, extra: Partial<{ locked: boolean; name: string }> = {}) {
+  return {
+    id: `tr_${type}`,
+    type,
+    name: extra.name ?? type,
+    locked: extra.locked ?? false,
+  };
+}
+
+test("sahi jodi par item type registry se aata hai", () => {
+  const image = planAssetDrop({ assetKind: "image", track: trackOf("image") });
+  assert.deepEqual(image, { ok: true, itemType: "image" });
+
+  const audio = planAssetDrop({ assetKind: "audio", track: trackOf("audio") });
+  assert.deepEqual(audio, { ok: true, itemType: "audio" });
+});
+
+test("galat jodi par mana, aur wajah me agla kadam bhi hota hai", () => {
+  /*
+   * ⚠️ Yahi 16.3 ka asli maqsad hai. Sirf `false` lauta dena kaafi nahi —
+   * "yahan nahi ja sakta" padh kar user wahi koshish dobara karta hai. Message
+   * me ye bhi hona chahiye ki **kahan** chhode.
+   */
+  const plan = planAssetDrop({ assetKind: "audio", track: trackOf("video", { name: "Video 1" }) });
+  assert.equal(plan.ok, false);
+  if (plan.ok) throw new Error("nahi hona chahiye tha");
+  assert.match(plan.reason, /nahi rakh sakte/i);
+  assert.match(plan.reason, /track par chhodo/i, "agla kadam bhi likha hona chahiye");
+});
+
+test("locked track par pehle hi ruk jaata hai", () => {
+  const plan = planAssetDrop({
+    assetKind: "image",
+    track: trackOf("image", { locked: true, name: "Bandh" }),
+  });
+  assert.equal(plan.ok, false);
+  if (plan.ok) throw new Error("nahi hona chahiye tha");
+  assert.match(plan.reason, /locked/i);
+});
+
+test("font timeline par jaata hi nahi — aur ye registry se aata hai", () => {
+  // `itemType: null` registry me likha hai; yahan koi list nahi rakhi gayi.
+  const plan = planAssetDrop({ assetKind: "font", track: trackOf("text") });
+  assert.equal(plan.ok, false);
+  if (plan.ok) throw new Error("nahi hona chahiye tha");
+  assert.match(plan.reason, /text ki setting/i);
+});
+
+test("anjaan asset kind par saaf mana — chup-chaap true nahi", () => {
+  const plan = planAssetDrop({ assetKind: "kuch-bhi", track: trackOf("video") });
+  assert.equal(plan.ok, false);
+});
+
+test("firstTrackFor locked aur galat track chhod kar sahi wala chunta hai", () => {
+  const tracks = [
+    trackOf("audio", { name: "Awaaz" }),
+    trackOf("image", { name: "Bandh tasveer", locked: true }),
+    trackOf("image", { name: "Tasveer" }),
+  ] as never;
+
+  const forImage = firstTrackFor(tracks, "image");
+  assert.equal(forImage?.name, "Tasveer", "locked wala chhod kar agla");
+
+  const forAudio = firstTrackFor(tracks, "audio");
+  assert.equal(forAudio?.name, "Awaaz");
+
+  assert.equal(firstTrackFor(tracks, "font"), null, "font ke liye koi track nahi");
+});
+
+
+/* ------------------------------------- upload kiye hue font (17.13 / brand) */
+
+test("font asset se family ka naam file se aata hai", () => {
+  assert.equal(fontFamilyForFile("Poppins-Bold.woff2"), "Poppins-Bold");
+  assert.equal(fontFamilyForFile("/fonts/Noto Sans.ttf"), "Noto Sans");
+  // Bina extension wali file bhi chalti hai — DB me kabhi bhi kuch bhi ho sakta hai.
+  assert.equal(fontFamilyForFile("kuch"), "kuch");
+  assert.equal(fontFamilyForFile(""), "Font");
+});
+
+test("upload wale font ka @font-face poora URL rakhta hai — basePath nahi chipkta", () => {
+  /*
+   * ⚠️ Yahi wo galti hai jo chup-chaap chalti: `basePath + url` se src
+   * `"/fonts/https://…"` ban jaata hai, browser file dhoondhta hai, milti nahi,
+   * aur fallback lag jaata hai — na error, na warning.
+   */
+  const entry = fontEntryForAsset({
+    id: "as_1",
+    filename: "Poppins-Bold.woff2",
+    src: "https://cdn.example.com/x/Poppins-Bold.woff2",
+  });
+  const css = fontFaceCss([entry]);
+  assert.match(css, /url\("https:\/\/cdn\.example\.com\/x\/Poppins-Bold\.woff2"\)/);
+  assert.equal(css.includes("/fonts/https"), false, "basePath dobara nahi lagna chahiye");
+  assert.match(css, /format\("woff2"\)/);
+  assert.match(css, /font-family: Poppins-Bold/);
+});
+
+test("publicDir wali file par basePath ab bhi lagta hai", () => {
+  const entry = fontEntryForAsset({ id: "as_2", filename: "Local.ttf", src: "Local.ttf" });
+  const css = fontFaceCss([entry]);
+  assert.match(css, /url\("\/fonts\/Local\.ttf"\)/);
+  assert.match(css, /format\("truetype"\)/);
+});
+
+test("weight file ke naam se andaaza nahi lagaya jaata", () => {
+  // "Bold" dekh kar 700 maan lena `Semibold` par galat hota, aur wo galti
+  // chup-chaap chalti — text thoda mota, aur wajah kahin nahi.
+  const entry = fontEntryForAsset({ id: "as_3", filename: "Poppins-Bold.woff2", src: "x.woff2" });
+  assert.equal(entry.files[0]?.weight, 400);
+  assert.deepEqual(entry.weights, [400]);
 });
 
 console.log(JSON.stringify(sample, null, 2));

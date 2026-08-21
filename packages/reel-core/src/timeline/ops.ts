@@ -2916,6 +2916,57 @@ export const setSceneDuration = defineOp<SetSceneDurationArgs>(
   },
 );
 
+export interface SyncDurationToVoiceArgs {
+  /** Wo item jispar voice lagi hai. */
+  itemId: string;
+  /** Voice ki lambai frames me — `voiceFrames()` se nikali hui. */
+  durationInFrames: number;
+}
+
+/**
+ * Voice ki lambai se clip/scene ki lambai (22.11).
+ *
+ * ⚠️ **Do alag halat hain aur dono ka jawab alag hai**, isliye ye ek hi op me
+ * hai — warna har caller ko yaad rakhna padta ki kis case me kaunsa op bulana
+ * hai, aur ek din koi bhool jaata.
+ *
+ *  - Item kisi **scene** ka hissa hai → poore scene ki lambai badalti hai. Yahi
+ *    sahi hai: scene me tasveer aur caption bhi hain, aur agar sirf awaaz lambi
+ *    ho jaaye to baaki sab pehle khatam ho kar kaala frame chhod dete hain.
+ *  - Item **akela** hai (seedha timeline par) → sirf uski apni lambai badalti hai.
+ *    Yahan scene hai hi nahi, isliye kuch aur chhoona galat hoga.
+ *
+ * ⚠️ Lambai hamesha `voiceFrames()` se aani chahiye (upar ki taraf round), aam
+ * `secondsToFrames()` se nahi — warna awaaz ka aakhri akshar kat jaata hai.
+ * Wo katna sunai deta hai par dikhta kahin nahi.
+ */
+export const syncDurationToVoice = defineOp<SyncDurationToVoiceArgs>(
+  "syncDurationToVoice",
+  (draft, args) => {
+    const next = Math.round(args.durationInFrames);
+    if (!Number.isFinite(next) || next < 1) {
+      throw new TimelineOpError(
+        `Voice ki lambai kam se kam 1 frame honi chahiye (mili: ${args.durationInFrames})`,
+      );
+    }
+
+    const item = draft.items.find((entry) => entry.id === args.itemId);
+    if (!item) throw new TimelineOpError(`Item "${args.itemId}" nahi mila`);
+
+    if (item.sceneId) {
+      setSceneDuration.recipe(draft, {
+        sceneId: item.sceneId,
+        durationInFrames: next,
+        proportional: false,
+      });
+      return;
+    }
+
+    item.durationInFrames = next;
+    recomputeDuration.recipe(draft, undefined as never);
+  },
+);
+
 export interface SetSceneSlotArgs {
   sceneId: string;
   slotId: string;
@@ -3612,6 +3663,7 @@ export const OPS = {
   duplicateScene,
   deleteScene,
   setSceneDuration,
+  syncDurationToVoice,
   setSceneSlot,
   repairScenes,
   addTrack,

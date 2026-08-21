@@ -682,6 +682,15 @@ async function measureColor(
    * usi item par honi chahiye jispar effect laga hai.
    */
   colorBand: { from: number; to: number } = { from: 0, to: 1 },
+  /**
+   * `roundedCorners` ka radius. `insideLuma` isi se tay hota hai.
+   *
+   * ⚠️ Pehle wo bindu **(150,150)** par jama hua tha — 1080x1920 ke hisaab se
+   * theek, par 16:9 par wo vignette ke andhere kone me gir jaata tha. Tab kona
+   * 0.3 aur "andar" 0.0 nikalta, aur check fail hota — jabki gol kona MP4 me
+   * saaf dikh raha hota. Naap galat thi, render nahi.
+   */
+  cornerRadius: number = 96,
 ): Promise<{ colorSpread: number; centerLuma: number; cornerLuma: number; insideLuma: number }> {
   const rawPath = resolve(scratchDir, `rgb-${randomUUID()}.rgb`);
   await run(ffmpegPath(), [
@@ -739,8 +748,16 @@ async function measureColor(
     colorSpread: spread / count,
     centerLuma: box(Math.floor(width / 2), Math.floor(height / 2)),
     cornerLuma: box(14, 14),
-    // Gol kone ki curve ke **andar** ka bindu — 96px radius par (150,150) andar hai.
-    insideLuma: box(150, 150),
+    /*
+     * Curve ke aage ka bindu — **usi upari patti me**, sirf daayein sarka hua.
+     *
+     * ⚠️ Ek hi row par rehna hi is naap ki jaan hai. Vignette kinaron ko gehra
+     * karta hai, aur wo gehrapan kone se andar ki taraf badhta hai. Tirchha
+     * (diagonal) bindu lene par dono cheezein ek saath badalti hain — kona bhi
+     * kala, "andar" bhi kala — aur check kuch bhi saabit nahi kar paata. Ek hi
+     * row par rehne se sirf ek cheez badalti hai: kona kata hua hai ya nahi.
+     */
+    insideLuma: box(cornerRadius * 2 + 40, 14),
   };
 }
 
@@ -1262,12 +1279,15 @@ async function main(): Promise<void> {
    * bindu se milaya jaata hai — wo dono ek jaise honge to radius laga hi nahi.
    */
   const videoItem = sample.videoItem;
+  const cornerRadius = 96; // sample doc me `roundedCorners` ka radius — neeche 2R+40 par naapa jaata hai
   const videoCorner = await measureColor(
     finalOut,
     framesToSeconds(videoItem.startFrame + Math.round(videoItem.durationInFrames * 0.2), fps),
     width,
     height,
     scratchDir,
+    { from: 0, to: 1 },
+    cornerRadius,
   );
   check(
     "rounded corners — kona kata hua hai (andar se kaafi gehra)",

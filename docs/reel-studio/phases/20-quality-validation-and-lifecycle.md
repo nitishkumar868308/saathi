@@ -49,11 +49,13 @@
         function dobara chalata hai (job ka doc jama hua hota hai aur us beech me asset
         delete/expire ho sakti hai).
 - [x] 20.8 Validation panel: grouped issues, "Dikhao", aur jahan mumkin "Theek karo".
+      → **browser me khola (2026-08-21):** saaf project par panel ne likha — "Koi dikkat
+        nahi mili. Yahi jaanch export ke waqt bhi chalti hai — wahan preset ka tier bhi
+        ginti me aata hai (Strict me chetavni bhi rokti hai)."
       → `ValidationPanel.tsx` (naya "Quality" tab). Auto-fix **sirf wahan** hai jahan ek hi
         sahi jawab ho (upscale, source-shorter, beyond-duration, zero-duration, clipping).
         "Asset gayab hai" par button nahi — do jawab ho sakte hain, aur galat auto-fix se koi
         fix na hona behtar hai.
-      → **browser me nahi dekha.**
 - [x] 20.9 4K ki imaandaari: render time + file size, aur "4K se quality nahi badhegi".
       → `no-gain-from-4k` rule — aur wo **info** hai, warning nahi. User 4K jaan-boojhkar
         chun sakta hai; use "galti" batana galat hoga, use **sach** batana zaroori hai.
@@ -77,12 +79,46 @@
       → Phase 11 se hi hai (`finally` me scratch dir hat'ti hai, failure par bhi).
 - [x] 20.13 Storage usage: permanent/temporary, top 10, free-tier warning.
       → `cleanup.ts` ka pehla section. 80% par saaf chetavni.
-      → **Chalaya nahi** — DB chahiye.
+      → **Chalaya (2026-08-21)** — asli DB par: permanent **10 file / 8.8 MB**, temporary
+        **11 file / 10.6 MB**, kul **19.3 MB** aur "R2 free tier ka 0.2% (10 GB me se)",
+        saath me sabse badi 10 files ki list. Yahi numbers admin ke Reel Studio tab me bhi
+        aate hain — dono ek hi jagah se.
 - [x] 20.14 Test: 480p + missing asset + clipping + missing font; 4K par warnings, Strict par block.
       → `npm run validate:demo` — 11 checks. Asli output neeche.
-- [ ] 20.15 Cleanup test: temp asset banao, expire karo, dry-run, phir `--apply`.
-      → **Nahi chalaya** — `worker/.env` (Supabase) nahi hai. Faisla wala poora hissa test se
-        pakka hai (8 test), par R2 se file sach me gayi — ye naapa nahi gaya.
+- [x] 20.15 Cleanup test: temp asset banao, expire karo, dry-run, phir `--apply`.
+      → **poora chalaya (2026-08-20).** Ek asli temporary asset banaya —
+      `temp/tts/cleanup-test-20-15.wav` (4 KB disk par) + `reel_assets` me row jiska
+      `lifecycle: temporary` aur `expires_at` kal ka (yaani expire ho chuki).
+
+      **dry-run** (`npm run cleanup`):
+      ```
+      2. expire ho chuki temporary assets (20.10)
+        expire ho chuki : 1
+        mitane layak    : 1
+        bachi (kisi project me hain) : 0
+          mitegi cleanup-test-20-15.wav (4.0 KB)
+        khaali hogi: 4.0 KB (plan: 4.0 KB)
+      Ye sirf dikhawa tha. Sach me mitane ke liye --apply do.
+      ```
+      Aur is dry-run ke baad file **disk par waise ki waisi thi** — jaanch kar dekha.
+
+      **`--apply`**:
+      ```
+          mitayi cleanup-test-20-15.wav
+        khaali hui: 4.0 KB (plan: 4.0 KB)
+      ```
+      Uske baad `render-out/media/temp/tts/` **khaali** hai aur DB me wo row bhi nahi
+      bachi. Yaani dono taraf (storage + DB) saaf hui, aur permanent wali 10 assets ko
+      haath tak nahi laga.
+
+      ⚠️ **Is test ne ek asli bug pakda.** `npm run cleanup` shuru hi nahi ho pa raha tha:
+      `DbError: GET /reel_assets?select=id,key,… → column reel_assets.key does not exist`.
+      Column ka naam DB me `r2_key` hai (`reel-studio.sql:120`); `key` sirf app ki taraf
+      ka naam hai (`studio/lib/assets.ts` me `key: row.r2_key`). Script seedha `key`
+      maang rahi thi. Ab PostgREST ka alias `key:r2_key` lagta hai, taaki script ke neeche
+      ke saare `asset.key` waise ke waise rahein.
+      (Bilkul yahi galti worker ke render path me bhi thi — 11.7 dekho.)
+
 - [x] 20.16 `npm run typecheck` clean + check script me assertions.
 - [x] 20.17 Commit.
 
@@ -171,7 +207,6 @@ bhi anadekha kar diya jaata.
 
 | Kya | Kyun ruka |
 |---|---|
-| 20.15 cleanup ka asli chalna | `worker/.env` (Supabase) nahi hai. Faisla (`planCleanup`) ke 8 test pass hain; R2 se file sach me gayi — wo naapa nahi gaya. |
 | 20.8 / 20.9 ka browser wala hissa | `studio/.env.local` nahi hai → dev server nahi chalta |
 | Text overflow ka rule | Text ki asli chaudai naapne ke liye font metrics chahiye, jo core me nahi hain (wahan DOM nahi hai). Ye Phase 6 ke safe-area guides se aankh se dikhta hai. |
 | Codec ka rule | `probeAsset()` codec deta hai par abhi wo `assetMeta` tak nahi pahunchta. Rule ka jhoola (`AssetInfo.codec`) bana hua hai. |
@@ -189,4 +224,4 @@ nahi bolta, aur temp files safe tarike se saaf hote hain.
 
 | Kab | Kya hua |
 |---|---|
-| 2026-08-20 | 20.1–20.14, 20.16, 20.17 done; 20.15 env par ruka. Purana `preflight()` naye registry me migrate hua (do list nahi). Ek asli bug pakda gaya: `estimateMixPeak()` image items ko bhi gin raha tha, isliye bina awaaz wali reel par bhi clipping ki jhoothi chetavni aati thi. Naye scripts: `validate:demo` (11/11) aur `cleanup` (dry-run default). |
+| 2026-08-20 | **Poora phase done — 20.15 bhi.** `worker/.env` maujood hai, cleanup dry-run aur `--apply` dono chalaye gaye (asli expired temp asset par: dry-run ne chhua nahi, `--apply` ne storage file + DB row dono mitaye). Ek asli bug bhi nikla — script `reel_assets.key` maang rahi thi jabki column `r2_key` hai; ab alias lagta hai. Baaki: 20.1–20.14, 20.16, 20.17. Purana `preflight()` naye registry me migrate hua (do list nahi). Ek asli bug pakda gaya: `estimateMixPeak()` image items ko bhi gin raha tha, isliye bina awaaz wali reel par bhi clipping ki jhoothi chetavni aati thi. Naye scripts: `validate:demo` (11/11) aur `cleanup` (dry-run default). |

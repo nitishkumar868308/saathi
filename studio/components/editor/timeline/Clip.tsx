@@ -123,6 +123,14 @@ export function Clip({
 
       <button
         type="button"
+        /*
+         * ⚠️ Global 44px wale niyam se bahar (globals.css dekho). Clip ka naap
+         * doc se aata hai — 6 frame ki clip 12px chaudi hi honi chahiye. Use
+         * ungli ke hisaab se bada kar dena timeline ko jhootha bana deta hai:
+         * dikhne me clip lambi hoti aur asli video chhoti. Chhoti clip pakadne
+         * ka sahi ilaaj zoom hai.
+         */
+        data-touch-exempt=""
         title={clipTooltip(item, fps)}
         aria-label={clipLabel(item)}
         aria-pressed={selected}
@@ -141,7 +149,10 @@ export function Clip({
           if (event.detail === 0) onKeyboardSelect(item);
         }}
         className={clsx(
-          "absolute inset-0 cursor-grab text-left active:cursor-grabbing",
+          // ⚠️ `touch-none` — phone par ungli rakhte hi browser page scroll
+          // karne lagta hai aur pointermove aana band ho jaata hai, yaani clip
+          // hilti hi nahi. Maus par ye kabhi nahi dikhta.
+          "absolute inset-0 cursor-grab touch-none text-left active:cursor-grabbing",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-chalk-100",
         )}
       >
@@ -202,7 +213,7 @@ function TrimHandle({
       aria-label={side === "start" ? "Shuruaat trim" : "Ant trim"}
       onPointerDown={onPointerDown}
       className={clsx(
-        "absolute inset-y-0 cursor-ew-resize bg-chalk-100/0 transition-colors hover:bg-chalk-100/30",
+        "absolute inset-y-0 cursor-ew-resize touch-none bg-chalk-100/0 transition-colors hover:bg-chalk-100/30",
         side === "start" ? "left-0" : "right-0",
       )}
       style={{ width: TRIM_HANDLE_PX }}

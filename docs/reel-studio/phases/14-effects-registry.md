@@ -54,14 +54,17 @@ apply hon. Kisi item component ke andar effect hardcode karna mana hai.
       → `MaskSchema` + `config/mask.ts`. feather 0 par `clip-path`, feather par `mask-image`
         gradients (`mask-composite: intersect`, warna kone tez rehte hain).
       → `assetId` (image mask) schema me hai, UI me **koi button nahi**.
-      → **browser me nahi dekha** — feather ka narm kinara aankh se hi tay hota hai.
+      → **panel browser me dekha (2026-08-21):** chuni hui image clip ke properties me
+        MASK wala hissa maujood hai. Feather ka narm kinara ab bhi aankh se hi tay hota hai.
 - [x] 14.10 Overlays: blend mode (`normal, multiply, screen, overlay`).
+      → **browser me dekha (2026-08-21):** blend mode ka dropdown asli options ke saath —
+        `normal / multiply / screen / overlay`.
       → `blendMode` item par; `Transformed` "normal" ke alawa hi likhta hai (normal likhna bhi
         browser ko naya stacking context banwa deta hai).
-      → **browser me nahi dekha.**
-- [x] 14.11 UI: Effects section — add dropdown (registry se), har effect ka card, reorder, eye toggle.
+- [x] 14.11 UI: Effects section — add dropdown (registry se), har effect ka apna form,
+      → **browser me dekha (2026-08-21):** "Effect jodo…" dropdown registry se bharta hai —
+        Blur, Brightness, Contrast, Saturation, Black & white, Sepia, Hue shift.
       → `EffectsSection.tsx` — Effects + Mask + Blend. Reorder teeron se (drag baaki).
-      → **browser me nahi dekha.**
 - [x] 14.12 Naya effect add karke `git diff --stat` se prove karo ki sirf 1–2 file lagi.
       → Neeche asli output.
 - [x] 14.13 Test: render karke frames dikhao, preview vs render compare.

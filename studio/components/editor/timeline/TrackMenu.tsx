@@ -212,7 +212,9 @@ export function TrackOpacity({ track }: { track: Track }) {
           { label: "Track opacity", coalesceKey: `track-opacity:${track.id}` },
         )
       }
-      className="h-1 w-10 shrink-0 accent-terracotta"
+      // Ungli wale device par patti chaudi — 40px ki lakeer par 5% ka farak
+      // rakhna namumkin hai; oonchai global niyam se aati hai (globals.css).
+      className="h-1 w-10 shrink-0 accent-terracotta [@media(pointer:coarse)]:w-28"
     />
   );
 }

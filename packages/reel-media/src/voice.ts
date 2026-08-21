@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import { ffmpegPath, run } from "./ffmpeg";
 import { measureEbur128 } from "./loudness";
+import { getTtsAdapter, type RawSpeech } from "./tts/providers";
 
 /**
  * Voice: TTS + cleanup (22.4 / 22.6 / 22.7 / 22.8).
@@ -135,6 +136,81 @@ export interface GenerateSpeechResult {
  * Do kadam: edge-tts se mp3, phir ek hi baar 48kHz WAV me. edge-tts seedha WAV
  * nahi deta — ye uski hadd hai. Par uske baad hum lossy me wapas nahi jaate.
  */
+export interface SynthesizeOptions {
+  /** `TTS_PROVIDERS` ka id — "gemini", "edge", … */
+  providerId: string;
+  voiceId: string;
+  text: string;
+  rate?: number;
+  pitch?: number;
+  outPath: string;
+  scratchDir: string;
+  /** Voice category ka andaaz — Gemini jaison ko shabdon me batana padta hai. */
+  stylePrompt?: string;
+}
+
+/**
+ * Kisi bhi provider se awaaz — aur uske baad **hamesha** wahi ek raasta.
+ *
+ * ⚠️ Ye function isliye hai ki "final audio 48kHz stereo WAV hoga" wala niyam
+ * kisi ek provider ke bhool jaane par toot na sake. Adapter ka kaam sirf kacchi
+ * file dena hai; rate, channels aur lambai naapna yahan hota hai — ek jagah,
+ * sab ke liye.
+ */
+export async function synthesize(options: SynthesizeOptions): Promise<GenerateSpeechResult> {
+  const adapter = getTtsAdapter(options.providerId);
+
+  const text = options.text.trim();
+  if (!text) throw new Error("Bolne ke liye kuch to likho — khaali text par awaaz nahi banti.");
+
+  const check = await adapter.available();
+  if (!check.ok) throw new TtsNotAvailable(check.detail);
+
+  let raw: RawSpeech | null = null;
+  try {
+    raw = await adapter.synthesize({
+      voiceId: options.voiceId,
+      text,
+      rate: options.rate ?? 1,
+      pitch: options.pitch ?? 0,
+      scratchDir: options.scratchDir,
+      ...(options.stylePrompt === undefined ? {} : { stylePrompt: options.stylePrompt }),
+    });
+
+    /*
+     * Kaccha PCM apna naap khud nahi batata — wo adapter se aata hai. Bina in
+     * do flags ke ffmpeg apna default maan leta hai aur awaaz galat raftaar par
+     * bajti hai (aur bajti hai, isliye ye galti chup-chaap nikal jaati hai).
+     */
+    const inputArgs = raw.pcm
+      ? ["-f", "s16le", "-ar", String(raw.pcm.sampleRate), "-ac", String(raw.pcm.channels)]
+      : [];
+
+    await run(ffmpegPath(), [
+      "-hide_banner", "-loglevel", "error", "-y",
+      ...inputArgs,
+      "-i", raw.path,
+      "-af", "pan=stereo|c0=c0|c1=c0",
+      "-ar", String(VOICE_TARGET_RATE),
+      "-resampler", "soxr",
+      "-c:a", "pcm_s16le",
+      options.outPath,
+    ]);
+  } finally {
+    if (raw) await rm(raw.path, { force: true });
+  }
+
+  return { outPath: options.outPath, durationSeconds: await measureDuration(options.outPath) };
+}
+
+/** File ki asli lambai — ffmpeg se naapi hui, andaaza nahi. */
+async function measureDuration(path: string): Promise<number> {
+  // `-f null -` — bina output ke ffmpeg exit 1 deta hai, chahe file bilkul theek ho.
+  const { stderr } = await run(ffmpegPath(), ["-hide_banner", "-i", path, "-f", "null", "-"]);
+  const match = /Duration:\s*(\d+):(\d+):([\d.]+)/.exec(stderr);
+  return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : 0;
+}
+
 export async function generateSpeech(
   options: GenerateSpeechOptions,
 ): Promise<GenerateSpeechResult> {

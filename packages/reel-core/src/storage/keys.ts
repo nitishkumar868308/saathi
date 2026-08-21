@@ -116,6 +116,42 @@ export const storageKey = {
   probe: (id: string, ext: string): string => join(KEY_PREFIX.tempProbe, `${id}.${ext}`),
 };
 
+/**
+ * Key aur lifecycle ek doosre se mel khate hain? — warna saaf error.
+ *
+ * ⚠️ Ye function ek asli chot ke baad aaya. TTS ki awaaz `temp/tts/…` par
+ * chadhi thi par uski row me `permanent/assets/…` likha gaya — aur us ek galti
+ * ke teen nateeje the, teeno chup-chaap:
+ *
+ *   1. asset kabhi play nahi hoti, kyunki URL us key se banta hai jo file hai
+ *      hi nahi (aur error "404" hota hai, "galat key" nahi — isliye asli wajah
+ *      kabhi saamne nahi aati);
+ *   2. cleanup us permanent path ko dhoondhta hai, use nahi milta, aur maan
+ *      leta hai ki kaam ho gaya;
+ *   3. asli `temp/` wali file hamesha ke liye padi rehti hai — theek us jagah
+ *      jise saaf karne ke liye poora lifecycle system banaya gaya tha.
+ *
+ * Isliye ab ye jodi bharose par nahi chhodi jaati. Ye upar wale
+ * `storageKey` doc-comment ka hi doosra pehra hai: wo kehta hai "key ek hi
+ * jagah se banao", aur ye jaanchta hai ki jo bani wo sahi duniya me hai.
+ */
+export function assertKeyMatchesLifecycle(key: string, lifecycle: string): void {
+  if (lifecycle === "temporary" && !isTemporaryKey(key)) {
+    throw new InvalidStorageKey(
+      key,
+      `ye asset "temporary" hai par key temp/ me nahi hai. ` +
+        `Cleanup sirf temp/ ko chhoota hai — aisi file kabhi mitegi hi nahi.`,
+    );
+  }
+  if (lifecycle === "permanent" && !isPermanentKey(key)) {
+    throw new InvalidStorageKey(
+      key,
+      `ye asset "permanent" hai par key permanent/ me nahi hai. ` +
+        `User ki apni file temp/ me rakhna matlab ek din cleanup use utha le jaayega.`,
+    );
+  }
+}
+
 /** `temp/` me hai? Cleanup sirf inhe chhoo sakta hai. */
 export function isTemporaryKey(key: string): boolean {
   return key.startsWith("temp/");

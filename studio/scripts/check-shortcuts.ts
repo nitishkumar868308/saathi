@@ -240,6 +240,59 @@ test("remap ek shortcut ko doosre ki key par le jaakar bhi list poori rakhta hai
   assert.ok(keys.includes("mod+alt+shift+f9"));
 });
 
+section("UI ke tooltip registry se hi aate hain (6.4)");
+
+/**
+ * Har jagah jo `shortcutLabel("kuch")` bulati hai, uska id registry me hona
+ * chahiye.
+ *
+ * Ye test ek asli chot se aaya: `TransportBar` frame-step buttons ke liye
+ * `"frame-back"` / `"frame-forward"` maangta tha, par Phase 8 me arrow keys
+ * dohre kaam ki ho gayi aur registry me unka naam `"nudge-back"` /
+ * `"nudge-forward"` ho gaya. `shortcutLabel()` na milne par khaali string deta
+ * hai — isliye kuch toota nahi, bas tooltip se `←` aur `→` **chup-chaap gayab**
+ * ho gaye. Button dikhta bilkul theek tha.
+ *
+ * Chupchaap gayab hona hi sabse buri surat hai: koi error nahi, koi test lal
+ * nahi, sirf ek din user ko pata hi nahi chalta ki arrow key se frame khiskti
+ * hai. Isliye ab rename us din pakda jaayega jis din wo hoga.
+ */
+test("shortcutLabel() jo bhi id maangta hai wo registry me maujood hai", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const ids = new Set(SHORTCUTS.map((entry) => entry.id));
+
+  // Jo file bhi tooltip banati hai, use yahan jodo.
+  const files = [
+    "../components/editor/preview/TransportBar.tsx",
+    "../components/editor/timeline/TimelineView.tsx",
+    "../components/editor/TopBar.tsx",
+  ];
+
+  const missing: string[] = [];
+  let found = 0;
+
+  for (const file of files) {
+    let source: string;
+    try {
+      source = readFileSync(resolve(here, file), "utf8");
+    } catch {
+      continue; // File abhi hai hi nahi — us par test rokna bekaar hai.
+    }
+    for (const match of source.matchAll(/shortcutLabel\(\s*"([^"]+)"\s*\)/g)) {
+      found += 1;
+      const id = match[1] as string;
+      if (!ids.has(id)) missing.push(`${file.split("/").pop()} → "${id}"`);
+    }
+  }
+
+  assert.ok(found > 0, "ek bhi shortcutLabel() call nahi mila — test bekaar ho gaya");
+  assert.deepEqual(
+    missing,
+    [],
+    `ye id registry me nahi hain (tooltip chup-chaap khaali reh jaayega):\n  ${missing.join("\n  ")}`,
+  );
+});
+
 console.log(`\n${"-".repeat(60)}`);
 if (failures.length > 0) {
   console.log(`FAILED: ${failures.length} fail, ${passed} pass`);

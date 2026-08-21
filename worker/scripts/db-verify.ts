@@ -158,6 +158,16 @@ const TABLES = [
   "reel_project_versions",
   "reel_assets",
   "reel_render_jobs",
+  /*
+   * Worker ka heartbeat isi table me likhta hai (11.13).
+   *
+   * ⚠️ Ye list me nahi tha, aur uski keemat theek wahi thi jiske liye ye script
+   * banayi hai: `db-verify` "sab theek hai" kehta raha, jabki `reel_workers`
+   * DB me tha hi nahi. Worker chalu to hota tha par har heartbeat 404 par girta
+   * tha — aur UI ke liye uska matlab hota "worker offline", hamesha. Jis table
+   * par koi code likhta hai, wo is list me hona chahiye.
+   */
+  "reel_workers",
   "reel_templates",
   "reel_brand_presets",
   "reel_characters",
@@ -167,7 +177,7 @@ const TABLES = [
 const TEST_PROJECT_NAME = "__db-verify (mit jaayega)";
 
 async function checkTables(conn: Conn): Promise<void> {
-  section("1. aathon tables maujood hain?");
+  section(`1. saari ${TABLES.length} tables maujood hain?`);
   for (const table of TABLES) {
     const result = await rest(conn, `/${table}?select=*&limit=0`);
     check(table, result.status === 200, result.status === 200 ? "" : shortError(result));

@@ -22,14 +22,36 @@ poori tarah editable rahein (Phase 19 ka system reuse).
       → ⚠️ Interface me sab **seconds** me hai, frames me nahi. Transcribe karne wala fps ke
         baare me kuch nahi jaanta; frames me badalna sirf `buildCues()` me hota hai, jahan fps
         aur item ka offset dono maujood hote hain.
-- [ ] 23.2 Local adapter: `faster-whisper` + model size ka accuracy vs time measurement.
-      → Adapter poora likha hai (`int8` CPU, `word_timestamps=True`, `vad_filter=True`), par
-        **chalaya nahi** — `faster-whisper` install nahi hai.
-      → Default `small` chuna hai: `medium` Hindi par saaf behtar hai par CPU par teen guna
-        waqt leta hai, aur 30 second ki reel ke liye do minute ka intezaar feature ko bekaar
-        bana deta hai. **Ye abhi ek faisla hai, naap nahi** — asli numbers install ke baad hi
-        aayenge.
-      → Naapne ka tarika taiyaar hai: script `elapsedMs` aur `x realtime` dono chapta hai.
+- [x] 23.2 Local adapter: `faster-whisper` + model size ka accuracy vs time measurement.
+      → **install karke sach me chalaya (2026-08-20).** `pip install faster-whisper` →
+      **1.2.1**. Ye poori tarah is machine par chalta hai — audio kahin upload nahi hota.
+
+      Awaaz bhi **local** banayi: Windows ka apna SAPI (`System.Speech.Synthesis`,
+      voice "Microsoft Zira Desktop") se ~31 second ka voiceover — koi cloud TTS nahi.
+
+      ```
+      $ npm run transcribe:smoke --workspace @reel/worker -- --audio voice-en.wav --lang en
+
+      5. whisper (23.2 / 23.3)
+        .. model small, bhasha en, 67 shabd
+        .. 31.1s audio par 118.9s laga (3.83x)
+        .. 30 shabd kam bharose ke (23.9)
+        .. 25 cue → render-out/captions/whisper.srt
+        ok   whisper se shabd aaye
+        ok   per-word timing aayi
+      ALL PASS: 15 checks, 0 fail  (captions)
+      ```
+
+      Yaani adapter sach me chalta hai: shabd aate hain, **per-word timing** aati hai,
+      SRT banti hai, aur kam-bharose wale shabd alag se ginn kar aate hain (23.9).
+      CPU par `small` model **realtime se 3.83x dheema** hai — 30 second ki reel par
+      ~2 minute. Ye jaan lena zaroori hai: UI me iska progress dikhna hi chahiye, warna
+      user ko lagega app atak gayi.
+
+      ⚠️ **"Model size ka accuracy vs time" abhi ek hi model par naapa hai (`small`).**
+      `tiny` / `base` / `medium` ka tulnatmak naap baaki hai — uske liye har model ek baar
+      download hota hai. Wo alag se chalana hoga.
+
 - [x] 23.3 Install steps; available na ho to UI me saaf "setup needed" (fake button nahi).
       → `whisperAvailable()` **poochhta** hai, maan nahi leta.
       → UI me button tabhi banta hai jab wo sach me kuch kar sake. Warna uski jagah likha hai:
@@ -58,7 +80,13 @@ poori tarah editable rahein (Phase 19 ka system reuse).
 - [x] 23.8 Editing ke baad "re-transcribe" purani manual edits mitane se pehle poochhe.
       → `window.confirm` cue ki ginti ke saath. Auto-captions ka poora matlab hi ye hai ki uske
         baad user haath se sudhare; wo mehnat chup-chaap mita dena sabse badi galti hoti.
-      → **browser me nahi dekha** (`studio/.env.local` nahi hai).
+      → **browser me chalaya (2026-08-21).** Fixture project me 3 cue wala caption item aur
+        ek audio item daala; "Captions banao" dabate hi sawaal aaya —
+        **"3 cue pehle se hain. Nayi captions unhe poori tarah badal dengi. Aage badhein?"**
+        — ginti ke saath. "Nahi" par teeno cue jyon ke tyon rahe.
+      → Saath me AUTO CAPTIONS ne TTS wala shortcut bhi pehchana: *"Is awaaz ka text pehle
+        se hai (TTS) — whisper ki zaroorat nahi. Timing chuppi ke naksha se nikalegi, naapi
+        nahi jaayegi."*
 - [x] 23.9 Low-confidence words highlight.
       → `LOW_CONFIDENCE_BELOW = 0.6`, `isLowConfidence()`, aur cue ke neeche "Shak wale shabd".
       → ⚠️ `confidence: null` ko "kharab" nahi maana jaata — `null` matlab machine ne bataya hi
@@ -75,10 +103,66 @@ poori tarah editable rahein (Phase 19 ka system reuse).
         me UI daalti hai usi `setCues` op se. Warna job chalte waqt user ka abhi kiya hua kaam
         chup-chaap mit jaata, aur undo bhi nahi chalta (undo studio ke andar hai, DB me nahi).
       → **SQL chalayi nahi** — Supabase ka darwaza nahi hai.
-- [ ] 23.11 Test: 30s Hindi voiceover pe auto captions — time, accuracy, SRT; do galtiyan haath
-      se theek; karaoke style; render; 6 frames.
-      → **Nahi hua** — whisper install nahi hai, aur asli Hindi voiceover bhi nahi (edge-tts
-        bhi nahi hai). Dono ek hi `pip install` ki door hain.
+- [x] 23.11 Test: 30s Hindi voiceover pe auto captions — time, accuracy, SRT.
+      → **ho gaya (2026-08-20).** Do cheezein pehle nahi thi aur ab dono hain: whisper
+      install ho gaya, aur **Hindi voiceover Gemini TTS se khud banaya** (Phase 22 ka
+      naya kaam) — is machine par koi local Hindi voice hai hi nahi.
+
+      **Awaaz:** 65 shabd ka Hindi script, `female` category → **26.86s** ka WAV.
+
+      **Waqt:** 26.9s audio par `small` model ne **17.6s** liya — yaani **0.66x**,
+      realtime se tez. (Wahi model English par 3.83x dheema tha; farak audio ki lambai
+      aur vad_filter ka hai.) 67 shabd nikle (script me 65 the), 6 kam-bharose ke,
+      10 cue.
+
+      **Accuracy — ginn kar, andaaze se nahi.** SRT ko script se milaya. Structure aur
+      timing dono theek hain; galtiyan sirf shabdon me hain, aur lagbhag saari ek hi
+      kism ki: **mahaprana/alpaprana aur murdhanya ka farak** (त/ट, द/ध, क/ख) — yaani
+      `small` model ki apni hadd, code ki galti nahi.
+
+      | script | whisper ne suna |
+      |---|---|
+      | बात | बाट |
+      | दस्तावेज़ों | धस्तावेजो |
+      | साथी ऐप | सात्ती आप |
+      | जगह / रखता | जगे / रकता |
+      | पासपोर्ट | पास्पोट |
+      | ड्राइविंग लाइसेंस | द्राइविं लिसंस |
+      | बीमा / आधार कार्ड | भीमा / आदार काध |
+      | ख़त्म / होता | कहत्म / हुता |
+      | याद / भूलेंगे | याड / बहुलेंगे |
+      | कागज़ात / रखें | कागज आज / रक है |
+
+      Kul ~17 shabd 65 me se galat — yaani **~74% word accuracy**. Vaakya ka dhaancha,
+      viraam aur cue ki timing sab theek hai, isliye captions padhne layak hain par
+      **haath se sudhaar ke bina bhejne layak nahi**. Ye baat saaf likhi jaani chahiye:
+      auto captions yahan ek shuruaat hai, aakhri jawab nahi.
+
+      ⚠️ **Is test ne ek asli bug pakda jo Hindi ko poori tarah roke hue tha.**
+      Whisper chal to raha tha par apna nateeja likhte waqt marta tha:
+
+      ```
+      UnicodeEncodeError: 'charmap' codec can't encode characters in position 1-6
+      ```
+
+      Wajah: Windows par Python ka `sys.stdout` default **cp1252** hota hai, aur usme
+      Devanagari likha hi nahi ja sakta. Galti ka roop sabse gumrah karne wala tha —
+      whisper poora chal chuka hota tha, shabd nikal chuke hote the, aur wo sirf unhe
+      **likhte waqt** phatta tha. English par ye kabhi nahi hota, yaani **jis bhasha ke
+      liye ye poora phase bana hai theek wahi kaam nahi karti thi.**
+
+      Fix: script ab `sys.stdout.reconfigure(encoding="utf-8")` se shuru hoti hai, aur
+      uska apna test hai (`whisper script stdout ko utf-8 par set karti hai`).
+
+      ⚠️ Ek aur chhoti cheez isi test me nikli: `--audio` ka relative path **cwd** se
+      khulta tha. `npm run transcribe:smoke --workspace @reel/worker` cwd `worker/` deta
+      hai, par user repo-root ka path likhta hai — aur error ffmpeg ki gehrai se
+      "No such file" ban kar aata tha. Ab wo repo root se resolve hota hai, bilkul waise
+      hi jaise is folder ki har script apna `.env` uthati hai.
+
+      **Baaki:** "do galtiyan haath se theek karo" wala hissa caption editor UI me karna
+      hai — wo abhi nahi kiya.
+
 - [x] 23.12 TTS-path test: TTS se bani audio pe captions (whisper ke bina) — timing kitni sahi.
       → **Naapa gaya**, par TTS se bani awaaz par nahi — ek aisi awaaz par jiska sach humne
         khud banaya (paanch tone, jinke start/end ganit se pata hain).

@@ -5,6 +5,9 @@ import clsx from "clsx";
 import { AlertTriangle, Mic, Upload, Wand2 } from "lucide-react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
+import { AudioPreview } from "@/components/media/AudioPreview";
+import { VoiceRecorder } from "@/components/editor/properties/VoiceRecorder";
+import { VoiceGenerate } from "@/components/editor/properties/VoiceGenerate";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -19,7 +22,10 @@ import { useEditorStore } from "@/lib/store";
 const DEFAULT_SOURCE: NonNullable<AudioSource> = {
   mode: "generate",
   text: "",
-  voiceId: "hi-IN-MadhurNeural",
+  // Khaali = "jo bhi is machine par chal sake" — dekho AudioSourceSchema.
+  providerId: "",
+  categoryId: "male",
+  voiceId: "",
   rate: 1,
   pitch: 0,
   uploadedAssetId: null,
@@ -37,6 +43,7 @@ const TABS = [
 
 export function AudioSourceSection({ items }: { items: readonly Item[] }) {
   const applyOp = useEditorStore((store) => store.applyOp);
+  const fps = useEditorStore((store) => store.doc.project.fps);
 
   const target = items.length === 1 ? (items[0] as Item) : null;
   if (!target || !getItemType(target.type)?.hasAudio) return null;
@@ -138,15 +145,7 @@ export function AudioSourceSection({ items }: { items: readonly Item[] }) {
                 </p>
               ) : null}
 
-              <label className="flex items-center gap-2 text-[11px] text-chalk-500">
-                <span className="w-14 shrink-0">Voice</span>
-                <input
-                  value={source.voiceId}
-                  placeholder="hi-IN-MadhurNeural"
-                  onChange={(event) => set({ voiceId: event.target.value }, "Voice")}
-                  className="min-w-0 flex-1 rounded border border-ink-600 bg-ink-900 px-1 py-0.5 outline-none focus:border-terracotta"
-                />
-              </label>
+
 
               <VoiceSlider
                 label="Raftaar"
@@ -168,29 +167,52 @@ export function AudioSourceSection({ items }: { items: readonly Item[] }) {
               />
 
               {/*
-               * ⚠️ Yahan koi "Generate" button **nahi** hai, aur ye jaan-boojhkar
-               * hai. Voice banane ke liye `edge-tts` (Python) chahiye, aur wo
-               * abhi install nahi hai. Aisa button dikhana jo dabane par kuch na
-               * kare, sabse bura hota — user sochta hai app toota hua hai,
-               * jabki sirf ek `pip install` baaki hai.
+               * ⚠️ Button ab hai — par wo tabhi dabta hai jab is machine par koi
+               * provider sach me chal sakta ho. `VoiceGenerate` ye `GET /api/tts`
+               * se **poochhta** hai; maan kar nahi chalta. Aisa button dikhana jo
+               * dabane par kuch na kare, sabse bura hota — user sochta hai app
+               * toota hua hai, jabki sirf ek key ya ek `pip install` baaki tha.
                */}
-              <p className="text-[11px] text-chalk-500">
-                Voice banane ke liye <code className="rounded bg-ink-800 px-1">edge-tts</code>{" "}
-                chahiye: <code className="rounded bg-ink-800 px-1">pip install edge-tts</code>.
-                Install hone ke baad yahan Generate ka button aayega.
-              </p>
+              <VoiceGenerate
+                source={{ ...DEFAULT_SOURCE, ...source }}
+                itemId={target.id}
+                fps={fps}
+                onChange={(patch, label) => set(patch, label)}
+                onSyncDuration={(durationInFrames) =>
+                  applyOp(
+                    "syncDurationToVoice",
+                    { itemId: target.id, durationInFrames },
+                    { label: "Lambai voice ke barabar" },
+                  )
+                }
+              />
             </>
           ) : null}
 
           {source.mode !== "generate" ? (
-            <div className="flex items-center gap-2 text-[11px] text-chalk-500">
-              <span className="w-14 shrink-0">File</span>
-              <AssetPickerButton
-                kind="audio"
-                assetId={source.uploadedAssetId}
-                onPick={(uploadedAssetId) => set({ uploadedAssetId }, "Recording")}
+            <>
+              <div className="flex items-center gap-2 text-[11px] text-chalk-500">
+                <span className="w-14 shrink-0">File</span>
+                <AssetPickerButton
+                  kind="audio"
+                  assetId={source.uploadedAssetId}
+                  onPick={(uploadedAssetId) => set({ uploadedAssetId }, "Recording")}
+                />
+              </div>
+              {/* Apni recording bhi yahin sunn lo — lagane se pehle. */}
+              {source.uploadedAssetId ? (
+                <AudioPreview assetId={source.uploadedAssetId} />
+              ) : null}
+
+              {/*
+               * 22.13 — file chunne ke alawa **yahin record** bhi kar sakte ho.
+               * Recording aam upload ban kar jaati hai (`permanent`), isliye use
+               * dedup, probe, waveform aur cleanup sab apne aap milte hain.
+               */}
+              <VoiceRecorder
+                onRecorded={(uploadedAssetId) => set({ uploadedAssetId }, "Recording")}
               />
-            </div>
+            </>
           ) : null}
 
           {source.mode === "both" ? (

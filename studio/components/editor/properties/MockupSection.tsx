@@ -11,7 +11,7 @@ import {
   type Item,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Crosshair, Smartphone } from "lucide-react";
+import { AlertTriangle, Crosshair, Hand, Smartphone, Trash2 } from "lucide-react";
 
 import { useAssetDurations } from "@/lib/assetMeta";
 import { useEditorStore } from "@/lib/store";
@@ -28,6 +28,7 @@ import { useEditorStore } from "@/lib/store";
 export function MockupSection({ items }: { items: readonly Item[] }) {
   const doc = useEditorStore((store) => store.doc);
   const applyOp = useEditorStore((store) => store.applyOp);
+  const playheadFrame = useEditorStore((store) => store.playheadFrame);
   const zoomToolOn = useEditorStore((store) => store.zoomToolOn);
   const setZoomToolOn = useEditorStore((store) => store.setZoomToolOn);
   const meta = useAssetDurations(doc.project.fps);
@@ -48,6 +49,8 @@ export function MockupSection({ items }: { items: readonly Item[] }) {
         mockup: {
           deviceId: DEFAULT_DEVICE_ID,
           colorId: "graphite",
+          // Naye mockup par koi tap nahi (18.11) — nishaan user khud jodta hai.
+          taps: [],
           widthPercent: 58,
           shadow: true,
           glare: false,
@@ -254,6 +257,100 @@ export function MockupSection({ items }: { items: readonly Item[] }) {
           </p>
         ) : null}
       </div>
+
+      {/* ------------------------------------------------ tap ke nishaan (18.11) */}
+      {mockup ? (
+        <div className="space-y-1.5 border-t border-ink-800/60 px-3 pb-2 pt-2">
+          <p className="text-[10px] uppercase tracking-wide text-chalk-500">Tap ke nishaan</p>
+
+          <button
+            type="button"
+            onClick={() => {
+              /*
+               * ⚠️ Tap **playhead par** judta hai, aur uska frame item-local hota
+               * hai — clip ke apne start se. Absolute frame likhne par clip
+               * khiskate hi nishaan apni jagah chhod deta, aur wo galti sirf
+               * export dekhne par pakdi jaati.
+               *
+               * Jagah abhi beech me (0.5, 0.5) hai. Screen par chun kar rakhna
+               * Phase 18 ke baad ka kaam hai; beech se shuru karna is se behtar
+               * hai ki tap kahin dikhe hi na.
+               */
+              const local = playheadFrame - target.startFrame;
+              if (local < 0 || local >= target.durationInFrames) return;
+              applyOp(
+                "setMockup",
+                {
+                  itemIds: [target.id],
+                  mockup: { ...mockup, taps: [...mockup.taps, { frame: local, x: 0.5, y: 0.5 }] },
+                },
+                { label: "Tap jodo" },
+              );
+            }}
+            disabled={
+              playheadFrame < target.startFrame ||
+              playheadFrame >= target.startFrame + target.durationInFrames
+            }
+            title={
+              playheadFrame < target.startFrame ||
+              playheadFrame >= target.startFrame + target.durationInFrames
+                ? "Playhead is clip ke bahar hai — tap clip ke andar hi lagta hai"
+                : "Playhead par tap ka nishaan jodo"
+            }
+            className={clsx(
+              "flex w-full items-center justify-center gap-1 rounded border px-2 py-1 text-[11px] transition-colors",
+              playheadFrame >= target.startFrame &&
+                playheadFrame < target.startFrame + target.durationInFrames
+                ? "border-ink-600 text-chalk-400 hover:border-terracotta hover:text-chalk-200"
+                : "cursor-not-allowed border-ink-600 text-chalk-500",
+            )}
+          >
+            <Hand size={11} />
+            Playhead par tap jodo
+          </button>
+
+          {mockup.taps.length === 0 ? (
+            <p className="text-[10px] text-chalk-500">
+              Abhi koi nishaan nahi. Screen recording me ungli kahan padi ye dikhane se
+              achanak badalti screen ko wajah mil jaati hai.
+            </p>
+          ) : (
+            <ul className="space-y-0.5">
+              {mockup.taps.map((tap, index) => (
+                <li
+                  key={`${tap.frame}-${index}`}
+                  className="flex items-center gap-2 text-[10px] text-chalk-400"
+                >
+                  <span className="flex-1 font-mono">
+                    frame {tap.frame} · {Math.round(tap.x * 100)}% / {Math.round(tap.y * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    title="Ye nishaan hatao"
+                    aria-label="Tap hatao"
+                    onClick={() =>
+                      applyOp(
+                        "setMockup",
+                        {
+                          itemIds: [target.id],
+                          mockup: {
+                            ...mockup,
+                            taps: mockup.taps.filter((_, at) => at !== index),
+                          },
+                        },
+                        { label: "Tap hataya" },
+                      )
+                    }
+                    className="shrink-0 rounded p-0.5 text-chalk-500 hover:bg-ink-700 hover:text-amber"
+                  >
+                    <Trash2 size={9} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

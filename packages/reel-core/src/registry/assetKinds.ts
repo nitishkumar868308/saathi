@@ -271,6 +271,19 @@ export const LIBRARY_TABS: readonly LibraryTabEntry[] = [
     tag: "screen-recording",
     appliesTagOnUpload: true,
   },
+  /*
+   * Font — timeline par item nahi banta (`itemType: null`), par library me hona
+   * zaroori hai: upload ka poora raasta yahin se guzarta hai (accept, max size,
+   * lifecycle). Uske baad wo font apne aap font-picker me aa jaata hai.
+   */
+  {
+    id: "fonts",
+    label: "Fonts",
+    icon: "Type",
+    kinds: ["font"],
+    tag: null,
+    appliesTagOnUpload: false,
+  },
 ];
 
 export function getLibraryTab(id: string): LibraryTabEntry | undefined {

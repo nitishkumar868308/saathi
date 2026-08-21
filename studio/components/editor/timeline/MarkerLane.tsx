@@ -4,7 +4,7 @@ import type { Marker } from "@reel/core";
 import { useState } from "react";
 
 import { useEditorStore } from "@/lib/store";
-import { frameToX, xToFrame } from "@/lib/timeline";
+import { MARKER_LANE_HEIGHT, frameToX, xToFrame } from "@/lib/timeline";
 
 /**
  * Markers ki patti (16.8) — ruler ke neeche.
@@ -18,7 +18,9 @@ import { frameToX, xToFrame } from "@/lib/timeline";
  * ki jagah nahi khaane chahiye, sirf dikhne chahiye.
  */
 
-const LANE_HEIGHT = 12;
+// Naap `lib/timeline.ts` se — headers ka spacer bhi wahi jod padhta hai,
+// warna header aur lane dobara khisak jaate hain (wo bug ho chuka hai).
+const LANE_HEIGHT = MARKER_LANE_HEIGHT;
 
 export function MarkerLane({ pxPerFrame, width }: { pxPerFrame: number; width: number }) {
   const markers = useEditorStore((state) => state.doc.markers);

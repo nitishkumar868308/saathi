@@ -85,6 +85,27 @@ function normalizeRotation(degrees: number): number {
   return ((rounded % 360) + 360) % 360;
 }
 
+/**
+ * Ye file ek thehri hui tasveer hai ya chalta hua video?
+ *
+ * ffprobe tasveeron ko `png_pipe` / `mjpeg_pipe` / `webp_pipe` jaise demuxer se
+ * padhta hai, aur un streams ka `r_frame_rate` bina poochhe `25/1` aa jaata hai.
+ * Wo 25 kisi naap se nahi aaya — demuxer ka default hai. Use `fps` me likh dena
+ * DB me ek jhootha number baithane jaisa hai, jo baad me asli naap jaisa dikhta
+ * hai (Section 3A: andaaza kabhi asli number ki jagah nahi baithta).
+ *
+ * Pehchaan ke do saaf ishaare hain, aur dono chahiye — akela koi kaafi nahi:
+ *   - demuxer ka naam `_pipe` par khatam hota hai, aur
+ *   - format me koi `duration` hai hi nahi (tasveer ki lambai hoti hi nahi).
+ * Sirf `duration` par bharosa karna galat hota: kuch webm me duration nahi hota
+ * par wo poora video hote hain.
+ */
+function isStillImage(result: ProbeResult): boolean {
+  const container = result.format.format_name ?? "";
+  const fromPipe = container.split(",").some((name) => name.trim().endsWith("_pipe"));
+  return fromPipe && toNumber(result.format.duration) === null;
+}
+
 export function fromProbeResult(result: ProbeResult): AssetProbeResult {
   const video = videoStream(result);
   const audio = audioStream(result);
@@ -103,7 +124,7 @@ export function fromProbeResult(result: ProbeResult): AssetProbeResult {
     width,
     height,
     durationMs: durationSeconds === null ? null : Math.round(durationSeconds * 1000),
-    fps: video ? parseFrameRate(video.r_frame_rate) : null,
+    fps: video && !isStillImage(result) ? parseFrameRate(video.r_frame_rate) : null,
     sampleRate: toNumber(audio?.sample_rate),
     channels: toNumber(audio?.channels),
     meta: {

@@ -1,4 +1,5 @@
 import {
+  assertKeyMatchesLifecycle,
   assetKindForFile,
   extensionOf,
   storageKey,
@@ -38,6 +39,8 @@ export interface AssetRow {
   lifecycle: AssetLifecycle;
   expires_at: string | null;
   checksum: string | null;
+  /** TTS cache ki key — sirf generate ki hui awaaz par hoti hai. */
+  cache_key: string | null;
   meta: Record<string, unknown>;
   tags: string[];
   created_at: string;
@@ -60,6 +63,8 @@ export interface Asset {
   lifecycle: AssetLifecycle;
   expiresAt: string | null;
   checksum: string | null;
+  /** TTS cache ki key — sirf generate ki hui awaaz par hoti hai. */
+  cacheKey: string | null;
   meta: Record<string, unknown>;
   tags: string[];
   createdAt: string;
@@ -88,6 +93,7 @@ export function toAsset(row: AssetRow): Asset {
     lifecycle: row.lifecycle,
     expiresAt: row.expires_at,
     checksum: row.checksum,
+    cacheKey: row.cache_key ?? null,
     meta,
     tags: row.tags ?? [],
     createdAt: row.created_at,
@@ -151,12 +157,45 @@ export async function findAssetByChecksum(checksum: string): Promise<Asset | nul
   return row ? toAsset(row) : null;
 }
 
+/**
+ * TTS cache ka lookup (22.x).
+ *
+ * ⚠️ Ye `findAssetByChecksum` ka jodidaar hai par **alag** hai, aur alag hona
+ * zaroori hai: `checksum` file ke bytes ka hash hai (upload ka duplicate),
+ * `cache_key` us **maang** ka hash hai jisse file bani (provider+voice+text+
+ * rate+pitch). Dono ek column me daalne par ek din ye sawaal aata hai ki "is
+ * row me jo hash hai wo kis cheez ka hai" — aur uska jawab kahin likha nahi hota.
+ *
+ * `expires_at` ki jaanch yahan **jaan-boojhkar nahi** hai: expire ho chuki par
+ * abhi tak mitayi na gayi file bilkul theek chalti hai, aur use dobara banwana
+ * bekaar ka kharcha hai. Cleanup jab use mitayega tab agli maang par nayi ban
+ * jaayegi.
+ */
+export async function findAssetByCacheKey(cacheKey: string): Promise<Asset | null> {
+  const row = await restOne<AssetRow>(
+    `${TABLE}?cache_key=eq.${encodeURIComponent(cacheKey)}&select=*&order=created_at.desc&limit=1`,
+  );
+  return row ? toAsset(row) : null;
+}
+
 export interface CreateAssetInput {
   id: string;
   filename: string;
   mime: string;
   bytes: number;
   checksum?: string | null;
+  /** TTS cache ki key — sirf generate ki hui awaaz par. */
+  cacheKey?: string | null;
+  /**
+   * Storage me file kahan chadhi — sirf tab do jab wo `permanent/assets/` me
+   * na ho (jaise TTS ki awaaz, jo `temp/tts/` me jaati hai).
+   *
+   * ⚠️ Ise **bharosa nahi kiya jaata** — neeche `assertKeyMatchesLifecycle()`
+   * jaanchta hai ki key aur lifecycle ek hi duniya ke hain. Iske bina wahi chot
+   * dobara hoti hai jisse ye field aaya: file `temp/` par chadhi thi aur row me
+   * `permanent/` likha gaya tha.
+   */
+  key?: string;
   /** Browser ne upload se pehle jo naapa — probe aane tak yahi dikhta hai. */
   width?: number | null;
   height?: number | null;
@@ -182,13 +221,22 @@ export async function createAsset(input: CreateAssetInput): Promise<Asset> {
   }
 
   const lifecycle: AssetLifecycle = input.lifecycle ?? "permanent";
+
+  /*
+   * Key aur lifecycle ka mel yahin, insert se **pehle** jaancha jaata hai.
+   * Baad me pakadne ka koi tarika hai hi nahi: galat jodi wali row bilkul theek
+   * dikhti hai, bas uski file kabhi milti nahi.
+   */
+  const key = input.key ?? assetKey(input.id, input.filename);
+  assertKeyMatchesLifecycle(key, lifecycle);
+
   const row = await restOne<AssetRow>(TABLE, {
     method: "POST",
     prefer: "return=representation",
     body: {
       id: input.id,
       kind: kind.id,
-      r2_key: assetKey(input.id, input.filename),
+      r2_key: key,
       filename: input.filename,
       mime: input.mime,
       bytes: input.bytes,
@@ -199,6 +247,7 @@ export async function createAsset(input: CreateAssetInput): Promise<Asset> {
       lifecycle,
       expires_at: lifecycle === "temporary" ? temporaryExpiryIso(Date.now()) : null,
       checksum: input.checksum ?? null,
+      cache_key: input.cacheKey ?? null,
       tags: [...(input.tags ?? [])],
       meta: input.meta ?? {},
     },

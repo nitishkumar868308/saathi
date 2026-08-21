@@ -69,6 +69,8 @@ export type AdminDict = {
     planExpiry: string;
     deleteRequests: string;
     team: string;
+    /** AI Reel Studio ka haal — AI usage, render, aur voice. */
+    reelStudio: string;
   };
   headings: Record<
     | "rewards"
@@ -91,7 +93,8 @@ export type AdminDict = {
     | "renewals"
     | "planExpiry"
     | "deleteRequests"
-    | "team",
+    | "team"
+    | "reelStudio",
     { title: string; sub: string }
   >;
   broadcast: {
@@ -545,6 +548,70 @@ export type AdminDict = {
       rows: string;
     };
     /**
+     * "Reel Studio" tab — AI se reel banane ka apna hisaab.
+     *
+     * ⚠️ `spend` se alag rakha gaya hai. `spend` poore product ka bill hai;
+     * yahan sirf reel ka kharcha, render aur voice hai — kyunki ise dekhne wala
+     * aksar wahi banda hota hai jo reel banata hai.
+     */
+    reelStudio: {
+      days7: string;
+      days30: string;
+      days90: string;
+      aiLabel: string;
+      voiceLabel: string;
+      renderLabel: string;
+      tokens: string;
+      letters: string;
+      videos: string;
+      calls: string;
+      failed: string;
+      cached: string;
+      cost: string;
+      /** Rate set na ho to kharche ki jagah yahi likha jaata hai — "0" nahi. */
+      costUnknown: string;
+      /** {file} — env file ka naam. Rate kahan set karni hai, wo batata hai. */
+      costHint: string;
+      /** {n} — kitni calls ka kharcha nahi gina ja saka. */
+      costPartial: string;
+      avgTime: string;
+      storage: string;
+      permanent: string;
+      temporary: string;
+      files: string;
+      workers: string;
+      workerIdle: string;
+      workerBusy: string;
+      noWorker: string;
+      /** {when} — aakhri baar kab dikha tha. */
+      workerStale: string;
+      /** {file} — worker chalane ka hukum. */
+      noWorkerHint: string;
+      breakdown: string;
+      what: string;
+      units: string;
+      last: string;
+      rows: string;
+      renders: string;
+      status: string;
+      count: string;
+      size: string;
+      /** Sub-tab: hisaab wala pehla panel. */
+      tabOverview: string;
+      /** Sub-tab: bani hui aur ban rahi videos. */
+      tabVideos: string;
+      videosNone: string;
+      preset: string;
+      length: string;
+      made: string;
+      why: string;
+      /** {n} — kitne render abhi chal rahe hain. */
+      liveNote: string;
+      download: string;
+      inQueue: string;
+      none: string;
+    };
+    /**
      * Play / RevenueCat ke payments — hamari KAMAI.
      *
      * ⚠️ `spend` se ulta sawaal hai aur dono ko alag rakhna zaroori hai: `spend`
@@ -949,6 +1016,7 @@ const en: AdminDict = {
     planExpiry: "Plus ended",
     deleteRequests: "Delete requests",
     team: "Admin team",
+    reelStudio: "Reel Studio",
   },
   headings: {
     support: { title: "Support", sub: "Questions raised from the app — read the whole thread and reply. Your reply reaches them in the app, by email and as a notification." },
@@ -963,6 +1031,7 @@ const en: AdminDict = {
     users: { title: "Users", sub: "Who's on which plan, when they joined, and how active they are." },
     usage: { title: "Usage", sub: "Who uses how much — documents, reminders, chats. And who not at all." },
     spend: { title: "AI & WhatsApp", sub: "How much we are actually consuming — Gemini tokens, WhatsApp messages and emails." },
+    reelStudio: { title: "Reel Studio", sub: "AI reels — what the AI and the voices cost, which renders finished, and how much storage they hold." },
     payments: { title: "Payments", sub: "Every Play Store purchase, renewal and refund — who paid, when, and how much." },
     notes: { title: "Notes", sub: "Who writes notes, and how many turn into a reminder. What people write is never shown." },
     documents: { title: "Documents", sub: "Who uploaded which document and when — with the path. Click View to see." },
@@ -1288,6 +1357,30 @@ const en: AdminDict = {
         "No usage recorded yet. If you're sure AI/WhatsApp is running, you still need to run {file} in Supabase.",
       service: "Service", what: "What", units: "Units", last: "Last", rows: "rows",
     },
+    reelStudio: {
+      days7: "7 days", days30: "30 days", days90: "90 days",
+      aiLabel: "AI (scenes)", voiceLabel: "Voice (TTS)", renderLabel: "Renders",
+      tokens: "tokens", letters: "letters spoken", videos: "videos",
+      calls: "calls", failed: "failed", cached: "from cache",
+      cost: "Cost", costUnknown: "rate not set",
+      costHint:
+        "Token counts are stored. To see money here, put the per-million rate in {file} — for example REEL_AI_RATES={\"gemini-2.5-flash\":{\"inputPerMillion\":0.3,\"outputPerMillion\":2.5}}.",
+      costPartial: "{n} calls could not be priced",
+      avgTime: "avg time",
+      storage: "Storage", permanent: "Permanent", temporary: "Temporary", files: "files",
+      workers: "Render worker", workerIdle: "idle", workerBusy: "rendering",
+      noWorker: "No render worker has ever checked in.",
+      workerStale: "No render worker is running right now — last seen {when}.",
+      noWorkerHint: "Renders will just sit in the queue until you run {file}.",
+      breakdown: "Breakdown", what: "What", units: "Units", last: "Last", rows: "rows",
+      renders: "Render jobs", status: "Status", count: "Count", size: "Size",
+      tabOverview: "Overview", tabVideos: "Videos",
+      videosNone: "No render has happened yet.",
+      preset: "Quality", length: "Length", made: "Made", why: "Reason",
+      liveNote: "{n} render(s) running — this list refreshes on its own.",
+      download: "Download", inQueue: "waiting in queue",
+      none: "No Reel Studio activity recorded yet.",
+    },
     payments: {
       today: "Today", days7: "7 days", days30: "30 days", days90: "90 days", all: "All",
       revenue: "Revenue", payers: "Paying users", events: "Events",
@@ -1597,6 +1690,7 @@ const hi: AdminDict = {
     planExpiry: "Plus खत्म",
     deleteRequests: "डिलीट रिक्वेस्ट",
     team: "एडमिन टीम",
+    reelStudio: "रील स्टूडियो",
   },
   headings: {
     support: { title: "सपोर्ट", sub: "ऐप से आए सवाल — पूरी बातचीत पढ़िए और जवाब दीजिए। जवाब ऐप, ईमेल और नोटिफ़िकेशन तीनों जगह पहुँचता है।" },
@@ -1611,6 +1705,7 @@ const hi: AdminDict = {
     users: { title: "यूज़र्स", sub: "कौन किस प्लान पर है, कब जुड़ा, और कितना एक्टिव है।" },
     usage: { title: "उपयोग", sub: "कौन कितना उपयोग करता है — डॉक्युमेंट्स, रिमाइंडर, चैट। और कौन बिलकुल नहीं।" },
     spend: { title: "AI और WhatsApp", sub: "हमारा कितना इस्तेमाल हो रहा है — Gemini टोकन, WhatsApp मैसेज और ईमेल।" },
+    reelStudio: { title: "रील स्टूडियो", sub: "AI रील — AI और आवाज़ पर कितना लगा, कितने रेंडर बने, और स्टोरेज कितना भरा है।" },
     payments: { title: "पेमेंट", sub: "हर Play Store परचेज़, रिन्यूअल और रिफ़ंड — किसने, कब, कितना दिया।" },
     notes: { title: "नोट्स", sub: "कौन नोट लिखता है, और उनमें से कितनों का रिमाइंडर बनता है। लोग क्या लिखते हैं वह कभी नहीं दिखता।" },
     documents: { title: "डॉक्युमेंट्स", sub: "किसने कौन सा डॉक्युमेंट, कब अपलोड किया — path के साथ। View पर क्लिक करके देखें।" },
@@ -1937,6 +2032,30 @@ const hi: AdminDict = {
         "अभी तक कोई उपयोग रिकॉर्ड नहीं हुआ। अगर आपको यक़ीन है कि AI/WhatsApp चल रहा है, तो Supabase में {file} चलाना बाक़ी है।",
       service: "सर्विस", what: "क्या", units: "यूनिट", last: "आख़िरी", rows: "रो",
     },
+    reelStudio: {
+      days7: "7 दिन", days30: "30 दिन", days90: "90 दिन",
+      aiLabel: "AI (सीन)", voiceLabel: "आवाज़ (TTS)", renderLabel: "रेंडर",
+      tokens: "टोकन", letters: "बोले गए अक्षर", videos: "वीडियो",
+      calls: "calls", failed: "फेल", cached: "cache से",
+      cost: "खर्चा", costUnknown: "रेट सेट नहीं है",
+      costHint:
+        "टोकन की गिनती जमा हो रही है। यहाँ पैसा दिखाने के लिए {file} में प्रति-मिलियन रेट डालो — जैसे REEL_AI_RATES={\"gemini-2.5-flash\":{\"inputPerMillion\":0.3,\"outputPerMillion\":2.5}}.",
+      costPartial: "{n} calls का खर्चा नहीं गिना जा सका",
+      avgTime: "औसत समय",
+      storage: "स्टोरेज", permanent: "पक्की", temporary: "कच्ची", files: "फाइलें",
+      workers: "रेंडर worker", workerIdle: "खाली", workerBusy: "रेंडर कर रहा है",
+      noWorker: "कोई रेंडर worker अब तक आया ही नहीं।",
+      workerStale: "अभी कोई रेंडर worker चल नहीं रहा — आख़िरी बार {when}।",
+      noWorkerHint: "जब तक {file} नहीं चलाओगे, रेंडर queue में ही पड़े रहेंगे।",
+      breakdown: "ब्यौरा", what: "क्या", units: "यूनिट", last: "आख़िरी", rows: "rows",
+      renders: "रेंडर jobs", status: "स्टेटस", count: "गिनती", size: "साइज़",
+      tabOverview: "हाल", tabVideos: "वीडियो",
+      videosNone: "अभी तक कोई रेंडर नहीं हुआ।",
+      preset: "क्वालिटी", length: "लंबाई", made: "बना", why: "वजह",
+      liveNote: "{n} रेंडर चल रहे हैं — ये लिस्ट अपने आप ताज़ा हो रही है।",
+      download: "डाउनलोड", inQueue: "queue में लगा है",
+      none: "अभी तक Reel Studio का कोई इस्तेमाल दर्ज नहीं हुआ।",
+    },
     payments: {
       today: "आज", days7: "7 दिन", days30: "30 दिन", days90: "90 दिन", all: "सब",
       revenue: "कमाई", payers: "पैसे देने वाले", events: "इवेंट",
@@ -2249,6 +2368,7 @@ const hinglish: AdminDict = {
     planExpiry: "Plus khatam",
     deleteRequests: "Delete requests",
     team: "Admin team",
+    reelStudio: "Reel Studio",
   },
   headings: {
     support: { title: "Support", sub: "App se aaye sawaal — poori baatcheet padhiye aur jawab dijiye. Jawab app, email aur notification teeno jagah pahunchta hai." },
@@ -2263,6 +2383,7 @@ const hinglish: AdminDict = {
     users: { title: "Users", sub: "Kaun kis plan pe hai, kab juda, aur kab tak active hai." },
     usage: { title: "Usage", sub: "Kaun kitna use karta hai — documents, reminders, chats. Aur kaun bilkul nahi." },
     spend: { title: "AI & WhatsApp", sub: "Humara kitna istemaal ho raha hai — Gemini token, WhatsApp message aur email." },
+    reelStudio: { title: "Reel Studio", sub: "AI reel — AI aur awaaz par kitna laga, kitne render bane, aur storage kitna bhara hai." },
     payments: { title: "Payments", sub: "Har Play Store kharidari, renewal aur refund — kisne, kab, kitna diya." },
     notes: { title: "Notes", sub: "Kaun note likhta hai, aur unme se kitno ka reminder banta hai. Log kya likhte hain wo kabhi nahi dikhta." },
     documents: { title: "Documents", sub: "Kisne kaun sa document, kab upload kiya — path ke saath. View pe click karke dekho." },
@@ -2587,6 +2708,30 @@ const hinglish: AdminDict = {
       nothingYet:
         "Abhi tak koi usage record nahi hui. Agar aapko yakeen hai ki AI/WhatsApp chal raha hai, to Supabase me {file} run karna baaki hai.",
       service: "Service", what: "Kya", units: "Units", last: "Aakhri", rows: "rows",
+    },
+    reelStudio: {
+      days7: "7 din", days30: "30 din", days90: "90 din",
+      aiLabel: "AI (scenes)", voiceLabel: "Awaaz (TTS)", renderLabel: "Render",
+      tokens: "token", letters: "bole gaye akshar", videos: "video",
+      calls: "calls", failed: "fail", cached: "cache se",
+      cost: "Kharcha", costUnknown: "rate set nahi hai",
+      costHint:
+        "Token ki ginti jama ho rahi hai. Yahan paisa dekhne ke liye {file} me per-million rate daalo — jaise REEL_AI_RATES={\"gemini-2.5-flash\":{\"inputPerMillion\":0.3,\"outputPerMillion\":2.5}}.",
+      costPartial: "{n} calls ka kharcha gina nahi ja saka",
+      avgTime: "aausat samay",
+      storage: "Storage", permanent: "Pakki", temporary: "Kachchi", files: "files",
+      workers: "Render worker", workerIdle: "khaali", workerBusy: "render kar raha hai",
+      noWorker: "Koi render worker abhi tak aaya hi nahi.",
+      workerStale: "Abhi koi render worker chal nahi raha — aakhri baar {when}.",
+      noWorkerHint: "Jab tak {file} nahi chalaoge, render queue me hi pade rahenge.",
+      breakdown: "Breakdown", what: "Kya", units: "Units", last: "Aakhri", rows: "rows",
+      renders: "Render jobs", status: "Status", count: "Ginti", size: "Size",
+      tabOverview: "Haal", tabVideos: "Video",
+      videosNone: "Abhi tak koi render hua hi nahi.",
+      preset: "Quality", length: "Lambai", made: "Bana", why: "Wajah",
+      liveNote: "{n} render chal rahe hain — ye list apne aap taaza ho rahi hai.",
+      download: "Download", inQueue: "queue me laga hai",
+      none: "Abhi tak Reel Studio ka koi istemaal record nahi hua.",
     },
     payments: {
       today: "Aaj", days7: "7 din", days30: "30 din", days90: "90 din", all: "Sab",

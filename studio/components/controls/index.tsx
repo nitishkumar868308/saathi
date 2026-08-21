@@ -418,7 +418,13 @@ const AlignControl: ControlComponent = (props) => (
 const FontControl: ControlComponent = (props) => {
   const mixed = isMixed(props.value);
   const current = mixed ? "" : String(props.value ?? "");
-  const known = BUILTIN_FONTS.some((font) => font.id === current);
+  /*
+   * List panel se aati hai (`props.fonts`), yahan se import nahi hoti — warna
+   * `public/fonts/fonts.json` me daala font is dropdown me kabhi nahi aata,
+   * chahe render use theek hi kyun na dikhaye (9.10).
+   */
+  const fonts = props.fonts ?? BUILTIN_FONTS;
+  const known = fonts.some((font) => font.id === current);
 
   return (
     <Row control={props.control}>
@@ -434,7 +440,7 @@ const FontControl: ControlComponent = (props) => {
             {current.startsWith("brand.") ? `${current} (brand token)` : `${current} (list me nahi)`}
           </option>
         ) : null}
-        {BUILTIN_FONTS.map((font) => (
+        {fonts.map((font) => (
           <option key={font.id} value={font.id}>
             {font.label}
           </option>

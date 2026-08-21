@@ -10,8 +10,11 @@
  */
 
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import { MockAiProvider, listSceneTypes, sceneTypesForPrompt } from "@reel/core";
+
+import { readTokenUsage } from "../lib/ai/usage";
 
 let passed = 0;
 const failures: { name: string; error: string }[] = [];
@@ -134,6 +137,68 @@ async function main(): Promise<void> {
     const first = await mock.generateScript(input);
     const second = await mock.generateScript(input);
     assert.deepEqual(first.data, second.data);
+  });
+
+  section("token ki ginti (21.11)");
+
+  await test("sochne wale token bhi output me gine jaate hain", () => {
+    /*
+     * ⚠️ Ye ginti ek asli naap se aayi hai — isi repo se, ek chhoti si call par:
+     * prompt 12, candidates 5, thoughts 105, total 122. Sirf `candidates` ginne
+     * par jawab 17 aata tha: saat guna kam, aur bilkul bharosemand dikhta hua.
+     * Isliye ye test poore number ke saath likha hai, "zyada hona chahiye"
+     * jaise dheele daawe ke saath nahi.
+     */
+    const usage = readTokenUsage({
+      promptTokenCount: 12,
+      candidatesTokenCount: 5,
+      thoughtsTokenCount: 105,
+      totalTokenCount: 122,
+    });
+    assert.equal(usage.inputTokens, 12);
+    assert.equal(usage.outputTokens, 110, "candidates + thoughts");
+    assert.equal(usage.totalTokens, 122, "Gemini ke apne totalTokenCount se milna chahiye");
+  });
+
+  await test("purane jawab (bina thoughts ke) waise ke waise chalte hain", () => {
+    const usage = readTokenUsage({ promptTokenCount: 40, candidatesTokenCount: 60 });
+    assert.equal(usage.outputTokens, 60);
+    assert.equal(usage.totalTokens, 100);
+  });
+
+  await test("ginti na aaye to jawab null hai — 0 nahi", () => {
+    // 0 ka matlab "kharcha kuch nahi hua" hota hai. Jab provider ne bataya hi
+    // nahi, wo likh dena jhooth hai — aur usi jhooth par kharcha gina jaata.
+    const usage = readTokenUsage(undefined);
+    assert.equal(usage.inputTokens, null);
+    assert.equal(usage.outputTokens, null);
+    assert.equal(usage.totalTokens, 0, "units 0 theek hai — par tokens null hi rehte hain");
+  });
+
+  await test("sirf sochne ke token aayein to bhi output 'pata nahi' rehta", () => {
+    const usage = readTokenUsage({ promptTokenCount: 10, thoughtsTokenCount: 99 });
+    assert.equal(usage.outputTokens, null);
+  });
+
+  await test("route khud token nahi ginta — wahi ginti ek jagah rehti hai", async () => {
+    /*
+     * ⚠️ Source padha jaata hai, jaan-boojhkar. Sahi ginti ek helper me daal
+     * dena aadha kaam hai; doosra aadha ye hai ki koi kal route me wapas
+     * `candidatesTokenCount` na likh de. Wo galti chalti rehti hai aur kisi
+     * test se pakdi nahi jaati, kyunki number tab bhi aata hai — bas kam.
+     */
+    const source = await readFile(
+      new URL("../app/api/ai/generate/route.ts", import.meta.url),
+      "utf8",
+    );
+    // Comment hata ke dekha jaata hai — wahin us purani galti ki kahani likhi
+    // hai, aur usme wahi shabd aata hai jise hum code me dhoondh rahe hain.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    assert.ok(code.includes("readTokenUsage("), "route ko helper hi bulana chahiye");
+    assert.ok(
+      !code.includes("candidatesTokenCount"),
+      "ginti do jagah bat gayi — route me phir se apna hisaab likha hai",
+    );
   });
 
   console.log(`\n${"-".repeat(60)}`);

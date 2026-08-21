@@ -31,7 +31,9 @@ export function Ruler({
 
   return (
     <div
-      className="relative select-none border-b border-ink-600 bg-ink-900"
+      // ⚠️ `touch-none` — ruler par ungli se scrub karne ke liye zaroori.
+      // Bina iske browser ise page scroll samajh leta hai aur playhead hilta hi nahi.
+      className="relative touch-none select-none border-b border-ink-600 bg-ink-900"
       style={{ height: RULER_HEIGHT }}
       // Ruler par kahin bhi dabao ya ghaseeto — playhead wahin aata hai (7.10).
       onPointerDown={(event) => {

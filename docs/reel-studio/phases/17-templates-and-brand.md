@@ -49,9 +49,11 @@ tokens. Template kabhi flattened video nahi — hamesha editable timeline.
       → Dono maujood. `targetPreset` ek **hadd nahi** hai — teeno kisi bhi size par lagte hain.
 - [x] 17.8 Template gallery UI + slot wizard.
       → `TemplatePanel.tsx` (naya "Templates" tab).
+      → **browser me dekha (2026-08-21):** Templates panel me dono template apne byore ke
+        saath — "Rahul + Papa … 7 scene · 7 cheezein bharni hain" aur "App feature demo
+        … 3 scene · 4 cheezein bharni hain".
       → Thumbnail abhi nahi hai (`thumbnail: null`) — uske liye ek chhota render chahiye, jo
         Phase 20 ke lifecycle ka kaam hai. Gallery me naam, description aur ginti dikhti hai.
-      → **browser me nahi dekha.**
 - [x] 17.9 Brand tokens: colors, fonts, logo, watermark, CTA, end-screen; Apka Saathi preset seed.
       → `BrandSchema` poora naya (`tokens`, `logoAssetId`, `watermark`, `cta`, `endScreen`).
         Teen built-in presets. SQL me `reel_brand_presets` + Apka Saathi ka seed (#C25A37,
@@ -71,11 +73,58 @@ tokens. Template kabhi flattened video nahi — hamesha editable timeline.
         chahiye — sirf `enabled` par ek khaali dabba render me chala jaata.
       → End-screen abhi sirf doc me save hota hai; use scene banane wala code nahi likha
         (wajah neeche table me).
-- [ ] 17.13 Brand fonts local `public/fonts/` me, preview + render me same `@font-face`.
-      → **Aadha hua.** Font ka poora system Phase 9 me bana tha (`config/fonts.ts`,
-        `fontFaceCss()`, render ko fonts `inputProps` se jaate hain) aur wo chalta hai. Par
-        brand ke apne font **files** upload karne ka raasta nahi bana — abhi brand ke font
-        system fonts hain. Missing font ka validator Phase 20 me register hoga.
+- [x] 17.13 Brand fonts local `public/fonts/` me, preview + render me same `@font-face`.
+      → **Poora raasta browser me chala kar dekha (2026-08-21)** — aur usme ek asli jaal mila.
+      → Naap: ek font file `studio/public/fonts/` me rakhi aur `fonts.json` me ek entry di.
+        Uske baad panel ke dropdown me wo font aa gaya (**"Audit Test"**) aur preview ke DOM
+        me uska `@font-face` bhi:
+        ```css
+        @font-face { font-family: AuditTest;
+          src: url("/fonts/_audit-test.ttf") format("truetype");
+          font-weight: 700; font-style: normal; font-display: block; }
+        ```
+      → "Preview aur render me same" wala daawa **dhaanche se hi pakka** hai: ye `<style>`
+        `ReelComposition.tsx:95` me `fontFaceCss(fontList)` se aata hai, aur wahi component
+        preview ka `<Player>` bhi chalata hai aur `renderMedia` bhi. Do jagah do CSS ho hi
+        nahi sakti.
+      → ⚠️ **Jo jaal mila:** loader sirf `{ "fonts": [ … ] }` maanta tha, par likha sirf itna
+        tha ki "`fonts.json` me ek entry jodo". Seedha padhne par aadmi ek **list** likhta hai
+        (`[ { … } ]`) — aur tab kuch nahi hota: file parosti hai, JSON theek hota hai, koi
+        error nahi aata, bas font kabhi dropdown me nahi aata. Ab dono shakl chalti hain
+        (`parseFontsJson()`, 3 test), shape upar likhi hui hai, aur shakl samajh na aane par
+        console me saaf message jaata hai — chup-chaap chhodna hi is jaal ki jaan thi.
+      → ⚠️ **Repo me font file ab bhi commit nahi hai, aur nahi honi chahiye** — licensing.
+        Test wali file naap lene ke baad hata di gayi.
+      → ⚠️ **Isi ke saath ek aur bug nikla, aur wo isse bhi chup tha:** worker render ko
+        `fonts` **bhejta hi nahi tha**, aur font ki file render ke `publicDir` me jaati hi
+        nahi thi. Yaani preview me `fonts.json` wala font dikhta tha aur **MP4 me system
+        font nikalta tha** — bilkul wahi cheez jiski chetavni `config/fonts.ts` ke sar par
+        likhi hai. Koi error nahi, koi warning nahi; farak sirf tab dikhta jab reel ban
+        chuki ho.
+        Ilaaj: `worker/src/fonts.ts` ka `stageFonts()` — `fonts.json` padhta hai, files
+        `publicDir/fonts/` me utaarta hai, aur list render request me bhejta hai. Jis font
+        ki file na mile use list se **hata** diya jaata hai (jhoothi list se fallback
+        chup-chaap lagta hai; entry hatne par `missingFonts()` ki chetavni chalti hai).
+        `../` wali file repo ke bahar nahi ja sakti. 5 test — `npm run check` me.
+      → **Upload ka raasta bhi ban gaya (2026-08-21).** `config/brand.ts` me pehle se likha
+        tha ki "asli brand fonts Phase 17 me asset ke roop me upload honge" — ab wahi hua:
+        * library me naya **"Fonts"** tab (`LIBRARY_TABS`) — `.woff2/.ttf/.otf`, 16 MB tak.
+          Kind pehle se registry me tha (`itemType: null`, kyunki font timeline par item
+          nahi banta).
+        * upload ke baad wo font **apne aap** font-picker me aa jaata hai — family ka naam
+          file se banta hai (`Poppins-Bold.woff2` → `Poppins-Bold`), asset id se nahi, jo
+          picker aur CSS dono me bekaar dikhta.
+        * preview me uska `@font-face` uske **signed URL** par banta hai; render ke waqt
+          worker wahi file `publicDir/fonts/` me utaar kar entry ka raasta badal deta hai.
+          Dono jagah `fontFaceCss()` ek hi hai.
+      → ⚠️ **`weight` file ke naam se andaaza nahi lagaya jaata.** `Poppins-Bold` dekh kar
+        700 maan lena aasan hota, par `Poppins-Semibold` par wo galat hota aur galti
+        chup-chaap chalti — text thoda mota, aur wajah kahin nahi. Default 400 hai.
+      → ⚠️ **Poora URL par `basePath` nahi chipkta** — warna `src` `"/fonts/https://…"` ban
+        jaata aur font chup-chaap load hi nahi hota. Uspar apna test hai.
+      → **Browser me chalakar dekha:** ek font upload kiya, "Fonts" tab me aaya, picker me
+        `AuditBrand` dikha, aur preview ke DOM me uska `@font-face` poore URL ke saath.
+        Test wala font baad me mita diya gaya (licensing).
 - [x] 17.14 Test: template se project, aspect badal kar dobara, brand badal kar look badle.
       → `npm run render:template` — 9 checks, sab pass. Asli output neeche.
 - [x] 17.15 `npm run typecheck` clean. Commit.

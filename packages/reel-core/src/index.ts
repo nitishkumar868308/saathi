@@ -36,6 +36,14 @@ export * from "./schema/project";
 export * from "./schema/migrate";
 export * from "./schema/factory";
 
+// TTS — cache ki key (asli awaaz banana @reel/media me)
+export * from "./tts/cacheKey";
+export * from "./tts/pending";
+export * from "./scenes/primary";
+export * from "./timeline/assetDrop";
+export * from "./mockup/taps";
+export * from "./ai/cost";
+
 // Keyframes — value nikalna (poora engine Phase 13 me)
 export * from "./keyframes/interpolate";
 

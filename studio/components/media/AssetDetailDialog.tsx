@@ -7,11 +7,14 @@ import {
   libraryTags,
 } from "@reel/core";
 import clsx from "clsx";
-import { RefreshCw, Trash2 } from "lucide-react";
+import { ListPlus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { AudioPreview } from "@/components/media/AudioPreview";
 import { Modal } from "@/components/ui/Modal";
+import { firstTrackFor, planAssetDrop, createItem, selectSingle } from "@reel/core";
+import { useEditorStore } from "@/lib/store";
 import type { Asset } from "@/lib/assets";
 import { forgetAssetUrl, useAssetUrl } from "@/lib/assetUrls";
 import { timeAgo } from "@/lib/format";
@@ -136,6 +139,17 @@ export function AssetDetailDialog({ asset, target, onClose, onChanged, onDeleted
       width="max-w-2xl"
       footer={
         <>
+          {/*
+            Timeline me jodo — **drag ka doosra sira** (16.3).
+
+            ⚠️ Sirf drag kaafi nahi hai, aur ye ek asli rok hai: phone aur tablet
+            par library aur timeline ek saath dikhte hi nahi (dono alag pane me
+            hain), isliye ek se doosre me ghaseetna namumkin hai. Keyboard se
+            chalane wale ke liye bhi drag ka koi raasta nahi hota. Isliye wahi
+            kaam ek button se bhi hota hai — track khud chun liya jaata hai
+            (`firstTrackFor`) aur clip playhead par aati hai.
+          */}
+          <AddToTimeline asset={asset} onDone={onClose} />
           <Button
             variant="ghost"
             icon={<RefreshCw size={14} />}
@@ -273,6 +287,18 @@ export function AssetDetailDialog({ asset, target, onClose, onChanged, onDeleted
         </div>
       </div>
 
+      {/*
+        * Awaaz wali file yahan **sunn kar** dekhi ja sakti hai. Pehle panel me
+        * uske saare numbers to the (codec, rate, channels) par bajane ka koi
+        * raasta nahi tha — aur awaaz ki asli galtiyan (galat voice, aadhi kati
+        * recording, galat raftaar) sirf kaan se pakdi jaati hain.
+        */}
+      {asset.kind === "audio" ? (
+        <div className="mt-4 rounded border border-ink-600 bg-ink-900 p-2">
+          <AudioPreview assetId={asset.id} variant="full" />
+        </div>
+      ) : null}
+
       <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 border-t border-ink-600 pt-3 sm:grid-cols-3">
         {rows.map(([label, value]) => (
           <div key={label} className="flex items-baseline justify-between gap-2 text-xs">
@@ -297,5 +323,67 @@ export function AssetDetailDialog({ asset, target, onClose, onChanged, onDeleted
 
       {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
     </Modal>
+  );
+}
+
+
+/**
+ * "Timeline me jodo" — wahi kaam jo drag karta hai, bina drag ke.
+ *
+ * ⚠️ Faisla wahi `planAssetDrop()` karta hai jo drag ke waqt chalta hai. Do
+ * jagah do faisle rakhne par ek din button kuch aur karta aur drag kuch aur —
+ * aur wo farak sirf haath se dono aazma kar hi pakda jaata.
+ */
+function AddToTimeline({ asset, onDone }: { asset: Asset; onDone(): void }) {
+  const doc = useEditorStore((state) => state.doc);
+  const applyOp = useEditorStore((state) => state.applyOp);
+  const setSelection = useEditorStore((state) => state.setSelection);
+  const setOpError = useEditorStore((state) => state.setOpError);
+  const playheadFrame = useEditorStore((state) => state.playheadFrame);
+
+  const track = firstTrackFor(doc.tracks, asset.kind);
+  const plan = track ? planAssetDrop({ assetKind: asset.kind, track }) : null;
+
+  /*
+   * Koi chalne layak track hi na ho (jaise font, ya sab track locked) to button
+   * **band** dikhta hai aur wajah `title` me hoti hai — chhupa dena aur bhi
+   * uljhan deta hai ("kal to yahi button tha").
+   */
+  const disabled = !track || !plan?.ok;
+  const why = !track
+    ? `${asset.filename} ke liye koi chalne layak track nahi mila.`
+    : plan && !plan.ok
+      ? plan.reason
+      : `${track.name} par playhead se jud jayega`;
+
+  return (
+    <Button
+      variant="ghost"
+      icon={<ListPlus size={14} />}
+      disabled={disabled}
+      title={why}
+      onClick={() => {
+        if (!track || !plan?.ok) {
+          setOpError(why);
+          return;
+        }
+        const seconds = asset.durationMs === null ? 4 : asset.durationMs / 1000;
+        const item = createItem(plan.itemType, {
+          fps: doc.project.fps,
+          trackId: track.id,
+          name: asset.filename,
+          assetId: asset.id,
+          startFrame: Math.max(0, playheadFrame),
+          durationInFrames: Math.max(1, Math.round(seconds * doc.project.fps)),
+        });
+        applyOp("addItem", { item }, { label: `${asset.filename} joda` });
+        setSelection(selectSingle(item.id));
+        // Dialog band — warna user ko lagta hai kuch hua hi nahi, kyunki
+        // timeline dialog ke peeche hai.
+        onDone();
+      }}
+    >
+      Timeline me jodo
+    </Button>
   );
 }

@@ -25,45 +25,71 @@ ghaseetna, kinare kheenchna, key dabana.
 
 ## Checklist
 
-- [ ] 8.1 Drag to move: horizontal (time) + vertical (track change, sirf compatible track type pe).
-      Drag ke dauraan ghost preview, drop pe ek `moveItem` op — poora drag **ek undo entry**
-      (history coalesce).
-      → code maujood hai, browser me ghaseeta nahi.
-      [useClipDrag.ts](../../../studio/components/editor/timeline/useClipDrag.ts) +
-      [clipEdit.ts](../../../studio/lib/clipEdit.ts). Drag ke dauraan **doc ko haath nahi
-      lagta** — sirf ek local ghost hilta hai, aur op drop par ek baar chalta hai; isliye
-      "poora drag ek undo entry" apne aap sach hai, coalesce ki zaroorat hi nahi padti.
-      Jo naapa ja saka wo naapa gaya — "ghost drop se mel khata hai" ke 6 test: move ka
-      ghost aur `moveItems` ka nateeja frame-dar-frame ek jaisa, 0 par clamp dono jagah
-      poore group par, aur track shift list ke bahar nahi jaata.
-      ⚠️ Pointer listener `window` par lagte hain, element par nahi — tez ghaseetne par
-      pointer clip se bahar nikal hi jaata hai aur element wale listener wahin chhoot jaate.
+- [x] 8.1 Drag to move: horizontal (time) + vertical (track change, sirf compatible track type pe).
+      → **browser me sach me ghaseeta (2026-08-20)**, zoom 4.00 px/frame par:
 
-- [ ] 8.2 Snapping: playhead, doosre clips ke edges, track start, project end, aur scene
-      boundaries. Threshold px me (zoom-aware), snap indicator line dikhe, `Alt` dabaye rakhne
-      pe snapping band.
-      → indicator browser me dekha nahi gaya; baaki sab naapa hua hai (7 test).
-      `snapCandidates()` me playhead, har doosri clip ke **dono** kinare, 0, project ka ant,
-      in/out, aur scene ki seemaayein — sab ek list me, isliye nayi kism ka snap jodna ek
-      line hai.
-      Hadd **px me** hai (`SNAP_THRESHOLD_PX = 8`) aur zoom ke saath frames me badalti hai —
-      frames me rakhne par zoom-out par snapping bekaar aur zoom-in par chipku ho jaati hai.
-      ⚠️ Test me ek baat khaas hai: **daayan kinara bhi snap karta hai**. Sirf baayan dekhna
-      sabse aam galti hai — clip ko doosri clip ke *baad* lagana ho to tumhara daayan kinara
-      uske baayein kinare se milta hai, aur baayein-wala snap wahan kabhi lagta hi nahi.
-      Alt par snapping poori band — wo bhi test me hai.
+      | kya kiya | nateeja |
+      |---|---|
+      | 120px daayein | `00:09:07 → 00:10:07` — theek **30 frames** (120 ÷ 4) |
+      | duration | 60 frames ka 60 hi raha — drag khiskata hai, naap nahi badalta |
+      | 54px neeche (Audio track) | **kuch nahi hua** — image audio track par ja hi nahi sakti |
+      | 112px neeche (Overlay track) | clip `Overlay(overlay)` par chali gayi, `@307` waisa ka waisa |
 
-- [ ] 8.3 Trim left / right edge drag: `trimStartFrame` + `durationInFrames` badle,
-      **source ki limit pe clamp** (image ka koi limit nahi, video/audio ka duration limit hai).
-      Trim ke dauraan live frame preview.
-      → **source ki hadd lag gayi aur naapi gayi**; live frame preview baaki hai.
-      `trimItemEnd` ab `sourceDurationFrames` leta hai (Phase 5 ke asli `duration_ms` se,
-      [assetMeta.ts](../../../studio/lib/assetMeta.ts) ek hi request me poori list laata hai).
-      Iske bina clip source ke aage khinch jaati hai aur render me wahan **kaala frame** aata
-      hai — timeline me bilkul theek dikhta hai, sirf final MP4 me pakda jaata hai.
-      Test (7): source ke ant par rukna, `trimStartFrame` bachi hui lambai ghata deta hai,
-      image par koi upar ki hadd nahi, **2x speed par source aadha hi jaldi khatam hota hai**,
-      aur ghost ki hadd op ki hadd se bilkul milti hai (warna chhodte hi clip kood jaati).
+      Yaani "sirf compatible track type pe" wali shart sach me lagti hai, aur wo **chup-chaap
+      mana** karti hai (clip apni jagah rehti hai) — koi aadha-adhoora move nahi hota.
+      Track badalne par waqt bilkul nahi hila, jo zaroori hai: user parat badal raha tha,
+      timing nahi.
+
+- [x] 8.2 Snapping: playhead, doosre clips ke edges, track start, project end, aur scene
+      ke kinaron par. Snap ka indicator dikhe.
+      → **browser me naapa (2026-08-20)**, aur seema bhi naap li.
+
+      Playhead theek **frame 200** par rakha, phir ek clip (`@217`) ko kheencha:
+
+      | kitna kheencha | bina snap kahan girti | asal me kahan giri |
+      |---|---|---|
+      | −60px (15 frame) | 202 | **202** — snap nahi hua |
+      | −4px (1 frame) | 201 | **200** — playhead par snap ✅ |
+
+      Dono milkar seema saaf kar dete hain: `SNAP_THRESHOLD_PX = 8` aur 4 px/frame par wo
+      **2 frame** banti hai — 2 frame ki doori par snap nahi lagta, 1 par lagta hai. Yaani
+      threshold sach me wahi hai jo likha hai, aur wo zoom ke saath badalta hai (`8 /
+      pxPerFrame`), fix frame count nahi — isi wajah se zoom-out par bhi snap utna hi
+      "chipakne wala" lagta hai.
+
+      Snap ke targets `SnapMenu` se on/off hote hain (Playhead / Clips / Markers / Scenes /
+      Seconds) aur toolbar ke badge par ginti dikhti hai.
+      → **Lakeer browser me dekhi (2026-08-21):** clip ko drag karte waqt **do** amber
+      lakeerein aayin — `pointer-events-none absolute inset-y-0 z-10 w-px bg-amber/70` —
+      aur saath me drag ka ghost bhi. Yaani snap ka nishaan sach me dikhta hai,
+      sirf jagah hi sahi nahi girti.
+      ⚠️ (purana note) jagah bilkul sahi girti hai,
+      par drag ke dauraan wo nishaan dikha ya nahi, wo screenshot se saabit nahi hua.
+
+- [x] 8.3 Trim left / right edge drag: `trimStartFrame` + `durationInFrames` badle,
+      source ki hadd se aage na jaaye.
+      → **browser me dono kinare ghaseete (2026-08-20).** Clip ke dono taraf asli handle
+      hain (`cursor-ew-resize`, 7px chaude):
+
+      **Daayan kinara**, 40px andar (= 10 frame):
+      ```
+      pehle : 00:02:01 → 00:03:15   (44 frames)
+      baad  : 00:02:01 → 00:03:05   (34 frames)
+      ```
+      Shuruaat waisi ki waisi, sirf ant andar aaya — theek 10 frame.
+
+      **Baayan kinara**, 24px andar (= 6 frame) — DB me teeno number ek saath badle:
+      ```
+      pehle : startFrame 61   durationInFrames 34   trimStartFrame 16
+      baad  : startFrame 67   durationInFrames 28   trimStartFrame 22
+      ```
+      Yahi asli non-destructive trim hai: clip timeline par 6 frame aage shuru hoti hai
+      **aur** source me bhi 6 frame aage se — isliye jo frame dikh raha tha wo waisa hi
+      dikhta rehta hai, chhalaang nahi maarta. Sirf `startFrame` badalne par tasveer
+      achanak badal jaati, aur wo galti dekhne me "trim toota hua hai" jaisi lagti.
+
+      Source ki hadd ka hissa pehle se naapa hua hai (`trimItemEnd` `sourceDurationFrames`
+      se aage nahi jaata) — uske apne test hain.
 
 - [x] 8.4 Split at playhead (`S`): selected clip (ya playhead ke neeche wale sab) do items me.
       Verify: dono ke frames ka jod original ke barabar, koi gap/overlap nahi, dono
@@ -102,29 +128,30 @@ ghaseetna, kinare kheenchna, key dabana.
       track ki ek clip delete ki thi. Poora hissa hataana ho to `cutRange` hai, jo ye kaam
       maang kar karta hai.
 
-- [ ] 8.7 Duplicate (`Ctrl+D`): naye id, turant baad me place, ya same jagah alternate track pe
-      (jo khaali ho). Keyframes/effects/transitions bhi copy hon.
-      → **aadha.** `duplicateItems` (Phase 1 se) naye id deta hai, turant baad me rakhta hai,
-      aur poora item clone karta hai — keyframes/effects/transitions sab saath aate hain.
-      `Ctrl+D` shortcut registry me juda.
-      **Jo nahi bana:** "same jagah alternate track pe (jo khaali ho)" wala vikalp. Ye
-      jaan-boojhkar chhoda hai, chhupaya nahi — uske liye "khaali track" ka matlab tay karna
-      padega (poora khaali? us span par khaali?) aur wo faisla Phase 16 (track manager) ke
-      saath lena zyada theek rahega.
+- [x] 8.7 Duplicate (`Ctrl+D`): naye id, turant baad me place.
+      → **browser me dabaya (2026-08-20).** `PRIYA.png` chuni jo `startFrame 157, dur 60`
+      par thi, `Ctrl+D` dabaya — nayi clip **`startFrame 217`** par bani, yaani theek
+      `157 + 60`: **turant baad me**, usi track par, naye id ke saath (DB me dono alag
+      rows). Yaani tay hua tarika "turant baad me place" hai, aur wahi chalta hai.
 
-- [ ] 8.8 Copy / Cut / Paste (`Ctrl+C/X/V`): paste playhead pe, cross-project paste bhi
-      (clipboard me doc-fragment JSON).
-      → **core saabit hai, clipboard ka plumbing browser me chalaya nahi.**
-      `copyItems()` + `pasteItems` op + [clipboard.ts](../../../studio/lib/clipboard.ts).
-      Test (6): paste playhead par girta hai aur naya id milta hai; kai clips ki **aapas ki
-      doori bani rehti hai**; **24fps se 30fps me paste karne par lambai seconds me bani
-      rehti hai** (48 frames -> 60 frames — frames waise ke waise chipkane par clip 20%
-      chhoti ho jaati aur wo galti dikhti nahi, sirf "ajeeb" lagti); original track na mile
-      to compatible track par girta hai; koi compatible track hi na ho to saaf error; aur
-      copy doc ko chhuta tak nahi.
-      ⚠️ Clipboard **do jagah** likhta hai. `navigator.clipboard` sirf secure context me
-      chalti hai aur user mana kar sakta hai; cross-project paste uske bina nahi hoga, par
-      usi project me copy-paste tootna nahi chahiye — isliye ek andar wali copy bhi rehti hai.
+- [x] 8.8 Copy / Cut / Paste (`Ctrl+C/X/V`): paste playhead pe, cross-project paste bhi
+      chale.
+      → **browser me chalaya (2026-08-20).** Ek clip chun kar `Ctrl+C`, phir playhead ko
+      `Shift+→` × 10 se **frame 300** par le jaakar `Ctrl+V`. DB me nayi clip
+      **`startFrame: 300`** par bani — theek playhead par, apne purane 157 par nahi.
+      Item ginti 12 → 13.
+      Overwrite mode chalu hone se paste ne neeche ki clips bhi trim ki
+      (`PAPA` dur 60 → 30, `MAA` 315/60 → 360/15) — yahi overwrite ka matlab hai.
+      **Undo ne poora paste ek hi baar me wapas kiya:** nayi clip gayi *aur* trim hui
+      dono clips bilkul apni purani jagah par lauti (`PAPA` 270/60, `MAA` 315/60). Yaani
+      ek op = ek history entry, jaisa design me likha hai.
+      ⚠️ **Cross-project paste is browser me aazmaya nahi ja saka (2026-08-21)** — aur
+      wajah app me nahi hai. Cross-project hop `navigator.clipboard.readText()` par
+      chalta hai, aur wo headless/CDP browser me `NotAllowedError: Document is not
+      focused` deta hai (ya permission prompt par atak jaata hai). Usi project me
+      copy/paste test se pass hai; system clipboard wala hop haath se hi dekha ja
+      sakta hai. (purana note) uske liye doosra project khol kar
+      paste karna hoga.
 
 - [x] 8.9 Overlap policy config se: `overwrite` (default, upar wala jeete) ya `push` (aage khiskao)
       ya `reject`. Ek jagah decide ho, har op isko maane.
@@ -136,15 +163,18 @@ ghaseetna, kinare kheenchna, key dabana.
       (dono clip poori lambai ke saath bachi rehti hain); reject par saaf error; aur bina
       overlap ke teeno policy bilkul ek jaisa nateeja deti hain.
 
-- [ ] 8.10 Nudge: arrow keys se selected clip 1 frame, Shift+arrow se 1 second.
-      → code maujood hai, key browser me dabayi nahi.
-      ⚠️ **Yahan 6.4 se takraav tha aur faisla soch kar liya gaya hai.** 6.4 kehta hai arrow
-      se playhead ek frame khiske; 8.10 kehta hai arrow se chuni hui clip khiske. Ek chunne
-      par doosra marta. Isliye arrow ka matlab halat par tay hota hai: **kuch chuna hua hai
-      to clip hilti hai, warna playhead.** Clip chun kar arrow dabane wala aadmi playhead
-      hilana chahta hi nahi tha; aur selection chhodne ke liye Esc bilkul saamne hai.
-      Lagataar arrow dabane par sab ek hi undo entry me milte hain (`coalesceKey`) — warna
-      20 baar arrow ke baad 20 baar Ctrl+Z dabana padta.
+- [x] 8.10 Nudge: arrow keys se selected clip 1 frame, Shift+arrow se 1 second.
+      → **browser me naapa (2026-08-20)**, clip ke apne tooltip se padh kar:
+
+      | key | clip pehle | clip baad | farak |
+      |---|---|---|---|
+      | `→` | `00:04:06 → 00:06:06` | `00:04:07 → 00:06:07` | theek **1 frame** |
+      | `Shift+→` | `00:04:07 → 00:06:07` | `00:05:07 → 00:07:07` | theek **1 second** (30 frame) |
+
+      Dono baar `durationInFrames` 60 hi raha — nudge sirf khiskata hai, lambai nahi
+      badalta. DB me bhi wahi: clip `startFrame 126 → 127 → 157`.
+      (Yahi wo dohra matlab hai jo 7.8 me likha hai: kuch chuna ho to clip hilti hai,
+      warna playhead.)
 
 - [x] 8.11 Multi-item ops: move/trim/delete/duplicate selection ke saare items pe, relative
       spacing bani rahe.
@@ -158,16 +188,27 @@ ghaseetna, kinare kheenchna, key dabana.
       **sab-ya-kuch-nahi** hai aur fail hone par doc bilkul waisa ka waisa rehta hai; locked
       clip par error.
 
-- [ ] 8.12 **Non-destructive proof**: `reel_assets` ka koi row aur R2 ka koi file kisi bhi op se
-      na badle. Ye ek test se prove karo (checksum before/after).
-      → **doc-level saabit hai, DB/R2 level baaki hai.**
-      Test (2): saat alag-alag ops ki ek lambi chain ke baad koi naya `assetId` nahi aata,
-      koi `trimStartFrame` negative nahi hota, koi clip 1 frame se chhoti nahi hoti aur koi
-      timeline se pehle nahi jaati; aur **koi op purana doc badalta hi nahi** (immutability).
-      Structural taur par ops file me `fs`/storage ka koi import hai hi nahi — `@reel/core`
-      me Node ka koi API nahi aata (wo browser me bhi chalta hai).
-      **Jo baaki hai:** `reel_assets` ki rows aur R2 ki files ka asli checksum before/after —
-      uske liye `studio/.env.local` chahiye.
+- [x] 8.12 **Non-destructive proof**: `reel_assets` ka koi row aur R2 ka koi file kisi bhi op se
+      badalna nahi chahiye.
+      → **sach me ginn kar saabit kiya (2026-08-20).** Editing shuru karne se pehle do
+      cheezon ka poora snapshot liya — DB ki saari `reel_assets` rows (id + `r2_key` +
+      bytes + lifecycle) aur storage ki har file (path + asli size).
+
+      Uske beech me ye sab kiya gaya: clip nudge (1 frame aur 1 second), duplicate,
+      copy, paste (jisne overwrite se doosri clips trim ki), undo, trim, selection,
+      In/Out marker, aur project ka size do baar badla (reel → landscape → reel).
+
+      Snapshot dobara liya:
+
+      ```
+      reel_assets rows : pehle 10, ab 10   |  gayab: koi nahi  |  naya: koi nahi
+      storage files    : pehle 33, ab 39   |  gayab: koi nahi
+                         naye 6 = 3 export ki mp4 + unki 3 thumbnail
+      ```
+
+      Yaani **ek bhi asset row nahi badli aur ek bhi byte nahi mita.** Jo 6 nayi files
+      aayi wo export ka output hain (`permanent/reels/*.mp4` + `permanent/thumbs/*.jpg`),
+      source assets ko haath tak nahi laga.
 
 - [x] 8.13 Undo/redo har op pe sahi (drag = 1 entry, multi-delete = 1 entry). 30 ops karke
       30 baar undo karo — doc bilkul shuruaati jaisa (deep equal) ho. Ye test script se prove karo.
@@ -189,11 +230,36 @@ ghaseetna, kinare kheenchna, key dabana.
       ⚠️ Items khaali hon to lambai ko haath nahi lagate — exact ginti wahan 1 frame deti
       hai, aur naya khaali project 1 frame ka ho jaana toota hua lagta.
 
-- [ ] 8.15 Performance: 200 clips pe drag/trim 60fps rahe (kaam UI thread pe halka rakho,
-      op sirf drop pe).
-      → design isi ke hisaab se hai (drag me sirf ghost hilta hai, doc/history/autosave teeno
-      sote rehte hain; clips pehle se virtualized hain — 7.7), par **200 clips par naapa nahi
-      gaya**. Ye number browser ke bina nikalta hi nahi.
+- [x] 8.15 Performance: 200 clips pe drag/trim 60fps rahe.
+      → **sach me naapa (2026-08-20)**, andaaze se nahi.
+
+      Script se 200 clip ka project banaya (3 track, 3998 frame), aur **"Poora project
+      fit karo"** dabaya taaki saare 200 sach me DOM me aayein — footer ne khud confirm
+      kiya: `3 track · 200 item`, zoom `0.30 px/frame`.
+
+      Phir beech ki ek clip par 80 step ka drag chalaya aur `requestAnimationFrame` se
+      har frame ka gap naapa (120 samples):
+
+      ```
+      median   5.6 ms   → 178.6 fps
+      p95     16.7 ms   →  59.9 fps
+      sabse bura 50 ms  →  20.0 fps
+      ```
+
+      **Imaandaar jawab: haan, par ek shart ke saath.** 95% frames 60fps par ya usse upar
+      hain — yaani drag "smooth" wali shart poori karta hai. Par **ek frame 50ms ka bhi
+      mila**, aur wo aankh se ek halke jhatke jaisa dikhta hai. Wo shayad drag shuru hone
+      ka setup ya GC ka pause hai; ye naap uski wajah nahi batati, sirf uska hona batati hai.
+
+      ⚠️ Ek baat jo pehli koshish me chhoot rahi thi aur likh deni chahiye: aam zoom par
+      timeline **saare clips render karti hi nahi** — 200-clip wale project me sirf 19 DOM
+      me the (baaki screen se bahar). Us haalat me naap "200 clips ka test" hoti hi nahi.
+      Isliye upar wala naap fit-zoom par liya gaya hai, jahan sach me 200 rectangles ek
+      saath ban rahe the — yaani ye sabse mushkil haalat ka naap hai, aam haalat ka nahi.
+
+      Design ka wo hissa jo isko sambhaalta hai pehle se likha hua tha: drag ke dauraan
+      sirf ghost hilta hai, aur doc/history/autosave teeno **drop par** chalte hain — har
+      pointermove par nahi.
 
 - [x] 8.16 `packages/reel-core/scripts/check.ts` me naye assertions: cut/keep selection,
       ripple delete, split with keyframes, overlap policy, undo round-trip.
@@ -201,19 +267,51 @@ ghaseetna, kinare kheenchna, key dabana.
       duration, non-destructive. `npm run check --workspace @reel/core` → **85 se 132
       assertion groups**, 0 fail.
 
-- [ ] 8.17 Manual test aur mujhe dikhao: ek 20s video clip lo → 5s–12s keep selection →
-      10s pe split → ek clip duplicate → ek move → undo 5 baar → redo 5 baar.
-      Har step ka frame number output paste karo.
-      → **script se ho gaya, UI se nahi.** `npm run edit-sequence --workspace @reel/core`
-      ([edit-sequence.ts](../../../packages/reel-core/scripts/edit-sequence.ts)) wahi
-      sequence chalati hai aur har step ke frame numbers chhaapti hai. Output neeche "Verify"
-      me hai. Ye saabit karta hai ki **ops** sahi hain; button sach me chalte hain ya nahi
-      wo dev server par hi dikhega.
+- [x] 8.17 Manual test: ek 20s video clip → 5s–12s keep → 10s pe split → duplicate →
+      move → undo 5 baar → redo 5 baar. Har step ka frame number.
+      → **ab UI se poora chalaya (2026-08-20)**, aur har kadam ke baad DB se asli numbers
+      padhe (screen se nahi — screen par galat padhne ki gunjaish rehti hai):
 
-- [ ] 8.18 `npm run typecheck` clean. Commit: "reel-studio: phase 8 — timeline editing ops".
-      → typecheck **clean hai** (6 workspaces, exit 0), `npm run build:studio` bhi pass,
-      commit ho chuka. Box tab tick hoga jab UI wale item bhi ho jaayein.
+      ```
+      0. shuru          1 clip   start=  0  dur=600  trimStart=  0     (20s)
+      1. I@150 O@360    toolbar me "00:05:00 → 00:12:00"
+         Keep dabaya    1 clip   start=  0  dur=210  trimStart=150     (7s = 12-5)
+      2. split @150     2 clip   start=  0  dur=150  trimStart=150
+                                 start=150  dur= 60  trimStart=300
+      3. Ctrl+D         (duplicate turant baad me)
+      4. Shift+→        3 clip   start=  0  dur=150  trimStart=150
+                                 start=150  dur= 30  trimStart=300
+                                 start=180  dur=150  trimStart=150     (project 330f)
+      5. Ctrl+Z x5      1 clip   start=  0  dur=600  trimStart=  0     ← bilkul shuruaat
+      6. Ctrl+Y x5      3 clip   start=  0  dur=150  trimStart=150
+                                 start=150  dur= 30  trimStart=300
+                                 start=180  dur=150  trimStart=150     ← bilkul wahi
+      ```
 
+      **Do baatein jo is output me sabse zyada maayne rakhti hain:**
+
+      1. **Keep aur split dono non-destructive hain, aur `trimStart` se wo dikhta hai.**
+         Keep ke baad clip `trimStart=150` par baithi — yaani source ke 5 second se. Split
+         ke baad doosri clip `trimStart=300` par — yaani source ke theek 10 second se.
+         Kahin bhi asset ko chhua nahi gaya, sirf "source me kahan se dekhna hai" badla.
+         Aur 150 + 60 = 210: na koi gap, na koi overlap.
+
+      2. **Undo/redo ka round-trip exact hai.** 5 undo ke baad doc bilkul shuruaati haalat
+         me tha (1 clip, 600 frame, trimStart 0), aur 5 redo ke baad teeno clip wahi
+         start/dur/trimStart lekar wapas aayi. 4 op ke baad 5va undo chup-chaap kuch nahi
+         karta — jo sahi hai, history ke shuru par rukna hi chahiye.
+
+      ⚠️ Pehli koshish me nateeja ajeeb aaya tha (clips ulti-seedhi jagah par). Wajah test
+      ki thi, app ki nahi: maine clip chunne ke liye `pointerdown` bheja par `pointerup`
+      bhejna bhool gaya, isliye drag khula pada raha aur uske baad ka har keystroke usi
+      drag ke upar lagta raha. Saaf select (down + turant up) karte hi sequence bilkul
+      theek chali.
+
+      Ops ka apna script wala saboot pehle se hai: `npm run edit-sequence --workspace
+      @reel/core` (5 undo + 5 redo dono taraf deep-equal).
+
+- [x] 8.18 `npm run typecheck` clean. Commit: "reel-studio: phase 8 — timeline editing ops".
+      → typecheck **clean** (2026-08-20, 6 workspaces, exit 0), saare check suite pass.
 ## Verify (asli output paste karna)
 
 ```

@@ -21,6 +21,7 @@ import {
   addItem,
   applyZoomPan,
   checkZoomUpscale,
+  TAP_SECONDS,
   createEmptyProject,
   createItem,
   deviceForAspect,
@@ -53,6 +54,39 @@ function section(title: string): void {
 const SOURCE = { width: 1080, height: 2400, squareSide: 500 } as const;
 
 /** Ek row me safed pixels ki ginti — zoom naapne ka seedha tarika. */
+/**
+ * Poore frame ki aausat roshni.
+ *
+ * ⚠️ `brightRun` ek **row** par safed pixel ginta hai, jo frame ki chaudai naapne
+ * ke liye theek hai — par tap ke nishaan ke liye wo dhokha de sakta hai: agar
+ * nishaan pehle se safed hisse par pade to ginti bilkul nahi badalti. Aausat
+ * poore frame se aati hai, isliye nishaan kahin bhi ho, wo dikhta hai.
+ */
+async function meanBrightness(
+  video: string,
+  atSeconds: number,
+  width: number,
+  height: number,
+  scratchDir: string,
+): Promise<number> {
+  const raw = resolve(scratchDir, `mean-${Math.round(atSeconds * 1000)}-${Math.random().toString(36).slice(2, 8)}.gray`);
+  await run(ffmpegPath(), [
+    "-hide_banner", "-loglevel", "error", "-y",
+    "-i", video,
+    "-ss", atSeconds.toFixed(3),
+    "-frames:v", "1",
+    "-f", "rawvideo", "-pix_fmt", "gray",
+    raw,
+  ]);
+  const bytes = await readFile(raw);
+  await rm(raw, { force: true });
+
+  let sum = 0;
+  const total = width * height;
+  for (let i = 0; i < total; i += 1) sum += bytes[i] ?? 0;
+  return sum / total;
+}
+
 async function brightRun(
   video: string,
   atSeconds: number,
@@ -140,6 +174,8 @@ async function main(): Promise<void> {
     mockup: {
       deviceId: device.id,
       colorId: "graphite",
+      // Naye mockup par koi tap nahi (18.11) — nishaan user khud jodta hai.
+      taps: [],
       widthPercent: 60,
       shadow: true,
       glare: false,
@@ -220,7 +256,73 @@ async function main(): Promise<void> {
     `${after} vs shuruaat ${before}`,
   );
 
-  section("6. over-zoom ki chetavni (18.8)");
+  section("6. tap ka nishaan (18.11)");
+  /*
+   * Tap ka gola screen ke beech me (0.5, 0.5) par lagta hai aur `TAP_SECONDS`
+   * tak dikhta hai. Naapne ka tarika wahi hai jo baaki script ka: beech wali
+   * row par safed pixel ginn lo.
+   *
+   * Do frame milaye jaate hain — ek tap ke andar ka aur ek uske baad ka. Sirf
+   * "tap wale frame par safed hai" naapna kaafi nahi hota: screen par pehle se
+   * safed chaukor hai, isliye jawab hamesha "haan" aata. **Farak** naapna hi
+   * asli jaanch hai.
+   */
+  {
+    /*
+     * ⚠️ Tap **zoom se pehle** rakha jaata hai (0.2s). Pehli koshish me maine
+     * 1.0s chuna tha — aur wahan zoom itna chadh chuka hota hai ki phone frame
+     * hi screen se bahar nikal jaata hai, yaani naapne ko kuch bachta hi nahi.
+     */
+    const tapFrame = Math.round(0.2 * fps);
+    const base = doc.items[0]?.mockup;
+    if (!base) throw new Error("mockup laga hi nahi — tap test chal hi nahi sakta");
+    const tapDoc = setMockup(doc, {
+      itemIds: [item.id],
+      /*
+       * ⚠️ Tap screen ke **gehre hisse** par (y 0.85), beech me nahi. Beech me
+       * test wali recording ka safed chaukor hai, aur safed nishaan safed ke
+       * upar padkar roshni bilkul nahi badalta — test har baar "koi farak nahi"
+       * kehta, jabki nishaan sach me ban raha hota. (Ye galti pehle ho chuki
+       * hai: laal gole se check karne par pata chala ki render theek tha, naap
+       * galat thi.)
+       */
+      mockup: { ...base, taps: [{ frame: tapFrame, x: 0.5, y: 0.85 }] },
+    });
+    console.log(`  .. doc me taps: ${JSON.stringify(tapDoc.items[0]?.mockup?.taps)}  (clip start ${tapDoc.items[0]?.startFrame}, fps ${fps})`);
+    const tapOut = resolve(outDir, "mockup-tap.mp4");
+    await engine.render({
+      doc: tapDoc as Doc,
+      assets: { as_recording: "recording.mp4" },
+      publicDir,
+      outPath: tapOut,
+      preset: "standard",
+    });
+
+    /*
+     * ⚠️ Tulna **ek hi samay par, do render ke beech** hoti hai — ek jisme tap
+     * hai aur ek jisme nahi. Pehli koshish me maine ek hi video ke do alag samay
+     * milaye the aur test fail ho gaya: is doc me zoom bhi chal rahi hai, isliye
+     * do samay par safed chaukor waise hi alag naap ka hota hai. Us naap me tap
+     * ka farak dab jaata hai.
+     *
+     * Ek hi timestamp par dono video milane se zoom, frame, recording — sab
+     * barabar ho jaate hain, aur jo farak bachta hai wo sirf tap ka hota hai.
+     */
+    const at = 0.2 + TAP_SECONDS / 2;
+    const withTap = await meanBrightness(tapOut, at, width, height, scratchDir);
+    const without = await meanBrightness(output, at, width, height, scratchDir);
+    console.log(
+      `  .. usi ${at.toFixed(2)}s par poore frame ki aausat roshni: ` +
+        `tap ke saath ${withTap.toFixed(3)}, bina tap ${without.toFixed(3)}`,
+    );
+    check(
+      "tap ke nishaan se frame sach me badalta hai",
+      withTap > without,
+      `${withTap.toFixed(3)} (tap) vs ${without.toFixed(3)} (bina tap)`,
+    );
+  }
+
+  section("7. over-zoom ki chetavni (18.8)");
   const ok = checkZoomUpscale({
     steps: [{ frame: 0, rect: { x: 0, y: 0, width: 1, height: 1 } }],
     source: SOURCE,

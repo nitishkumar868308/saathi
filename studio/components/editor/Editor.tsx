@@ -12,6 +12,8 @@ import { TimelineView } from "@/components/editor/timeline/TimelineView";
 import { DraftRecovery } from "@/components/editor/DraftRecovery";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { TopBar } from "@/components/editor/TopBar";
+import { MobileShell } from "@/components/editor/MobileShell";
+import { useScreen } from "@/lib/breakpoint";
 import { useLayout } from "@/lib/layout";
 import { PlaybackProvider } from "@/lib/playback";
 import { useShortcuts } from "@/lib/shortcuts";
@@ -80,6 +82,35 @@ function EditorShell() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [store]);
 
+  /*
+   * Chhoti screen ka apna shell.
+   *
+   * ⚠️ Ye faisla yahan, sabse upar hota hai — CSS ke breakpoints se neeche nahi.
+   * `hidden md:flex` se dono layout ek saath render hote: do preview player, do
+   * timeline, dono ke apne effects aur listeners. Player do baar chalna sirf
+   * bhaari nahi, galat bhi hai (do audio, do playhead). Isliye ek waqt me ek hi
+   * shell tree me rehta hai.
+   *
+   * ⚠️ Banner (conflict, draft recovery, op error) dono shell ke bahar hain —
+   * wo har naap par ek jaise chahiye, aur unhe do jagah likhna matlab ek din
+   * phone par conflict ka banner aana band ho jaana, jo kisi ko dikhta bhi nahi.
+   */
+  const screen = useScreen();
+
+  if (screen !== "desktop") {
+    return (
+      <div className="flex h-[100dvh] flex-col overflow-hidden">
+        <ConflictBanner />
+        <DraftRecovery />
+        <ShortcutsDialog />
+        {opError ? <OpError message={opError} onClear={clearOpError} /> : null}
+        <div className="min-h-0 flex-1">
+          <MobileShell screen={screen} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <TopBar />
@@ -89,14 +120,7 @@ function EditorShell() {
       {/* `?` se khulta hai — list registry se banti hai, haath se nahi (16.6). */}
       <ShortcutsDialog />
 
-      {opError ? (
-        <div className="flex items-center gap-3 border-b border-red-500/40 bg-red-500/10 px-4 py-1.5 text-sm text-red-300">
-          <span className="flex-1">{opError}</span>
-          <button type="button" onClick={clearOpError} className="text-xs underline">
-            theek hai
-          </button>
-        </div>
-      ) : null}
+      {opError ? <OpError message={opError} onClear={clearOpError} /> : null}
 
       <div className="flex min-h-0 flex-1">
         <div style={{ width: layout.left }} className="min-h-0 shrink-0">
@@ -150,6 +174,23 @@ function EditorShell() {
           <RightSidebar />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Op fail hone par upar aane wali patti.
+ *
+ * Alag component isliye ki ye desktop aur mobile dono shell me chahiye — aur ek
+ * hi jagah rehne se wo dono par hamesha ek jaisi rehti hai.
+ */
+function OpError({ message, onClear }: { message: string; onClear: () => void }) {
+  return (
+    <div className="flex items-center gap-3 border-b border-red-500/40 bg-red-500/10 px-4 py-1.5 text-sm text-red-300">
+      <span className="flex-1">{message}</span>
+      <button type="button" onClick={onClear} className="text-xs underline">
+        theek hai
+      </button>
     </div>
   );
 }

@@ -159,8 +159,7 @@ async function roundTrip(driver: StorageDriver, config: StorageConfig): Promise<
     } else if (driver.name === "local") {
       // Local driver ka "signed URL" studio ka route hai — studio band ho to
       // ye check nahi ho sakta. Jhootha pass dene se behtar hai saaf bolna.
-      console.log(`  SKIP signed URL se HTTP fetch — studio band lag raha hai (${viaHttp.reason})`);
-      console.log(`       studio chalao (npm run dev:studio) phir dobara chalao`);
+      console.log(`  SKIP signed URL se HTTP fetch — ${skipReason(viaHttp.reason)}`);
     } else {
       check("signed URL se HTTP par wahi bytes utre", false, viaHttp.reason);
     }
@@ -184,7 +183,7 @@ async function roundTrip(driver: StorageDriver, config: StorageConfig): Promise<
         after !== null && bytesEqual(after, payload),
       );
     } else if (driver.name === "local") {
-      console.log(`  SKIP putSigned URL par upload — studio band lag raha hai (${uploaded.reason})`);
+      console.log(`  SKIP putSigned URL par upload — ${skipReason(uploaded.reason)}`);
     } else {
       check("putSigned URL par sach me upload hua", false, uploaded.reason);
     }
@@ -197,6 +196,24 @@ async function roundTrip(driver: StorageDriver, config: StorageConfig): Promise<
     // Kahin beech me fail ho gaya to bhi kachra peeche nahi chhodna.
     await driver.delete(key).catch(() => undefined);
   }
+}
+
+/**
+ * Skip ki wajah insaan ki bhasha me.
+ *
+ * ⚠️ Ye ek asli galat-pata ka ilaaj hai. Pehle har nakaam fetch par likha jaata
+ * tha "studio band lag raha hai" — par studio ka `/api/local-media` **login ke
+ * peeche** hai, aur script ke paas cookie hoti hi nahi. Nateeja: server chalta
+ * rehta tha aur script kehti thi "server chalao". Us salah par jitna waqt jaata
+ * hai wo poori jaanch se zyada hota hai.
+ *
+ * 401/403 = server zinda hai, bas ye script anjaan hai. Baaki = sach me band.
+ */
+function skipReason(reason: string): string {
+  if (reason.includes("401") || reason.includes("403")) {
+    return `studio chal raha hai par ye route login ke peeche hai (${reason}) — script ke paas cookie nahi hoti. Browser me khol kar dekho.`;
+  }
+  return `studio band lag raha hai (${reason}) — npm run dev:studio chalao`;
 }
 
 async function tryUpload(

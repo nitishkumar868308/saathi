@@ -85,9 +85,15 @@ export async function whisperAvailable(): Promise<{ ok: boolean; detail: string 
  * ⚠️ `word_timestamps=True` hi is poore phase ki jaan hai (23.6) — iske bina
  * sirf cue milte hain aur karaoke/highlight styles andaaze par chalte hain.
  */
-const WHISPER_SCRIPT = `
+export const WHISPER_SCRIPT = `
 import json, sys
 from faster_whisper import WhisperModel
+
+# Windows par stdout default cp1252 hota hai aur usme Devanagari likha hi nahi
+# ja sakta. Bina is line ke Hindi transcription hamesha phatti hai — aur sabse
+# gumrah karne wale tarike se: whisper poora chal chuka hota hai, shabd nikal
+# chuke hote hain, aur wo sirf unhe *likhte waqt* marti hai.
+sys.stdout.reconfigure(encoding="utf-8")
 
 audio, model_name, language = sys.argv[1], sys.argv[2], sys.argv[3]
 

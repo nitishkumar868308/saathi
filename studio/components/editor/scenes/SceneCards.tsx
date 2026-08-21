@@ -19,6 +19,7 @@ import { SceneSlotRow } from "@/components/editor/scenes/SceneSlotRow";
 import { NumberField } from "@/components/controls/NumberField";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
+import { SceneAnimation } from "@/components/editor/scenes/SceneAnimation";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -234,6 +235,9 @@ function SceneCard({
             Timeline me edit
           </Button>
         </div>
+
+        {/* Scene ka animation/transition — 12.11. Primary item ka faisla core me hai. */}
+        <SceneAnimation scene={scene} />
 
         <p className="text-[10px] text-chalk-500">
           {items.length} clip · {framesToSeconds(start, fps).toFixed(1)}s se{" "}

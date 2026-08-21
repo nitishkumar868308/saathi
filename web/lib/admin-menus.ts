@@ -58,6 +58,15 @@ export const ADMIN_MENUS = [
   "pricing",
   "rewards",
   "team",
+  /**
+   * AI Reel Studio ka haal — AI usage/kharcha, render jobs aur voice.
+   *
+   * ⚠️ `spend` se alag menu hai, aur alag hi rehna chahiye. `spend` poore
+   * product ka bill hai (Gemini, Twilio, email); ye sirf Reel Studio ka hai,
+   * aur ise dekhne wala aksar wahi banda hota hai jo reel banata hai — usse
+   * poore product ka kharcha dikhane ki koi wajah nahi.
+   */
+  "reelStudio",
 ] as const;
 
 export type AdminMenu = (typeof ADMIN_MENUS)[number];

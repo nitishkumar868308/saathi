@@ -12,6 +12,7 @@ import {
 } from "@remotion/renderer";
 
 import type { RenderEngine, RenderRequest, RenderResult } from "./types";
+import { cachedBundle, rememberBundle, sourceFingerprint } from "./bundleCache";
 
 /**
  * Remotion se render.
@@ -24,7 +25,13 @@ import type { RenderEngine, RenderRequest, RenderResult } from "./types";
  * `bundle()` har render par chalta hai. Ye thoda kharcha hai (~5-15s) par
  * imaandaar hai: code badal gaya ho to purana bundle chupchaap chalte rehna
  * "maine to theek kar diya tha, video me kyun nahi aaya" wali sabse chidhane
- * wali cheez banta hai. Cache Phase 11 me jodenge, jab render UI se chalega.
+ * wali cheez banta hai.
+ *
+ * ⚠️ **Ab wo har baar nahi chalta — par wo dar ab bhi sahi hai.** Cache ki
+ * chaabi source ke fingerprint se banti hai (`bundleCache.ts`): ek line badalte
+ * hi chaabi badal jaati hai aur naya bundle banta hai. Yaani tezi mili, par
+ * "purana bundle chup-chaap chalta raha" wali halat ban nahi sakti.
+ * Naapa hua: bundling ~13.6s se 0s (cache lagne par).
  */
 
 /** Remotion ka entry file — repo root se, cwd se nahi. */
@@ -47,14 +54,29 @@ export class RemotionRenderEngine implements RenderEngine {
     request.onProgress?.({ stage: "bundling", progress: 0 });
     await ensureBrowser();
 
-    const serveUrl = await bundle({
-      entryPoint: entryPoint(),
-      // Assets isi folder me utari gayi hain — `staticFile()` yahin se padhta hai.
-      publicDir: request.publicDir,
-      onProgress: (percent) => {
-        request.onProgress?.({ stage: "bundling", progress: 0.05 + (percent / 100) * 0.1 });
-      },
-    });
+    /*
+     * Bundle ka cache — naapa hua faayda: 12.5s ki reel me bundling ~13.6s leti
+     * thi, har baar. Chaabi source ke fingerprint se banti hai, isliye ek line
+     * badalte hi naya bundle banta hai — "maine theek kiya tha, video me kyun
+     * nahi aaya" wali halat ban hi nahi sakti. Dekho `bundleCache.ts`.
+     */
+    const bundleStartedAt = Date.now();
+    const fingerprint = sourceFingerprint(requireRepoRoot(), entryPoint());
+    let serveUrl = cachedBundle(fingerprint);
+    const fromCache = serveUrl !== null;
+
+    if (!serveUrl) {
+      serveUrl = await bundle({
+        entryPoint: entryPoint(),
+        // Assets isi folder me utari gayi hain — `staticFile()` yahin se padhta hai.
+        publicDir: request.publicDir,
+        onProgress: (percent) => {
+          request.onProgress?.({ stage: "bundling", progress: 0.05 + (percent / 100) * 0.1 });
+        },
+      });
+      rememberBundle(fingerprint, serveUrl);
+    }
+    const bundleMs = Date.now() - bundleStartedAt;
 
     const inputProps = {
       doc: request.doc,
@@ -143,6 +165,10 @@ export class RemotionRenderEngine implements RenderEngine {
       outPath: request.outPath,
       bytes: size,
       renderMs: finishedAt - renderStartedAt,
+      // Naap meta me jaati hai taaki "dheema kyun hai" ka jawab andaaze se na
+      // dena pade — admin aur Renders panel dono yahi padhte hain.
+      bundleMs,
+      bundleCached: fromCache,
       totalMs: finishedAt - startedAt,
       frames: composition.durationInFrames,
     };

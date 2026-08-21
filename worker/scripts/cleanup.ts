@@ -121,7 +121,16 @@ async function main(): Promise<void> {
   console.log(`mode    : ${args.apply ? "APPLY (sach me mitega)" : "dry-run (kuch nahi mitega)"}`);
   console.log(`storage : ${storage.name}`);
 
-  const assets = rows(await select(conn, "/reel_assets?select=id,key,lifecycle,expires_at,bytes,filename")) as unknown as AssetRow[];
+  /*
+   * DB me column ka naam `r2_key` hai, `key` nahi — aur wo naam driver se nahi
+   * bandha hai (local driver bhi wahi key use karta hai, reel-studio.sql:118).
+   * Baaki poora code app ki taraf use `key` kehta hai (studio/lib/assets.ts),
+   * isliye yahan PostgREST ka alias laga kar wahi naam rakha hai; warna is
+   * script ke neeche ke saare `asset.key` badalne padte.
+   */
+  const assets = rows(
+    await select(conn, "/reel_assets?select=id,key:r2_key,lifecycle,expires_at,bytes,filename"),
+  ) as unknown as AssetRow[];
   const docs = await allDocs(conn);
 
   section("1. storage ka hisaab (20.13)");

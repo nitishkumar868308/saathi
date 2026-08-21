@@ -1,6 +1,6 @@
-import { frameGeometry, requireDevice, type Mockup } from "@reel/core";
+import { frameGeometry, requireDevice, visibleTaps, type Mockup } from "@reel/core";
 import type React from "react";
-import { useVideoConfig } from "remotion";
+import { useCurrentFrame, useVideoConfig } from "remotion";
 
 /**
  * Phone frame (18.1 / 18.3 / 18.4) — **poora SVG/CSS se**, koi PNG nahi.
@@ -19,7 +19,14 @@ export const PhoneFrame: React.FC<{
   /** Screen ke andar kya dikhega. */
   children: React.ReactNode;
 }> = ({ mockup, children }) => {
-  const { width: frameWidth } = useVideoConfig();
+  const { width: frameWidth, fps } = useVideoConfig();
+  /*
+   * ⚠️ `useCurrentFrame()` yahan **item-local** frame deta hai, kyunki har item
+   * apne `<Sequence>` ke andar render hota hai. Tap ke frame bhi item-local hain
+   * (schema me likha hai), isliye dono ek hi paimane par hain — koi offset ka
+   * hisaab nahi lagana padta, aur wahi hisaab galat hone ki sabse aam jagah hoti.
+   */
+  const localFrame = useCurrentFrame();
   const device = requireDevice(mockup.deviceId);
 
   const color =
@@ -87,6 +94,36 @@ export const PhoneFrame: React.FC<{
           }}
         >
           {children}
+
+          {/*
+           * Tap ke nishaan (18.11) — screen ke **andar**, isliye bezel par kabhi
+           * nahi chadhte aur screen ke round kone se apne aap kat jaate hain.
+           */}
+          {visibleTaps(mockup.taps, localFrame, fps).map((tap, index) => {
+            /*
+             * Gola phailta hai aur saath me feeka hota hai — asli ungli ka
+             * nishaan aisa hi lagta hai. Dono ek saath isliye ki sirf phailne
+             * par wo ek badhta hua chhalla lagta hai jo rukta hi nahi.
+             */
+            const size = geometry.screenWidth * 0.16 * (0.5 + tap.progress);
+            return (
+              <div
+                key={`${tap.x}-${tap.y}-${index}`}
+                style={{
+                  position: "absolute",
+                  left: tap.x * geometry.screenWidth - size / 2,
+                  top: tap.y * geometry.screenHeight - size / 2,
+                  width: size,
+                  height: size,
+                  borderRadius: "50%",
+                  border: `${Math.max(2, size * 0.06)}px solid rgba(255,255,255,0.9)`,
+                  backgroundColor: "rgba(255,255,255,0.18)",
+                  opacity: 1 - tap.progress,
+                  pointerEvents: "none",
+                }}
+              />
+            );
+          })}
 
           {/*
            * Chamak (glare) — default off.
