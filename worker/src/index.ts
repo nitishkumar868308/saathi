@@ -453,6 +453,47 @@ async function runJob(conn: DbConn, job: RenderJobRow): Promise<JobOutcome> {
 
     log(`  render ke baad ka kaam (faststart + loudness + thumbnail + upload): ${Date.now() - renderCallStartedAt - result.renderMs - result.bundleMs}ms`);
     const { size } = await stat(finalPath);
+
+    /*
+     * Bani hui reel media library me bhi (26.17).
+     *
+     * ⚠️ Ye pehle nahi hota tha, aur us kami ki shakl seedhi thi: reel ban jaati,
+     * R2 par chadh jaati, Renders panel me dikhti — par **library me kahin nahi**
+     * hoti. Yaani use kisi doosre project me daalna, ya kisi aur reel me ek clip
+     * ki tarah use karna, mumkin hi nahi tha. File maujood thi aur pahunch nahi
+     * thi.
+     *
+     * ⚠️ `id` job ki id hi hai, aur ye jaan-boojhkar hai: ek job ki ek hi reel
+     * hoti hai. Nayi id har baar banane par dobara render (retry) par do row ban
+     * jaati aur library me ek hi reel do baar dikhti — dono ki file bhi ek hi.
+     * Isi wajah se `upsert` hai, `insert` nahi.
+     *
+     * ⚠️ Ye fail hone par render ko rokna nahi hai. Reel ban chuki hai aur R2 par
+     * hai; library me na dikhna asuvidha hai, nuksaan nahi.
+     */
+    try {
+      await upsert(conn, "/reel_assets", {
+        id: job.id,
+        kind: "video",
+        r2_key: outKey,
+        filename: `reel-${job.id.slice(0, 8)}.mp4`,
+        mime: "video/mp4",
+        bytes: size,
+        width: video?.width ?? null,
+        height: video?.height ?? null,
+        duration_ms: Math.round((Number(probed.format.duration ?? 0) || 0) * 1000),
+        fps: null,
+        lifecycle: "permanent",
+        expires_at: null,
+        checksum: null,
+        cache_key: null,
+        tags: [],
+        meta: { fromRenderJob: job.id, preset: job.preset },
+      });
+      log(`  library me bhi jud gayi (asset ${job.id.slice(0, 8)})`);
+    } catch (error) {
+      log(`  ⚠️ library me nahi jud paayi: ${error instanceof Error ? error.message : String(error)}`);
+    }
     await updateJob(conn, job.id, {
       status: "completed",
       progress: 100,

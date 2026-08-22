@@ -218,19 +218,32 @@ export function StepVoice({
         const response = await fetch("/api/tts");
         const data = (await response.json()) as {
           categories?: Category[];
-          providers?: { id: string; ok: boolean }[];
+          providers?: { id: string; kind: string; available: boolean; detail: string }[];
           reason?: string;
         };
         if (!alive) return;
         setCategories(data.categories ?? []);
         setCategoryId((previous) => previous ?? data.categories?.[0]?.id ?? null);
+
         /*
-         * ⚠️ Ek bhi provider chalne layak na ho to wo saaf likha jaata hai. Bina
-         * iske "Awaaz banao" dabta rehta aur har baar fail hota — aur aadmi ko
-         * lagta ki uski galti hai.
+         * ⚠️ Field ka naam `available` hai, `ok` nahi — aur ye galti maine ki
+         * thi. `entry.ok` hamesha `undefined` aata tha, isliye ye jaanch hamesha
+         * "koi provider nahi chalta" kehti thi. Nateeja sabse bura wala tha: TTS
+         * bilkul theek chal raha tha (Gemini ki key maujood hai) par wizard use
+         * band bata kar button hi disable kar deta tha.
+         *
+         * ⚠️ Aur `manual` wale provider ko ginna nahi hai. Wo hamesha "available"
+         * hota hai kyunki usme chalta hi kuch nahi — wo to "apni file upload
+         * karo" ka hi doosra naam hai. Use ginne par ye jaanch kabhi fail hi
+         * nahi hoti, aur tab wo hoti hi bekaar.
          */
-        if (data.providers && !data.providers.some((entry) => entry.ok)) {
-          setTtsOff("Koi TTS provider chalne layak nahi hai — apni awaaz upload kar sakte ho.");
+        const generators = (data.providers ?? []).filter((entry) => entry.kind !== "manual");
+        const usable = generators.filter((entry) => entry.available);
+        if (generators.length > 0 && usable.length === 0) {
+          setTtsOff(
+            `Koi TTS provider chalne layak nahi hai — apni awaaz upload kar sakte ho. ` +
+              (generators[0]?.detail ?? ""),
+          );
         }
       } catch {
         if (alive) setTtsOff("TTS ki haalat pata nahi chali — apni awaaz upload kar sakte ho.");

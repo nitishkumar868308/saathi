@@ -23,7 +23,6 @@ import {
   autoFill,
   createEmptyProject,
   draftFromScript,
-  effectiveType,
   missingPlainNames,
   plainAnimation,
   plainTransition,
@@ -31,6 +30,8 @@ import {
   suggestAll,
   suggestAnimation,
   suggestTransition,
+  effectiveType,
+  requiredVisualSize,
   voiceStale,
   type AiScript,
   type WizardSceneLike,
@@ -325,6 +326,142 @@ check(
     doc: project,
     draft: { ...filled, scenes: filled.scenes.map((s, i) => (i === 1 ? { ...s, removed: true } : s)) },
   }).applied === 3,
+);
+
+console.log(`\n${passed} ok, ${failures.length} fail`);
+if (failures.length > 0) {
+  for (const line of failures) console.log(`  - ${line}`);
+  process.exit(1);
+}
+
+/* ==================================================================== */
+/*  Video, trim, aur "kitni badi tasveer chahiye" (26.16 / 26.18)       */
+/* ==================================================================== */
+
+console.log("\nvideo + trim");
+
+function sceneWith(patch: Partial<(typeof draft)["scenes"][number]>) {
+  return { ...draft.scenes[0]!, ...patch };
+}
+
+/*
+ * ⚠️ Ye jaanch us galti ke liye hai jo render me chup-chaap khaali frame deti
+ * hai: `image_audio` wale scene par video daal dena. Us slot ka kind mel nahi
+ * khaata, aur item `image` bankar ek video ki id le kar baith jaata hai.
+ */
+check(
+  "tasveer wale scene par video daalo to type video ho jaata hai",
+  effectiveType(sceneWith({ visualAssetId: "as_v", visualAssetKind: "video" })) === "video",
+);
+check(
+  "video wale scene par tasveer daalo to type image_audio",
+  effectiveType(
+    sceneWith({ type: "screen_recording", visualAssetId: "as_i", visualAssetKind: "image" }),
+  ) === "image_audio",
+);
+check(
+  "mel khaata ho to type wahi rehta hai",
+  effectiveType(sceneWith({ visualAssetId: "as_i", visualAssetKind: "image" })) === "image_audio",
+);
+
+/*
+ * ⚠️ Video ke saath awaaz. `video` scene type me pehle AUDIO_SLOT tha hi nahi,
+ * yaani video chunte hi banayi hui awaaz chup-chaap gayab ho jaati.
+ */
+const withVideo = {
+  ...filled,
+  scenes: filled.scenes.map((sc, i) =>
+    i === 0
+      ? { ...sc, visualAssetId: "as_vid", visualAssetKind: "video" as const, voiceAssetId: "as_voice_0", voiceForText: sc.text, visualTrim: { startSeconds: 3, endSeconds: 8 } }
+      : sc,
+  ),
+};
+const outVideo = applyWizard({ doc: project, draft: withVideo });
+const firstScene = [...outVideo.doc.scenes].sort((a, b) => a.order - b.order)[0]!;
+const sceneItems = outVideo.doc.items.filter((item) => item.sceneId === firstScene.id);
+
+check(
+  "video scene me awaaz bhi lagi",
+  sceneItems.some((item) => item.type === "audio" && item.assetId === "as_voice_0"),
+  sceneItems.map((i) => `${i.type}:${String(i.assetId)}`).join(", "),
+);
+
+const videoItem = sceneItems.find((item) => item.type === "video");
+check(
+  "trim se scene ki lambai 5s hui",
+  videoItem !== undefined &&
+    Math.abs(videoItem.durationInFrames / outVideo.doc.project.fps - 5) < 0.2,
+  `${videoItem ? (videoItem.durationInFrames / outVideo.doc.project.fps).toFixed(1) : "?"}s`,
+);
+check(
+  "trim ne source ke andar 3s se shuru kiya",
+  videoItem !== undefined && videoItem.trimStartFrame > 0,
+  `trimStartFrame=${videoItem?.trimStartFrame ?? "?"}`,
+);
+
+/* ------------------------------------------ kitni badi tasveer chahiye */
+
+console.log("\nrequiredVisualSize");
+
+const slow = requiredVisualSize("kenburns-slow", 1080, 1920);
+const punch = requiredVisualSize("kenburns-punch", 1080, 1920);
+const none = requiredVisualSize(null, 1080, 1920);
+
+check("dheeme zoom par 1.12x", Math.abs(slow.scale - 1.12) < 0.001, `${slow.width}x${slow.height}`);
+check("tez zoom par 1.35x", Math.abs(punch.scale - 1.35) < 0.001, `${punch.width}x${punch.height}`);
+/*
+ * WARNING: Ye jaanch us farak ke liye hai jo asli export me dikha: landscape
+ * tasveer portrait frame me bharne ke liye hi ~1.78x ho jaati hai, zoom se
+ * pehle. Bina is hisaab ke wizard aur validator do alag number bolte the.
+ */
+const landscape = requiredVisualSize("kenburns-slow", 1080, 1920, { width: 1920, height: 1080 });
+check(
+  "landscape tasveer par fit + zoom dono ginte hain",
+  landscape.scale > 1.9,
+  `scale=${landscape.scale.toFixed(2)} chahiye=${landscape.width}x${landscape.height}`,
+);
+check(
+  "portrait tasveer par sirf zoom",
+  Math.abs(requiredVisualSize("kenburns-slow", 1080, 1920, { width: 1080, height: 1920 }).scale - 1.12) < 0.001,
+);
+
+check(
+  "bina animation ke project jitni hi",
+  none.width === 1080 && none.height === 1920 && none.scale === 1,
+);
+check(
+  "bahaav 1.08 se shuru hota hai isliye uska bhi hisaab lagta hai",
+  requiredVisualSize("cinematic-drift", 1080, 1920).scale > 1,
+);
+
+/* ------------------------------------------------------ CTA ka logo slot */
+
+console.log("\nCTA");
+
+const ctaDraft = draftFromScript({
+  summary: "",
+  scenes: [{ type: "cta", name: "CTA", durationSeconds: 3, slots: { text: "Apka Saathi." }, reason: "" }],
+});
+const ctaOut = applyWizard({
+  doc: project,
+  draft: {
+    ...ctaDraft,
+    scenes: ctaDraft.scenes.map((sc) => ({ ...sc, visualAssetId: "as_logo", visualAssetKind: "image" as const })),
+  },
+});
+const ctaItems = ctaOut.doc.items.filter((item) => item.sceneId === ctaOut.doc.scenes[0]!.id);
+check("CTA me logo lag gaya", ctaItems.some((item) => item.assetId === "as_logo"), ctaItems.map((i) => i.type).join(", "));
+
+/*
+ * ⚠️ Ye jaanch us naarangi dabbe ke liye hai jo CTA ke text ko dhak leta tha.
+ * Wo DEFAULT_SHAPE tha - 60% x 20% ka bharaa rectangle. Ab patli patti honi
+ * chahiye, taaki wo z-order par tiki na rahe.
+ */
+const bandItem = ctaItems.find((item) => item.type === "shape");
+check(
+  "CTA ki patti patli hai, dabba nahi",
+  bandItem !== undefined && (bandItem.shape?.heightPercent ?? 99) < 5,
+  `heightPercent=${bandItem?.shape?.heightPercent ?? "?"}`,
 );
 
 console.log(`\n${passed} ok, ${failures.length} fail`);

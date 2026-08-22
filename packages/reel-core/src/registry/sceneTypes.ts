@@ -45,6 +45,16 @@ export interface SceneBuildInput {
   /** Slot ki values — `{ image: "as_123", caption: "Namaste" }`. */
   slots: Record<string, unknown>;
   fps: number;
+  /**
+   * Project ka frame naap.
+   *
+   * WARNING: Ye isliye chahiye ki kuch scene apne items ko frame ke hisaab se
+   * jagah dete hain (CTA ki patti, logo). Bina iske wahan pixel likhne padte,
+   * aur wo 1080x1920 ke alawa har naap par galat baith jaate - `widthPercent`
+   * wale comment me yahi baat likhi hai: magic pixels se bachna hai.
+   */
+  width: number;
+  height: number;
   /** Scene kitna lamba ho (frames). Na ho to type ka default. */
   durationInFrames?: number;
   /** Scene ka id — bane hue items par `sceneId` isi se lagti hai. */
@@ -269,8 +279,16 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     icon: "Video",
     hint: "Ek video clip",
     group: "media",
+    /*
+     * WARNING: `AUDIO_SLOT` yahan wizard ki wajah se aaya. Wizard me aadmi kisi
+     * bhi scene par tasveer ki jagah video daal sakta hai. Bina is slot ke us
+     * scene ka type `video` banta aur uski BANAYI HUI AWAAZ chup-chaap gayab ho
+     * jaati - scene banta, video chalti, bas voiceover chala jaata. Wahi galti
+     * pehle `text` ke saath ho chuki thi (dekho `text_audio`).
+     */
     slots: [
       { id: "video", label: "Video", kind: "asset:video", required: true },
+      AUDIO_SLOT,
       CAPTION_SLOT,
     ],
     defaultDurationSeconds: 6,
@@ -291,6 +309,20 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
           }),
         );
       }
+      const audio = slotString(input.slots, "audio");
+      if (audio) {
+        items.push(
+          createItem("audio", {
+            fps: input.fps,
+            trackId: "",
+            name: "Awaaz",
+            assetId: audio,
+            startFrame: 0,
+            durationInFrames: duration,
+          }),
+        );
+      }
+
       items.push(...captionItem(input, duration));
       return tag(items, input.sceneId);
     },
@@ -417,6 +449,13 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     group: "text",
     slots: [
       { id: "text", label: "CTA text", kind: "text", required: true, multiline: true },
+      {
+        id: "logo",
+        label: "Logo",
+        kind: "asset:image",
+        required: false,
+        hint: "Brand ka logo — text ke upar. Khaali chhod sakte ho.",
+      },
     ],
     defaultDurationSeconds: 3,
     build: (input) => {
@@ -424,14 +463,54 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       const content = slotString(input.slots, "text");
       if (!content) return [];
 
-      // Peeche ka band — CTA ko baaki reel se alag dikhata hai.
+      /*
+       * WARNING: Pehle yahan `createItem("shape")` bina kisi naap ke banta tha,
+       * yaani DEFAULT_SHAPE lag jaata tha - 60% x 20% ka bharaa hua rectangle,
+       * brand ke rang me, bilkul beech me. Screen par wo "band" nahi, ek naarangi
+       * DABBA banta tha jo CTA ke text ke upar aa jaata tha aur use padhne hi
+       * nahi deta.
+       *
+       * Aur wo upar isliye aata tha ki track item ke TYPE se milta hai
+       * (`trackForItem`): shape aur text alag track par jaate hain, isliye
+       * "pehle band, phir text" wali tarteeb z-order tay karti hi nahi.
+       *
+       * Isliye ab wo patli patti hai - poori chaudai, 1.5% oonchi, text se
+       * neeche. Is shakl me wo z-order par tiki hui nahi hai: upar rahe ya
+       * neeche, wo text ko dhak hi nahi sakti.
+       */
       const band = createItem("shape", {
         fps: input.fps,
         trackId: "",
-        name: "CTA band",
+        name: "CTA patti",
         startFrame: 0,
         durationInFrames: duration,
       });
+      const banded = {
+        ...band,
+        shape: { ...(band.shape as NonNullable<Item["shape"]>), widthPercent: 34, heightPercent: 1.5, radius: 4 },
+        transform: { ...band.transform, y: Math.round(input.height * 0.16) },
+      };
+
+      // Logo - text ke upar, chhota. Slot khaali ho to kuch nahi.
+      const logoId = slotString(input.slots, "logo");
+      const logo = logoId
+        ? [
+            (() => {
+              const item = createItem("image", {
+                fps: input.fps,
+                trackId: "",
+                name: "Logo",
+                assetId: logoId,
+                startFrame: 0,
+                durationInFrames: duration,
+              });
+              return {
+                ...item,
+                transform: { ...item.transform, y: -Math.round(input.height * 0.18), scale: 0.28 },
+              };
+            })(),
+          ]
+        : [];
       const text = createItem("text", {
         fps: input.fps,
         trackId: "",
@@ -442,7 +521,8 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
 
       return tag(
         [
-          band,
+          banded,
+          ...logo,
           { ...text, text: { ...(text.text as NonNullable<Item["text"]>), content } },
         ],
         input.sceneId,

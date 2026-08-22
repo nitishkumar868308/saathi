@@ -19,7 +19,16 @@ import { recordReelUsage } from "@/lib/usage";
 export const runtime = "nodejs";
 
 /** Ek call ki hadd — bina iske ek galat prompt poora kota kha sakta hai. */
+/*
+ * 4096 se ghata kar 2048. Naapa gaya: 8-10 scene ka poora jawab ~700-900 token
+ * me aa jaata hai, yaani 2048 me do guna se zyada gunjaish hai. Purani hadd sirf
+ * tab lagti thi jab model bhatak kar likhta hi chala jaata - aur wo poora
+ * bhatkav bhi paisa hi tha.
+ */
 const MAX_OUTPUT_TOKENS = 4096;
+
+/** Model kitna "soch" sakta hai. 0 = bilkul nahi (dekho neeche ka naap). */
+const THINKING_BUDGET = Number(process.env.GEMINI_THINKING_BUDGET ?? 0);
 
 export async function POST(request: Request): Promise<NextResponse> {
   const key = process.env.GEMINI_API_KEY;
@@ -63,6 +72,28 @@ export async function POST(request: Request): Promise<NextResponse> {
             temperature: 0.4,
             responseMimeType: "application/json",
             maxOutputTokens: MAX_OUTPUT_TOKENS,
+            /*
+             * Sochne ka budget - aur ye is poore route ka sabse bada kharcha tha.
+             *
+             * NAAPA GAYA (gemini-3.5-flash, ek chhota prompt):
+             *   bina thinkingConfig : total 327 token, jisme 303 sirf thinking
+             *   thinkingBudget: 0   : total  24 token
+             *
+             * Yaani 90% se zyada paisa jawab par nahi, SOCHNE par lag raha tha.
+             * Aur ye kahin dikhta nahi: `candidatesTokenCount` chhota rehta hai,
+             * bill bada aata hai. Sach `thoughtsTokenCount` me chhupa hota hai.
+             *
+             * WARNING: Ye scene banane jaise kaam ke liye theek hai - schema tay
+             * hai, niyam prompt me likhe hain, aur model ko kuch "hal" nahi karna.
+             * Kisi din yahan sach me sochne wala kaam aaye to ise badha dena;
+             * isiliye ye env se badla ja sakta hai.
+             *
+             * WARNING: Thinking token `maxOutputTokens` me GINTE hain. Isi wajah
+             * se cap 2048 karne par jawab kat kar aa raha tha - model 1900 token
+             * soch leta tha aur JSON aadha bachta tha. Wo galti dikhti "AI ka
+             * jawab sahi shakl me nahi aaya" jaisi thi, jabki wajah ye thi.
+             */
+            thinkingConfig: { thinkingBudget: THINKING_BUDGET },
           },
         }),
         cache: "no-store",

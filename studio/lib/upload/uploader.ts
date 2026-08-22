@@ -322,7 +322,27 @@ function putWithProgress(
     };
     xhr.onerror = () => {
       entry.xhr = null;
-      rejectPromise(new Error("upload ke beech network toot gaya"));
+      /*
+       * ⚠️ `onerror` par browser hume **kuch nahi** batata — na status, na body.
+       * Isliye "network toot gaya" likhna aasan tha aur gumraah karta tha: sabse
+       * aam wajah network nahi, **R2 bucket par CORS ka na hona** hai.
+       *
+       * Wo halat theek aisi hi dikhti hai: file browser se seedha R2 par PUT
+       * hoti hai, R2 preflight ko 403 deta hai bina `access-control-allow-origin`
+       * ke, aur browser request ko hi gira deta hai. Internet bilkul theek chal
+       * raha hota hai, aur aadmi apna Wi-Fi dekhta rehta hai.
+       *
+       * (Ye tab shuru hota hai jab REEL_STORAGE_DRIVER `local` se `r2` hota hai —
+       * `local` par upload apne hi server par jaata tha, isliye CORS ka sawaal
+       * hi nahi uthta tha.)
+       */
+      rejectPromise(
+        new Error(
+          "Upload nahi ja saki. Sabse aam wajah: R2 bucket par CORS set nahi hai " +
+            "(browser seedha R2 par bhejta hai). Cloudflare > R2 > bucket > Settings > " +
+            "CORS Policy me is site ka origin allow karo. Warna network dekho.",
+        ),
+      );
     };
     xhr.onabort = () => {
       entry.xhr = null;

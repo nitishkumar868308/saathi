@@ -109,6 +109,29 @@ async function localKeys(dir: string): Promise<string[]> {
   return found;
 }
 
+/**
+ * Key ke extension se content-type.
+ *
+ * WARNING: Ye pehle bheja hi nahi jaata tha (`dest.put(key, data)`), aur us
+ * chook ka nateeja chala kar dekhne par mila: R2 file ko
+ * `application/octet-stream` bana kar rakh leta hai, aur browser us par `<video>`
+ * chalane se **saaf mana** kar deta hai - readyState 0 par atka rehta hai, koi
+ * error bhi nahi deta. Tasveerein phir bhi dikhti hain (browser unhe soongh leta
+ * hai), isliye galti aadhi chhupi rehti hai: gallery theek dikhti hai aur video
+ * kahin nahi chalti.
+ */
+function mimeFor(key: string): string {
+  const ext = key.split(".").pop()?.toLowerCase() ?? "";
+  const table: Record<string, string> = {
+    mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm",
+    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif",
+    wav: "audio/wav", mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", ogg: "audio/ogg",
+    woff2: "font/woff2", woff: "font/woff", ttf: "font/ttf", otf: "font/otf",
+    json: "application/json", srt: "text/plain", vtt: "text/vtt",
+  };
+  return table[ext] ?? "application/octet-stream";
+}
+
 function mb(bytes: number): string {
   return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
@@ -189,9 +212,19 @@ async function main(): Promise<void> {
      * wo wahin se uthti hai jahan chhodi thi.
      */
     const already = await dest.exists(key);
-    if (already && already.size === size) {
+    /*
+     * WARNING: Sirf size dekhna kaafi nahi. Pehle ke run me content-type bheja
+     * hi nahi jaata tha, isliye R2 par sahi size ki file `octet-stream` bankar
+     * padi hai - aur wo video browser me chalti hi nahi. Aisi file dobara
+     * chadhani padti hai, isliye jaanch me content-type bhi hai.
+     */
+    const wrongType = already !== null && already.contentType !== mimeFor(key);
+    if (already && already.size === size && !wrongType) {
       skipped += 1;
       continue;
+    }
+    if (wrongType && !dryRun) {
+      console.log(`  content-type theek kar rahe hain: ${key} (${already?.contentType})`);
     }
 
     if (dryRun) {
@@ -207,7 +240,7 @@ async function main(): Promise<void> {
         failed.push(`${key} — local se padhi hi nahi gayi`);
         continue;
       }
-      await dest.put(key, data);
+      await dest.put(key, data, mimeFor(key));
 
       /*
        * ⚠️ Upload ke baad **poochha** jaata hai, maan nahi liya jaata. Storage me

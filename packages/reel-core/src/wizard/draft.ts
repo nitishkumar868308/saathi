@@ -2,7 +2,7 @@ import type { AiScene, AiScript } from "../ai/types";
 import { applyProposal, buildProposal } from "../ai/proposal";
 import { getSceneType, requireSceneType } from "../registry/sceneTypes";
 import type { Doc } from "../schema/project";
-import { applyAnimationPreset, setTransition } from "../timeline/ops";
+import { applyAnimationPreset, setTransition, trimItemToSourceRange } from "../timeline/ops";
 import { primarySceneItem } from "../scenes/primary";
 import { suggestAnimation, suggestTransition, type WizardSceneLike } from "./suggest";
 
@@ -37,6 +37,24 @@ export interface WizardScene {
   slots: Record<string, string>;
 
   visualAssetId: string | null;
+  /**
+   * Jo cheez chuni gayi wo tasveer thi ya video.
+   *
+   * WARNING: Iske bina scene type ka faisla ho hi nahi sakta. Aadmi `image_audio`
+   * wale scene par video daal de to us slot ka kind mel nahi khaata, aur item
+   * `image` bankar ek video ki id le kar baith jaata - render me wo chup-chaap
+   * khaali frame deta hai.
+   */
+  visualAssetKind: "image" | "video" | null;
+  /**
+   * Video ka kaunsa hissa lena hai — file ke andar ka waqt (26.18).
+   *
+   * WARNING: `null` matlab poori file. Video daalte hi aadmi se ye poochha jaata
+   * hai, kyunki 2 minute ki recording ko 4 second ke scene me daalne par bina
+   * poochhe **pehle 4 second** hi lag jaate hain - aur wo aksar wahi hissa hota
+   * hai jisme kuch hua hi nahi (camera set ho raha tha).
+   */
+  visualTrim: { startSeconds: number; endSeconds: number } | null;
   voiceAssetId: string | null;
   /**
    * Kis text se awaaz bani thi.
@@ -115,7 +133,16 @@ export function audioSlotId(typeId: string): string | null {
  * `text_audio`, warna `text`.
  */
 export function effectiveType(scene: WizardScene): string {
-  if (scene.visualAssetId) return scene.type;
+  if (scene.visualAssetId) {
+    /*
+     * Chuni hui cheez us scene type ke slot se mel khaati hai? Na khaaye to type
+     * badalna hi padta hai - warna `image` ka item ek video ki id le kar baith
+     * jaata hai aur render me khaali frame aata hai, bina kisi error ke.
+     */
+    const want = scene.visualAssetKind;
+    if (!want || visualSlotKind(scene.type) === want) return scene.type;
+    return want === "video" ? "video" : "image_audio";
+  }
 
   const visual = visualSlotId(scene.type);
   const type = getSceneType(scene.type);
@@ -149,6 +176,8 @@ export function draftFromScript(script: AiScript): WizardDraft {
         text: (textSlot ? scene.slots[textSlot] : "") ?? "",
         slots: rest,
         visualAssetId: null,
+        visualAssetKind: null,
+        visualTrim: null,
         voiceAssetId: null,
         voiceForText: null,
         animationPresetId: null,
@@ -266,10 +295,21 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       delete slots[audioSlot];
     }
 
+    /*
+     * WARNING: Trim ho to scene ki lambai bhi wahi ho jaati hai. Bina iske do me
+     * se ek galti pakki hai: chuna hua hissa scene se chhota ho to aakhir me
+     * jamaa hua frame dikhta hai, aur bada ho to chuna hua hissa beech me hi kat
+     * jaata hai - aur dono me aadmi ko lagta hai ki uska chunav maana hi nahi
+     * gaya.
+     */
+    const trimmed = scene.visualTrim
+      ? Math.max(0.5, scene.visualTrim.endSeconds - scene.visualTrim.startSeconds)
+      : null;
+
     return {
       type,
       name: scene.name,
-      durationSeconds: scene.durationSeconds,
+      durationSeconds: trimmed ?? scene.durationSeconds,
       slots,
       reason: `wizard · scene ${at + 1}`,
     };
@@ -327,6 +367,18 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       doc = applyAnimationPreset(doc, {
         itemIds: [primary.id],
         presetId: source.animationPresetId,
+      });
+    }
+
+    /*
+     * Video ka chuna hua hissa. Ye `applyAnimationPreset` se **pehle** nahi, baad
+     * me lagta hai - dono alag cheezein hain aur ek doosre ko chhoote nahi.
+     */
+    if (source.visualTrim && primary.assetId === source.visualAssetId) {
+      doc = trimItemToSourceRange(doc, {
+        itemId: primary.id,
+        startSeconds: source.visualTrim.startSeconds,
+        endSeconds: source.visualTrim.endSeconds,
       });
     }
 

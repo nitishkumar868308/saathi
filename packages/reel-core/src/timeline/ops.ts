@@ -2748,6 +2748,8 @@ export const addScene = defineOp<AddSceneArgs>("addScene", (draft, args) => {
   const built = entry.build({
     slots: args.slots ?? {},
     fps: draft.project.fps,
+    width: draft.project.width,
+    height: draft.project.height,
     sceneId,
     ...(args.durationInFrames === undefined ? {} : { durationInFrames: args.durationInFrames }),
   });

@@ -1,3 +1,5 @@
+import { ANIMATION_PRESETS } from "../config/animationPresets";
+
 /**
  * Wizard ki sifaarish — **ek likha hua niyam, AI ka andaaza nahi** (26.2 / 26.3).
  *
@@ -97,4 +99,65 @@ export function suggestAll(scenes: readonly WizardSceneLike[]): WizardSuggestion
     animation: suggestAnimation(scene, index),
     transition: suggestTransition(index, scene.hasImage, scenes[index - 1]?.hasImage ?? false),
   }));
+}
+
+/* ------------------------------------------------- kitni badi tasveer chahiye */
+
+/**
+ * Is animation ke saath tasveer kam se kam kitni badi honi chahiye (26.16).
+ *
+ * WARNING: Ye sawaal aadmi ke liye sabse chhupa hua hai. Reel 1080x1920 ki hai,
+ * to lagta hai 1080x1920 ki tasveer kaafi hai. Par zoom wali animation use
+ * 1.12x se 1.35x tak bada karti hai - aur us waqt wo phail kar dhundhli ho
+ * jaati hai. Validator ye pakadta hai, par **render ke baad**; tab tak aadmi
+ * saari tasveerein daal chuka hota hai.
+ *
+ * Isliye ye hisaab wizard me hi dikh jaata hai, tasveer chunte hi.
+ */
+export function requiredVisualSize(
+  presetId: string | null,
+  projectWidth: number,
+  projectHeight: number,
+  /**
+   * Tasveer ka apna naap — na do to sirf zoom ka hisaab lagta hai.
+   *
+   * WARNING: Ye chala kar dekhne par joda gaya, aur ye sabse bada hissa nikla.
+   * Ek 1920x1080 (landscape) tasveer 1080x1920 (portrait) frame me bharne ke liye
+   * hi **1.78x** ho jaati hai - zoom shuru hone se pehle. Bina is hisaab ke wizard
+   * "chahiye 1458x2592" bolta aur export ke waqt validator "chahiye 3414x1920"
+   * bolta. Do alag number, dono sach ke tukde - aur aadmi dono par bharosa kho
+   * deta hai.
+   */
+  source?: { width: number; height: number } | null,
+): { width: number; height: number; scale: number } {
+  const preset = presetId ? ANIMATION_PRESETS.find((entry) => entry.id === presetId) : null;
+
+  /*
+   * Sabse zyada zoom jo is preset me kahin bhi lagta hai. `from` aur `to` dono
+   * dekhe jaate hain - "Bahaav" 1.08 se shuru hokar 1.15 par jaata hai, yaani
+   * uska pehla frame bhi pehle se bada hota hai.
+   */
+  let scale = 1;
+  for (const animation of preset?.animations ?? []) {
+    for (const key of ["from", "to"] as const) {
+      const value = (animation as Record<string, unknown>)[key];
+      if (typeof value === "number" && value > scale) scale = value;
+    }
+  }
+
+  /*
+   * Frame bharne wali scale (cover fit) - dono taraf me se jo zyada chahiye.
+   * Ye zoom se pehle lagti hai, isliye dono guna hoti hain.
+   */
+  const fit =
+    source && source.width > 0 && source.height > 0
+      ? Math.max(projectWidth / source.width, projectHeight / source.height)
+      : 1;
+  const total = scale * fit;
+
+  return {
+    width: Math.ceil((source?.width ?? projectWidth) * total),
+    height: Math.ceil((source?.height ?? projectHeight) * total),
+    scale: total,
+  };
 }

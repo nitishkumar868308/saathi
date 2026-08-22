@@ -1,18 +1,22 @@
 "use client";
 
 import {
+  requiredVisualSize,
   suggestAnimation,
   suggestTransition,
   visualSlotKind,
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
-import { ImageOff, Loader2, Upload } from "lucide-react";
-import { useRef } from "react";
+import { AlertTriangle, Film, ImageOff, Loader2, Upload } from "lucide-react";
+import { useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
+import { VideoTrimDialog } from "@/components/editor/wizard/VideoTrimDialog";
 import { useAssetUrl } from "@/lib/assetUrls";
+import { useAssetDurations } from "@/lib/assetMeta";
+import { useEditorStore } from "@/lib/store";
 import { useUploader } from "@/lib/upload/uploader";
 
 /**
@@ -55,12 +59,20 @@ function SceneRow({
   at,
   recommendedAnimation,
   recommendedTransition,
+  source,
+  project,
+  sourceSeconds,
   onChange,
 }: {
   scene: WizardScene;
   at: number;
   recommendedAnimation: string | null;
   recommendedTransition: string;
+  /** Chuni hui file ka asli naap — `null` = abhi pata nahi. */
+  source: { width: number; height: number } | null;
+  /** Video ki DB wali lambai — trim dialog ka fallback. */
+  sourceSeconds: number | null;
+  project: { width: number; height: number };
   onChange(index: number, patch: Partial<WizardScene>): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -80,9 +92,19 @@ function SceneRow({
    * text ajeeb dikhta hai — theek wahi cheez jisse bachne ke liye
    * `suggestAnimation` bina tasveer ke `null` deta hai.
    */
-  function setImage(assetId: string | null): void {
+  const [trimFor, setTrimFor] = useState<string | null>(null);
+
+  function setImage(assetId: string | null, kind: "image" | "video" = "image"): void {
+    /*
+     * Video chunte hi trim ka sawaal — baad me nahi. Baad me poochhne par aadmi
+     * aage badh chuka hota hai, aur galat hissa reel bante waqt hi dikhta hai.
+     */
+    if (assetId && kind === "video") setTrimFor(assetId);
+
     onChange(scene.index, {
       visualAssetId: assetId,
+      visualAssetKind: assetId ? kind : null,
+      ...(assetId && kind === "video" ? {} : { visualTrim: null }),
       ...(assetId
         ? scene.animationPresetId
           ? {}
@@ -91,9 +113,11 @@ function SceneRow({
     });
   }
 
+  /** Kaunsa button daba tha — file aane par yahi kind lagti hai. */
+  const uploadKind = useRef<"image" | "video">("image");
   const uploader = useUploader({
     tags: ["wizard"],
-    onFinished: ({ assetId }) => setImage(assetId),
+    onFinished: ({ assetId }) => setImage(assetId, uploadKind.current),
   });
   const { url } = useAssetUrl(scene.visualAssetId, { thumb: true });
 
@@ -103,8 +127,28 @@ function SceneRow({
    * aur wo scene ant me "asset library me nahi mili" keh kar chhoot jaata tha,
    * bina aadmi ko theek karne ka koi raasta diye.
    */
-  const want = visualSlotKind(scene.type) ?? "image";
-  const wantLabel = want === "video" ? "Video daalo" : "Tasveer daalo";
+  /*
+   * WARNING: Ab DONO option hamesha dikhte hain, aur ek par "Sifaarish" ka
+   * nishaan hota hai. Pehle sirf wahi ek dikhta tha jo scene type ka slot
+   * maangta tha - yaani aadmi ke paas video hoti bhi to `image_audio` wale scene
+   * par wo daal hi nahi sakta tha, aur use kabhi pata bhi nahi chalta ki ye ho
+   * sakta hai. Chunav chhupa dena "aasan" nahi hota, wo sirf kam hota hai.
+   *
+   * Doosri cheez badalne par scene ka type khud badal jaata hai
+   * (`effectiveType`), isliye galat jodi ban hi nahi sakti.
+   */
+  const suggested = visualSlotKind(scene.type) ?? "image";
+  const picked = scene.visualAssetKind;
+
+  /*
+   * WARNING: Ye chetavni yahan hai, render ke baad nahi - aur wahi iska poora
+   * matlab hai. Validator yahi baat pakadta hai, par tab tak aadmi saari
+   * tasveerein daal chuka hota hai aur do minute ka render bhi ho chuka hota
+   * hai. Yahan wo tasveer chunte hi dikh jaati hai, poore naap ke saath.
+   */
+  const need = requiredVisualSize(scene.animationPresetId, project.width, project.height, source);
+  const tooSmall =
+    source && (source.width < need.width || source.height < need.height) ? need : null;
 
   const task = uploader.tasks[uploader.tasks.length - 1];
   const uploading = task && task.phase !== "done" && task.phase !== "duplicate" && task.phase !== "error";
@@ -137,11 +181,23 @@ function SceneRow({
           <p className="text-[10px] text-red-300">{task.error}</p>
         ) : null}
 
+        {tooSmall && source ? (
+          <p className="flex items-start gap-1 rounded border border-amber/40 bg-amber/10 px-1.5 py-1 text-[10px] leading-snug text-amber">
+            <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+            <span>
+              Ye tasveer <strong>{source.width}×{source.height}</strong> ki hai. Is harkat me wo{" "}
+              {tooSmall.scale.toFixed(2)}x badi dikhegi, isliye dhundhli aayegi — chahiye kam se
+              kam <strong>{tooSmall.width}×{tooSmall.height}</strong>. Badi tasveer daalo, ya
+              harkat badal kar halki wali chuno.
+            </span>
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-1.5">
           <input
             ref={input}
             type="file"
-            accept={want === "video" ? "video/*" : "image/*"}
+            accept={uploadKind.current === "video" ? "video/*" : "image/*"}
             hidden
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -150,20 +206,37 @@ function SceneRow({
               event.target.value = "";
             }}
           />
-          <button
-            type="button"
-            onClick={() => input.current?.click()}
-            className="flex items-center gap-1 rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-300 transition-colors hover:border-terracotta hover:text-chalk-100"
-          >
-            <Upload size={9} />
-            {wantLabel}
-          </button>
 
-          <div className="min-w-0 max-w-[150px] flex-1">
+          {(["image", "video"] as const).map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => {
+                uploadKind.current = kind;
+                input.current?.click();
+              }}
+              title={
+                kind === suggested
+                  ? "Is scene ke liye yahi sabse theek baithta hai"
+                  : "Ye bhi chal jaayega — scene ka type apne aap badal jaayega"
+              }
+              className="flex items-center gap-1 rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-300 transition-colors hover:border-terracotta hover:text-chalk-100"
+            >
+              {kind === "video" ? <Film size={9} /> : <Upload size={9} />}
+              {kind === "video" ? "Video daalo" : "Tasveer daalo"}
+              {kind === suggested ? (
+                <span className="rounded bg-terracotta/20 px-1 text-[9px] text-terracotta">
+                  Sifaarish
+                </span>
+              ) : null}
+            </button>
+          ))}
+
+          <div className="min-w-0 max-w-[130px] flex-1">
             <AssetPickerButton
-              kind={want}
+              kind={picked ?? suggested}
               assetId={scene.visualAssetId}
-              onPick={(assetId) => setImage(assetId)}
+              onPick={(assetId) => setImage(assetId, picked ?? suggested)}
             />
           </div>
 
@@ -197,6 +270,34 @@ function SceneRow({
           />
         ) : null}
 
+        {/* Video ho to uska chuna hua hissa saaf dikhe, aur badla ja sake. */}
+        {scene.visualAssetKind === "video" && scene.visualAssetId ? (
+          <button
+            type="button"
+            onClick={() => setTrimFor(scene.visualAssetId)}
+            className="flex items-center gap-1 text-[10px] text-chalk-400 transition-colors hover:text-chalk-100"
+          >
+            <Film size={9} />
+            {scene.visualTrim
+              ? `${scene.visualTrim.startSeconds.toFixed(1)}s se ${scene.visualTrim.endSeconds.toFixed(1)}s`
+              : "poori video"}
+            <span className="underline">badlo</span>
+          </button>
+        ) : null}
+
+        <VideoTrimDialog
+          open={trimFor !== null}
+          assetId={trimFor}
+          sceneSeconds={scene.durationSeconds}
+          fallbackSeconds={sourceSeconds}
+          value={scene.visualTrim}
+          onCancel={() => setTrimFor(null)}
+          onSave={(trim) => {
+            onChange(scene.index, { visualTrim: trim });
+            setTrimFor(null);
+          }}
+        />
+
         {at > 0 ? (
           <ChoicePicker
             kind="transition"
@@ -217,6 +318,9 @@ export function StepImage({
   draft: WizardDraft;
   onChange(index: number, patch: Partial<WizardScene>): void;
 }) {
+  const project = useEditorStore((state) => state.doc.project);
+  // Wahi hook jo Export dialog chalata hai — asset ka asli naap ek hi jagah se.
+  const meta = useAssetDurations(project.fps);
   const live = draft.scenes.filter((scene) => !scene.removed);
 
   return (
@@ -245,6 +349,14 @@ export function StepImage({
             Boolean(scene.visualAssetId),
             Boolean(live[at - 1]?.visualAssetId),
           )}
+          source={meta.loaded ? meta.sourceSize(scene.visualAssetId) : null}
+          sourceSeconds={
+            meta.loaded && scene.visualAssetId
+              ? (meta.sourceFrames(scene.visualAssetId) ?? null) &&
+                (meta.sourceFrames(scene.visualAssetId) as number) / project.fps
+              : null
+          }
+          project={{ width: project.width, height: project.height }}
           onChange={onChange}
         />
       ))}

@@ -264,6 +264,42 @@ le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
 
 ## Progress log
 
+- **2026-08-22 (raat, teesra daur)** — feedback ke baad ka batch.
+
+  **Teen bug, teeno ki jad mili:**
+  1. **Upload fail** — network ka masla tha hi nahi. R2 bucket par CORS rule hai hi nahi;
+     `OPTIONS` par 403 aur `access-control-allow-origin` nadarad. `local` driver par upload
+     apne hi server par jaata tha, isliye ye kabhi saamne nahi aaya. Error message ab CORS ka
+     naam leta hai.
+  2. **"Awaaz nahi ban rahi" — meri galti.** Jawab me field `available` hai, `ok` nahi. Main
+     `entry.ok` padh raha tha jo hamesha `undefined` aata, isliye wizard TTS ko band bataata
+     tha — aur pichhle daur me maine us "chetavni" ke bharose button bhi disable kar diya tha.
+     Yaani chalti hui cheez band kar di thi. `manual` provider ab ginta bhi nahi.
+  3. **CTA par naarangi dabba** — wo `DEFAULT_SHAPE` tha (60% x 20%, brand rang). Aur wo text
+     ke upar isliye aata tha ki track item ke **type** se milta hai, yaani "pehle band phir
+     text" wali tarteeb z-order tay karti hi nahi. Ab patli patti hai (1.5%), jo z-order par
+     tiki hi nahi — upar rahe ya neeche, text dhak nahi sakti.
+
+  **Paanch feature:**
+  - CTA me **logo** ka slot
+  - Tasveer chhoti ho to poora naap: *"1080x1920 ki hai, 1.35x badi dikhegi — chahiye 1458x2592"*
+  - Tasveer **aur** video dono ka option, ek par "Sifaarish". Doosra chunne par scene ka type
+    khud badal jaata hai (`effectiveType`)
+  - Video daalte hi **trim ka modal** — kahan se, kitna lamba
+  - Bani hui reel ab **media library me** bhi (worker se, job ki id par — retry par do row nahi)
+
+  Do cheezein raaste me jodni padi, dono usi "chup-chaap gayab" wali shakl ki:
+  `video` scene type me `AUDIO_SLOT` (warna video chunte hi banayi hui awaaz chali jaati), aur
+  `SceneBuildInput` me `width`/`height` (warna CTA ki patti ke liye pixel likhne padte, jo
+  1080x1920 ke alawa har naap par galat baithte).
+
+  Naapa hua: core **585 + 52 assertions, 0 fail**; studio + worker typecheck saaf; `next build`
+  saaf.
+
+  WARNING: Is daur ka **browser pass nahi hua** — Chrome beech me band ho gaya. Logic poori
+  tarah naapi gayi (video/trim/CTA/size ki apni jaanchein hain), par screen par ye batch abhi
+  dekha nahi gaya.
+
 - **2026-08-22 (raat, baad me)** — **26.14: poora chakkar browser me chala kar dekha.**
 
   Asli Gemini call se 5 scene bane, phir: shabd → tasveer (library se PAPA.png) → awaaz →

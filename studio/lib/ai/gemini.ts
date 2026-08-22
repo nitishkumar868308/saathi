@@ -8,6 +8,7 @@ import {
   type AiResult,
   type AiUsage,
   type GenerateScriptInput,
+  type AiScript,
 } from "@reel/core";
 import { z } from "zod";
 
@@ -41,6 +42,36 @@ Niyam:
 - Bhasha aam bolchaal ki rakho, sarkari/kitaabi nahi.
 - Har scene chhota rakho — 2 se 5 second. Reel me lambi baat koi nahi sunta.
 - Sab scene ki durationSeconds ka jod di gayi lambai ke aas-paas hona chahiye.`;
+
+/**
+ * Ek hi maang ka jawab dobara na khareedo (26.15).
+ *
+ * WARNING: Ye wahi soch hai jo TTS ke cache ke sar par likhi hai, aur wajah bhi
+ * wahi hai. Seekhte waqt aadmi "Scenes banao" ek hi kahani par teen-chaar baar
+ * dabata hai - kabhi settings dekhne, kabhi wizard band karke dobara kholne. Har
+ * baar poora prompt jaata hai aur poora jawab aata hai, aur har baar paisa lagta
+ * hai. Dikhne me kuch galat nahi hota, isliye koi pakadta bhi nahi.
+ *
+ * Chaabi poora prompt hai. Kahani ka ek akshar, tone, ya lambai badle to chaabi
+ * badal jaati hai aur nayi call jaati hai - yaani cache kabhi purana jawab nahi
+ * thopta.
+ *
+ * WARNING: Ye sirf is server process ki yaad hai (dev me reload par khali, Vercel
+ * me naye instance par khali). Jaan-boojhkar: DB me daalne ka matlab ek aur table
+ * aur uski safai, jabki bachana theek wahi hai jo ek baithak me hota hai.
+ */
+const scriptCache = new Map<string, { data: AiScript; usage: AiUsage }>();
+
+/** Cache ki hadd - iske baad sabse purani entry hat jaati hai. */
+const SCRIPT_CACHE_MAX = 20;
+
+function cacheScript(key: string, value: { data: AiScript; usage: AiUsage }): void {
+  if (scriptCache.size >= SCRIPT_CACHE_MAX) {
+    const oldest = scriptCache.keys().next().value;
+    if (oldest !== undefined) scriptCache.delete(oldest);
+  }
+  scriptCache.set(key, value);
+}
 
 function usage(started: number, calls: number, raw: unknown): AiUsage {
   const meta = (raw as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } })
@@ -170,12 +201,25 @@ export class GeminiAiProvider implements AIProvider {
      * dena aasan hai par tab naya scene type jodne par AI ko uska pata hi nahi
      * chalta, aur wo chup-chaap purane types hi use karta rehta hai.
      */
+    /*
+     * WARNING: Ye list har call me jaati hai, isliye iska ek-ek akshar har baar
+     * paisa hai. Pehle isme har type ka poora `hint` bhi jaata tha - aam bolchaal
+     * ki ek-do line, jo aadmi ke liye likhi gayi thi, model ke liye nahi.
+     *
+     * Naapa gaya: 1296 akshar (~324 token) se 447 akshar (~112 token) - 66% kam,
+     * har call me. Slot ab `id*:kind` shakl me hai (`*` = zaroori), aur `asset:`
+     * ka upsarg hata diya gaya kyunki wo har asset slot me dohrata tha.
+     *
+     * WARNING: Label rakha gaya hai, hint nahi. Sirf id se model `image_audio` aur
+     * `text_audio` me farak theek se nahi kar paata; label wo farak ek-do shabd me
+     * bata deta hai.
+     */
     const types = input.sceneTypes
       .map((entry) => {
         const slots = entry.slots
-          .map((slot) => `${slot.id} (${slot.kind}${slot.required ? ", zaroori" : ""})`)
-          .join(", ");
-        return `- "${entry.id}" — ${entry.label}. ${entry.hint} Slots: ${slots || "koi nahi"}`;
+          .map((slot) => `${slot.id}${slot.required ? "*" : ""}:${slot.kind.replace("asset:", "")}`)
+          .join(" ");
+        return `${entry.id} (${entry.label}) ${slots}`;
       })
       .join("\n");
 
@@ -194,7 +238,17 @@ export class GeminiAiProvider implements AIProvider {
       (input.characters?.length ? ` Characters: ${input.characters.join(", ")}.` : "") +
       `\n\nScene types (SIRF inhi me se chuno):\n${types}${assets}\n\n` +
       `JSON is shakl me lautao:\n` +
-      `{"summary":"...","scenes":[{"type":"...","name":"...","durationSeconds":3,"slots":{"text":"..."},"reason":"..."}]}`;
+      `{"summary":"...","scenes":[{"type":"...","name":"...","durationSeconds":3,"slots":{"text":"..."}}]}`;
+
+    /*
+     * Cache pehle, API baad me. Wahi kahani dobara bhejne par ek bhi token nahi
+     * lagta - aur `usage` me `calls: 0` jaata hai, taaki panel me saaf dikhe ki
+     * ye jawab muft aaya. Chhupane par cache ki keemat kabhi nahi dikhti.
+     */
+    const cached = scriptCache.get(prompt);
+    if (cached) {
+      return { data: cached.data, usage: { ...cached.usage, calls: 0, ms: Date.now() - started } };
+    }
 
     const first = await callGemini(prompt, "server");
     const { data, raw, calls } = await parseWithRepair(AiScriptSchema, first, () =>
@@ -204,7 +258,9 @@ export class GeminiAiProvider implements AIProvider {
       ),
     );
 
-    return { data, usage: usage(started, calls, raw) };
+    const result = { data, usage: usage(started, calls, raw) };
+    cacheScript(prompt, result);
+    return result;
   }
 
   async suggestCaptions(input: {
