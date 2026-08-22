@@ -211,11 +211,12 @@ Jab tak Phase 22 nahi bana, sirf **Upload** option dikhega — baaki buttons UI 
 |---|---|---|
 | 24 | Lip-sync decision, batch reels, hosting, multi-user | [phases/24-optional-heavy.md](phases/24-optional-heavy.md) |
 
-**Milestone 5 — Cloud worker (Phase 25)**
+**Milestone 5 — Cloud worker + wizard (Phase 25-26)**
 
 | # | Phase | File |
 |---|---|---|
 | 25 | Render GitHub Actions par — bina server, bina PC chalu rakhe | [phases/25-cloud-worker.md](phases/25-cloud-worker.md) |
+| 26 | Reel Wizard — kahani se chalti hui reel, ek raaste me | [phases/26-reel-wizard.md](phases/26-reel-wizard.md) |
 
 ---
 
