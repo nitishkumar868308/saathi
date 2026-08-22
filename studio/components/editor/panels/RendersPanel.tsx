@@ -43,6 +43,8 @@ export function RendersPanel() {
   const [worker, setWorker] = useState<{ online: boolean; secondsAgo: number | null } | null>(null);
   /** Worker kahan chalta hai — is PC par ya GitHub ke runner par (25.3). */
   const [mode, setMode] = useState<"cloud" | "local">("local");
+  /** Cloud worker + local storage — ek aisi galti jo khud kabhi nahi dikhti (25.6). */
+  const [storageMismatch, setStorageMismatch] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -64,9 +66,11 @@ export function RendersPanel() {
       const workerData = (await workerResponse.json()) as {
         worker?: { online: boolean; secondsAgo: number | null };
         mode?: "cloud" | "local";
+        storageMismatch?: boolean;
       };
       if (workerData.worker) setWorker(workerData.worker);
       if (workerData.mode) setMode(workerData.mode);
+      setStorageMismatch(workerData.storageMismatch === true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -114,6 +118,27 @@ export function RendersPanel() {
           <RefreshCw size={11} />
         </IconButton>
       </div>
+
+      {/*
+        ⚠️ Ye laal hai, peeli nahi — kyunki ye "shayad" nahi, "pakka" hai. Cloud
+        worker GitHub ke runner par chalta hai; wo tumhare disk ko kabhi nahi dekh
+        sakta. Is haalat me har render ya to "asset nahi mili" par marega, ya ban
+        kar runner ki us disk par chala jaayega jo run khatam hote hi mit jaati
+        hai. Dono soorat me galti do minute ka setup jala kar dikhti hai.
+      */}
+      {storageMismatch ? (
+        <p className="border-b border-red-500/40 bg-red-500/10 px-3 py-2 text-[11px] leading-snug text-red-300">
+          <strong>Cloud worker hai, par storage local hai.</strong> Runner tumhare disk ko nahi
+          dekh sakta — render fail hoga. Pehle purani media R2 par chadhao:
+          <br />
+          <code className="font-mono text-[11px]">
+            npm run migrate:r2 --workspace @reel/worker
+          </code>
+          <br />
+          phir studio ka <code className="font-mono text-[11px]">REEL_STORAGE_DRIVER=r2</code> karo
+          (R2 ki chaaron keys ke saath).
+        </p>
+      ) : null}
 
       {worker && !worker.online && mode === "local" ? (
         /*

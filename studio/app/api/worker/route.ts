@@ -1,3 +1,5 @@
+import { readStorageConfig } from "@reel/storage";
+
 import { handle, ok } from "@/lib/api";
 import { dispatchConfigured } from "@/lib/dispatch";
 import { workerStatus } from "@/lib/renders";
@@ -26,10 +28,28 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-  return handle(async () =>
-    ok({
+  return handle(async () => {
+    const cloud = dispatchConfigured();
+    const driver = readStorageConfig().driver;
+
+    return ok({
       worker: await workerStatus(),
-      mode: dispatchConfigured() ? "cloud" : "local",
-    }),
-  );
+      mode: cloud ? "cloud" : "local",
+      driver,
+      /**
+       * Cloud worker + local storage = hamesha galat, aur wo bilkul chup-chaap
+       * galat hota hai (25.6).
+       *
+       * ⚠️ Runner tumhare disk ko kabhi nahi dekh sakta. Local driver par asset
+       * `render-out/media/` me padi hoti hai, aur DB me uska key maujood hota
+       * hai — isliye studio me sab bilkul theek dikhta hai. Galti tab dikhti hai
+       * jab runner do minute setup karne ke baad "asset nahi mili" par marta
+       * hai, ya (uske aage) reel ban kar runner ki us disk par chali jaati hai
+       * jo run khatam hote hi mit jaati hai.
+       *
+       * Isliye ye jaanch yahan hai, render ke waqt nahi: sabse sasti jagah.
+       */
+      storageMismatch: cloud && driver !== "r2",
+    });
+  });
 }

@@ -17,6 +17,7 @@
     "render:mockup": "tsx scripts/render-mockup.ts",
     "render:captions": "tsx scripts/render-captions.ts",
     "cleanup": "tsx scripts/cleanup.ts",
+    "migrate:r2": "tsx scripts/migrate-local-to-r2.ts",
     "validate:demo": "tsx scripts/validate-demo.ts",
     "tts:smoke": "tsx scripts/tts-smoke.ts",
     "transcribe:smoke": "tsx scripts/transcribe-smoke.ts",

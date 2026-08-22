@@ -86,7 +86,13 @@ begin
     '*/15 * * * *',
     format(
       $job$select net.http_post(url := %L, headers := %L::jsonb, body := '{}'::jsonb);$job$,
-      v_base || '/api/cron/reel-dispatch',
+      -- ⚠️ rtrim jaan-boojhkar hai. Domain copy karne par aakhri slash saath aa
+      -- jaana bilkul aam hai, aur bina iske URL me `//api/...` ban jaata tha.
+      -- Wo Vercel par abhi redirect ho kar chal to jaata hai, par wo kismat hai
+      -- niyam nahi — aur redirect par curl doosre host par Authorization header
+      -- gira deta hai. Ek jagah aisa hua to wahi purana "401 aur secret dono
+      -- taraf sahi" wala chakkar shuru ho jaata.
+      rtrim(v_base, '/') || '/api/cron/reel-dispatch',
       jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || v_secret
@@ -94,7 +100,7 @@ begin
     )
   );
 
-  raise notice 'reel-dispatch-15-min lag gayi → %/api/cron/reel-dispatch', v_base;
+  raise notice 'reel-dispatch-15-min lag gayi → %/api/cron/reel-dispatch', rtrim(v_base, '/');
 end
 $setup$;
 

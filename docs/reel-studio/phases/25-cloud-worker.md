@@ -117,7 +117,59 @@ Ye order jaan-boojhkar hai — sabse chhoti cheez pehle:
 
 - [ ] 25.3 teeno step pass
 
-### 25.4 Safety net (optional, par lagane layak)
+### 25.4 Storage — **ye sabse zaroori step hai, aur ye chhoot gaya tha**
+
+⚠️ Cloud par jaate hi ek baat badal jaati hai: **asset ab runner ko dikhne chahiye.**
+
+Ab tak studio `REEL_STORAGE_DRIVER=local` par thi, yaani har upload `render-out/media/` me —
+tumhare apne disk par. Local worker ke liye wo bilkul theek tha, wo usi machine par tha.
+**GitHub ka runner us disk ko kabhi nahi dekh sakta.**
+
+Aur ye khaami sabse buri shakl me saamne aati: job queue me jaati, runner uthta, npm ci chalti,
+Chrome utarta — aur uske baad "asset nahi mili" par render marta. Do minute aur poora setup,
+sirf ye pata karne ke liye ki file wahan kabhi thi hi nahi.
+
+⚠️ **Sirf `REEL_STORAGE_DRIVER=r2` kar dena kaafi NAHI hai.** Wo sirf aage ke upload ka rasta
+badalta hai; purani files disk par padi rehti hain, aur DB me unka `r2_key` maujood hone ki
+wajah se studio me sab theek dikhta rehta hai.
+
+Isliye tarteeb yahi hai, aur ulti nahi ho sakti:
+
+```
+# 1. pehle dekho kya-kya chadhega (kuch upload nahi hoga)
+npm run migrate:r2 --workspace @reel/worker -- --dry-run
+
+# 2. phir sach me chadhao
+npm run migrate:r2 --workspace @reel/worker
+```
+
+Script local se kuch **delete nahi** karti — galat migration ke baad local copy hi wo cheez hai
+jisse sab wapas laaya ja sakta hai. Tasalli ke baad `render-out/` khud hata dena.
+
+Uske baad studio ke **dono** jagah (`studio/.env.local` aur Vercel ke studio project) ye:
+
+```
+REEL_STORAGE_DRIVER = r2
+R2_ACCOUNT_ID       = …
+R2_ACCESS_KEY_ID    = …
+R2_SECRET_ACCESS_KEY= …
+R2_BUCKET           = apkasaathi-storage
+```
+
+Studio ko R2 sirf upload ke liye nahi chahiye — **download link bhi wahi banati hai**
+(`/api/render/[id]/url`). Studio `local` par rahi aur worker ne R2 par chadha diya, to reel ban
+to jaayegi par uska download 404 dega.
+
+⚠️ Ab ye galti chup-chaap nahi ho sakti: cloud mode + local driver par Renders panel me **laal**
+chetavni aati hai (`/api/worker` ka `storageMismatch`). Ye jaanch waha hai jahan sabse sasti
+hai — render se pehle, render ke baad nahi.
+
+- [ ] 25.4 migration chali, dono jagah driver `r2`, laal chetavni gayab
+
+### 25.5 Safety net (optional, par lagane layak)
+
+⚠️ Iske liye studio ke Vercel project me `CRON_SECRET` bhi hona chahiye — bina uske
+har call 401 hoti hai aur wo 401 kahin dikhti nahi.
 
 `supabase/cron-reel-dispatch.sql` — usme `v_secret` (studio ka `CRON_SECRET`) aur `v_base`
 (studio ka production domain) bhar kar Supabase SQL Editor me Run karo. Studio ke Vercel env me
@@ -129,7 +181,7 @@ dispatch bhejta hai. Queue khaali ho to ek DB query par baat khatam, koi runner 
 Iske bina bhi sab chalta hai; ye sirf us job ke liye hai jo dispatch fail hone ki wajah se
 queue me atak gayi ho.
 
-- [ ] 25.4 cron laga (ya "abhi nahi" ka faisla likha)
+- [ ] 25.5 cron laga (ya "abhi nahi" ka faisla likha)
 
 ---
 
@@ -144,6 +196,7 @@ queue me atak gayi ho.
 | `studio/app/api/transcribe/route.ts` | wahi, aur whisper ka sawaal sahi machine se |
 | `studio/app/api/worker/route.ts` | `mode: "cloud" \| "local"` — UI ke liye |
 | `studio/app/api/cron/reel-dispatch/route.ts` | safety net |
+| `worker/scripts/migrate-local-to-r2.ts` | purani local media R2 par chadhane wali script |
 | `studio/components/editor/…` | "Worker offline" cloud par jhooth na bole |
 
 ### Teen baatein jo dhyan se likhi gayi hain
