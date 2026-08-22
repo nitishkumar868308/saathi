@@ -34,10 +34,12 @@
  * haath se hata dena.
  */
 
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { storageKey } from "@reel/core";
 import { createStorageDriver, readStorageConfig, requireRepoRoot, r2Configured } from "@reel/storage";
 
 /* ------------------------------------------------------------------ setup */
@@ -111,11 +113,59 @@ function mb(bytes: number): string {
   return `${(bytes / 1_000_000).toFixed(1)} MB`;
 }
 
+/**
+ * R2 sach me likhne-padhne layak hai? — ek chhoti file chadha kar, padh kar, hata kar.
+ *
+ * ⚠️ Ye jaanch is script ki sabse zaroori line hai, aur wo ek jhoothi tasalli ke
+ * baad aayi. `exists()` **har** na-theek jawab par `null` deta hai — 404 par bhi
+ * aur 401/403 (galat key) par bhi. Yaani bilkul galat credentials ke saath bhi
+ * `--dry-run` "4 chadhegi, 0 pehle se R2 par thi" bol kar hara jhanda dikha deta
+ * tha. Aadmi tasalli se asli migration chalata, aur galti pehli `put()` par
+ * dikhti — aadha maal chadha kar.
+ *
+ * Isliye pehle likh kar dekho. Sirf `temp/probe/…` chhoota hai, aur wahi ek
+ * jagah hai jise cleanup script bhi mita sakti hai — kisi ki asli file kabhi
+ * kharaab nahi hoti.
+ */
+async function probeR2(dest: ReturnType<typeof createStorageDriver>): Promise<void> {
+  const key = storageKey.probe(`migrate-${randomUUID()}`, "txt");
+  const payload = new TextEncoder().encode("reel-migrate-probe");
+
+  try {
+    await dest.put(key, payload, "text/plain");
+    const back = await dest.get(key);
+    if (!back || back.length !== payload.length) {
+      throw new Error("chadhi hui file wapas padhi nahi ja saki (ya size alag aayi)");
+    }
+  } finally {
+    // Probe apni file hamesha hataata hai — chahe beech me kuch bhi hua ho.
+    await dest.delete(key).catch(() => {});
+  }
+}
+
 /* ------------------------------------------------------------------- main */
 
 async function main(): Promise<void> {
   console.log(`local media: ${localRoot}`);
   console.log(`R2 bucket  : ${config.r2.bucket}`);
+
+  /*
+   * ⚠️ Ye jaanch `--dry-run` me bhi chalti hai, aur wahi iska poora maqsad hai.
+   * Dry-run ka kaam "ye chalega ya nahi" ka jawab dena hai — bina R2 ko chhue wo
+   * jawab andaaza hota, sach nahi.
+   */
+  try {
+    await probeR2(dest);
+    console.log("R2 jaanch  : ok (likh kar, padh kar, hata kar dekha)");
+  } catch (error) {
+    console.error(
+      `\nR2 par likha nahi ja saka: ${error instanceof Error ? error.message : String(error)}\n\n` +
+        `Aksar wajah: R2 API token ki permission "Object Read & Write" nahi hai,\n` +
+        `ya R2_BUCKET ka naam galat hai, ya keys kisi doosre account ki hain.`,
+    );
+    process.exit(1);
+  }
+
   if (dryRun) console.log("\n⚠️ --dry-run — kuch upload nahi hoga, sirf hisaab dikhega.\n");
 
   const keys = (await localKeys(localRoot)).sort();
