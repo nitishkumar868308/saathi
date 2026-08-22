@@ -285,6 +285,36 @@ Teen fix, aur teeno alag jagah:
 
 ## Progress log
 
+- **2026-08-22 (shaam)** — **cloud par pehli asli reelein ban gayi.**
+
+  ```
+  e59e6248  completed  100%  gh-actions-32557355572
+  e79af1b5  completed  100%  gh-actions-32557355572
+  26597448  completed  100%  gh-actions-32557355572
+  ```
+
+  Yaani ffmpeg wala fix asli runner par chal gaya, R2 upload hua, aur `output_r2_key` bhara.
+  Isse pehle wahi do job `spawn ffmpeg ENOENT` par mari thi jabki run "Success" dikha raha tha.
+
+  Media migration bhi ho chuki (`migrate:r2` — 4 file, 9.0 MB, R2 probe pass) aur studio ka
+  driver `r2` hai.
+
+  ⚠️ **Ek nayi job phir bhi fail hui, aur wo ek alag bug tha:**
+
+  ```
+  e344afb8  failed  2%  Asset "…" DB me hai par storage me nahi (key: temp/tts/…)
+  ```
+
+  Wajah `/api/tts` ka cache tha. Wo `findAssetByCacheKey()` se row uthata tha aur seedha wapas
+  de deta tha — **file maujood hai ya nahi, ye kabhi poochha hi nahi jaata tha.** Do aam
+  raaston se wo row jhoothi ho jaati hai: TTS ki awaaz `temporary` hoti hai (cleanup use utha
+  sakta hai), aur storage driver badalne par purani awaaz us disk par reh jaati hai jise ab koi
+  padhta hi nahi. Dono me DB poore vishwas se kehta hai "awaaz ban chuki hai", aur galti render
+  ke waqt dikhti hai — cloud me to poora runner khada karne ke baad.
+
+  Ab cache hit se pehle `storage().exists()` poochha jaata hai. File na mile to cache hit girta
+  hai aur awaaz dobara ban jaati hai.
+
 - **2026-08-22** — code likha. Typecheck saaf (`worker` + `studio` + `web`).
 
   Drain mode ek nakli PostgREST ke saamne chala kar naapa gaya:

@@ -4,34 +4,36 @@ import {
   AI_LANGUAGES,
   AI_TONES,
   AiError,
-  applyProposal,
-  buildProposal,
   sceneTypesForPrompt,
   type AiLanguage,
+  type AiScript,
   type AiTone,
   type AiUsage,
-  type Proposal,
 } from "@reel/core";
-import clsx from "clsx";
-import { Check, Loader2, Sparkles, X } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 
+import { WizardModal } from "@/components/editor/wizard/WizardModal";
 import { useAiProvider } from "@/lib/ai/provider";
 import { useEditorStore } from "@/lib/store";
 
 /**
  * AI panel (21.10 / 21.11 / 21.13).
  *
- * ⚠️ **AI ka output seedha doc me nahi jaata.** Pehle ek prastaav banta hai,
- * user use scene-by-scene dekhta hai, aur jo maanta hai wahi lagta hai — aur wo
- * bhi `replaceDoc` op se, jispar Ctrl+Z chalta hai.
+ * ⚠️ **AI ka output seedha doc me nahi jaata.** Wo wizard me khulta hai, jahan
+ * user har scene ka text, tasveer aur awaaz dekh kar tay karta hai — aur ant me
+ * sab ek `replaceDoc` op se lagta hai, jispar Ctrl+Z chalta hai.
  *
  * Ye bharosa ka sawaal hai: ek baar AI ne bina poochhe kisi ka kaam badal diya,
  * to wo dobara AI ke paas nahi aata.
+ *
+ * ⚠️ Purani scene-by-scene accept/reject list **hata di gayi** (26.12). Wizard
+ * khud ek poora review hai; uske pehle ek aur review rakhne ka matlab tha do
+ * baar wahi cheez dekhna — aur doosri baar koi dhyan se nahi dekhta. Scene
+ * hataane ka button wizard ke pehle step me hi hai.
  */
 export function AiPanel() {
   const doc = useEditorStore((state) => state.doc);
-  const applyOp = useEditorStore((state) => state.applyOp);
   const ai = useAiProvider();
 
   const [story, setStory] = useState("");
@@ -41,14 +43,15 @@ export function AiPanel() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; raw: string | null } | null>(null);
-  const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [accepted, setAccepted] = useState<Set<string>>(new Set());
+  const [script, setScript] = useState<AiScript | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [usage, setUsage] = useState<AiUsage | null>(null);
+  const [done, setDone] = useState<string | null>(null);
 
   async function generate(): Promise<void> {
     setBusy(true);
     setError(null);
-    setProposal(null);
+    setDone(null);
     try {
       const result = await ai.provider.generateScript({
         story,
@@ -62,15 +65,14 @@ export function AiPanel() {
         sceneTypes: sceneTypesForPrompt(),
       });
 
-      const next = buildProposal({ doc, script: result.data, mode: "append" });
-      setProposal(next);
-      setUsage(result.usage);
       /*
-       * Sab entries **pehle se chuni hui** hoti hain — sivaay unke jinme galti
-       * hai. Ulta karne par (sab reject) user ko har entry par click karna
-       * padta, aur wo aksar poora prastaav chhod deta hai.
+       * Script seedha wizard me. Yahan koi prastaav-list nahi banti — wizard hi
+       * wo jagah hai jahan user har scene dekhta hai, aur wahin uske paas wo do
+       * cheezein bhi hain jo AI de hi nahi sakta: apni tasveer aur apni awaaz.
        */
-      setAccepted(new Set(next.entries.filter((entry) => !entry.problem).map((entry) => entry.id)));
+      setScript(result.data);
+      setUsage(result.usage);
+      setWizardOpen(true);
     } catch (cause) {
       const aiError = cause instanceof AiError ? cause : null;
       setError({
@@ -82,18 +84,6 @@ export function AiPanel() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function apply(): void {
-    if (!proposal) return;
-    const result = applyProposal({ doc, proposal, acceptedIds: [...accepted] });
-    if (result.applied === 0) {
-      setError({ message: "Koi scene nahi bana — sab reject the ya unme galti thi.", raw: null });
-      return;
-    }
-    applyOp("replaceDoc", { doc: result.doc }, { label: `AI: ${result.applied} scene` });
-    setProposal(null);
-    setUsage(null);
   }
 
   return (
@@ -187,101 +177,58 @@ export function AiPanel() {
         </div>
       ) : null}
 
-      {proposal ? (
-        <section className="space-y-1.5 border-t border-ink-800 pt-2">
-          <div className="flex items-baseline justify-between">
-            <h3 className="text-[10px] uppercase tracking-wide text-chalk-500">
-              Prastaav ({accepted.size}/{proposal.entries.length})
-            </h3>
-            {usage ? (
-              <span className="font-mono text-[10px] text-chalk-500">
-                {usage.calls} call
-                {usage.outputTokens !== null ? ` · ${usage.outputTokens} tok` : ""} ·{" "}
-                {(usage.ms / 1000).toFixed(1)}s
-              </span>
-            ) : null}
-          </div>
-
-          {proposal.summary ? <p className="text-chalk-500">{proposal.summary}</p> : null}
-
-          {proposal.entries.map((entry) => {
-            const on = accepted.has(entry.id);
-            return (
-              <div
-                key={entry.id}
-                className={clsx(
-                  "rounded border px-2 py-1",
-                  entry.problem
-                    ? "border-amber/40 bg-amber/10"
-                    : on
-                      ? "border-terracotta/50 bg-terracotta/10"
-                      : "border-ink-700 opacity-50",
-                )}
-              >
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    disabled={Boolean(entry.problem)}
-                    aria-pressed={on}
-                    onClick={() =>
-                      setAccepted((previous) => {
-                        const next = new Set(previous);
-                        if (next.has(entry.id)) next.delete(entry.id);
-                        else next.add(entry.id);
-                        return next;
-                      })
-                    }
-                    className="shrink-0 rounded p-0.5 text-chalk-400 hover:bg-ink-700 disabled:opacity-30"
-                  >
-                    {on ? <Check size={11} /> : <X size={11} />}
-                  </button>
-                  <span className="min-w-0 flex-1 truncate text-chalk-300">
-                    {entry.scene.name || entry.scene.type}
-                  </span>
-                  <span className="shrink-0 font-mono text-[10px] text-chalk-500">
-                    {entry.scene.type} · {entry.scene.durationSeconds}s
-                  </span>
-                </div>
-
-                {Object.entries(entry.scene.slots).map(([key, value]) => (
-                  <p key={key} className="pl-5 text-[10px] text-chalk-500">
-                    <span className="opacity-70">{key}:</span> {value}
-                  </p>
-                ))}
-
-                {entry.problem ? (
-                  <p className="pl-5 text-[10px] text-amber">{entry.problem}</p>
-                ) : entry.scene.reason ? (
-                  <p className="pl-5 text-[10px] text-chalk-500 opacity-70">{entry.scene.reason}</p>
-                ) : null}
-              </div>
-            );
-          })}
-
-          <div className="flex gap-1">
-            <button
-              type="button"
-              disabled={accepted.size === 0}
-              onClick={apply}
-              className="flex-1 rounded bg-terracotta px-2 py-1 text-chalk-100 hover:opacity-90 disabled:opacity-40"
-            >
-              {accepted.size} scene jodo
-            </button>
-            <button
-              type="button"
-              onClick={() => setProposal(null)}
-              className="rounded border border-ink-600 px-2 py-1 text-chalk-400 hover:bg-ink-700"
-            >
-              Rehne do
-            </button>
-          </div>
-
-          <p className="text-chalk-500">
-            Jodne ke baad ye aam scenes hote hain — Ctrl+Z chalta hai, aur unpar har edit waise
-            hi lagti hai jaise haath se banaye hue scenes par.
-          </p>
-        </section>
+      {/*
+        AI ka kharcha saaf dikhta hai — chhupane par ye kabhi pata nahi chalta ki
+        ek reel banane me kitna gaya, aur "AI mehnga hai" ek ehsaas bana rehta
+        hai jiska koi number nahi hota.
+      */}
+      {usage ? (
+        <p className="border-t border-ink-800 pt-2 font-mono text-[10px] text-chalk-500">
+          {usage.calls} call
+          {usage.outputTokens !== null ? ` · ${usage.outputTokens} tok` : ""} ·{" "}
+          {(usage.ms / 1000).toFixed(1)}s
+        </p>
       ) : null}
+
+      {done ? (
+        <p className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-300">
+          {done} Ctrl+Z se poora wapas ho sakta hai.
+        </p>
+      ) : null}
+
+      {/*
+        ⚠️ Wizard tabhi khulta hai jab script sach me aa chuki ho. Use pehle se
+        khula rakhna aur andar "intezaar karo" dikhana aasan tha, par tab aadmi ek
+        khaali dabbe ke saamne baitha rehta hai aur use pata nahi chalta ki kuch
+        ho bhi raha hai ya nahi.
+      */}
+      {script ? (
+        <WizardModal
+          open={wizardOpen}
+          script={script}
+          onClose={() => setWizardOpen(false)}
+          onDone={(applied) => {
+            setWizardOpen(false);
+            setScript(null);
+            setDone(`${applied} scene ban gaye.`);
+          }}
+        />
+      ) : null}
+
+      {/*
+        Script bani hui hai par wizard band kar diya — dobara kholne ka raasta
+        rehna chahiye, warna wo poori AI call bekaar chali jaati.
+      */}
+      {script && !wizardOpen ? (
+        <button
+          type="button"
+          onClick={() => setWizardOpen(true)}
+          className="w-full rounded border border-ink-600 px-2 py-1.5 text-chalk-300 transition-colors hover:border-terracotta hover:text-chalk-100"
+        >
+          Wizard dobara kholo
+        </button>
+      ) : null}
+
     </div>
   );
 }

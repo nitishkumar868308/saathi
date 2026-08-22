@@ -324,6 +324,21 @@ $$;
 
 -- Template = **data**, code nahi. Isi wajah se naya template banane ke liye
 -- kuch deploy nahi karna padta — ek row daalo, bas.
+/*
+ * ⚠️ Ye do table (`reel_templates`, `reel_brand_presets`) Phase 17 me **dobara
+ * banti hain**, aur wahan ka dhaancha alag hai (`id text`, `owner_id`,
+ * `is_builtin`, RLS ke saath). Asli maalik wahi file hai:
+ * `supabase/reel-studio-templates.sql`.
+ *
+ * Yahan wale roop sirf Phase 2 ke liye the aur ab bhi isliye pade hain ki
+ * `db-verify` ki list me hain. Wo file khud dekh leti hai ki table purane
+ * dhaanche ki to nahi, aur khaali ho to naye sire se bana deti hai.
+ *
+ * Ye note isliye likha hai ki ek baar `create table if not exists` ne yahan
+ * chup-chaap sab kuch rok diya tha: Phase 17 ki file chalti thi, kuch banata
+ * nahi thi, aur do line baad `column "owner_id" does not exist` par phat'ti thi
+ * — jisse lagta tha ki galti index me hai.
+ */
 create table if not exists public.reel_templates (
   id                 uuid primary key default gen_random_uuid(),
   name               text not null,

@@ -223,7 +223,7 @@ draft = {
   ...draft,
   scenes: draft.scenes.map((s, i) =>
     i === 0 || i === 1
-      ? { ...s, imageAssetId: `as_img_${i}`, voiceAssetId: `as_voice_${i}`, voiceForText: s.text }
+      ? { ...s, visualAssetId: `as_img_${i}`, voiceAssetId: `as_voice_${i}`, voiceForText: s.text }
       : i === 2
         ? { ...s, voiceAssetId: "as_voice_2", voiceForText: s.text }
         : s,

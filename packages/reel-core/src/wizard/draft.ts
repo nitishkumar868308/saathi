@@ -36,7 +36,7 @@ export interface WizardScene {
   /** AI ke diye baaki slots (role naam ke saath), jaise ke waise. */
   slots: Record<string, string>;
 
-  imageAssetId: string | null;
+  visualAssetId: string | null;
   voiceAssetId: string | null;
   /**
    * Kis text se awaaz bani thi.
@@ -73,9 +73,32 @@ export function textSlotId(typeId: string): string | null {
   return type?.slots.find((slot) => slot.kind === "text")?.id ?? null;
 }
 
-export function imageSlotId(typeId: string): string | null {
+/**
+ * Scene ka **dikhne wala** asset slot — tasveer ya video.
+ *
+ * ⚠️ Pehle yahan sirf `asset:image` dekha jaata tha, aur wo ek asli chhed tha jo
+ * chala kar dekhne par mila: AI aksar `screen_recording` scene banata hai, jiska
+ * slot `asset:video` hota hai. Wizard uske liye koi button dikhata hi nahi tha,
+ * isliye wo scene bhara ja hi nahi sakta tha aur ant me "asset library me nahi
+ * mili" keh kar chhoot jaata tha — aur aadmi ke paas use theek karne ka koi
+ * raasta nahi hota tha.
+ */
+export function visualSlotId(typeId: string): string | null {
   const type = getSceneType(typeId);
-  return type?.slots.find((slot) => slot.kind.startsWith("asset:image"))?.id ?? null;
+  return (
+    type?.slots.find((slot) => slot.kind === "asset:image" || slot.kind === "asset:video")?.id ??
+    null
+  );
+}
+
+/** Wo slot tasveer maangta hai ya video — picker aur label dono isse tay hote hain. */
+export function visualSlotKind(typeId: string): "image" | "video" | null {
+  const type = getSceneType(typeId);
+  const slot = type?.slots.find(
+    (entry) => entry.kind === "asset:image" || entry.kind === "asset:video",
+  );
+  if (!slot) return null;
+  return slot.kind === "asset:video" ? "video" : "image";
 }
 
 export function audioSlotId(typeId: string): string | null {
@@ -92,19 +115,19 @@ export function audioSlotId(typeId: string): string | null {
  * `text_audio`, warna `text`.
  */
 export function effectiveType(scene: WizardScene): string {
-  if (scene.imageAssetId) return scene.type;
+  if (scene.visualAssetId) return scene.type;
 
-  const image = imageSlotId(scene.type);
+  const visual = visualSlotId(scene.type);
   const type = getSceneType(scene.type);
-  const required = type?.slots.find((slot) => slot.id === image)?.required ?? false;
-  if (!image || !required) return scene.type;
+  const required = type?.slots.find((slot) => slot.id === visual)?.required ?? false;
+  if (!visual || !required) return scene.type;
 
   return scene.voiceAssetId ? "text_audio" : "text";
 }
 
 /** Sifaarish ke liye scene ka chhota roop. */
 function asSceneLike(scene: WizardScene): WizardSceneLike {
-  return { type: effectiveType(scene), text: scene.text, hasImage: Boolean(scene.imageAssetId) };
+  return { type: effectiveType(scene), text: scene.text, hasImage: Boolean(scene.visualAssetId) };
 }
 
 /* -------------------------------------------------------------- draft banao */
@@ -125,7 +148,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         durationSeconds: scene.durationSeconds,
         text: (textSlot ? scene.slots[textSlot] : "") ?? "",
         slots: rest,
-        imageAssetId: null,
+        visualAssetId: null,
         voiceAssetId: null,
         voiceForText: null,
         animationPresetId: null,
@@ -180,7 +203,7 @@ export function autoFill(draft: WizardDraft): WizardDraft {
           scene.animationPresetId ?? suggestAnimation(asSceneLike(scene), at),
         transitionId:
           scene.transitionId ??
-          suggestTransition(at, Boolean(scene.imageAssetId), Boolean(previous?.imageAssetId)),
+          suggestTransition(at, Boolean(scene.visualAssetId), Boolean(previous?.visualAssetId)),
       };
     }),
   };
@@ -225,13 +248,13 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * asli id map me. Id seedha likhne par wo naam samajh kar dhoondhi jaati aur
      * na milne par slot khaali reh jaata — bina kisi error ke.
      */
-    const imageSlot = imageSlotId(type);
-    if (imageSlot && scene.imageAssetId) {
-      const role = `image:${scene.index}`;
-      slots[imageSlot] = role;
-      assetByRole[role] = scene.imageAssetId;
-    } else if (imageSlot) {
-      delete slots[imageSlot];
+    const visualSlot = visualSlotId(type);
+    if (visualSlot && scene.visualAssetId) {
+      const role = `visual:${scene.index}`;
+      slots[visualSlot] = role;
+      assetByRole[role] = scene.visualAssetId;
+    } else if (visualSlot) {
+      delete slots[visualSlot];
     }
 
     const audioSlot = audioSlotId(type);
@@ -292,7 +315,15 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
     // sawaal hi nahi uthta — SceneAnimation bhi wahan dropdown nahi dikhata.
     if (!primary) return;
 
-    if (source.animationPresetId) {
+    /*
+     * ⚠️ Harkat sirf tab lagti hai jab us scene me sach me tasveer ho. Ye guard
+     * UI par bharosa nahi karta, aur wo jaan-boojhkar hai: aadmi tasveer daal kar
+     * harkat chun sakta hai aur phir tasveer hata sakta hai. Us haalat me `primary`
+     * ab **text** ka item hota hai, aur harkat text par jaakar lagti — hilta hua
+     * text, bina kisi wajah ke. `suggestAnimation` isi liye bina tasveer ke `null`
+     * deta hai; yahan wahi baat dobara bandhi hui hai.
+     */
+    if (source.animationPresetId && source.visualAssetId) {
       doc = applyAnimationPreset(doc, {
         itemIds: [primary.id],
         presetId: source.animationPresetId,
@@ -329,11 +360,11 @@ export function draftProgress(draft: WizardDraft): {
   const live = draft.scenes.filter((scene) => !scene.removed);
   return {
     total: live.length,
-    withImage: live.filter((scene) => scene.imageAssetId).length,
+    withImage: live.filter((scene) => scene.visualAssetId).length,
     withVoice: live.filter((scene) => scene.voiceAssetId).length,
     staleVoice: live.filter(voiceStale).length,
     needsChoice: live.filter(
-      (scene) => scene.transitionId === null || (scene.imageAssetId && !scene.animationPresetId),
+      (scene) => scene.transitionId === null || (scene.visualAssetId && !scene.animationPresetId),
     ).length,
   };
 }

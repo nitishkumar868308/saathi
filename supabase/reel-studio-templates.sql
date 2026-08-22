@@ -1,8 +1,26 @@
 -- ============================================================================
 -- Phase 17 — templates + brand presets
 --
--- Ise Supabase ke SQL editor me ek baar chala do. Dobara chalane par kuch nahi
--- toot'ta (`if not exists` / `on conflict`).
+-- Ise Supabase ke SQL editor me ek baar chala do. Dobara chalana safe hai.
+--
+-- ⚠️⚠️ `create table if not exists` ne yahan ek chup-chaap jaal bana diya tha,
+-- aur wo asli chal kar pakda gaya (2026-08-22). Baat ye hai:
+--
+--   * `supabase/reel-studio.sql` (Phase 2) me bhi `reel_templates` aur
+--     `reel_brand_presets` banti hain — par **poore alag dhaanche** ke saath
+--     (`id uuid`, `tags`, `thumbnail_r2_key`; owner_id/is_builtin naam ki koi
+--     cheez nahi).
+--   * Wo file pehle chal chuki hoti hai, isliye neeche wala
+--     `create table if not exists` **kuch nahi karta** — aur koi error bhi nahi
+--     deta. Sab theek chalta dikhta hai.
+--   * Phir do line neeche `create index ... (owner_id, ...)` par jaakar phat'ta
+--     hai: `ERROR: 42703: column "owner_id" does not exist`. Aur us error se
+--     bilkul lagta hai ki galti index me hai, jabki galti 15 line upar hai.
+--
+-- Isliye ab ye file `if not exists` par bharosa nahi karti. Neeche wala block
+-- dekhta hai ki table purane dhaanche ki to nahi, aur ho to use **naye sire se
+-- banata hai** — par sirf tab jab wo **khaali** ho. Ek bhi row hui to wo saaf
+-- mana kar deta hai, taaki kisi ka kaam chup-chaap na mit jaaye.
 --
 -- ⚠️ Dono table me asli cheez ek `jsonb` column hai (`doc` aur `tokens`), aur ye
 -- jaan-boojhkar hai. Template ke har slot ke liye ek column banane par har naye
@@ -10,6 +28,68 @@
 -- hai ki wo **data** hai, schema nahi. Shape ki jaanch `TemplateSchema` (zod)
 -- karta hai, DB nahi.
 -- ============================================================================
+
+/* ------------------------------------------------------------------------
+ * Pehle ye: `reel-studio.sql` chal chuki hai ya nahi.
+ *
+ * ⚠️ Ye file uspar tiki hui hai (`reel_touch_updated_at`, `auth.users`), par wo
+ * nirbharta kahin likhi nahi thi. Bina uske yahan ka error kisi aur cheez ka
+ * dikhta hai aur aadmi galat jagah dhoondhta rehta hai.
+ * ------------------------------------------------------------------------ */
+do $need$
+begin
+  if to_regprocedure('public.reel_touch_updated_at()') is null then
+    raise exception
+      'public.reel_touch_updated_at() nahi mila — pehle supabase/reel-studio.sql chalao, phir ye file.';
+  end if;
+end
+$need$;
+
+/* ------------------------------------------------------------------------
+ * Purane dhaanche ki table ho to use hatao — par sirf khaali ho tab.
+ * ------------------------------------------------------------------------ */
+do $rebuild$
+declare
+  v_table text;
+  v_rows  bigint;
+begin
+  foreach v_table in array array['reel_templates', 'reel_brand_presets']
+  loop
+    -- Table hai hi nahi to kuch karne ko nahi — neeche create bana dega.
+    if to_regclass('public.' || v_table) is null then
+      continue;
+    end if;
+
+    -- `owner_id` hai matlab dhaancha pehle se naya hai. Haath mat lagao.
+    if exists (
+      select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = v_table and column_name = 'owner_id'
+    ) then
+      continue;
+    end if;
+
+    /*
+     * ⚠️ Yahan pahunche matlab table purane dhaanche ki hai. Ab ek hi sawaal
+     * maayne rakhta hai: usme kisi ka kaam pada hai ya nahi.
+     *
+     * Khaali ho to naye sire se banana bilkul surakshit hai. Ek bhi row ho to
+     * ruk jaana hi sahi hai — `drop cascade` chala dena us aadmi ka kaam mita
+     * deta jise pata bhi nahi chalta ki kya gaya. Aur wo nuksaan wapas nahi
+     * aata.
+     */
+    execute format('select count(*) from public.%I', v_table) into v_rows;
+
+    if v_rows > 0 then
+      raise exception
+        'public.% purane dhaanche ki hai aur usme % row hain. Ye file use naye sire se banati hai, par khaali table hi hataayegi. Pehle wo rows kahin bacha lo (ya khud tay karo ki nahi chahiye), phir dobara chalao.',
+        v_table, v_rows;
+    end if;
+
+    raise notice 'public.% purane dhaanche ki thi aur khaali thi — naye sire se bana rahe hain', v_table;
+    execute format('drop table public.%I cascade', v_table);
+  end loop;
+end
+$rebuild$;
 
 create table if not exists public.reel_templates (
   id          text primary key,
@@ -51,6 +131,20 @@ drop policy if exists reel_templates_write on public.reel_templates;
 create policy reel_templates_write on public.reel_templates
   for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
+/*
+ * `updated_at` khud badalta rahe.
+ *
+ * ⚠️ Ye trigger pehle `reel-studio.sql` me tha, aur upar wala rebuild block
+ * `drop table ... cascade` chalata hai — yaani wo trigger uske saath chala jaata
+ * hai. Use yahan dobara na banana ek chup-chaap nuksaan hota: table banti,
+ * policy lagti, sab theek dikhta, bas `updated_at` hamesha pehle din ka rehta —
+ * aur gallery ka "recent" order chupchaap galat ho jaata.
+ */
+drop trigger if exists reel_templates_touch on public.reel_templates;
+create trigger reel_templates_touch before update on public.reel_templates
+  for each row execute function public.reel_touch_updated_at();
+
+
 -- ============================================================================
 
 create table if not exists public.reel_brand_presets (
@@ -87,6 +181,20 @@ create policy reel_brand_presets_read on public.reel_brand_presets
 drop policy if exists reel_brand_presets_write on public.reel_brand_presets;
 create policy reel_brand_presets_write on public.reel_brand_presets
   for all using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+/*
+ * `updated_at` khud badalta rahe.
+ *
+ * ⚠️ Ye trigger pehle `reel-studio.sql` me tha, aur upar wala rebuild block
+ * `drop table ... cascade` chalata hai — yaani wo trigger uske saath chala jaata
+ * hai. Use yahan dobara na banana ek chup-chaap nuksaan hota: table banti,
+ * policy lagti, sab theek dikhta, bas `updated_at` hamesha pehle din ka rehta —
+ * aur gallery ka "recent" order chupchaap galat ho jaata.
+ */
+drop trigger if exists reel_brand_presets_touch on public.reel_brand_presets;
+create trigger reel_brand_presets_touch before update on public.reel_brand_presets
+  for each row execute function public.reel_touch_updated_at();
+
 
 -- ---------------------------------------------------------------- seed ------
 -- Apka Saathi ka apna preset (17.9). Rang `web/app/globals.css` se hain, taaki

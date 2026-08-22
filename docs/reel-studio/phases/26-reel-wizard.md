@@ -1,6 +1,6 @@
 # Phase 26 — Reel Wizard (kahani se reel, ek raaste me)
 
-**STATUS:** dimaag ban gaya aur naapa gaya (26.1-26.4, 26.8, 26.11) — UI baaki
+**STATUS:** COMPLETE — browser me poora chakkar chala kar dekha gaya.
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 26 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding. Resume Protocol follow karo.
 **Depends on:** Phase 21 (AI provider), Phase 22 (TTS) complete
@@ -248,21 +248,76 @@ Zyada kaam **jodne** ka hai. Nayi buniyaadi cheez sirf do chhote pure function h
 - [x] 26.2 `suggestAnimation()` pure function + test (har scene type par)
 - [x] 26.3 `suggestTransition()` pure function + test (pehla scene, tasveer/bina-tasveer)
 - [x] 26.4 wizard ka draft state — ek jagah, ek shape (`wizard/draft.ts`)
-- [ ] 26.5 Step 1 "Shabd" — edit, hata do
-- [ ] 26.6 Step 2 "Tasveer" — upload / library / chhod do
-- [ ] 26.7 Animation + transition chunne wala chalta hua preview (ek waqt me ek loop)
+- [x] 26.5 Step 1 "Shabd" — edit, hata do
+- [x] 26.6 Step 2 "Tasveer" — upload / library / chhod do
+- [x] 26.7 Animation + transition chunne wala chalta hua preview (ek waqt me ek loop)
 - [x] 26.8 `autoFill()` — sirf khaali chunav bharta hai (UI ka button baaki)
-- [ ] 26.9 Step 3 "Awaaz" — banao / apni daalo / chhod do + purane shabdon ka nishaan
-- [ ] 26.10 Step 4 "Dekho" — poori reel modal ke andar
+- [x] 26.9 Step 3 "Awaaz" — banao / apni daalo / chhod do + purane shabdon ka nishaan
+- [x] 26.10 Step 4 "Dekho" — poori reel modal ke andar
 - [x] 26.11 `applyWizard()` — `assetByRole` bhar kar `buildProposal` → `applyProposal`, ek op
-- [ ] 26.12 AiPanel se purani accept/reject list hataana
-- [ ] 26.13 Beech me band karne par tasdeek
-- [ ] 26.14 Ek poora chakkar chala kar dekhna: kahani → reel, aur Ctrl+Z se poora wapas
+- [x] 26.12 AiPanel se purani accept/reject list hataana
+- [x] 26.13 Beech me band karne par tasdeek
+- [x] 26.14 Ek poora chakkar chala kar dekhna: kahani → reel, aur Ctrl+Z se poora wapas
 
 **Done when:** ek aadmi jo editor kabhi nahi khola, kahani paste karke ek chalti hui reel bana
 le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
 
 ## Progress log
+
+- **2026-08-22 (raat, baad me)** — **26.14: poora chakkar browser me chala kar dekha.**
+
+  Asli Gemini call se 5 scene bane, phir: shabd → tasveer (library se PAPA.png) → awaaz →
+  dekho → editor. Naapa hua:
+
+  - **Apply:** "5 scene ban gaye", timeline `4 track · 11 item` → `18 item`
+  - **Undo:** button ka title `Undo: Wizard: 5 scene (Ctrl+Z)` — yaani **ek hi entry**.
+    Dabane par `18 item` → `11 item`, aur history khaali (`Undo karne ko kuch nahi`).
+    DB me project wapas 11 item par — kuch peeche nahi chhoota.
+  - Nested modal (asset picker wizard ke upar) theek chala
+  - Preview me asli `<Player>` chala — "5 scene · 75 second", controls ke saath
+
+  **Teen cheezein sirf chala kar dekhne se mili, aur teeno theek ki gayi:**
+
+  1. **Tasveer daalne par "Harkat" khaali reh jaata tha.** Wizard khulte hi `autoFill` chalta
+     hai, us waqt tasveer hoti nahi, isliye `suggestAnimation` sahi hi `null` deta hai. Phir
+     tasveer daalne par wo dobara nahi chalta — natija: bagal me "Sifaarish" ka nishaan, aur
+     chunav khaali. Screen ek sujhav dikha rahi thi jo laga hi nahi tha. Ab tasveer lagte hi
+     harkat lag jaati hai, aur tasveer hatte hi hat jaati hai (warna wo TEXT par lagti).
+  2. **Video wale scene bhare hi nahi ja sakte the.** AI aksar `screen_recording` scene banata
+     hai jiska slot `asset:video` hai; wizard sirf `asset:image` dekhta tha. Preview me saaf
+     dikha: *"…naam ki asset library me nahi mili — ye slot khaali rahega"*, aur aadmi ke paas
+     use theek karne ka koi raasta nahi tha. Ab slot ke hisaab se "Tasveer daalo" ya "Video
+     daalo" aata hai (`visualSlotKind`).
+  3. **"Awaaz banao" tab bhi dabta tha jab koi TTS provider chal hi nahi raha tha** — har baar
+     503, aur aadmi ko lagta ki galti uski hai. Ab wo disabled hai; upar likhi chetavni hi
+     kaafi hai (README rule 5).
+
+  In teeno me se ek bhi typecheck ya build se nahi milti. Yahi wo farak hai jiske liye 26.14
+  alag box tha.
+
+- **2026-08-22 (raat)** — poora UI ban gaya: `WizardModal` + chaar step
+  (`StepText`, `StepImage`, `StepVoice`, `StepPreview`), `ChoicePicker`, aur AiPanel se purani
+  accept/reject list hat gayi.
+
+  Naapa hua:
+  - `npx tsc --noEmit` — studio saaf
+  - `npx next build` — poora build saaf (`/project/[id]` 181 kB)
+  - core ka check — 585 groups + 40 wizard assertions, 0 fail
+
+  ⚠️ **26.14 jaan-boojhkar tick NAHI kiya.** Upar wala sab "code hai aur compile hota hai"
+  saabit karta hai — "browser me chal kar dikhta hai" nahi. Ye do alag baatein hain, aur inhe
+  ek maan lena hi wo aadat hai jiske khilaaf is repo ka Resume Protocol likha gaya hai. Ek
+  aadmi ko kahani paste karke poora chakkar chalana hoga: shabd → tasveer → awaaz → dekho →
+  editor, aur phir Ctrl+Z.
+
+  Banate waqt do faisle jo design me nahi likhe the:
+  - **Har scene ki qatar ka apna uploader hai.** Ek saanjha uploader rakhne par ye sawaal bacha
+    reh jaata ki jo file abhi chadhi wo *kis scene* ki thi — `addFiles()` koi id nahi lautata.
+    "Aakhri wala scene" maan lena bilkul chalta dikhta hai aur do file ek saath chunne par
+    chup-chaap galat scene par tasveer laga deta.
+  - **Awaaz ka chunav poori reel ke liye ek hai**, har scene par alag nahi. Ek hi reel me har
+    scene ka bolne wala badalta rahe to reel tooti hui lagti hai — aur aath scene par aath baar
+    wahi dropdown bharna wo kaam hai jise aadmi teesre scene par chhod deta hai.
 
 - **2026-08-22** — design tay hua aur likha gaya.
 - **2026-08-22** — wizard ka poora dimaag ban gaya (`wizard/draft.ts`) aur bina browser ke

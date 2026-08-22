@@ -127,7 +127,38 @@ export async function POST(request: Request): Promise<Response> {
     /* ------------------------------------------------------- cache pehle */
 
     const cached = await findAssetByCacheKey(cacheKey);
-    if (cached) {
+
+    /*
+     * ⚠️ **Cache hit ka matlab "DB me row hai", "file maujood hai" nahi — aur
+     * ye farak ek asli render tod chuka hai (2026-08-22).**
+     *
+     * Job 2% par mari, ye keh kar: `Asset "…" DB me hai par storage me nahi
+     * (key: temp/tts/…)`. Do raaste hain jinse ye halat banti hai, aur dono aam
+     * hain:
+     *
+     *   1. TTS ki awaaz `temporary` hoti hai (`temp/tts/…`) — cleanup use utha
+     *      sakta hai. Row peeche reh jaati hai.
+     *   2. Storage driver badal jaaye (`local` se `r2`). Purani awaaz us disk
+     *      par padi rehti hai jise ab koi padhta hi nahi.
+     *
+     * Dono me DB poore vishwas se kehta hai "awaaz ban chuki hai", studio wahi
+     * asset id job me daal deta hai, aur galti **render ke waqt** dikhti hai —
+     * yaani sabse mehngi jagah par, aur cloud me to poora runner khada karne ke
+     * baad.
+     *
+     * Isliye ab poochha jaata hai, maana nahi jaata. Ek HEAD call ki keemat ek
+     * toote hue render ke aage kuch bhi nahi hai. File na mile to cache hit
+     * girta hai aur awaaz dobara ban jaati hai — user ko kuch pata bhi nahi
+     * chalta, jo ki theek hai: uske liye ye kabhi toota hi nahi.
+     */
+    const cachedExists = cached ? await storage().exists(cached.key) : null;
+    if (cached && !cachedExists) {
+      console.warn(
+        `[tts] cache me asset ${cached.id} tha par storage me file nahi (${cached.key}) — dobara bana rahe hain`,
+      );
+    }
+
+    if (cached && cachedExists) {
       /*
        * Cache hit bhi likha jaata hai, `units: 0` ke saath. Ise chhod dena
        * aasan hota — "kharcha to hua hi nahi" — par tab admin me ye kabhi nahi
