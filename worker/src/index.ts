@@ -11,9 +11,22 @@
  * matlab hota ek aur cheez jo chalu rakhni padti, aur ek aur jagah jo alag se
  * toot sakti — jabki Postgres ye kaam pehle se karta hai.
  *
- * ⚠️ **Worker sirf is machine par chalta hai.** Vercel par ye kabhi nahi jaata:
- * Chrome Headless (~150MB) aur ffmpeg wahan hote hi nahi, aur render minute
- * bhar chalta hai — serverless me wo timeout ho jaata.
+ * ⚠️ **Ye Vercel par kabhi nahi jaata.** Chrome Headless (~150MB) aur ffmpeg
+ * wahan hote hi nahi, aur render minute bhar chalta hai — serverless me wo
+ * timeout ho jaata. Isliye worker do hi jagah chalta hai, aur code dono jagah
+ * wahi ka wahi hai:
+ *
+ *   1. **Tumhara PC** — `npm run dev:worker`. Hamesha chalta rehta hai (daemon).
+ *   2. **GitHub Actions ka runner** — `npm run start:once --workspace @reel/worker`.
+ *      Ek job aane par machine uthti hai, queue khaali hote hi khud band ho
+ *      jaati hai. Dekho `.github/workflows/reel-render.yml` aur
+ *      `docs/reel-studio/25-cloud-worker.md`.
+ *
+ * ⚠️ Cloud par `REEL_STORAGE_DRIVER=r2` **zaroori** hai. Runner ki disk run
+ * khatam hote hi mit jaati hai — `local` driver par reel ban to jaayegi aur usi
+ * lamhe gayab bhi ho jaayegi, aur DB me job "completed" likhi rahegi. Isliye
+ * `main()` shuru me hi ye jaanch karta hai aur galat setting par saaf mana kar
+ * deta hai.
  */
 
 import { existsSync } from "node:fs";
@@ -115,6 +128,82 @@ const MAX_CONCURRENT = Math.max(1, Number(process.env.REEL_WORKER_CONCURRENCY ??
 
 const WORKER_ID = process.env.REEL_WORKER_ID ?? `${hostname()}-${process.pid}`;
 
+/**
+ * Heartbeat me kaunsa nishaan jaaye. Cloud runner apne aap ko `cloud` likhta
+ * hai, taaki "kis machine ne banayi thi" ka jawab andaaze se na dena pade.
+ */
+const WORKER_VERSION = process.env.REEL_WORKER_VERSION?.trim() || "phase-11";
+
+/* ------------------------------------------------------------- drain mode */
+
+/**
+ * **Drain mode** — queue khaali hote hi worker khud nikal jaata hai (`--once`).
+ *
+ * Ye ek hi jagah ke liye bana hai: GitHub Actions ka runner. Wahan worker hamesha
+ * ke liye nahi chalta — ek job aayi, uske liye machine uthi, kaam hua, machine
+ * band. Anant loop wahan do tarah se galat hai: ya to 6 ghante ka timeout aata
+ * hai (aur run "failed" dikhta hai jabki reel ban chuki hoti hai), ya minute
+ * khaali baithe hue kat'te rehte hain.
+ *
+ * ⚠️ Exit **turant nahi** hota — `IDLE_EXIT_MS` ka sabra rakha jaata hai. Wajah
+ * asli hai: user aksar ek ke baad ek do-teen reel export karta hai. Pehli poori
+ * hote hi nikal jaane par doosri ke liye poora runner dobara khada hota (checkout
+ * + npm ci + Chrome), yaani 2-3 minute sirf shuruaat me. 20 second ruk jaana us
+ * poore setup se sasta hai.
+ *
+ * ⚠️ Aur ye default me **band** hai. Tumhare PC par worker ka rukna galat hoga —
+ * wahan wo daemon hai, ek baar ka kaam nahi.
+ */
+const RUN_ONCE =
+  process.argv.includes("--once") || /^(1|true|yes|on)$/i.test(process.env.REEL_WORKER_ONCE ?? "");
+
+/** Drain mode me: itni der queue khaali rahi to nikal jao. */
+const IDLE_EXIT_MS = Number(process.env.REEL_WORKER_IDLE_EXIT_MS ?? 20_000);
+
+/**
+ * Drain mode me kul zyada se zyada itni der.
+ *
+ * ⚠️ GitHub Actions ek job ko 6 ghante par khud maar deta hai, aur us maut ka
+ * koi shaistagi wala roop nahi hota: chal rahi job `processing` par jam jaati
+ * hai aur `reel_requeue_stale_jobs` ke 15 minute baad hi wapas queue me aati
+ * hai. Isliye hum uss hadd se pehle khud rukte hain — chal rahi job poori karke,
+ * saaf-saaf.
+ */
+const MAX_RUN_MS = Number(process.env.REEL_WORKER_MAX_RUN_MS ?? 5 * 60 * 60 * 1000);
+
+/**
+ * Drain mode: lagataar itni baar DB se baat na ho paayi to run **fail** karo.
+ *
+ * 10 × (poll × 2) ≈ 40 second — network ka ek jhatka isme aaram se sambhal jaata
+ * hai, par galat secret 40 second me pakda jaata hai, 80 minute me nahi.
+ */
+const MAX_CONSECUTIVE_FAILURES = Number(process.env.REEL_WORKER_MAX_FAILURES ?? 10);
+
+/**
+ * Ye worker kis tarah ki job uthaayega (`REEL_WORKER_KINDS=render,transcribe`).
+ *
+ * ⚠️ Ye knob cloud ki wajah se hai. `render` ko ffmpeg + Chrome chahiye — dono
+ * GitHub runner me pehle se hote hain. `transcribe` ko faster-whisper chahiye,
+ * jo nahi hota: pip install + model download (~150MB) har run me lagta hai.
+ *
+ * Isliye runner default me sirf `render` uthata hai. Bina is filter ke ek
+ * transcribe job us runner par ja girti jahan whisper hai hi nahi, aur "faster-
+ * whisper is machine par nahi hai" keh kar fail hoti — jabki wo job tumhare PC
+ * par bilkul chal jaati. Job **uthni hi nahi chahiye** thi.
+ *
+ * Khaali chhod do (default) to dono uthte hain — tumhare PC wale worker ke liye
+ * yahi sahi hai.
+ */
+const WORKER_KINDS = (() => {
+  const raw = (process.env.REEL_WORKER_KINDS ?? "").trim();
+  if (!raw) return null;
+  const kinds = raw
+    .split(",")
+    .map((kind) => kind.trim())
+    .filter(Boolean);
+  return kinds.length > 0 ? kinds : null;
+})();
+
 /* ----------------------------------------------------------------- helpers */
 
 /** Lambi galti ki sirf pehli line — baaki stack UI me kaam ka nahi hota. */
@@ -162,7 +251,7 @@ async function heartbeat(conn: DbConn, currentJob: string | null): Promise<void>
       id: WORKER_ID,
       last_seen: new Date().toISOString(),
       current_job: currentJob,
-      version: "phase-11",
+      version: WORKER_VERSION,
     });
   } catch (error) {
     // Heartbeat fail hona render rokne layak nahi hai — sirf UI ka nishaan hai.
@@ -568,15 +657,44 @@ async function main(): Promise<void> {
   const conn = readDbConn();
   const config = readStorageConfig();
 
+  /*
+   * ⚠️ Cloud par `local` driver chup-chaap sab kuch barbaad kar deta hai, aur
+   * wo barbaadi kahin **dikhti nahi**: reel banti hai, `finalizeMp4` chalta hai,
+   * job "completed" ho jaati hai, progress 100 par pahunchta hai — aur file
+   * runner ki us disk par hoti hai jo run khatam hote hi mit jaati hai. User ko
+   * history me poori hui job dikhti hai jiska download 404 deta hai.
+   *
+   * Isliye ye shart yahan hai, render ke baad nahi: 5 minute ka render karke
+   * "kahan rakhun" poochhna sabse mehngi jagah hai galti pakadne ki.
+   */
+  if (RUN_ONCE && config.driver !== "r2") {
+    throw new Error(
+      `Drain mode (--once) me REEL_STORAGE_DRIVER="r2" hona chahiye, "${config.driver}" nahi. ` +
+        `Runner ki disk run ke saath mit jaati hai — local driver par reel ban kar usi ` +
+        `lamhe gayab ho jaayegi, aur DB me job "completed" likhi rahegi.`,
+    );
+  }
+
   log(
     `chalu — storage driver "${config.driver}", ek waqt me ${MAX_CONCURRENT} reel, ` +
-      `frame concurrency: ${RENDER_CONCURRENCY ?? "Remotion ka apna hisaab"}`,
+      `frame concurrency: ${RENDER_CONCURRENCY ?? "Remotion ka apna hisaab"}, ` +
+      `job kinds: ${WORKER_KINDS?.join(" + ") ?? "sab"}`,
   );
-  log(`queue har ${POLL_INTERVAL_MS}ms dekhi jaayegi. Rokne ke liye Ctrl+C.`);
+  log(
+    RUN_ONCE
+      ? `drain mode — queue ${IDLE_EXIT_MS}ms tak khaali rahi to worker khud band ho jaayega ` +
+          `(zyada se zyada ${Math.round(MAX_RUN_MS / 60_000)} minute).`
+      : `queue har ${POLL_INTERVAL_MS}ms dekhi jaayegi. Rokne ke liye Ctrl+C.`,
+  );
 
+  const startedAt = Date.now();
   let running = 0;
   let stopping = false;
   let lastRequeueAt = 0;
+  /** Drain mode: kab se queue khaali hai. `null` = abhi-abhi kaam mila tha. */
+  let idleSince: number | null = null;
+  /** Lagataar kitni baar DB se baat nahi ho paayi (drain mode ki hadd). */
+  let failures = 0;
 
   const shutdown = () => {
     if (stopping) return;
@@ -603,17 +721,64 @@ async function main(): Promise<void> {
         if (requeued.length > 0) log(`${requeued.length} atki hui job wapas queue me`);
       }
 
+      /*
+       * Drain mode ki upari hadd. Ye check yahan hai (claim se **pehle**), taaki
+       * hadd ke aakhri lamhe me ek nayi job na uth jaaye — wo job poori hone se
+       * pehle GitHub runner mar jaata aur wo 15 minute `processing` par atki
+       * rehti. Chal rahi jobs neeche wala loop poori karta hai.
+       */
+      if (RUN_ONCE && Date.now() - startedAt > MAX_RUN_MS) {
+        log(`${Math.round(MAX_RUN_MS / 60_000)} minute ki hadd — nayi job nahi uthayenge.`);
+        stopping = true;
+        continue;
+      }
+
       if (running >= MAX_CONCURRENT) {
+        // Kaam chal raha hai — ye khaali baithna nahi hai.
+        idleSince = null;
         await sleep(POLL_INTERVAL_MS);
         continue;
       }
 
-      const job = asJob(await rpc(conn, "reel_claim_render_job", { p_worker: WORKER_ID }));
+      const job = asJob(
+        await rpc(conn, "reel_claim_render_job", {
+          p_worker: WORKER_ID,
+          // Kuch na bhejo to SQL ka apna default lagta hai — render + transcribe dono.
+          ...(WORKER_KINDS ? { p_kinds: WORKER_KINDS } : {}),
+        }),
+      );
+
+      /*
+       * ⚠️ Ginti yahan reset hoti hai, loop ke ant me nahi — aur ye farak matlab
+       * rakhta hai. Loop ke ant tak to `if (!job) continue` pahunchta hi nahi,
+       * isliye khaali queue par ginti kabhi sifar hoti hi na. Aur wahi ek asli
+       * DB round-trip hai jo abhi-abhi kaamyaab hua: yahi "DB se baat ho rahi
+       * hai" ka saboot hai. Warna hafte bhar ke ek-ek chhote network jhatke
+       * mil-jul kar hadd paar kar dete aur worker bina wajah ruk jaata.
+       */
+      failures = 0;
       if (!job) {
+        /*
+         * Queue khaali. Normal worker ke liye ye kuch nahi — wo intezaar karta
+         * hai. Drain mode me yahi wo lamha hai jiska hisaab rakhna hai.
+         *
+         * ⚠️ `running > 0` par ghadi shuru **nahi** hoti: ek reel render ho rahi
+         * ho aur queue us beech khaali ho (bilkul aam baat), to worker apni hi
+         * chal rahi job ke beech me nikal jaata.
+         */
+        if (RUN_ONCE && running === 0) {
+          idleSince ??= Date.now();
+          if (Date.now() - idleSince >= IDLE_EXIT_MS) {
+            log("queue khaali hai — drain poora, band ho raha hai.");
+            stopping = true;
+            continue;
+          }
+        }
         await sleep(POLL_INTERVAL_MS);
         continue;
       }
 
+      idleSince = null;
       running += 1;
       log(`job ${job.id} uthayi (${job.kind ?? "render"}, preset ${job.preset}, koshish ${job.attempts})`);
       void heartbeat(conn, job.id);
@@ -655,12 +820,45 @@ async function main(): Promise<void> {
       // Loop ko kabhi marne nahi dena — network ek second ke liye gaya ho to
       // worker ko band nahi hona chahiye.
       log(`loop error: ${error instanceof Error ? error.message : String(error)}`);
+      failures += 1;
+
+      /*
+       * ⚠️ Par drain mode me "kabhi mat maro" ulta pad jaata hai, aur ye stub ke
+       * saath chalate hue saamne aaya: SUPABASE_URL galat ho ya key expire ho
+       * chuki ho, to har chakkar `fetch failed` deta hai aur worker chupchaap
+       * loop karta rehta hai — jab tak `MAX_RUN_MS` ki 80 minute ki hadd na aa
+       * jaaye. GitHub par uska matlab hai ek galat secret ke badle **80 Actions
+       * minute** jal jaana, aur run ke ant me bhi wo "successful" dikhna.
+       *
+       * Ek-do fail ho jaana normal hai (network ek lamhe ke liye gaya). Lagataar
+       * fail hona alag baat hai: wo setup ki galti hai, aur wo jitni jaldi dikhe
+       * utna accha. Isliye yahan run **fail** hota hai — chup-chaap nahi rukta.
+       *
+       * Tumhare PC wale worker par ye laagu nahi: wahan Wi-Fi ka aana-jaana aam
+       * hai aur worker ka bane rehna hi sahi hai.
+       */
+      if (RUN_ONCE && failures >= MAX_CONSECUTIVE_FAILURES) {
+        throw new Error(
+          `lagataar ${failures} baar DB se baat nahi ho paayi — ruk rahe hain. ` +
+            `SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY dekho (GitHub repo Settings > Secrets).`,
+        );
+      }
       await sleep(POLL_INTERVAL_MS * 2);
     }
   }
 
-  clearInterval(heartbeatTimer);
+  /*
+   * ⚠️ Heartbeat **pehle band nahi hota** — pehle chal rahi job poori hone do.
+   *
+   * Ulta karne par (jaise pehle tha) shutdown ke doran dhadkan ruk jaati hai
+   * jabki render abhi chal raha hota hai, aur UI 20 second baad "worker offline"
+   * dikhane lagti hai — jabki reel bilkul ban rahi hoti hai. Cloud runner me ye
+   * aur bhi bura hai: `MAX_RUN_MS` ki hadd par aakhri render kai minute aur chal
+   * sakta hai, aur us poore waqt studio jhooth bolti.
+   */
   while (running > 0) await sleep(500);
+  clearInterval(heartbeatTimer);
+  await heartbeat(conn, null).catch(() => {});
   log("band.");
 }
 

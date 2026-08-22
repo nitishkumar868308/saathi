@@ -47,7 +47,18 @@ export function ExportDialog({
   const [presetId, setPresetId] = useState("standard");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Error nahi — kaam ho gaya, par ek baat jaanna zaroori hai. */
+  const [notice, setNotice] = useState<string | null>(null);
   const [worker, setWorker] = useState<{ online: boolean; secondsAgo: number | null } | null>(null);
+  /**
+   * Worker kahan chalta hai — is PC par ya GitHub ke runner par (25.3).
+   *
+   * ⚠️ Iske bina "Worker offline" cloud par roz jhoothi chetavni banti hai:
+   * runner tabhi uthta hai jab job aati hai, isliye Export dabane se **pehle**
+   * wo hamesha offline hi hota hai. Wo chetavni par gaur karna user turant band
+   * kar deta, aur phir asli wali (local worker chala hi nahi) bhi anpadhi jaati.
+   */
+  const [mode, setMode] = useState<"cloud" | "local">("local");
 
   // Worker zinda hai ya nahi — dialog khulte hi, aur phir har 5 second.
   useEffect(() => {
@@ -57,8 +68,13 @@ export function ExportDialog({
     const check = async () => {
       try {
         const response = await fetch("/api/worker");
-        const data = (await response.json()) as { worker?: { online: boolean; secondsAgo: number | null } };
-        if (alive && data.worker) setWorker(data.worker);
+        const data = (await response.json()) as {
+          worker?: { online: boolean; secondsAgo: number | null };
+          mode?: "cloud" | "local";
+        };
+        if (!alive) return;
+        if (data.worker) setWorker(data.worker);
+        if (data.mode) setMode(data.mode);
       } catch {
         if (alive) setWorker({ online: false, secondsAgo: null });
       }
@@ -106,6 +122,7 @@ export function ExportDialog({
   async function start(): Promise<void> {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       /*
        * Pehle save. Server DB se doc padhta hai, isliye bina save kiye export
@@ -119,12 +136,35 @@ export function ExportDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, preset: presetId, force: true }),
       });
-      const data = (await response.json()) as { job?: { id: string }; reason?: string };
+      const data = (await response.json()) as {
+        job?: { id: string };
+        reason?: string;
+        /** `false` = job to ban gayi par cloud worker jagaya nahi ja saka. */
+        dispatched?: boolean | null;
+      };
       if (!response.ok || !data.job) {
         setError(data.reason ?? `export shuru nahi hua (${response.status})`);
         return;
       }
+
       onStarted(data.job.id);
+
+      /*
+       * ⚠️ Dispatch fail hone par dialog **band nahi hota**, aur ye jaan-boojhkar
+       * hai. Job ban chuki hai, isliye ye error nahi hai — par agar hum chup-chaap
+       * band kar dete to user ko "queue me hai" dikhta aur wo ghanton wahi dekhta
+       * rehta. Queue me hona aur kaam shuru hona do alag baatein hain; jab doosri
+       * na hui ho, wo saaf bolna chahiye — waise hi jaise "worker offline" bolte hain.
+       */
+      if (data.dispatched === false) {
+        setNotice(
+          "Job queue me chali gayi, par cloud worker jagaya nahi ja saka (GitHub dispatch fail). " +
+            "Repo ke Actions tab me \"reel-render\" workflow ko \"Run workflow\" se chala do — " +
+            "job wahin se uth jaayegi.",
+        );
+        return;
+      }
+
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -196,22 +236,44 @@ export function ExportDialog({
           </p>
         ) : null}
 
+        {/*
+          Do alag baatein, do alag rang — kyunki inka matlab hi alag hai (25.3).
+
+          Cloud par worker ka so raha hona **normal** hai: runner job aane par
+          uthta hai. Wahan sirf itna batana hai ki pehli reel me 2-3 minute extra
+          lagenge (checkout + npm ci + Chrome), taaki "atak gaya kya" wala shak
+          na ho. Local par offline hona **galti** hai — koi worker chala hi nahi,
+          aur job hamesha ke liye queue me padi rahegi.
+        */}
         {worker && !worker.online ? (
-          <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">
-            <strong>Worker offline hai.</strong> Job queue me chali jaayegi par render tab tak
-            shuru nahi hoga. Ek doosre terminal me chalao:{" "}
-            <code className="font-mono">npm run dev:worker</code>
-            {worker.secondsAgo !== null ? (
-              <span className="block text-[10px] opacity-80">
-                aakhri dhadkan {worker.secondsAgo}s pehle
-              </span>
-            ) : null}
-          </p>
+          mode === "cloud" ? (
+            <p className="rounded border border-ink-600 bg-ink-800/60 px-2 py-1.5 text-[11px] text-ink-200">
+              <strong>Render cloud par hoga.</strong> Export dabate hi GitHub ka runner uthta hai —
+              pehli reel me setup ka ~2-3 minute extra lagta hai, uske baad ki turant.
+            </p>
+          ) : (
+            <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">
+              <strong>Worker offline hai.</strong> Job queue me chali jaayegi par render tab tak
+              shuru nahi hoga. Ek doosre terminal me chalao:{" "}
+              <code className="font-mono">npm run dev:worker</code>
+              {worker.secondsAgo !== null ? (
+                <span className="block text-[10px] opacity-80">
+                  aakhri dhadkan {worker.secondsAgo}s pehle
+                </span>
+              ) : null}
+            </p>
+          )
         ) : null}
 
         {error ? (
           <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">
             {error}
+          </p>
+        ) : null}
+
+        {notice ? (
+          <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">
+            {notice}
           </p>
         ) : null}
 

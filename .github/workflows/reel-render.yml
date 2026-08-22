@@ -1,0 +1,165 @@
+# ══════════════════════════════════════════════════════════════════════════
+#  Reel render worker — GitHub ke runner par
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Ye wo jagah hai jahan reel sach me banti hai. Studio (Vercel) sirf job
+# `reel_render_jobs` table me daalti hai aur is workflow ko phone kar deti hai;
+# render ka poora kaam yahin hota hai.
+#
+# ── Yahan kyun, Vercel par kyun nahi ─────────────────────────────────────
+#
+# ⚠️ Render ko do cheezein chahiye jo serverless me hoti hi nahi: Chrome Headless
+# (~150MB, Remotion har frame ka screenshot isi se leta hai) aur ffmpeg. Aur wo
+# minute bhar chalta hai, jabki Vercel ka function 10-60 second me kat jaata hai.
+# Isliye web/app ke baaki cron (reminders, plan expiry, prices) Vercel par theek
+# hain — reel unme fit hi nahi hoti.
+#
+# GitHub ke ubuntu runner me ffmpeg aur Chrome dono **pehle se** hote hain, ek
+# job 6 ghante tak chal sakti hai, aur alag se koi server nahi paalna padta.
+#
+# ── Kaun chalata hai ─────────────────────────────────────────────────────
+#
+#   repository_dispatch  — studio Export dabate hi khud bhejti hai
+#                          (`studio/lib/dispatch.ts`). Yahi asli raasta hai.
+#   workflow_dispatch    — Actions tab me "Run workflow" ka button. Jab dispatch
+#                          fail ho gaya ho ya koi job queue me atki ho.
+#
+# ⚠️ Koi `schedule:` jaan-boojhkar **nahi** hai. Private repo par free plan me
+# 2000 Actions minute/month hain. Har 15 minute ka khaali check bhi ~1 minute
+# leta hai, yaani mahine ke ~2880 minute — poora budget khaali jhaank kar khatam.
+# Job aane par bulao; baithe rehne ka paisa mat do.
+#
+# Docs: docs/reel-studio/phases/25-cloud-worker.md
+
+name: reel-render
+
+on:
+  repository_dispatch:
+    types: [reel-render]
+  workflow_dispatch:
+    inputs:
+      whisper:
+        description: "faster-whisper install karo (auto-captions wali job ke liye)"
+        type: boolean
+        default: false
+
+# ⚠️ Ek waqt me ek hi runner. Do saath chal jaayein to dono paise khaate hain aur
+# faayda koi nahi — queue ka claim `for update skip locked` se hota hai, isliye
+# doosre ko kaam milta hi nahi; wo bas 20 second khaali baith kar nikal jaata hai.
+#
+# `cancel-in-progress: false` zaroori hai: chal rahe render ko beech me maar dena
+# matlab job `processing` par atak jaana aur 15 minute baad hi wapas queue me
+# aana. Naya dispatch chup-chaap intezaar kare — ya us se pehle hi drain mode
+# wala worker uski job bhi utha le (aksar yahi hota hai).
+concurrency:
+  group: reel-render
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    # 6 ghante GitHub ki apni hadd hai; hum uske bahut pehle rukte hain. Worker
+    # khud bhi REEL_WORKER_MAX_RUN_MS par nayi job lena band kar deta hai.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      # ── Chrome Headless Shell ka cache ──────────────────────────────────
+      #
+      # ⚠️ Remotion apna Chrome `node_modules/.remotion/` me utaarta hai — yaani
+      # setup-node ka npm cache (`~/.npm`) use **nahi** dhakta. Bina is cache ke
+      # har run 150MB dobara utarta hai, ~40-60 second har baar.
+      #
+      # Chaabi me Remotion ka version hai: version badla to naya Chrome chahiye,
+      # aur purana cache chup-chaap chalte rehna hi wo halat banata hai jise
+      # debug karna sabse mushkil hota hai.
+      - name: Chrome Headless Shell cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.remotion
+          key: remotion-browser-${{ runner.os }}-${{ hashFiles('worker/package.json') }}
+
+      # ── Deps ────────────────────────────────────────────────────────────
+      #
+      # Sirf worker aur uske packages — `studio` (Next.js + React + Tailwind)
+      # yahan bilkul bekaar hai aur ~130MB extra utaarta hai.
+      #
+      # ⚠️ Fallback jaan-boojhkar hai. Scoped `npm ci` sahi tarika hai, par kabhi
+      # npm ka behaviour badla ya koi dep hoist ho kar chhoot gayi, to render ka
+      # ruk jaana is bachat se kahin mehnga hai. Isliye pehle scoped, aur wo na
+      # chale to poora.
+      - name: Install (worker + packages)
+        run: |
+          npm ci --include-workspace-root \
+            -w @reel/core -w @reel/media -w @reel/storage -w @reel/remotion -w @reel/worker \
+            || { echo "::warning::scoped npm ci nahi chali — poora npm ci chala rahe hain"; npm ci; }
+
+      # ── Jo maan liya jaata hai, use naapo ───────────────────────────────
+      #
+      # ⚠️ "ubuntu runner me ffmpeg hota hai" ek sach hai jo kisi din badal sakta
+      # hai. Wo din aane par render 3 minute chal kar aakhir me toota hua ffmpeg
+      # call dega, aur wajah log me kahin gehri dabi hogi. Yahan ek second me
+      # saaf jawab mil jaata hai.
+      - name: ffmpeg / ffprobe check
+        run: |
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      # ── faster-whisper — sirf jab sach me chahiye ───────────────────────
+      #
+      # Auto-captions wali job jisme text pehle se pata nahi hai. Studio dispatch
+      # ke saath `whisper: true` bhejti hai (dekho `studio/lib/dispatch.ts`).
+      # Baaki har render me ye steps chalte hi nahi — pip install + model
+      # download har run me ~1-2 minute khaata hai.
+      - name: faster-whisper model cache
+        if: ${{ github.event.client_payload.whisper || inputs.whisper }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-models-${{ runner.os }}
+
+      - name: faster-whisper install
+        if: ${{ github.event.client_payload.whisper || inputs.whisper }}
+        run: pip install --quiet faster-whisper
+
+      # ── Asli kaam ───────────────────────────────────────────────────────
+      #
+      # `--once` = drain mode: queue ki saari job nipta kar, 20 second khaali
+      # rehne par worker khud band ho jaata hai. Isi wajah se ek hi run me do-teen
+      # reel ban jaati hain jab user ek ke baad ek export kare — har reel ke liye
+      # poora runner dobara khada nahi karna padta.
+      - name: Render queue drain
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+          # ⚠️ `r2` — `local` nahi. Runner ki disk run khatam hote hi mit jaati
+          # hai; local driver par reel ban kar usi lamhe gayab ho jaati aur DB me
+          # job "completed" likhi reh jaati. Worker shuru me hi ye jaanch karta
+          # hai aur galat setting par saaf mana kar deta hai.
+          REEL_STORAGE_DRIVER: r2
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+          # Whisper ke bina transcribe job uthana matlab use fail karna — jabki
+          # wahi job tumhare PC par chal jaati. Isliye default sirf render.
+          REEL_WORKER_KINDS: ${{ (github.event.client_payload.whisper || inputs.whisper) && 'render,transcribe' || 'render' }}
+
+          # Heartbeat me nishaan — studio me "kis machine ne banayi" saaf dikhe.
+          REEL_WORKER_ID: gh-actions-${{ github.run_id }}
+          REEL_WORKER_VERSION: cloud
+
+          # Runner ki hadd 90 minute hai (upar `timeout-minutes`); worker 80 par
+          # nayi job lena band kar deta hai, taaki aakhri render poora ho sake aur
+          # koi job `processing` par atke nahi.
+          REEL_WORKER_MAX_RUN_MS: "4800000"
+          REEL_WORKER_IDLE_EXIT_MS: "20000"
+        run: npm run start:once --workspace @reel/worker

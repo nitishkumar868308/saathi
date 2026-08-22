@@ -211,6 +211,12 @@ Jab tak Phase 22 nahi bana, sirf **Upload** option dikhega — baaki buttons UI 
 |---|---|---|
 | 24 | Lip-sync decision, batch reels, hosting, multi-user | [phases/24-optional-heavy.md](phases/24-optional-heavy.md) |
 
+**Milestone 5 — Cloud worker (Phase 25)**
+
+| # | Phase | File |
+|---|---|---|
+| 25 | Render GitHub Actions par — bina server, bina PC chalu rakhe | [phases/25-cloud-worker.md](phases/25-cloud-worker.md) |
+
 ---
 
 ## 5. One-line prompts — bas ye copy karo

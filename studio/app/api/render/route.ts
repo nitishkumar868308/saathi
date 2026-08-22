@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { fail, handle, ok, readBody } from "@/lib/api";
 import { listAssets } from "@/lib/assets";
+import { dispatchConfigured, wakeWorker } from "@/lib/dispatch";
 import { loadProject } from "@/lib/projects";
 import { createRenderJob, listRenderJobs } from "@/lib/renders";
 
@@ -64,7 +65,25 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const job = await createRenderJob({ projectId, preset, doc: project.doc as Doc });
-    return ok({ job, warnings: check.warnings }, 201);
+
+    /*
+     * Cloud worker ko jagao (25.2).
+     *
+     * ⚠️ Job **pehle** ban chuki hai, aur ye tarteeb ulti nahi ho sakti. Dispatch
+     * pehle bhejne par runner queue me jhaank kar khaali paata aur 20 second baad
+     * band ho jaata — theek us lamhe se pehle jab job aati.
+     *
+     * ⚠️ Aur iska fail hona export ka fail hona **nahi** hai. Job DB me hai, wahi
+     * ek sach hai; runner Actions tab se ya agle export ke saath uth kar use utha
+     * lega. Isliye ye 201 hi lautata hai — sirf `dispatched` se sach bata deta
+     * hai, taaki UI "queue me hai, worker aa raha hai" aur "queue me hai, koi
+     * nahi aa raha" me farak kar sake.
+     */
+    const dispatched = dispatchConfigured()
+      ? (await wakeWorker({ reason: `render ${job.id}` })).ok
+      : null;
+
+    return ok({ job, warnings: check.warnings, dispatched }, 201);
   });
 }
 

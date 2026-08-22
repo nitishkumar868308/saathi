@@ -22,11 +22,27 @@ import { useEditorStore } from "@/lib/store";
  * se aaye hain. Export dialog ke andaaze aur yahan ke numbers me farak dikhna
  * bilkul theek hai — isi liye dono jagah saaf likha hai ki kaunsa kya hai.
  */
+
+/**
+ * Batti ke saath ka text.
+ *
+ * ⚠️ Cloud me "Worker offline" likhna sach hote hue bhi gumraah karta hai — wo
+ * padha "kuch toota hai" jaata hai, jabki runner ka so raha hona bilkul normal
+ * haal hai. Isliye wahan wahi likha hai jo sach me ho raha hai: worker so raha
+ * hai, aur job aate hi jaag jaayega.
+ */
+function workerLabel(online: boolean, mode: "cloud" | "local"): string {
+  if (online) return mode === "cloud" ? "Cloud worker chal raha hai" : "Worker chal raha hai";
+  return mode === "cloud" ? "Cloud worker so raha hai (job par jaagega)" : "Worker offline";
+}
+
 export function RendersPanel() {
   const projectId = useEditorStore((state) => state.projectId);
 
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const [worker, setWorker] = useState<{ online: boolean; secondsAgo: number | null } | null>(null);
+  /** Worker kahan chalta hai — is PC par ya GitHub ke runner par (25.3). */
+  const [mode, setMode] = useState<"cloud" | "local">("local");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,8 +63,10 @@ export function RendersPanel() {
 
       const workerData = (await workerResponse.json()) as {
         worker?: { online: boolean; secondsAgo: number | null };
+        mode?: "cloud" | "local";
       };
       if (workerData.worker) setWorker(workerData.worker);
+      if (workerData.mode) setMode(workerData.mode);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -87,20 +105,26 @@ export function RendersPanel() {
             "h-2 w-2 shrink-0 rounded-full",
             worker?.online ? "bg-emerald-400" : "bg-ink-500",
           )}
-          title={worker?.online ? "Worker chal raha hai" : "Worker offline"}
+          title={workerLabel(worker?.online === true, mode)}
         />
         <span className="min-w-0 flex-1 truncate text-[11px] text-chalk-500">
-          {worker?.online ? "Worker chal raha hai" : "Worker offline"}
+          {workerLabel(worker?.online === true, mode)}
         </span>
         <IconButton className="h-6 w-6" title="Refresh" aria-label="Refresh" onClick={() => void load()}>
           <RefreshCw size={11} />
         </IconButton>
       </div>
 
-      {worker && !worker.online ? (
+      {worker && !worker.online && mode === "local" ? (
         /*
          * 11.13 — "jhooth nahi". Ye line heartbeat par tiki hai, andaaze par
          * nahi, aur usme wahi command hai jo sach me chalani hai.
+         *
+         * ⚠️ Cloud mode me ye line **nahi** dikhti, aur ye zaroori hai (25.3):
+         * wahan worker ka so raha hona normal haal hai (runner job aane par
+         * uthta hai), aur `npm run dev:worker` ka koi matlab hi nahi. Har baar
+         * dikhne wali chetavni kuch dinon me anpadhi ho jaati hai — aur uske
+         * saath wo bhi jo sach me zaroori thi.
          */
         <p className="border-b border-amber/30 bg-amber/10 px-3 py-2 text-[11px] leading-snug text-amber">
           Render tab tak shuru nahi hoga. Ek doosre terminal me chalao:

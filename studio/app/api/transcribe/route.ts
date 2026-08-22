@@ -1,6 +1,7 @@
 import { WHISPER_MODELS, DEFAULT_WHISPER_MODEL, whisperAvailable } from "@reel/media";
 import { NextResponse } from "next/server";
 
+import { dispatchConfigured, wakeWorker } from "@/lib/dispatch";
 import { createTranscribeJob, getTranscribeJob } from "@/lib/transcribe";
 
 /**
@@ -17,6 +18,17 @@ import { createTranscribeJob, getTranscribeJob } from "@/lib/transcribe";
  *
  * ⚠️ Aur `whisperAvailable()` **poochha** jaata hai, maan nahi liya jaata. UI is
  * jawab se hi tay karti hai ki button dikhana hai ya "setup chahiye" (23.3).
+ *
+ * ⚠️ **Par wo sawaal is machine se poochha jaata hai, aur wahi ek chupa hua bug
+ * tha (25.4).** Studio ab Vercel par bhi chalti hai; wahan `python` hi nahi
+ * hota, isliye `whisperAvailable()` hamesha `false` deta — aur UI auto-captions
+ * ko "setup chahiye" keh kar band rakhti, jabki kaam to worker ko karna hai, is
+ * route ko nahi. Sawaal galat machine se poochha ja raha tha.
+ *
+ * Isliye ab do jawab hain: cloud worker set ho (`REEL_DISPATCH_*`) to whisper
+ * runner par install hota hai aur ye route apni machine ki taraf dekhta hi nahi.
+ * Warna purana wala hi sach hai — worker isi PC par hai, whisper bhi yahin
+ * chahiye.
  */
 
 export const runtime = "nodejs";
@@ -31,9 +43,23 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ job });
   }
 
+  // Cloud worker ho to whisper runner par install hota hai — is machine par
+  // dekhna bekaar hai, aur wahi dekhna Vercel par sab band kar deta tha.
+  if (dispatchConfigured()) {
+    return NextResponse.json({
+      available: true,
+      where: "cloud",
+      detail: "faster-whisper GitHub runner par install hota hai (job ke waqt).",
+      models: WHISPER_MODELS,
+      defaultModel: DEFAULT_WHISPER_MODEL,
+      install: "pip install faster-whisper",
+    });
+  }
+
   const check = await whisperAvailable();
   return NextResponse.json({
     available: check.ok,
+    where: "local",
     detail: check.detail.split("\n")[0] ?? "",
     models: WHISPER_MODELS,
     defaultModel: DEFAULT_WHISPER_MODEL,
@@ -68,7 +94,9 @@ export async function POST(request: Request): Promise<NextResponse> {
    * sirf tab lagti hai jab sach me whisper chalna hai. Warna TTS wali awaaz par
    * bhi "setup chahiye" aata, jabki wahan uska koi kaam hi nahi.
    */
-  if (text.length === 0) {
+  const cloud = dispatchConfigured();
+
+  if (text.length === 0 && !cloud) {
     const check = await whisperAvailable();
     if (!check.ok) {
       return NextResponse.json(
@@ -90,5 +118,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     ...(text ? { text } : {}),
   });
 
-  return NextResponse.json({ job }, { status: 201 });
+  /*
+   * Cloud worker ko jagao (25.2).
+   *
+   * ⚠️ `whisper` sirf tab `true` hai jab text pata **nahi** hai. Ye ek switch
+   * nahi, paise ka faisla hai: uske sach hone par runner pip install + model
+   * download karta hai (~1-2 minute har run). TTS se bani awaaz me text pehle se
+   * hota hai — wahan sirf ffmpeg ka kaam hai (`alignWords`), aur wo runner me
+   * pehle se maujood hai.
+   */
+  const dispatched = cloud
+    ? (await wakeWorker({ reason: `transcribe ${job.id}`, whisper: text.length === 0 })).ok
+    : null;
+
+  return NextResponse.json({ job, dispatched }, { status: 201 });
 }

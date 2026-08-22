@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Render worker — tumhare PC pe chalta hai. render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Vercel pe kabhi nahi jaata.",
+  "description": "Render worker — reel_render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Do jagah chalta hai: tumhare PC pe (daemon) aur GitHub Actions ke runner pe (--once, drain mode). Vercel pe kabhi nahi jaata.",
   "main": "./src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "start:once": "tsx src/index.ts --once",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "storage-smoke": "tsx scripts/storage-smoke.ts",
     "db-verify": "tsx scripts/db-verify.ts",

@@ -14,8 +14,16 @@ import { STUDIO_COOKIE, studioPasswordConfigured, verifyToken } from "@/lib/auth
  * machine kisi network par hogi, aur tab yaad nahi aayega ki gate tha hi nahi.
  */
 
-/** Sirf ye raaste bina login ke khulte hain. */
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+/**
+ * Sirf ye raaste bina login ke khulte hain.
+ *
+ * ⚠️ `/api/cron/*` yahan hai kyunki use bulane wala Supabase ka pg_cron hai —
+ * uske paas na browser hai na cookie, isliye studio ka password gate wahan lag
+ * hi nahi sakta. Wo raasta khula **nahi** hai: uska apna pehra `CRON_SECRET` ka
+ * Bearer token hai (dekho `app/api/cron/reel-dispatch/route.ts`). Ek pehre ki
+ * jagah doosra — bina pehre ke kuch bhi nahi.
+ */
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/cron"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
