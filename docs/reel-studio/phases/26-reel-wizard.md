@@ -1,6 +1,6 @@
 # Phase 26 — Reel Wizard (kahani se reel, ek raaste me)
 
-**STATUS:** neenv ban gayi (26.1-26.3) — UI baaki
+**STATUS:** dimaag ban gaya aur naapa gaya (26.1-26.4, 26.8, 26.11) — UI baaki
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 26 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding. Resume Protocol follow karo.
 **Depends on:** Phase 21 (AI provider), Phase 22 (TTS) complete
@@ -247,14 +247,14 @@ Zyada kaam **jodne** ka hai. Nayi buniyaadi cheez sirf do chhote pure function h
 - [x] 26.1 `wizard/names.ts` — animation/transition ke aam bhasha wale naam + "kab theek hai" line
 - [x] 26.2 `suggestAnimation()` pure function + test (har scene type par)
 - [x] 26.3 `suggestTransition()` pure function + test (pehla scene, tasveer/bina-tasveer)
-- [ ] 26.4 wizard ka draft state — ek jagah, ek shape
+- [x] 26.4 wizard ka draft state — ek jagah, ek shape (`wizard/draft.ts`)
 - [ ] 26.5 Step 1 "Shabd" — edit, hata do
 - [ ] 26.6 Step 2 "Tasveer" — upload / library / chhod do
 - [ ] 26.7 Animation + transition chunne wala chalta hua preview (ek waqt me ek loop)
-- [ ] 26.8 "Sab kuch apne aap set karo" — sirf khaali chunav bharta hai
+- [x] 26.8 `autoFill()` — sirf khaali chunav bharta hai (UI ka button baaki)
 - [ ] 26.9 Step 3 "Awaaz" — banao / apni daalo / chhod do + purane shabdon ka nishaan
 - [ ] 26.10 Step 4 "Dekho" — poori reel modal ke andar
-- [ ] 26.11 Apply — `assetByRole` bhar kar `buildProposal` → `applyProposal`, ek op
+- [x] 26.11 `applyWizard()` — `assetByRole` bhar kar `buildProposal` → `applyProposal`, ek op
 - [ ] 26.12 AiPanel se purani accept/reject list hataana
 - [ ] 26.13 Beech me band karne par tasdeek
 - [ ] 26.14 Ek poora chakkar chala kar dekhna: kahani → reel, aur Ctrl+Z se poora wapas
@@ -265,6 +265,27 @@ le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
 ## Progress log
 
 - **2026-08-22** — design tay hua aur likha gaya.
+- **2026-08-22** — wizard ka poora dimaag ban gaya (`wizard/draft.ts`) aur bina browser ke
+  chala kar dekha: `npm run check --workspace @reel/core` → purani suite **585 groups, 0 fail**
+  + wizard **40 ok, 0 fail**.
+
+  Do cheezein banate waqt nikli jo design me nahi thi:
+
+  1. **`text_audio` scene type jodna pada.** Tasveer chhodne par `image_audio` ban nahi sakta
+     (uska image slot required hai), aur seedha `text` par girne par aadmi ki **banayi hui awaaz
+     gayab ho jaati** — `text` me audio ka slot hai hi nahi. `audio` ("sirf awaaz") par girna
+     ulta nuksaan karta: wahan caption ka slot nahi. Isliye beech ki jagah bani.
+  2. **`check` script maine khud tod di thi.** `packages/reel-core/package.json` me
+     `"check": "tsx scripts/check.ts"` pehle se tha (585 assertion groups) aur maine use apne
+     wizard check se overwrite kar diya. Ab dono chain me chalti hain. Ye theek wahi shakl ki
+     galti thi jiske khilaaf ye poora repo likha gaya hai — kuch toota nahi dikhta, bas
+     jaanchein chupchaap band ho jaati hain.
+
+  Ek jaanch ne apni hi galti pakdi: "pehle scene par transition nahi" ko `!transitionIn` se
+  jaancha tha, jabki har item par `transitionIn` **hota hai** — bas uska type `"none"` hota hai.
+  Wo assertion hamesha fail hoti, aur uska aasan ilaaj use hata dena hota — jiske baad ye asli
+  halat kabhi jaanchi hi na jaati.
+
 - **2026-08-22** — 26.1/26.2/26.3 ban gaye aur chala kar dekhe:
   `npm run check --workspace @reel/core` → **21 ok, 0 fail**.
 

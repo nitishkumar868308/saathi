@@ -199,6 +199,70 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     },
   },
 
+  /*
+   * Text + awaaz, bina tasveer ke (26.6).
+   *
+   * ⚠️ Ye scene type wizard ki wajah se aaya, aur wo wajah ek chup-chaap hone
+   * wale nuksaan ki thi. Wizard me aadmi tasveer "chhod" sakta hai. Us haalat me
+   * `image_audio` nahi ban sakta (uska image slot required hai), aur seedha
+   * `text` par girne par **uski banayi hui awaaz gayab ho jaati** — `text` me
+   * audio ka slot hai hi nahi. Kuch toota hua nahi dikhta: scene banta hai, text
+   * dikhta hai, bas awaaz chali jaati hai.
+   *
+   * Aur `audio` ("sirf awaaz") par girna ulta nuksaan karta — wahan caption ka
+   * slot nahi hai, yaani screen se text gayab.
+   *
+   * Isliye ye beech ki jagah: text dikhta hai, awaaz chalti hai, tasveer ki
+   * zaroorat nahi.
+   */
+  {
+    id: "text_audio",
+    label: "Text + awaaz",
+    icon: "Mic",
+    hint: "Bina tasveer ke — screen par text, peeche voiceover",
+    group: "text",
+    slots: [
+      { id: "text", label: "Text", kind: "text", required: true, multiline: true },
+      AUDIO_SLOT,
+    ],
+    defaultDurationSeconds: 4,
+    build: (input) => {
+      const duration = input.durationInFrames ?? durationFromSeconds(4, input.fps);
+      const items: Item[] = [];
+
+      const content = slotString(input.slots, "text");
+      if (content) {
+        const item = createItem("text", {
+          fps: input.fps,
+          trackId: "",
+          name: content.slice(0, 40),
+          startFrame: 0,
+          durationInFrames: duration,
+        });
+        items.push({
+          ...item,
+          text: { ...(item.text as NonNullable<Item["text"]>), content },
+        });
+      }
+
+      const audio = slotString(input.slots, "audio");
+      if (audio) {
+        items.push(
+          createItem("audio", {
+            fps: input.fps,
+            trackId: "",
+            name: "Awaaz",
+            assetId: audio,
+            startFrame: 0,
+            durationInFrames: duration,
+          }),
+        );
+      }
+
+      return tag(items, input.sceneId);
+    },
+  },
+
   {
     id: "video",
     label: "Video",
