@@ -11,7 +11,7 @@
     "./*": "./src/*"
   },
   "scripts": {
-    "check": "tsx scripts/check.ts",
+    "check": "tsx scripts/check-wizard.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.scripts.json",
     "edit-sequence": "tsx scripts/edit-sequence.ts"
   },

@@ -86,3 +86,11 @@ export * from "./templates/builtins";
 export * from "./ai/types";
 export * from "./ai/mock";
 export * from "./ai/proposal";
+
+/*
+ * Wizard — sabse aakhir me, aur ye kram wahi wajah rakhta hai jo upar brand/
+ * templates ke saath likhi hai: `wizard/names` registry ko chhoota hai, isliye
+ * wo `registerBuiltins()` ke baad hi aana chahiye.
+ */
+export * from "./wizard/names";
+export * from "./wizard/suggest";

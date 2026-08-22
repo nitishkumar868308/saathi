@@ -1,6 +1,6 @@
 # Phase 26 — Reel Wizard (kahani se reel, ek raaste me)
 
-**STATUS:** design tay — banna baaki
+**STATUS:** neenv ban gayi (26.1-26.3) — UI baaki
 **One-line prompt:** `Read docs/reel-studio/README.md, then do Phase 26 of AI Reel Studio.`
 **Rules:** README.md ke Standing + Dynamic rules binding. Resume Protocol follow karo.
 **Depends on:** Phase 21 (AI provider), Phase 22 (TTS) complete
@@ -244,9 +244,9 @@ Zyada kaam **jodne** ka hai. Nayi buniyaadi cheez sirf do chhote pure function h
 
 ## Checklist
 
-- [ ] 26.1 `wizardNames.ts` — animation/transition ke aam bhasha wale naam + "kab theek hai" line
-- [ ] 26.2 `suggestAnimation()` pure function + test (har scene type par)
-- [ ] 26.3 `suggestTransition()` pure function + test (pehla scene, tasveer/bina-tasveer)
+- [x] 26.1 `wizard/names.ts` — animation/transition ke aam bhasha wale naam + "kab theek hai" line
+- [x] 26.2 `suggestAnimation()` pure function + test (har scene type par)
+- [x] 26.3 `suggestTransition()` pure function + test (pehla scene, tasveer/bina-tasveer)
 - [ ] 26.4 wizard ka draft state — ek jagah, ek shape
 - [ ] 26.5 Step 1 "Shabd" — edit, hata do
 - [ ] 26.6 Step 2 "Tasveer" — upload / library / chhod do
@@ -264,4 +264,20 @@ le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
 
 ## Progress log
 
-- **2026-08-22** — design tay hua aur likha gaya. Code abhi shuru nahi.
+- **2026-08-22** — design tay hua aur likha gaya.
+- **2026-08-22** — 26.1/26.2/26.3 ban gaye aur chala kar dekhe:
+  `npm run check --workspace @reel/core` → **21 ok, 0 fail**.
+
+  Do jaanchein khaas hain, kyunki wo niyam nahi *nateeja* dekhti hain:
+  - asli kahani (6 line) par ek se zyada animation aayi — sam/visham wala niyam
+    theek likha ho par sab lines chhoti nikal aayein to poori reel ek hi preset
+    par chali jaati, aur wo baat kisi bhi ek-scene wali jaanch me nahi dikhti.
+  - sifaarish sirf wahi id deti hai jo registry me sach me hai — galat id doc me
+    jaane par render use pehchaanta hi nahi aur animation **bina kisi error ke**
+    lagta hi nahi.
+
+  Aur ek jaanch iske liye ki har registry entry ka aam-bhasha wala naam maujood
+  ho — warna naya preset jodne par UI par kachcha id (`focus-pull`) chhap jaata
+  hai, chup-chaap.
+
+  Typecheck: core (dono tsconfig) + studio + worker — teeno saaf.
