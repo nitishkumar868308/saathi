@@ -100,14 +100,35 @@ jobs:
             -w @reel/core -w @reel/media -w @reel/storage -w @reel/remotion -w @reel/worker \
             || { echo "::warning::scoped npm ci nahi chali — poora npm ci chala rahe hain"; npm ci; }
 
-      # ── Jo maan liya jaata hai, use naapo ───────────────────────────────
+      # ── ffmpeg ──────────────────────────────────────────────────────────
       #
-      # ⚠️ "ubuntu runner me ffmpeg hota hai" ek sach hai jo kisi din badal sakta
-      # hai. Wo din aane par render 3 minute chal kar aakhir me toota hua ffmpeg
-      # call dega, aur wajah log me kahin gehri dabi hogi. Yahan ek second me
-      # saaf jawab mil jaata hai.
-      - name: ffmpeg / ffprobe check
+      # ⚠️ **"ubuntu runner me ffmpeg pehle se hota hai" galat nikla.** Aur ye
+      # baat pakadne me 4 minute 40 second lage, kyunki wo galti do parton ke
+      # peeche chhupi thi:
+      #
+      #   1. Remotion ka apna encoder alag hai, isliye render **poora ho jaata
+      #      hai**. Job 92% tak pahunchti hai. ffmpeg ki zaroorat uske baad
+      #      padti hai — faststart + loudness wale aakhri pass me.
+      #   2. Yahan pehle likha tha `ffmpeg -version | head -1`. Pipe ke saath
+      #      step ka exit code **head ka** hota hai, ffmpeg ka nahi. Yaani
+      #      ffmpeg maujood hi na ho tab bhi ye step hara nikalta tha.
+      #
+      # Nateeja: workflow "Success" dikhata raha aur har reel `spawn ffmpeg
+      # ENOENT` par marti rahi. Jo guard isi halat ko rokne ke liye likha gaya
+      # tha, wo khud usi halat ka hissa ban gaya.
+      #
+      # Isliye ab do baatein: ffmpeg **install** hota hai (agar image me na ho),
+      # aur jaanch `pipefail` ke saath hoti hai taaki wo sach me jaanch rahe.
+      - name: ffmpeg install + check
         run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            echo "ffmpeg runner image me nahi hai — apt se install kar rahe hain"
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          command -v ffmpeg
+          command -v ffprobe
           ffmpeg -version | head -1
           ffprobe -version | head -1
 

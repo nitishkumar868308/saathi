@@ -250,6 +250,39 @@ Minute kahan gaye, ye dekhne ki jagah: GitHub → Settings → Billing → Plans
 
 ---
 
+## Jo pehle asli run me toota (aur kya seekha)
+
+Pehla asli cloud run **"Success"** dikha raha tha, 4m40s chala, aur usme **dono reel fail** ho
+chuki thi. DB me dono par ek hi baat likhi thi:
+
+```
+"ffmpeg" chala hi nahi (spawn ffmpeg ENOENT)   — job 92% par
+```
+
+Teen parat, teeno ne apna kaam "theek" kiya, aur milkar ek jhooth banaya:
+
+1. **ubuntu runner me ffmpeg pehle se nahi hai.** Ye maan liya gaya tha.
+2. **Render phir bhi 92% tak pahunch gaya**, kyunki Remotion ka encoder alag hai. ffmpeg ki
+   zaroorat uske *baad* padti hai — faststart + loudness wale aakhri pass me. Isliye log ke 90%
+   hisse me sab bilkul theek dikhta hai.
+3. **Guard khud jhootha tha.** Workflow me likha tha `ffmpeg -version | head -1`. Pipe ke saath
+   step ka exit code **head ka** hota hai — yaani ffmpeg maujood hi na ho, step tab bhi hara.
+   Jo jaanch is halat ko rokne ke liye likhi gayi thi, wo khud usi halat ka hissa ban gayi.
+
+Aur upar se: **worker ne exit code 0 diya**, kyunki uske liye "job fail hui, DB me likh diya,
+queue saaf ki" bilkul normal kaam hai. GitHub ke paas dekhne ko sirf exit code hota hai.
+
+Teen fix, aur teeno alag jagah:
+
+- workflow ffmpeg **install** karta hai (image me na ho to), aur jaanch ab `set -euo pipefail`
+  ke saath hai taaki wo sach me jaanch rahe
+- drain mode me **aakhir tak fail hui job run ko fail** karti hai (`process.exitCode = 1`) —
+  hara nishaan aur zero reel ek saath ab nahi ho sakte
+- `work(conn, job)` par ab `.catch()` hai. `runJob` ki pehli do line (`requireExportPreset`,
+  `createStorageDriver`) uske apne `try` se **bahar** hain; wahan throw hone par unhandled
+  rejection se **poora worker mar jaata tha** aur job 15 minute `processing` par atki rehti.
+  Ye crash usi test me pakda gaya jo pehle fix ke liye likha gaya tha.
+
 ## Progress log
 
 - **2026-08-22** — code likha. Typecheck saaf (`worker` + `studio` + `web`).
@@ -262,5 +295,15 @@ Minute kahan gaye, ye dekhne ki jagah: GitHub → Settings → Billing → Plans
   R2 ki jaanch bhi chala kar dekhi: `REEL_WORKER_ONCE=1` + `REEL_STORAGE_DRIVER=local`
   par worker shuru hi nahi hota.
 
-  ⚠️ **Asli GitHub runner par abhi kuch nahi chala** — 25.1-25.4 ka setup baaki hai,
+- **2026-08-22 (baad me)** — asli runner par chala. Run #1 (khaali queue) 48s me green.
+  Run #2 me do reel uthi aur dono `spawn ffmpeg ENOENT` par fail hui — jabki run "Success"
+  dikha raha tha. Upar wala section us poori parat-dar-parat galti ka hisaab hai.
+
+  Stub ke saath dono naye fix naape gaye:
+  - aakhir tak fail hui job → worker **exit 1**, saaf list ke saath
+  - `runJob` ki pre-try throw ab normal fail banti hai, worker crash nahi hota
+
+  Media migration bhi ho chuki: 4 file (9.0 MB) R2 par, `migrate:r2` ka R2 probe pass.
+
+  ⚠️ **ffmpeg wala fix asli runner par abhi verify nahi hua** — 25.1-25.4 ka setup baaki hai,
   isliye ek bhi box tick nahi kiya gaya.

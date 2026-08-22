@@ -695,6 +695,8 @@ async function main(): Promise<void> {
   let idleSince: number | null = null;
   /** Lagataar kitni baar DB se baat nahi ho paayi (drain mode ki hadd). */
   let failures = 0;
+  /** Jo jobs aakhirkaar fail hui (retry bhi khatam). Drain mode ka exit code isi par hai. */
+  const deadJobs: string[] = [];
 
   const shutdown = () => {
     if (stopping) return;
@@ -786,7 +788,33 @@ async function main(): Promise<void> {
       // Kaun sa kaam — `kind` se. Purane rows me column nahi hoga, wahan render.
       const work = (job.kind ?? "render") === "transcribe" ? runTranscribeJob : runJob;
 
-      void work(conn, job)
+      /*
+       * ⚠️ **Ye `.catch()` ek asli crash ke baad aaya, aur wo crash ek test me
+       * pakda gaya jo kisi aur cheez ke liye likha gaya tha.**
+       *
+       * `runJob` apni har galti khud sambhalti hai — par uske `try` se **pehle**
+       * do line hain: `requireExportPreset()` aur `createStorageDriver()`. Dono
+       * throw kar sakti hain (anjaan preset, ya R2 ki keys adhoori). Wo throw
+       * `try` ke bahar hota hai, isliye seedha is promise tak aata tha — aur
+       * yahan koi `.catch()` tha hi nahi.
+       *
+       * Nateeja: **poora worker mar jaata tha** (Node unhandled rejection par
+       * process band kar deta hai), aur job `processing` par jam jaati — 15
+       * minute baad `reel_requeue_stale_jobs` ke aane tak. Cloud par ye aur bura
+       * hai: runner marta hai, us run me queue ki baaki jobs bhi chhoot jaati
+       * hain, aur Actions me sirf ek adhoora log bachta hai.
+       *
+       * Ab har galti wahi shakl le leti hai jo normal fail ki hai — job `failed`
+       * hoti hai apni wajah ke saath, aur worker agli job par chala jaata hai.
+       */
+      const outcomeOf = work(conn, job).catch(
+        (error: unknown): JobOutcome => ({
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+
+      void outcomeOf
         .then(async (outcome) => {
           if (outcome.status === "completed") return;
 
@@ -806,6 +834,7 @@ async function main(): Promise<void> {
            */
           const canRetry = job.attempts < job.max_attempts;
           log(`job ${job.id} fail: ${outcome.error} ${canRetry ? "(dobara koshish hogi)" : "(aur koshish nahi)"}`);
+          if (!canRetry) deadJobs.push(`${job.id}: ${outcome.error ?? "anjaan error"}`);
           await updateJob(conn, job.id, {
             status: canRetry ? "queued" : "failed",
             error: outcome.error ?? "anjaan error",
@@ -860,6 +889,33 @@ async function main(): Promise<void> {
   clearInterval(heartbeatTimer);
   await heartbeat(conn, null).catch(() => {});
   log("band.");
+
+  /*
+   * ⚠️ **Drain mode me fail hui jobs poore run ko fail karti hain — aur ye ek
+   * asli, mehngi galti ke baad aaya.**
+   *
+   * Pehla asli cloud run "Success" dikha raha tha, 4 minute 40 second chala, aur
+   * usme **dono** reel `spawn ffmpeg ENOENT` par mar chuki thi. Worker ke liye ye
+   * bilkul theek vyavhaar tha — job fail hui, DB me likh diya, queue saaf ki,
+   * shanti se nikal gaya. Par GitHub ke paas dekhne ko sirf exit code hota hai,
+   * aur wo 0 tha. Actions me hara nishaan, aur ek bhi reel nahi bani.
+   *
+   * Yahi wo shakl hai jo sabse mehngi padti hai: koi error kahin nahi dikhta,
+   * kyunki har parat ne apna kaam "theek" kiya. Sach sirf DB ke ek column me
+   * pada rehta hai jise koi nahi dekhta.
+   *
+   * ⚠️ Ginti sirf un jobs ki hai jinki **retry bhi khatam** ho chuki hai. Beech
+   * ki fail koshish par run ko laal karna galat hoga — wo job usi run me dobara
+   * uthti hai aur aksar ban bhi jaati hai.
+   *
+   * Normal (daemon) worker par ye laagu nahi: wahan exit code kisi ke kaam ka
+   * nahi, aur ek fail job par worker ka marna bilkul galat hoga.
+   */
+  if (RUN_ONCE && deadJobs.length > 0) {
+    log(`${deadJobs.length} job aakhir tak fail rahi — run ko fail kar rahe hain:`);
+    for (const line of deadJobs) log(`  ${line}`);
+    process.exitCode = 1;
+  }
 }
 
 function sleep(ms: number): Promise<void> {
