@@ -77,15 +77,12 @@ Cron jobs (SQL Editor, har file me `<CRON_SECRET>` ko apni asli value se replace
 ### 1d. Edge Functions (AI)
 ```bash
 supabase functions deploy ai
-supabase functions deploy chat   # (agar Claude-based chat path use ho raha ho)
 ```
 
 ### 1e. Function secrets  ← #4 Gemini key yahan
 `SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY` Supabase khud inject karta hai. Sirf AI key set karni hai:
 ```bash
 supabase secrets set GEMINI_API_KEY=YAHAN_ASLI_KEY
-# agar chat function use ho:
-supabase secrets set ANTHROPIC_API_KEY=...
 ```
 > ⚠️ Jo key di gayi (`AQ.Ab8...`) wo normal Gemini key format (`AIza...`, ~39 chars) jaisi NAHI hai.
 > AI calls fail ho to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) se nayi key banao.

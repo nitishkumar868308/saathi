@@ -1,7 +1,5 @@
 # Saathi App — Phase 1: Foundation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Ek chalta hua Expo (React Native) app khada karna — themed, navigation ke saath, Supabase se juda, aur Home + Chat screen ka skeleton — taaki iske upar features banaye ja sakein.
 
 **Architecture:** Expo (managed workflow) + EAS Build for store-ready builds. Supabase JS client backend ke liye (data/auth/storage). File-based routing (expo-router). Warm theme design tokens landing page se match. AI aur real logic baad ke phases mein.
@@ -778,8 +776,8 @@ git commit -m "chore(app): EAS build configuration"
 
 ## Next Phases (alag plans, jab yahan tak pahunchein)
 
-- **Phase 2 — Chat + AI:** Supabase Edge Function `/chat` (Claude Haiku), messages table, streaming reply, real memory.
-- **Phase 3 — Documents:** camera/upload, Edge Function `/scan-document` (Claude vision → expiry), documents table + storage (private, RLS), Documents screen real data.
+- **Phase 2 — Chat + AI:** Supabase Edge Function `/chat` (Gemini Flash), messages table, streaming reply, real memory.
+- **Phase 3 — Documents:** camera/upload, Edge Function `/scan-document` (Gemini vision → expiry), documents table + storage (private, RLS), Documents screen real data.
 - **Phase 4 — Reminders + Notifications:** expo-notifications, expiry reminders (1 month/1 week/on-expiry), natural-language reminders.
 - **Phase 5 — Daily Brief:** scheduled function, morning push.
 - **Phase 6 — Voice:** speech-to-text input + text-to-speech reply.

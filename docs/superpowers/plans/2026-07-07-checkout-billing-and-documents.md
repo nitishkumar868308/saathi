@@ -1,7 +1,5 @@
 # In-App Payment (GPB) + Profile Details + Local Documents — Implementation Plan (v2)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
-
 **Goal:** Web pe plan button "App download karo" modal khole (koi web payment nahi), GST 18% comment out, billing/details form app me aaye (Supabase me save), aur payment app ke andar Google Play Billing (RevenueCat) se ho. Saath me document ki actual file local folder me save + full-screen view.
 
 **Architecture:** Web (Next.js) sirf marketing — plan CTA modal, checkout page commented out. Payment app me RevenueCat (`react-native-purchases`, GPB wrapper), profile details Supabase `user_details` (per-user upsert, own-row RLS). Location cascade app se direct Supabase (public-read tables). Phone validation `libphonenumber-js` (pure JS). Documents `expo-file-system` se local copy.

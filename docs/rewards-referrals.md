@@ -26,11 +26,11 @@ Waitlist hata di gayi. Ab do offer hain, dono **admin se manage** hote hain.
 - Document `user_id` ke saath insert hota hai.
 
 ## 3. Chat abhi "stub mode" me hai
-`ai` edge function bina `ANTHROPIC_API_KEY` ke ek fixed reply deta hai — **par message phir bhi record karta hai**, isliye referral ki "first chat" condition aaj bhi kaam karti hai.
+`ai` edge function bina `GEMINI_API_KEY` ke ek fixed reply deta hai — **par message phir bhi record karta hai**, isliye referral ki "first chat" condition aaj bhi kaam karti hai.
 
 **Asli AI chalu karne ke liye sirf key set karo, koi code change nahi:**
 ```
-supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase secrets set GEMINI_API_KEY=AIza...
 ```
 (Key kabhi app ki `.env` me mat daalna — ye server secret hai.)
 
@@ -77,7 +77,7 @@ koi deploy nahi chahiye. Offer band karo to uska banner/row poori tarah gayab.
    supabase functions deploy ai
    ```
    Secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` Supabase khud inject karta hai.
-   `ANTHROPIC_API_KEY` **optional** — na ho to stub mode.
+   `GEMINI_API_KEY` **optional** — na ho to stub mode.
 3. Web me `ADMIN_PASSWORD` + `SUPABASE_SERVICE_ROLE_KEY` set hon (admin panel ke liye).
 4. Deep link chalane ke liye app ka `apkasaathi.com/r/*` association (Android App Links) baad me set karna — abhi web page Play Store bhej deta hai aur user code khud daal sakta hai.
 

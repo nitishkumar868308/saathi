@@ -68,10 +68,10 @@ Gym/habit tracker (full), job-switch help, interview Q&A, calendar sync, family 
       ├──► Supabase ready-made API (GET/POST)  →  data save/load (documents, messages, reminders)
       │
       └──► Edge Functions (apna custom code)
-                 ├─ POST /chat          → Claude AI se chat reply (streaming)
+                 ├─ POST /chat          → AI se chat reply (streaming)
                  └─ POST /scan-document → document se expiry + info nikalna
                             │
-                            └──► 🤖 Claude API (Haiku)
+                            └──► 🤖 Gemini API (Flash)
 
 🗄️ Supabase = Database (PostgreSQL) + Auth (login) + Storage (documents) + Edge Functions
 🔔 Notifications = Expo Notifications / FCM
@@ -82,14 +82,14 @@ Gym/habit tracker (full), job-switch help, interview Q&A, calendar sync, family 
 
 - **App (Expo/React Native):** UI, chat, voice input/output, camera, notifications dikhana. Android first.
 - **Supabase ready-made APIs:** simple data CRUD (documents, messages, reminders) — auto-generated, code nahi likhna.
-- **Edge Function `/chat`:** user message le → Claude Haiku ko bheje → reply (streaming) → messages save → reply return. (Apna code, full control.)
-- **Edge Function `/scan-document`:** image/PDF le → Claude (vision) se `{type, expiry_date, key_info}` nikale → documents table me save.
+- **Edge Function `/chat`:** user message le → Gemini Flash ko bheje → reply (streaming) → messages save → reply return. (Apna code, full control.)
+- **Edge Function `/scan-document`:** image/PDF le → Gemini (vision) se `{type, expiry_date, key_info}` nikale → documents table me save.
 - **Reminder engine:** normal scheduled logic (AI nahi) — expiry ke aage 1 mahina/1 hafta/expire pe notification. Device-local + backend scheduled job.
 - **Daily brief job:** har subah ek scheduled function → aaj ke reminders + is hafte ki expiry → ek chhota brief → push notification.
 
 ### AI ka use (cost control)
 
-AI sirf 2 jagah: **chat reply** aur **document scan**. Baaki sab (reminders, expiry status, lists) **normal code** se. Model: **Claude Haiku** (sasta + fast).
+AI sirf 2 jagah: **chat reply** aur **document scan**. Baaki sab (reminders, expiry status, lists) **normal code** se. Model: **Gemini Flash** (sasta + fast).
 
 ---
 
@@ -107,7 +107,7 @@ AI sirf 2 jagah: **chat reply** aur **document scan**. Baaki sab (reminders, exp
 ## 9. Privacy (shuru se sahi — DPDP-ready)
 
 - Documents **user ke apne private Supabase storage** mein (encrypted, sirf woh user access kare — Row Level Security).
-- **Claude ke memory server pe kuch save NAHI** — Claude API stateless, hum sirf zaroori cheez bhejenge.
+- **AI provider ke server pe kuch save NAHI** — API stateless hai, hum sirf zaroori cheez bhejenge.
 - User chahe toh **sab data export / delete** kar sake.
 - Privacy policy + consent onboarding mein.
 - Hamari chat/brainstorming bhi kisi external memory server pe save nahi (user ki request).
@@ -128,7 +128,7 @@ AI sirf 2 jagah: **chat reply** aur **document scan**. Baaki sab (reminders, exp
 - **App:** Expo (React Native), Android first
 - **Backend/DB/Auth/Storage:** Supabase (free tier se shuru; open-source, baad mein migrate/self-host option)
 - **Custom backend logic:** Supabase Edge Functions (apna code) — NestJS abhi NAHI
-- **AI:** Claude Haiku (API key sirf backend/Edge Function mein, app mein kabhi nahi)
+- **AI:** Gemini Flash (API key sirf backend/Edge Function mein, app mein kabhi nahi)
 - **Notifications:** Expo Notifications / FCM
 - **Landing page:** Next.js on Vercel (free)
 - **Code storage:** GitHub
@@ -149,7 +149,7 @@ AI sirf 2 jagah: **chat reply** aur **document scan**. Baaki sab (reminders, exp
 ## 13. Cost
 
 - **One-time:** ~₹2,000 (Google Play account)
-- **Monthly (MVP, chhote users):** ~₹1,000-2,000 (mostly Claude AI)
+- **Monthly (MVP, chhote users):** ~₹1,000-2,000 (mostly AI)
 - **Optional:** domain ~₹800/saal (landing page ke liye)
 - Supabase / Vercel / GitHub / notifications = **₹0** (free tiers)
 

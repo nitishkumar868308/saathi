@@ -27,7 +27,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/admin", "/api/", "/r/"],
       },
       // AI crawlers ko bhi allow — brand ka zikr in jawaabon me aana faayda hi hai.
-      { userAgent: ["GPTBot", "ClaudeBot", "PerplexityBot"], allow: "/" },
+      { userAgent: ["GPTBot", "PerplexityBot"], allow: "/" },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
     host: SITE_URL,
