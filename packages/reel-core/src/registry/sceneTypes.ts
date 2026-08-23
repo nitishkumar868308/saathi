@@ -578,7 +578,17 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
            * ka logo kata hua dikhna sabse buri galtiyon me se ek hai, aur wo galti
            * dikhti bhi nahi — logo bas thoda "zoom" lagta hai.
            */
-          fit: { ...logo.fit, mode: "contain" as const },
+          fit: {
+            mode: "contain" as const,
+            /*
+             * WARNING: Logo ke peeche **kuch nahi**. Default `blurred-asset` hai,
+             * jo tasveer ke liye theek hai (khaali kinare bhar deta hai) par logo
+             * par ek dhundhla dhabba bana deta hai — jaise logo ke peeche uski hi
+             * chhaya phail gayi ho. CTA wo ek frame hai jise aadmi screenshot leta
+             * hai; wahan safai sabse zyada maayne rakhti hai.
+             */
+            background: { kind: "color" as const, value: "transparent" },
+          },
           transform: { ...logo.transform, y: -Math.round(input.height * 0.2), scale: 0.34 },
         });
       }

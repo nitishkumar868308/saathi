@@ -480,6 +480,11 @@ check(
 
 const ctaLogo = ctaItems.find((item) => item.type === "image");
 check(
+  "CTA ke logo ke peeche koi dhabba nahi",
+  ctaLogo?.fit.background.kind === "color" && ctaLogo.fit.background.value === "transparent",
+  `bg=${ctaLogo?.fit.background.kind}/${ctaLogo?.fit.background.value} — blur logo par chhaya jaisa dikhta hai`,
+);
+check(
   "CTA ka logo kabhi kat-ta nahi (contain)",
   ctaLogo?.fit.mode === "contain",
   `mode=${ctaLogo?.fit.mode} — cover par chaukor logo ke kinare kat jaate hain`,
