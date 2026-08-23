@@ -30,6 +30,31 @@ import { useEditorStore } from "@/lib/store";
  * variable bitrate deta hai; ek sthir number dikhana jhooth hoga, aur us jhooth
  * ka pata tab chalta hai jab file aa chuki hoti hai.
  */
+/**
+ * Kisi bhi promise par ek hadd — taaki "kuch nahi ho raha" ek saaf error bane.
+ *
+ * ⚠️ Ye `Promise.race` hai, `AbortSignal` nahi, aur wo jaan-boojhkar: `saveNow()`
+ * ke andar abort ka koi raasta hai hi nahi. Yahan maqsad request rokna nahi,
+ * **user ko batana** hai — peeche ka kaam chalta rahe to koi nuksaan nahi.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `${what} (${ms / 1000}s tak). Ek baar page reload karke dobara koshish karo — ` +
+                `job shayad ban chuki ho, Renders panel dekh lena.`,
+            ),
+          ),
+        ms,
+      ),
+    ),
+  ]);
+}
+
 export function ExportDialog({
   open,
   onClose,
@@ -129,13 +154,30 @@ export function ExportDialog({
        * karne par aakhri kuch edits chhoot jaati — aur wo galti tab dikhti hai
        * jab video ban chuki hoti hai.
        */
-      await saveNow();
+      /*
+       * ⚠️ Dono par hadd lagi hui hai, aur ye ek asli halat dekhne ke baad aayi.
+       *
+       * Live par Export dabane par dialog **hamesha ke liye atak gaya**: button
+       * disabled, koi error nahi, koi job nahi. Wajah kuch bhi ho sakti thi —
+       * autosave ka flush jo laut hi na raha ho, ya ek request jiska jawab kabhi
+       * na aaye. Par user ke liye dono ek jaisi dikhti hain: kuch nahi ho raha,
+       * aur pata bhi nahi kyun.
+       *
+       * Bina hadd ke wo halat **kabhi khatam hi nahi hoti** — aadmi page reload
+       * karta hai aur use aaj tak nahi pata chalta ki kya hua tha. Hadd lagne se
+       * wo ek saaf jaawab me badal jaati hai jispar kuch kiya ja sakta hai.
+       */
+      await withTimeout(saveNow(), 15_000, "Project save hone me atak gaya");
 
-      const response = await fetch("/api/render", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, preset: presetId, force: true }),
-      });
+      const response = await withTimeout(
+        fetch("/api/render", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, preset: presetId, force: true }),
+        }),
+        30_000,
+        "Server ne jawab hi nahi diya",
+      );
       const data = (await response.json()) as {
         job?: { id: string };
         reason?: string;
