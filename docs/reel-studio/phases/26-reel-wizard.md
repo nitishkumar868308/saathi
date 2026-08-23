@@ -478,3 +478,89 @@ le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
   hai, chup-chaap.
 
   Typecheck: core (dono tsconfig) + studio + worker — teeno saaf.
+
+---
+
+## 26.22 — lay, awaaz aur CTA (2026-08-23)
+
+Pehli asli reel bani, aur usme se chhe cheezein nikli. Paanch shikayatein alag lagti thi;
+unme se teen ki **ek hi jad** thi.
+
+### Jad: scene ki lambai awaaz se nahi banti thi
+
+Scene ki lambai AI ke andaaze se aati thi (aksar 4s), aur awaaz apni lambai ki hoti thi.
+2.9s ki awaaz par har scene ke ant me 1.1s ka **suna hua khalaa**; 4.8s ki awaaz **beech
+shabd me kat** jaati thi. Dekhne wale ke liye dono ek hi cheez hain: "awaaz ruk jaati hai."
+
+Ye transition ka bug lagta tha (`ek scene se doosre pe jaate waqt time leta hai`) par
+transition me koi waqt lagta hi nahi — wo item ke apne frames me hota hai. Naap kar dekha:
+har scene ke beech gap **0 frame** tha, hamesha se.
+
+Ab `sceneSeconds()` lambai tay karta hai — awaaz + 0.25s saans, aur video ka chuna hua hissa
+usse bada ho to wo jeetta hai. Aath scene ki asli kahani par nateeja: har scene theek awaaz
+jitna, 0 gap, kul 31.2s.
+
+### Awaaz ki raftaar — `playbackRate`, provider se nahi
+
+Raftaar TTS se dobara maangi ja sakti thi, aur wo galat hota. Gemini me speed ka koi
+parameter hai hi nahi — wahan "thoda tez bolo" **shabdon me** kaha jaata hai, aur nateeja
+kabhi 1.5x hota hai kabhi 1.05x. Us andaaze par scene ki lambai bandhi nahi ja sakti.
+
+Isliye raftaar `item.playbackRate` se lagti hai: 1.15x sach me 1.15x hai, scene bhi usi
+hisaab se chhota hota hai, kharcha zero, aur wapas bhi ho jaata hai. Live par 8 scene par
+lagane se reel 30s se 26s ho gayi — turant, bina kisi nayi TTS call ke.
+
+### Video ki apni awaaz voiceover ko daba deti thi
+
+Dono poore volume par ek saath bajti thi. Phone ke speaker par uska matlab tha ki voiceover
+**suna hi nahi jaata** — aur screen par "awaaz lag gayi" likha aata tha. Aadmi kar bhi kuch
+nahi sakta tha: video ka volume kahin poochha nahi jaata.
+
+Ab voiceover hone par video ki apni awaaz band. Chup karna sahi default hai, kam volume
+nahi — voiceover wali reel me footage ka shor kuch jodta nahi.
+
+### CTA me ab koi `shape` nahi
+
+Wo naarangi dabba do baar theek kiya ja chuka tha (pehle DEFAULT_SHAPE, phir patli patti) aur
+dono baar ilaaj lakshan ka tha. Asli wajah: is system me z-order **track** se aata hai, track
+item ke TYPE se milta hai, aur wo track tab banta hai jab us type ka pehla item aata hai.
+Yaani shape text ke upar aayega ya neeche — ye poori reel ke banne ke tarike par tika tha.
+
+Ab CTA me shape hai hi nahi. Button ek text item hai jiska apna `background` hai; uska pallaa
+hamesha uske apne text ke peeche rehta hai, kyunki wo alag item hai hi nahi. Saath me logo
+bada (0.17 → 0.34) aur ek saaf line jispar likha hai ki karna kya hai.
+
+### Jo chunav the hi nahi
+
+- **Bina tasveer wale scene par harkat.** Pehle wahan `suggestAnimation` `null` deta tha aur
+  UI wo chunav dikhati hi nahi thi — is dalil par ki zoom text par ajeeb lagta hai. Wo dalil
+  ek preset ke liye sach thi aur usse poori shreni band ho gayi: jis reel me tasveerein nahi
+  thi (yaani pehli har reel) wo 30 second tak **bilkul sthir** rahi. Ab text ke liye text wala
+  preset chunta hai (`slide-up-soft` / `pop-in`), aur zoom sirf tasveer par.
+- **Text chhupana** (bola phir bhi jaayega) — sirf tab jab scene me tasveer ho, warna scene
+  khaali reh jaata.
+- **Text ka rang** — chaar brand rang. `null` = `brand.text` token bacha rehta hai; hex likh
+  dene par brand se naata toot jaata hai aur reel akeli purani reh jaati hai.
+- **Purane scene hata do.** Wizard dobara chalane par reel 30s ki jagah 56s ki ban rahi thi.
+  Footer 26s bolta tha (sirf naye), preview 56s (poori reel) — dono sach the.
+
+### Awaaz ka slot na hone par type upar chadhta hai
+
+`text` type par banayi hui awaaz **chup-chaap gir jaati** thi. Ye wahi galti thi jo pehle
+`text`, `video`, `cta` aur `screen_recording` ke saath **chaar baar** mil chuki hai, aur har
+baar ilaaj ek naya slot jodkar kiya gaya. Ab `VOICE_UPGRADE` us halat ko band karta hai:
+jahan bhi awaaz ho par slot na ho, type upar chadh jaata hai.
+
+### Chetavni wizard me, export me nahi
+
+Lay se judi galtiyan (bahut tez awaaz, padhne ka waqt na milna, aadhe scene par awaaz, reel
+90s se lambi) export rokne layak nahi hoti — video ban to jaati hai. Isliye `validateExportSettings`
+me wo aati hi nahi, aur aadmi ko kabhi pata nahi chalta ki reel buri kyun lagi. Ab `sceneAdvice()`
+har scene ke **saath** dikhta hai aur `draftAdvice()` poori reel par.
+
+### Ek jaanch jo apne aap ko nahi ginti thi
+
+`check-wizard.ts` me summary **do jagah** tha. Uske baad likhi har jaanch chalti to thi par
+ginti me nahi aati, aur fail hone par bhi script `exit 0` deti thi. Meri hi nayi jaanchein us
+daayre se bahar padi thi. Ab summary sirf file ke ant me hai — **89 assertions**, sab ginti me
+(`check.ts` ke 585 ke alawa).
