@@ -2,7 +2,7 @@ import { assetKindForFile } from "@reel/core";
 import { z } from "zod";
 
 import { fail, handle, ok, readBody } from "@/lib/api";
-import { assetKey, createAsset, findAssetByChecksum } from "@/lib/assets";
+import { assetKey, createAsset, deleteAssetRow, findAssetByChecksum } from "@/lib/assets";
 import { probeAndThumbnail } from "@/lib/assetProbe";
 import { storage } from "@/lib/storage";
 
@@ -79,9 +79,22 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     // dono ke liye khaali nikalta hai. Isliye yahan dobara.
     if (checksum) {
       const existing = await findAssetByChecksum(checksum);
-      if (existing) {
+      /*
+       * ⚠️ Yahan bhi row ke saath **file** dekhi jaati hai, presign ki tarah.
+       * Bina iske ye branch abhi-abhi chadhi hui sahi file **delete** kar deta
+       * hai aur badle me ek anaath row lauta deta hai — yaani upload "duplicate"
+       * kehlata hai aur dono jagah kuch nahi bachta. Ye us halat me hota hai jab
+       * DB me purani row ho jiski file kabhi chadhi hi na ho.
+       */
+      if (existing && (await storage().exists(existing.key))) {
         await storage().delete(key);
         return ok({ duplicate: true as const, asset: existing });
+      }
+      if (existing) {
+        console.warn(
+          `[assets/complete] ${existing.id} ki row thi par file nahi — row hata rahe hain`,
+        );
+        await deleteAssetRow(existing.id);
       }
     }
 
