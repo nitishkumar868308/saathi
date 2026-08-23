@@ -564,3 +564,68 @@ har scene ke **saath** dikhta hai aur `draftAdvice()` poori reel par.
 ginti me nahi aati, aur fail hone par bhi script `exit 0` deti thi. Meri hi nayi jaanchein us
 daayre se bahar padi thi. Ab summary sirf file ke ant me hai — **89 assertions**, sab ginti me
 (`check.ts` ke 585 ke alawa).
+
+---
+
+## 26.23 — asli media ke saath (2026-08-24)
+
+Pehli baar reel asli tasveeron, app ke screenshot aur screen recording ke saath banayi
+(user ki apni files, media library se). Jo kami dikhi wo koi "sajawat" ki nahi thi — teen
+me se do galtiyan aisi thi jo **sirf render ke baad** dikhti hain.
+
+### Blurred background asli tasveer ko dhak leta tha
+
+`contain` wala har scene bilkul dhundhla nikla — jaise tasveer hi kharab ho. Wajah CSS ki
+painting ka niyam hai: `FitBackground` ek `AbsoluteFill` hai (`position: absolute`), aur item
+components apna media ek saade `<Img>` / `<OffthreadVideo>` ke roop me dete hain, jo normal
+flow me baithta hai. **Positioned element normal flow wale content ke upar chhapta hai**, chahe
+`z-index` na ho. Yaani blurred copy saaf tasveer ke upar aa jaati thi.
+
+Kuch toota hua nahi dikhta tha, koi error nahi. Aur mockup wale scene par ye hota hi nahi
+(`PhoneFrame` khud positioned hai), isliye galti aur der tak chhupi rahi. Ilaaj: media bhi
+`AbsoluteFill` me.
+
+### Landscape tasveer 2x phail kar dhundhli ho jaati thi
+
+1698x926 ki tasveer 1080x1920 frame ko bharne ke liye **2.07 guna** phailti hai. Ab `fitFor()`
+1.6x se zyada phailne par `contain` + blurred kinare chunta hai — wahi tasveer 0.64 guna par
+baithti hai aur bilkul saaf rehti hai. Hadd 1.0 par nahi hai: thoda phailna (1.2-1.4x) aankh
+pakadti nahi, aur poora frame bharna behtar dikhta hai jab tak wo saaf ho.
+
+⚠️ Wizard fit ko **sirf contain ki taraf** badalta hai. Ek jaanch ne pakda ki wo CTA ke logo ka
+jaan-boojhkar liya hua `contain` wapas `cover` kar deta tha — yaani scene type ka faisla ek aam
+niyam se mit jaata tha.
+
+### App ki recording phone frame ke bina padhi nahi jaati
+
+386x850 ki recording poore frame me 2.26 guna phailti hai aur uska chhota UI text padha nahi
+jaata — yaani wo scene jo app dikhane ke liye hai, usme app dikhti hi nahi. Phone frame ke
+andar wo 58% chaudai par (1.62x) baithti hai aur saaf rehti hai. Chunav wizard me hai, default
+off: har portrait video ko frame me daal dena galat hoga (camera ki footage phone ke andar
+chipki hui ajeeb lagti hai).
+
+### Text tasveer par
+
+Do baatein jo poori reel dekhne par hi pakdi jaati hain:
+
+- Safed serif text tasveer ke **halke hisse** par gayab ho jaata tha (Papa ka safed kurta).
+  Ab uske peeche ek halki parat (45%) lagti hai. Gehri nahi — poora kaala dabba lagane par reel
+  "caption chipkaya hua" jaisi lagne lagti hai.
+- Beech me rakha text seedha **chehre par** baithta tha. `contain` beech me patti banata hai aur
+  upar-neeche jagah khaali chhodta hai; text ab wahan jaata hai.
+
+CTA dono se bahar hai: uska logo text se door upar baithta hai, aur uske saaf background par ek
+aur dabba bewajah dikhta.
+
+### CTA ka logo
+
+`cover` par chaukor logo ke kinare kat jaate the (item ka khaana 9:16 ka hota hai), aur
+`blurred-asset` background usके peeche ek dhundhla dhabba banata tha — jaise logo ki chhaya
+phail gayi ho. Ab logo hamesha `contain` hai aur uske peeche kuch nahi.
+
+### Library se video chuna hi nahi ja sakta tha
+
+Picker sirf us kind ki files dikhata tha jo scene ki sifaarish thi. Jis scene par "tasveer" ki
+sifaarish thi wahan library me sirf tasveerein dikhti thi — aadmi apni recording pehle hi
+library me daal chuka ho to bhi wo use nahi kar sakta tha; ek hi raasta bachta tha, wahi file
+dobara upload karna. Upload ke do button the, library ka ek hi.
