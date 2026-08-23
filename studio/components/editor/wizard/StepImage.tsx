@@ -9,7 +9,8 @@ import {
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
-import { AlertTriangle, Film, ImageOff, Loader2, Upload } from "lucide-react";
+import clsx from "clsx";
+import { AlertTriangle, Film, ImageOff, Loader2, Smartphone, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
@@ -356,6 +357,36 @@ function SceneRow({
             {(Math.max(project.width / (source?.width ?? 1), project.height / (source?.height ?? 1))).toFixed(1)}x
             phailana padta, jisme wo saaf nahi rehti.
           </p>
+        ) : null}
+
+        {/*
+          Phone frame — sirf video par.
+
+          ⚠️ Sifaarish saath me likhi hai kyunki ye chunav dekhe bina samajh nahi
+          aata: app ki recording frame ke andar SAAF dikhti hai (58% chaudai par
+          1.62x, poore frame me 2.26x), par camera ki footage phone ke andar chipki
+          hui ajeeb lagti hai.
+        */}
+        {scene.visualAssetKind === "video" && scene.visualAssetId ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => onChange(scene.index, { phoneFrame: !scene.phoneFrame })}
+              className={clsx(
+                "flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                scene.phoneFrame
+                  ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                  : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+              )}
+            >
+              <Smartphone size={9} />
+              Phone frame {scene.phoneFrame ? "lagega" : "nahi"}
+            </button>
+            <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
+              App ki screen recording ho to lagao — frame ke andar likha hua saaf padha jaata
+              hai. Camera se banayi video ho to rehne do.
+            </span>
+          </div>
         ) : null}
 
         {/* Video ho to uska chuna hua hissa saaf dikhe, aur badla ja sake. */}

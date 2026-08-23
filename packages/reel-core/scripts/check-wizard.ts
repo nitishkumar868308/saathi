@@ -886,6 +886,38 @@ check(
   `mode=${visual?.fit.mode} bg=${visual?.fit.background.kind}`,
 );
 
+/* ------------------------------------------------------------- phone frame */
+
+console.log("\nphone frame");
+
+const recScene = {
+  ...withVoice0.scenes[0]!,
+  visualAssetId: "as_rec",
+  visualAssetKind: "video" as const,
+  visualSize: { width: 386, height: 850 },
+};
+
+check(
+  "bina phone frame ke wo aam video scene hai",
+  effectiveType(recScene) === "video",
+);
+check(
+  "phone frame maangne par type badal jaata hai",
+  effectiveType({ ...recScene, phoneFrame: true }) === "screen_recording",
+);
+
+const frameOut = applyWizard({
+  doc: project,
+  draft: { ...withVoice0, replaceExisting: true, scenes: [{ ...recScene, phoneFrame: true }] },
+});
+const rec = frameOut.doc.items.find((i) => i.assetId === "as_rec");
+check("recording par phone frame sach me laga", rec?.mockup !== null, `mockup=${rec?.mockup ? rec.mockup.deviceId : "null"}`);
+check(
+  "aur uska apna fit chhua nahi gaya",
+  rec?.fit.mode === "cover",
+  "warna phone ke andar ek aur chhota phone ban jaata",
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *

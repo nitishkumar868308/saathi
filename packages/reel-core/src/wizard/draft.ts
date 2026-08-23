@@ -65,6 +65,21 @@ export interface WizardScene {
    * hai jisme kuch hua hi nahi (camera set ho raha tha).
    */
   visualTrim: { startSeconds: number; endSeconds: number } | null;
+  /**
+   * Video ko phone ke frame me dikhao — app ki recording ke liye.
+   *
+   * ⚠️ Ye sirf sajawat nahi hai, **saaf dikhne ka sawaal** hai. Ek 386x850 ki
+   * screen recording poore 1080 chaude frame me 2.26 guna phailti hai aur uska
+   * chhota UI text padha nahi jaata. Phone frame ke andar wo 58% chaudai par
+   * baithti hai — yaani 1.62 guna — aur utna hi kaafi hota hai ki likha hua saaf
+   * rahe.
+   *
+   * ⚠️ Default `false` hai aur apne aap nahi lagta. Har portrait video ko phone
+   * frame me daal dena galat hoga: koi apni selfie ya camera ki footage daale to
+   * wo ek phone ke andar chipki hui ajeeb lagti hai. Ye chunav aadmi ka hai, aur
+   * uske saath sifaarish likhi hoti hai.
+   */
+  phoneFrame: boolean;
   voiceAssetId: string | null;
   /**
    * Bani hui awaaz kitni lambi hai (second me) — `null` = pata nahi.
@@ -266,6 +281,8 @@ function baseType(scene: WizardScene): string {
      * jaata hai aur render me khaali frame aata hai, bina kisi error ke.
      */
     const want = scene.visualAssetKind;
+    // Phone frame maanga ho to wahi type jisme wo frame banta hai.
+    if (want === "video" && scene.phoneFrame) return "screen_recording";
     if (!want || visualSlotKind(scene.type) === want) return scene.type;
     return want === "video" ? "video" : "image_audio";
   }
@@ -308,6 +325,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         visualAssetKind: null,
         visualSize: null,
         visualTrim: null,
+        phoneFrame: false,
         textPosition: "center",
         voiceAssetId: null,
         voiceSeconds: null,
@@ -609,7 +627,13 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * scene me tasveer hai hi nahi (sirf text), wahan `primary` text ka item hota
      * hai aur uspar fit ka koi matlab nahi — isliye guard.
      */
-    if (source.visualAssetId && primary.assetId === source.visualAssetId) {
+    /*
+     * WARNING: Phone frame wale scene par fit **nahi** chhua jaata. `screen_recording`
+     * ka apna fit hai (frame ke andar `cover`), aur uske upar contain+blur lagane
+     * par recording frame ke andar chhoti ho kar beech me baith jaati hai — phone
+     * ke andar ek aur chhota phone.
+     */
+    if (source.visualAssetId && primary.assetId === source.visualAssetId && !source.phoneFrame) {
       const fit = fitFor(source.visualSize, doc.project);
       doc = {
         ...doc,
