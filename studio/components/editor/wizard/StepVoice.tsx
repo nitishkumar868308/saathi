@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { useUploader } from "@/lib/upload/uploader";
+import { forgetAssetMeta } from "@/lib/assetMeta";
 
 /**
  * Step 3 — **Awaaz** (26.9).
@@ -80,6 +81,8 @@ function VoiceRow({
        * SACH ME bani. Baad me kahin se copy karne par wo do jagah alag ho sakte
        * hain, aur tab "awaaz purani hai" wala nishaan jhootha ho jaata.
        */
+      // Nayi asset bani — list taaza karo, warna Export "asset nahi mila" bolega.
+      forgetAssetMeta();
       onChange(scene.index, { voiceAssetId: json.asset.id, voiceForText: scene.text });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -275,6 +278,7 @@ export function StepVoice({
         });
         const json = (await response.json()) as { asset?: { id: string } };
         if (response.ok && json.asset) {
+          forgetAssetMeta();
           onChange(scene.index, { voiceAssetId: json.asset.id, voiceForText: scene.text });
         }
       } catch {

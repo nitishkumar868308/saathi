@@ -18,6 +18,7 @@ import { useEditorStore } from "@/lib/store";
 import type { Asset } from "@/lib/assets";
 import { forgetAssetUrl, useAssetUrl } from "@/lib/assetUrls";
 import { timeAgo } from "@/lib/format";
+import { forgetAssetMeta } from "@/lib/assetMeta";
 
 /**
  * Ek asset ka poora byora — aur wahi teen kaam jo yahin hone chahiye:
@@ -190,6 +191,9 @@ export function AssetDetailDialog({ asset, target, onClose, onChanged, onDeleted
                 reason?: string;
               };
               setBusy(false);
+
+              // Asset mit gayi — list taaza karo.
+              if (response.ok) forgetAssetMeta();
 
               if (response.status === 409) {
                 // Pehla click sirf batata hai — mitata doosra click hai.

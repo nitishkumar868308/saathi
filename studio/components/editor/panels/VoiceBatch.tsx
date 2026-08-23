@@ -6,6 +6,7 @@ import { AlertTriangle, Loader2, Wand2 } from "lucide-react";
 import { useState } from "react";
 
 import { useEditorStore } from "@/lib/store";
+import { forgetAssetMeta } from "@/lib/assetMeta";
 
 /**
  * Batch generate — ek baar me un sab ki awaaz (22.12).
@@ -61,6 +62,8 @@ export function VoiceBatch() {
     };
     if (!response.ok || !json.asset) {
       throw new Error(json.reason || json.error || `HTTP ${response.status}`);
+    // Nayi asset bani — list taaza karo (nahi to Export "asset nahi mila" bolega).
+    forgetAssetMeta();
     }
 
     const item = doc.items.find((entry2) => entry2.id === entry.itemId);

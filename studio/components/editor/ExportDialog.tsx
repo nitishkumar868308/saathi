@@ -319,6 +319,23 @@ export function ExportDialog({
           </p>
         ) : null}
 
+        {/*
+          ⚠️ Button ka band hona **dikhna** chahiye, sirf tooltip me nahi.
+
+          Live par ye halat aayi thi: Export dabao, kuch nahi hota. Wajah upar
+          error list me likhi thi, par button ke paas kuch nahi tha — aur aadmi
+          button dabata hai, list nahi padhta. Bina wajah band button "toota hua"
+          padha jaata hai, aur user reload karke dobara wahi karta hai.
+        */}
+        {!allowed ? (
+          <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">
+            <strong>Export abhi band hai.</strong>{" "}
+            {preset.tier === "strict" && check.errors.length === 0
+              ? `Strict preset me ${check.warnings.length} chetavni bhi rokti hai — ya wo theek karo, ya doosra preset chuno.`
+              : `Upar wali ${check.errors.length} error theek karni hongi.`}
+          </p>
+        ) : null}
+
         <div className="flex items-center gap-2">
           <Button
             variant="primary"

@@ -4,6 +4,7 @@ import { checkUploadable, sha256HexFromStream, type AssetKindEntry } from "@reel
 import { useCallback, useRef, useState } from "react";
 
 import { probeFileInBrowser, type BrowserProbe } from "@/lib/upload/probeInBrowser";
+import { forgetAssetMeta } from "@/lib/assetMeta";
 
 /**
  * Upload ka poora raasta — ek file ke liye chaar padav:
@@ -265,6 +266,9 @@ async function runTask(
     });
 
     const asset = completed.asset as { id: string };
+    // Nayi asset chadh gayi — meta list taaza karo, warna Export ise "nahi mili" batayega.
+    forgetAssetMeta();
+
     patch(taskId, {
       phase: completed.duplicate ? "duplicate" : "done",
       progress: 1,

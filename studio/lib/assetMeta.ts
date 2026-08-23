@@ -37,6 +37,23 @@ interface Cached {
 let cache: Map<string, Cached> | null = null;
 let inflight: Promise<Map<string, Cached>> | null = null;
 
+/**
+ * Jo log is list par tike hue hain — taaki list badalne par unhe **bataya** ja sake.
+ *
+ * WARNING: Sirf `cache = null` kar dena kaafi nahi tha, aur us bharam ne ek asli
+ * bug kaee din chhupaye rakha. Har hook apni copy `useState` me rakhta hai aur
+ * uska effect `[]` par hai — yaani wo dobara padhta hi nahi. Module ka cache
+ * saaf karne se sirf **agla** mount taaza hota hai; jo pehle se khule hain wo
+ * purani list par ateke rehte hain.
+ *
+ * Nateeja kya dikhta tha: wizard ne 8 awaaz banayi, doc me daal di, aur Export
+ * ka button chup-chaap band ho gaya — "asset nahi mila", jabki asset DB me
+ * maujood thi. Us halat me na koi error aata hai na koi wajah; user ko lagta hai
+ * ki Export dabane par kuch hota hi nahi. Isliye ab list badalne ki khabar
+ * har sune wale tak jaati hai.
+ */
+const listeners = new Set<() => void>();
+
 async function loadAll(): Promise<Map<string, Cached>> {
   if (cache) return cache;
   if (inflight) return inflight;
@@ -67,10 +84,16 @@ async function loadAll(): Promise<Map<string, Cached>> {
   return inflight;
 }
 
-/** Naya asset upload hone par list purani ho jaati hai. */
+/**
+ * Naya asset bana / mit gaya — list purani ho gayi, sabko taaza karo.
+ *
+ * Jahan bhi asset banti ya mitti hai wahin se ye bulao (upload, TTS, delete).
+ * Bhool jaane par galti chup rehti hai aur bahut door jaakar dikhti hai.
+ */
 export function forgetAssetMeta(): void {
   cache = null;
   inflight = null;
+  for (const listener of listeners) listener();
 }
 
 export interface AssetSize {
@@ -91,11 +114,16 @@ export function useAssetDurations(fps: number): AssetMeta {
 
   useEffect(() => {
     let alive = true;
-    void loadAll().then((next) => {
-      if (alive) setMap(next);
-    });
+    const pull = (): void => {
+      void loadAll().then((next) => {
+        if (alive) setMap(next);
+      });
+    };
+    pull();
+    listeners.add(pull);
     return () => {
       alive = false;
+      listeners.delete(pull);
     };
   }, []);
 

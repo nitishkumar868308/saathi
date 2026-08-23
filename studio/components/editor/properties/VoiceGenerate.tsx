@@ -6,6 +6,7 @@ import { AlertTriangle, Loader2, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AudioPreview } from "@/components/media/AudioPreview";
+import { forgetAssetMeta } from "@/lib/assetMeta";
 
 /**
  * Voice generate ka hissa (22.4 / 22.5 / 22.9 / 22.x).
@@ -147,6 +148,8 @@ export function VoiceGenerate({
       };
       if (!response.ok || !json.asset) {
         throw new Error(json.reason || json.error || `HTTP ${response.status}`);
+      // Nayi asset bani — list taaza karo (nahi to Export "asset nahi mila" bolega).
+      forgetAssetMeta();
       }
 
       onChange(
