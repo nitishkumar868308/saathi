@@ -571,6 +571,14 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
         });
         items.push({
           ...logo,
+          /*
+           * WARNING: Logo hamesha `contain`. Default `cover` hai, aur wo logo par
+           * bilkul galat baithta hai: item ka khaana 9:16 ka hota hai, isliye ek
+           * chaukor logo ke daayein-baayein kinare KAT jaate hain. Kisi bhi brand
+           * ka logo kata hua dikhna sabse buri galtiyon me se ek hai, aur wo galti
+           * dikhti bhi nahi — logo bas thoda "zoom" lagta hai.
+           */
+          fit: { ...logo.fit, mode: "contain" as const },
           transform: { ...logo.transform, y: -Math.round(input.height * 0.2), scale: 0.34 },
         });
       }

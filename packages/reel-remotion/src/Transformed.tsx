@@ -179,11 +179,29 @@ export const Transformed: React.FC<{
            * blur phone ke peeche hona chahiye, uski screen ke andar nahi.
            */}
           {background}
-          {item.mockup ? (
-            <PhoneFrame mockup={item.mockup}>{children}</PhoneFrame>
-          ) : (
-            children
-          )}
+          {/*
+           * ⚠️ Media ko `<AbsoluteFill>` me lapetna **zaroori** hai, sajawat nahi.
+           *
+           * `background` ek `<AbsoluteFill>` hai, yaani `position: absolute`. Item
+           * components apna media ek saade `<Img>` / `<OffthreadVideo>` ke roop me
+           * dete hain, jo normal flow me baithta hai. CSS ki painting ka niyam ye
+           * hai ki positioned element (chahe `z-index` na ho) normal flow wale
+           * content ke UPAR chhapta hai — yaani blurred copy asli tasveer ko
+           * poori tarah dhak leti thi.
+           *
+           * Screen par uska nateeja ye tha: `contain` wala scene bilkul dhundhla
+           * dikhta tha, jaise tasveer hi kharab ho. Kuch toota hua nahi dikhta,
+           * koi error nahi — bas ek saaf tasveer kabhi dikhti hi nahi thi. Ye
+           * mockup wale scene par nahi hota tha (PhoneFrame khud positioned hai),
+           * isliye ye galti aur bhi der tak chhupi rahi.
+           */}
+          <AbsoluteFill>
+            {item.mockup ? (
+              <PhoneFrame mockup={item.mockup}>{children}</PhoneFrame>
+            ) : (
+              children
+            )}
+          </AbsoluteFill>
         </AbsoluteFill>
       </AbsoluteFill>
 

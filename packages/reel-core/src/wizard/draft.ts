@@ -633,24 +633,37 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * par recording frame ke andar chhoti ho kar beech me baith jaati hai — phone
      * ke andar ek aur chhota phone.
      */
+    /*
+     * WARNING: Wizard fit ko sirf **contain ki taraf** badalta hai, kabhi wapas
+     * cover par nahi laata. Wajah ek jaanch ne pakdi: CTA ka logo apne `build()`
+     * me jaan-boojhkar `contain` par set hota hai (warna chaukor logo ke kinare
+     * kat jaate hain), aur wizard uspar apna hisaab laga kar use wapas `cover`
+     * kar deta tha. Yaani scene type ka soch-samajh kar liya hua faisla ek aam
+     * niyam se mit jaata tha.
+     *
+     * Yahan ka kaam sirf ek halat sudhaarna hai — bahut zyada phailna — na ki
+     * har item ka fit tay karna.
+     */
     if (source.visualAssetId && primary.assetId === source.visualAssetId && !source.phoneFrame) {
       const fit = fitFor(source.visualSize, doc.project);
-      doc = {
-        ...doc,
-        items: doc.items.map((item) =>
-          item.id === primary.id
-            ? {
-                ...item,
-                fit: {
-                  mode: fit.mode,
-                  background: fit.blurred
-                    ? { kind: "blurred-asset" as const, value: null }
-                    : item.fit.background,
-                },
-              }
-            : item,
-        ),
-      };
+      if (fit.mode === "contain") {
+        doc = {
+          ...doc,
+          items: doc.items.map((item) =>
+            item.id === primary.id
+              ? {
+                  ...item,
+                  fit: {
+                    mode: "contain" as const,
+                    background: fit.blurred
+                      ? { kind: "blurred-asset" as const, value: null }
+                      : item.fit.background,
+                  },
+                }
+              : item,
+          ),
+        };
+      }
     }
 
     /*

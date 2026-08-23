@@ -478,6 +478,13 @@ check(
   ctaItems.map((i) => i.type).join(", "),
 );
 
+const ctaLogo = ctaItems.find((item) => item.type === "image");
+check(
+  "CTA ka logo kabhi kat-ta nahi (contain)",
+  ctaLogo?.fit.mode === "contain",
+  `mode=${ctaLogo?.fit.mode} — cover par chaukor logo ke kinare kat jaate hain`,
+);
+
 const buttonItem = ctaItems.find((item) => item.text?.background);
 check(
   "CTA ka button apne background ke saath hai",
