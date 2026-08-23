@@ -2,6 +2,7 @@
 
 import {
   requiredVisualSize,
+  fitFor,
   suggestAnimation,
   suggestTransition,
   visualSlotKind,
@@ -9,7 +10,7 @@ import {
   type WizardScene,
 } from "@reel/core";
 import { AlertTriangle, Film, ImageOff, Loader2, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
@@ -156,9 +157,35 @@ function SceneRow({
    * tasveerein daal chuka hota hai aur do minute ka render bhi ho chuka hota
    * hai. Yahan wo tasveer chunte hi dikh jaati hai, poore naap ke saath.
    */
+  /*
+   * ⚠️ Chuni hui file ka naap draft me likha jaata hai, aur wo yahin se ho sakta
+   * hai — `applyWizard` core me hai aur wo asset list nahi padh sakta. Iske bina
+   * fit ka faisla nahi ho sakta, aur landscape tasveer portrait frame me do guna
+   * phail kar dhundhli chali jaati hai.
+   */
+  useEffect(() => {
+    if (!source || !scene.visualAssetId) return;
+    if (
+      scene.visualSize &&
+      scene.visualSize.width === source.width &&
+      scene.visualSize.height === source.height
+    ) {
+      return;
+    }
+    onChange(scene.index, { visualSize: { width: source.width, height: source.height } });
+  }, [source?.width, source?.height, scene.visualAssetId]);
+
+  const fit = fitFor(source, project);
   const need = requiredVisualSize(scene.animationPresetId, project.width, project.height, source);
+  /*
+   * ⚠️ Chetavni sirf tab jab tasveer sach me phailegi. `contain` par wo chhoti
+   * hoti hai, phailti nahi — wahan "kam pixel hain" likhna ek jhoothi chetavni
+   * hai, aur jhoothi chetavni ka anjaam hamesha ek hi hota hai.
+   */
   const tooSmall =
-    source && (source.width < need.width || source.height < need.height) ? need : null;
+    fit.mode === "cover" && source && (source.width < need.width || source.height < need.height)
+      ? need
+      : null;
 
   /*
    * WARNING: File R2 me hai bhi ya nahi — ye alag sawaal hai, aur wizard ise
@@ -317,6 +344,19 @@ function SceneRow({
           recommended={recommendedAnimation}
           onPick={(id) => onChange(scene.index, { animationPresetId: id })}
         />
+
+        {/*
+          Fit ka faisla saaf likha hua — warna wo chup-chaap hota hai aur aadmi ko
+          lagta hai ki uski tasveer "apne aap chhoti ho gayi".
+        */}
+        {scene.visualAssetId && fit.mode === "contain" ? (
+          <p className="text-[10px] leading-snug text-chalk-500">
+            Ye tasveer frame se chaudi hai — poori dikhegi, aur kinare usi tasveer ke dhundhle
+            roop se bharenge. Cover karne par ise{" "}
+            {(Math.max(project.width / (source?.width ?? 1), project.height / (source?.height ?? 1))).toFixed(1)}x
+            phailana padta, jisme wo saaf nahi rehti.
+          </p>
+        ) : null}
 
         {/* Video ho to uska chuna hua hissa saaf dikhe, aur badla ja sake. */}
         {scene.visualAssetKind === "video" && scene.visualAssetId ? (

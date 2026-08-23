@@ -47,6 +47,16 @@ export interface WizardScene {
    */
   visualAssetKind: "image" | "video" | null;
   /**
+   * Chuni hui file ka apna naap — `null` = pata nahi.
+   *
+   * WARNING: Ye "kitni badi tasveer chahiye" wali chetavni ke liye nahi hai
+   * (wo `requiredVisualSize` karta hai). Ye is liye hai ki **kaunsa fit lagega**
+   * yahi tay karta hai: landscape tasveer portrait frame me cover se bharne par
+   * do guna phail jaati hai aur saaf dikhta hua dhundhlapan aa jaata hai. Dekho
+   * `fitFor()`.
+   */
+  visualSize: { width: number; height: number } | null;
+  /**
    * Video ka kaunsa hissa lena hai — file ke andar ka waqt (26.18).
    *
    * WARNING: `null` matlab poori file. Video daalte hi aadmi se ye poochha jaata
@@ -296,6 +306,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         slots: rest,
         visualAssetId: null,
         visualAssetKind: null,
+        visualSize: null,
         visualTrim: null,
         textPosition: "center",
         voiceAssetId: null,
@@ -334,6 +345,38 @@ export function voiceStale(scene: WizardScene): boolean {
  */
 export function textHidden(scene: WizardScene): boolean {
   return scene.hideText && Boolean(scene.visualAssetId);
+}
+
+/**
+ * Is tasveer/video ko frame me kaise baithana hai (26.23).
+ *
+ * ⚠️ Default `cover` hai aur wo aksar theek hai — par tab nahi jab source ka
+ * aakaar frame se bahut alag ho. Ek 1698x926 (landscape) tasveer 1080x1920
+ * (portrait) frame ko bharne ke liye **2.07 guna** phailti hai. Screen par wo
+ * dhundhli dikhti hai, aur wajah dekhne wale ko kabhi samajh nahi aati — file to
+ * badi hai, "1698 pixel" likha hai.
+ *
+ * Us haalat me `contain` ulta behtar hai: wahi tasveer 0.64 guna par baithti hai
+ * (yaani CHHOTI hoti hai, phailti nahi) aur bilkul saaf rehti hai. Kinaron ki
+ * khaali jagah usi tasveer ke dhundhle roop se bharti hai, isliye wo kaali patti
+ * nahi lagti — wahi tarika `screen_recording` pehle se istemal karta hai.
+ *
+ * ⚠️ Hadd 1.6x par hai, 1.0 par nahi. Thoda sa phailna (1.2-1.4x) aankh pakadti
+ * nahi, aur us par blur wala background lagana ulta nuksaan karta: poora frame
+ * bharna hamesha behtar dikhta hai jab tak wo saaf ho.
+ */
+const MAX_UPSCALE = 1.6;
+
+export function fitFor(
+  source: { width: number; height: number } | null,
+  project: { width: number; height: number },
+): { mode: "cover" | "contain"; blurred: boolean } {
+  if (!source || source.width <= 0 || source.height <= 0) return { mode: "cover", blurred: false };
+
+  const cover = Math.max(project.width / source.width, project.height / source.height);
+  if (cover <= MAX_UPSCALE) return { mode: "cover", blurred: false };
+
+  return { mode: "contain", blurred: true };
 }
 
 /**
@@ -557,6 +600,33 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         itemIds: [primary.id],
         presetId: source.animationPresetId,
       });
+    }
+
+    /*
+     * Fit — tasveer/video frame me kaise baithe.
+     *
+     * WARNING: Ye `primary` par lagta hai, jo scene ka dikhne wala item hai. Jahan
+     * scene me tasveer hai hi nahi (sirf text), wahan `primary` text ka item hota
+     * hai aur uspar fit ka koi matlab nahi — isliye guard.
+     */
+    if (source.visualAssetId && primary.assetId === source.visualAssetId) {
+      const fit = fitFor(source.visualSize, doc.project);
+      doc = {
+        ...doc,
+        items: doc.items.map((item) =>
+          item.id === primary.id
+            ? {
+                ...item,
+                fit: {
+                  mode: fit.mode,
+                  background: fit.blurred
+                    ? { kind: "blurred-asset" as const, value: null }
+                    : item.fit.background,
+                },
+              }
+            : item,
+        ),
+      };
     }
 
     /*

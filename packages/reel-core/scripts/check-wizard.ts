@@ -31,6 +31,7 @@ import {
   suggestAnimation,
   suggestTransition,
   effectiveType,
+  fitFor,
   requiredVisualSize,
   voiceStale,
   sceneSeconds,
@@ -834,6 +835,55 @@ check(
   "aur wo naye project ke default 30s se chhoti hai",
   chhotiReel.doc.project.durationInFrames < project.project.durationInFrames,
   `${(chhotiReel.doc.project.durationInFrames / 30).toFixed(1)}s < ${(project.project.durationInFrames / 30).toFixed(1)}s`,
+);
+
+/* ------------------------------------------------------------------- fit */
+
+console.log("\nfit — tasveer frame me kaise baithe");
+
+const frame = { width: 1080, height: 1920 };
+
+check(
+  "landscape tasveer contain me jaati hai",
+  fitFor({ width: 1698, height: 926 }, frame).mode === "contain",
+  "cover par wo 2.07x phailti aur dhundhli ho jaati",
+);
+check(
+  "aur uske kinare blur se bharte hain",
+  fitFor({ width: 1698, height: 926 }, frame).blurred,
+  "kaali patti se behtar",
+);
+check(
+  "portrait tasveer cover me hi rehti hai",
+  fitFor({ width: 727, height: 1600 }, frame).mode === "cover",
+  "1.49x phailna aankh pakadti nahi, aur poora frame bharna behtar dikhta hai",
+);
+check(
+  "badi portrait tasveer bhi cover",
+  fitFor({ width: 1080, height: 1920 }, frame).mode === "cover",
+);
+check("naap pata na ho to cover", fitFor(null, frame).mode === "cover");
+
+const fitOut = applyWizard({
+  doc: project,
+  draft: {
+    ...withVoice0,
+    replaceExisting: true,
+    scenes: [
+      {
+        ...withVoice0.scenes[0]!,
+        visualAssetId: "as_land",
+        visualAssetKind: "image" as const,
+        visualSize: { width: 1698, height: 926 },
+      },
+    ],
+  },
+});
+const visual = fitOut.doc.items.find((i) => i.assetId === "as_land");
+check(
+  "chuna hua fit doc me sach me laga",
+  visual?.fit.mode === "contain" && visual.fit.background.kind === "blurred-asset",
+  `mode=${visual?.fit.mode} bg=${visual?.fit.background.kind}`,
 );
 
 /*
