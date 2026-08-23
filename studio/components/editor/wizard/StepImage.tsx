@@ -121,6 +121,17 @@ function SceneRow({
       ...(scene.animationPresetId && assetId
         ? {}
         : { animationPresetId: recommendedAnimationFor(scene, at, Boolean(assetId)) }),
+      /*
+       * ⚠️ Text ki jagah bhi tasveer ke saath tay hoti hai, aur ye chala kar
+       * dekhne par nikla: beech me rakha hua text seedha **chehre par** baith
+       * jaata tha. Chaudi tasveer beech me ek patti banati hai (contain), aur
+       * uske upar-neeche dhundhli jagah khaali padi rehti hai — text wahan
+       * behtar baithta hai. Aadmi phir bhi badal sakta hai; ye sirf pehla
+       * jawab hai, aakhri nahi.
+       */
+      ...(assetId && scene.textPosition === "center"
+        ? { textPosition: "bottom" as const }
+        : {}),
     });
   }
 

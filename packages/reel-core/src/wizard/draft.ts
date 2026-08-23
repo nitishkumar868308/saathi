@@ -735,6 +735,51 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
    * andar karne par CTA jaise type chhoot jaate, jinka text `build()` ke andar
    * banta hai aur bahar se dikhta hi nahi.
    */
+  /*
+   * Tasveer wale scene ke text ke peeche ek halki parat.
+   *
+   * WARNING: Bina iske safed serif text tasveer par jagah-jagah gayab ho jaata
+   * hai — Papa ka safed kurta, app ka halka card, ya koi bhi chamakdaar hissa
+   * aur wahi shabd padhe hi nahi jaate. Aur wo galti sirf **us ek frame** par
+   * hoti hai jahan tasveer halki hai, isliye editor me scroll karte hue wo kabhi
+   * nazar nahi aati; pakdi tab jaati hai jab poori reel dekhi jaaye.
+   *
+   * WARNING: Parat halki hai (45%), gehri nahi. Poora kaala dabba lagane par
+   * text to padha jaata hai par reel "caption chipkaya hua" jaisi lagne lagti
+   * hai — tasveer aur shabd do alag cheezein dikhte hain.
+   *
+   * Jinke paas apna background pehle se hai (CTA ka button) unhe chhoda jaata
+   * hai — un par ye doosri parat ek dabbe ke andar dabba bana deti.
+   */
+  /*
+   * ⚠️ CTA yahan se bahar hai. Uski tasveer logo hai, jo text se door upar
+   * baithta hai — text uske upar aata hi nahi. Wahan parat lagane ka matlab
+   * hota saaf kaale background par ek aur kaala dabba, jo bewajah dikhta hai.
+   */
+  const withVisual = new Set(
+    created
+      .map((scene, at) => {
+        const src = madeFrom[at];
+        if (!src?.visualAssetId || effectiveType(src) === "cta") return null;
+        return scene.id;
+      })
+      .filter((id): id is string => id !== null),
+  );
+  doc = {
+    ...doc,
+    items: doc.items.map((item) =>
+      item.text && !item.text.background && item.sceneId && withVisual.has(item.sceneId)
+        ? {
+            ...item,
+            text: {
+              ...item.text,
+              background: { color: "rgba(0,0,0,0.45)", paddingX: 32, paddingY: 18, radius: 18 },
+            },
+          }
+        : item,
+    ),
+  };
+
   const scale = args.draft.textScale;
   const color = args.draft.textColor;
   if (scale !== 1 || color) {
@@ -749,7 +794,7 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * hai, ek jagah par ulta baithta hai - aur wahi ek jagah CTA hai.
      */
     const skipColor = (item: (typeof doc.items)[number]): boolean =>
-      Boolean(item.text?.background);
+      item.text?.color === "brand.textOnAccent";
 
     doc = {
       ...doc,

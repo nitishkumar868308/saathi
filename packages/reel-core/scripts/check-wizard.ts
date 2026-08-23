@@ -925,6 +925,49 @@ check(
   "warna phone ke andar ek aur chhota phone ban jaata",
 );
 
+/* ------------------------------------------------- text tasveer par padha jaaye */
+
+console.log("\ntext ke peeche parat");
+
+const scrimOut = applyWizard({
+  doc: project,
+  draft: {
+    ...withVoice0,
+    replaceExisting: true,
+    scenes: [
+      { ...withVoice0.scenes[0]!, visualAssetId: "as_img", visualAssetKind: "image" as const },
+      { ...withVoice0.scenes[1]! },
+    ],
+  },
+});
+const onImage = scrimOut.doc.items.find(
+  (i) => i.text && i.sceneId === scrimOut.doc.scenes.find((sc) => sc.order === 0)?.id,
+);
+const onPlain = scrimOut.doc.items.find(
+  (i) => i.text && i.sceneId === scrimOut.doc.scenes.find((sc) => sc.order === 1)?.id,
+);
+check(
+  "tasveer wale scene ke text ke peeche parat lagti hai",
+  onImage?.text?.background !== null && onImage?.text?.background !== undefined,
+  "warna safed text halke hisse par gayab ho jaata hai",
+);
+check(
+  "sirf text wale scene par parat nahi lagti",
+  onPlain?.text?.background === null,
+  "kaale par kaali parat bekaar hai",
+);
+
+const ctaScrim = applyWizard({
+  doc: project,
+  draft: { ...ctaDraft, replaceExisting: true, textColor: "#FFD166" },
+});
+const ctaBtn = ctaScrim.doc.items.find((i) => i.text?.color === "brand.textOnAccent");
+check(
+  "CTA ka button apne hi rang me raha",
+  ctaBtn !== undefined,
+  "terracotta patti par chuna hua rang padha nahi jaata",
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *
