@@ -103,6 +103,10 @@ export function WizardModal({
     );
   }
 
+  function setTextScale(scale: number): void {
+    setDraft((previous) => (previous ? { ...previous, textScale: scale } : previous));
+  }
+
   function fillEverything(): void {
     setDraft((previous) => (previous ? autoFill(previous) : previous));
   }
@@ -234,7 +238,7 @@ export function WizardModal({
         ) : null}
 
         <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
-          {step === 0 ? <StepText draft={draft} onChange={update} /> : null}
+          {step === 0 ? <StepText draft={draft} onChange={update} onTextScale={setTextScale} /> : null}
           {step === 1 ? <StepImage draft={draft} onChange={update} /> : null}
           {step === 2 ? <StepVoice draft={draft} onChange={update} /> : null}
           {step === 3 ? <StepPreview draft={draft} /> : null}

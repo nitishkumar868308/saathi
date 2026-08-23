@@ -20,3 +20,4 @@ export * from "./voice";
 export * from "./tts/providers";
 export * from "./transcribe";
 export * from "./energy";
+export * from "./tts/wav";

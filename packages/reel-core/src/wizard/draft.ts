@@ -75,6 +75,15 @@ export interface WizardScene {
 export interface WizardDraft {
   summary: string;
   scenes: WizardScene[];
+  /**
+   * Poori reel ke text ka size - 1 = jaisa hai.
+   *
+   * WARNING: Ye per-scene nahi hai, aur wo jaan-boojhkar hai. Ek hi reel me har
+   * scene ka text alag size ka ho to wo reel bani hui nahi, judi hui lagti hai.
+   * Aur saat scene par saat baar ye faisla lena wo kaam hai jise aadmi teesre
+   * scene par chhod deta hai.
+   */
+  textScale: number;
 }
 
 /* ------------------------------------------------------------ slot khojna */
@@ -163,6 +172,7 @@ function asSceneLike(scene: WizardScene): WizardSceneLike {
 export function draftFromScript(script: AiScript): WizardDraft {
   return {
     summary: script.summary,
+    textScale: 1,
     scenes: script.scenes.map((scene, index) => {
       const textSlot = textSlotId(scene.type);
       const rest: Record<string, string> = { ...scene.slots };
@@ -390,6 +400,26 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       });
     }
   });
+
+  /*
+   * Text ka size sabse aakhir me - saare scene ban jaane ke baad. Har scene ke
+   * andar karne par CTA jaise type chhoot jaate, jinka text `build()` ke andar
+   * banta hai aur bahar se dikhta hi nahi.
+   */
+  const scale = args.draft.textScale;
+  if (scale !== 1) {
+    const madeIds = new Set(
+      doc.items.filter((item) => !before.has(item.sceneId ?? "")).map((item) => item.id),
+    );
+    doc = {
+      ...doc,
+      items: doc.items.map((item) =>
+        madeIds.has(item.id) && item.text
+          ? { ...item, text: { ...item.text, fontSize: Math.round(item.text.fontSize * scale) } }
+          : item,
+      ),
+    };
+  }
 
   return {
     doc,

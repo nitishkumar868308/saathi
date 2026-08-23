@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import {
@@ -39,7 +40,22 @@ export function storageConfig(): StorageConfig {
  * `render-out/` gitignored hai, isliye ye kachra repo me kabhi nahi aata.
  */
 export function scratchDir(): string {
-  return resolve(storageConfig().local.outputDir, "tmp");
+  /*
+   * WARNING: Ye pehle `<REEL_OUTPUT_DIR>/tmp` tha, aur wo Vercel par TTS ko poori
+   * tarah tod deta tha:
+   *
+   *     ENOENT: no such file or directory, mkdir '/var/task/render-out'
+   *
+   * `REEL_OUTPUT_DIR=./render-out` repo root se resolve hota hai, aur serverless
+   * me repo root `/var/task` hai - jo **read-only** hai. Yaani awaaz banane ki
+   * har koshish wahin mar jaati thi, aur error aisa dikhta tha jaise TTS ka
+   * masla ho, jabki masla sirf ek folder ka tha.
+   *
+   * Ab hamesha OS ka apna temp folder. Scratch hai hi phenkne ke liye - use
+   * project ke folder se baandhne ki koi wajah kabhi thi hi nahi, aur us bandhan
+   * ka ek hi nateeja nikla.
+   */
+  return resolve(tmpdir(), "reel-studio-scratch");
 }
 
 export { scratchPath, withLocalFile };

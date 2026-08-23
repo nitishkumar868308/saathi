@@ -119,7 +119,16 @@ function SceneRow({
     tags: ["wizard"],
     onFinished: ({ assetId }) => setImage(assetId, uploadKind.current),
   });
-  const { url } = useAssetUrl(scene.visualAssetId, { thumb: true });
+  /*
+   * WARNING: Yahan pehle `{ thumb: true }` tha, aur wo har uploaded tasveer par
+   * toota hua nishaan dikhata tha. Thumbnail sirf **bani hui reel** ka banta hai;
+   * aam upload ka nahi. Us haalat me `/api/assets/[id]/url?thumb=1` saaf 404 deta
+   * hai (aur wo 404 sahi hai), par UI use `<img src="">` bana kar toota hua icon
+   * dikha deti thi - yaani aadmi ko lagta tha ki uski file kharab hai.
+   *
+   * Poori tasveer 54px ke dabbe me dikhane ka kharcha kuch bhi nahi hai.
+   */
+  const { url } = useAssetUrl(scene.visualAssetKind === "video" ? null : scene.visualAssetId);
 
   /*
    * ⚠️ Kuch scene tasveer maangte hain aur kuch video (`screen_recording`). Sirf
@@ -159,6 +168,9 @@ function SceneRow({
       <div className="flex h-24 w-[54px] shrink-0 items-center justify-center overflow-hidden rounded border border-ink-700 bg-ink-950">
         {uploading ? (
           <Loader2 size={14} className="animate-spin text-chalk-500" />
+        ) : scene.visualAssetKind === "video" && scene.visualAssetId ? (
+          // Video ko <img> me dikhaya nahi ja sakta — uska apna nishaan.
+          <Film size={16} className="text-chalk-500" />
         ) : url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="" className="h-full w-full object-cover" />

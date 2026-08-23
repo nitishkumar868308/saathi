@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { run } from "../ffmpeg";
+import { checkFfmpegAvailable, run } from "../ffmpeg";
 
 /**
  * TTS ke adapters (22.4 / 22.x).
@@ -157,6 +157,13 @@ export const geminiTtsAdapter: TtsAdapter = {
           "studio/.env.local me GEMINI_API_KEY=... daalo aur dev server dobara chalao.",
       };
     }
+    /*
+     * WARNING: Yahan pehle ffmpeg ki bhi jaanch lagayi gayi thi, aur wo galat
+     * ilaaj tha. Asli masla ye tha ki PCM se WAV banane ke liye ffmpeg maanga ja
+     * raha tha - jabki us kaam ko 44 byte ka header likh kar poora kiya ja sakta
+     * hai (`tts/wav.ts`). Wo ho jaane ke baad Gemini ki awaaz ko ffmpeg ki
+     * zaroorat hai hi nahi, aur ye ab Vercel par bhi chalti hai.
+     */
     return { ok: true, detail: `gemini (${GEMINI_TTS_MODEL})` };
   },
 

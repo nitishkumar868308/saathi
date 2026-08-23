@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { ffmpegPath, run } from "./ffmpeg";
+import { pcmDurationSeconds, pcmToWav } from "./tts/wav";
 import { measureEbur128 } from "./loudness";
 import { getTtsAdapter, type RawSpeech } from "./tts/providers";
 
@@ -178,17 +179,31 @@ export async function synthesize(options: SynthesizeOptions): Promise<GenerateSp
     });
 
     /*
-     * Kaccha PCM apna naap khud nahi batata — wo adapter se aata hai. Bina in
-     * do flags ke ffmpeg apna default maan leta hai aur awaaz galat raftaar par
-     * bajti hai (aur bajti hai, isliye ye galti chup-chaap nikal jaati hai).
+     * WARNING: Kaccha PCM ho to ffmpeg **chalta hi nahi** — aur ye is poore
+     * feature ki sabse zaroori line hai.
+     *
+     * Pehle yahan hamesha ffmpeg chalta tha, aur uska matlab tha ki Vercel par
+     * "Awaaz banao" kabhi kaam kar hi nahi sakta (wahan ffmpeg hota hi nahi).
+     * Ek feature jo UI me dikhta tha, deployed studio par hamesha marta -
+     * `spawn ffmpeg ENOENT` ke saath.
+     *
+     * Par WAV koi encoding hai hi nahi: wo wahi PCM hai jiske aage 44 byte ka
+     * header lagta hai. Wo header yahin likh diya jaata hai (`pcmToWav`), aur
+     * lambai ginti se nikal aati hai. Ffmpeg ki zaroorat sirf tab bachti hai jab
+     * provider mp3 jaisa kuch de (edge-tts) - aur wo waise bhi sirf us machine
+     * par chalta hai jahan python ho.
      */
-    const inputArgs = raw.pcm
-      ? ["-f", "s16le", "-ar", String(raw.pcm.sampleRate), "-ac", String(raw.pcm.channels)]
-      : [];
+    if (raw.pcm) {
+      const bytes = await readFile(raw.path);
+      await writeFile(options.outPath, pcmToWav(bytes, raw.pcm));
+      return {
+        outPath: options.outPath,
+        durationSeconds: pcmDurationSeconds(bytes.length, raw.pcm),
+      };
+    }
 
     await run(ffmpegPath(), [
       "-hide_banner", "-loglevel", "error", "-y",
-      ...inputArgs,
       "-i", raw.path,
       "-af", "pan=stereo|c0=c0|c1=c0",
       "-ar", String(VOICE_TARGET_RATE),

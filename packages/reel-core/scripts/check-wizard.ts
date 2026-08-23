@@ -464,6 +464,29 @@ check(
   `heightPercent=${bandItem?.shape?.heightPercent ?? "?"}`,
 );
 
+console.log("\ntextScale");
+
+const bigText = applyWizard({
+  doc: project,
+  draft: { ...ctaDraft, textScale: 1.25, scenes: ctaDraft.scenes },
+});
+const normalText = applyWizard({ doc: project, draft: { ...ctaDraft, textScale: 1 } });
+const bigSize = bigText.doc.items.find((i) => i.text)?.text?.fontSize ?? 0;
+const normSize = normalText.doc.items.find((i) => i.text)?.text?.fontSize ?? 0;
+check(
+  "text ka size poori reel par lagta hai",
+  bigSize > normSize,
+  `normal=${normSize} bada=${bigSize}`,
+);
+
+/*
+ * WARNING: CTA ka text `build()` ke andar banta hai, bahar se dikhta hi nahi.
+ * Isiliye size sabse aakhir me lagta hai - har scene ke andar lagane par CTA
+ * jaise type chup-chaap chhoot jaate.
+ */
+check("CTA ka text bhi ginti me aaya", normSize === 54, `fontSize=${normSize}`);
+
+
 console.log(`\n${passed} ok, ${failures.length} fail`);
 if (failures.length > 0) {
   for (const line of failures) console.log(`  - ${line}`);

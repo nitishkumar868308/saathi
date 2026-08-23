@@ -487,7 +487,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       });
       const banded = {
         ...band,
-        shape: { ...(band.shape as NonNullable<Item["shape"]>), widthPercent: 34, heightPercent: 1.5, radius: 4 },
+        shape: { ...(band.shape as NonNullable<Item["shape"]>), widthPercent: 22, heightPercent: 0.9, radius: 4 },
         transform: { ...band.transform, y: Math.round(input.height * 0.16) },
       };
 
@@ -506,18 +506,28 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
               });
               return {
                 ...item,
-                transform: { ...item.transform, y: -Math.round(input.height * 0.18), scale: 0.28 },
+                transform: { ...item.transform, y: -Math.round(input.height * 0.22), scale: 0.20 },
               };
             })(),
           ]
         : [];
-      const text = createItem("text", {
+      const base = createItem("text", {
         fps: input.fps,
         trackId: "",
         name: content.slice(0, 40),
         startFrame: 0,
         durationInFrames: duration,
       });
+      /*
+       * WARNING: CTA ka text default 72 par bahut bada baithta hai - do line me
+       * toot kar poora frame gher leta hai, aur logo ke saath wo bheed jaisa
+       * dikhta hai. CTA ki line waise bhi chhoti hoti hai ("Apka Saathi"), use
+       * bada karne ki zaroorat hi nahi.
+       */
+      const text = {
+        ...base,
+        text: { ...(base.text as NonNullable<Item["text"]>), fontSize: 54 },
+      };
 
       return tag(
         [

@@ -264,6 +264,68 @@ le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
 
 ## Progress log
 
+- **2026-08-23 (baad me)** — **"Awaaz banao" ab Vercel par bhi chalti hai (26.19).**
+
+  Pichhle daur me maine likha tha ki Vercel par ffmpeg nahi hai, isliye wahan awaaz nahi ban
+  sakti aur aadmi ko "Apni awaaz" upload karni padegi. **Wo jawab galat tha** — deewar zaroori
+  thi hi nahi.
+
+  Gemini kaccha PCM deta hai. Use WAV banane ke liye ffmpeg maanga ja raha tha — par WAV koi
+  encoding hai hi nahi: **wo wahi PCM hai jiske aage 44 byte ka header lagta hai.** Us header
+  me chaar baatein likhni hoti hain (channel, rate, bits, data ka naap). Uske liye ek poora
+  media toolchain maangna us kaam se bahut bada tha jitna wo kaam hai.
+
+  Ab `tts/wav.ts` wo header khud likhta hai aur lambai ginti se nikaalta hai. PCM wale raaste me
+  ffmpeg **chalta hi nahi**. (mp3 dene wale provider — edge-tts — ke liye purana raasta waisa ka
+  waisa hai; wo waise bhi sirf us machine par chalta hai jahan python ho.)
+
+  ⚠️ Resampling jaan-boojhkar nahi hoti. Purana raasta 48kHz stereo par le jaata tha (soxr se).
+  JS me wo "theek se" karna ek chhota DSP likhna hai; "jaise-taise" karna sunai deta hai. Aur
+  zaroorat bhi nahi: WAV har rate par jaayaz hai, preview use bajata hai, aur render ke waqt
+  ffmpeg (worker par, jahan wo maujood hai) sahi rate par le aata hai.
+
+  **Is machine par chala kar dekha — aur is machine par ffmpeg hai hi nahi:**
+
+  ```
+  available = true  (gemini-2.5-flash-preview-tts)
+  AWAAZ BAN GAYI  116 KB · 2.41s
+  header: RIFF/WAVE  rate=24000  channels=1  bits=16
+  ```
+
+  Header ke har number ki apni jaanch hai (`worker/scripts/check-wav.ts`, 15 assertions) —
+  kyunki ek galat offset par file "ban" jaati hai aur player use bajata bhi hai; bas raftaar ya
+  awaaz galat hoti hai, aur wo galti kaan tak pahunchti hai, kisi error tak nahi.
+
+- **2026-08-23** — screenshot ke feedback ke baad. Paanch cheezein, aur teen me jad wahi nikli:
+  koi "poochh raha tha" par jawab kisi aur se maang raha tha.
+
+  1. **Wizard me tasveer dikhti hi nahi thi** (toota hua icon). `useAssetUrl(..., {thumb:true})`
+     maanga jaata tha, par thumbnail sirf **bani hui reel** ka banta hai — aam upload ka nahi.
+     Route saaf 404 deta tha (aur wo 404 sahi tha), par UI use toota hua `<img>` bana deti thi,
+     yaani aadmi ko lagta tha ki uski file kharab hai. Ab poori tasveer dikhti hai (54px ke
+     dabbe me uska kharcha kuch bhi nahi), aur video par tasveer ki jagah film ka nishaan.
+
+  2. **Awaaz — `ENOENT: mkdir '/var/task/render-out'`.** `scratchDir()` `REEL_OUTPUT_DIR` se
+     bandha tha, jo serverless me `/var/task` par girta hai — aur wo **read-only** hai. Scratch
+     hai hi phenkne ke liye; use project ke folder se baandhne ki wajah kabhi thi hi nahi. Ab
+     hamesha OS ka temp folder.
+
+  3. **Aur us fix ke baad bhi awaaz nahi bani — kyunki `available()` jhooth bol raha tha.**
+     Gemini PCM lautata hai; use wav banane ke liye ffmpeg chahiye. `available()` sirf API key
+     dekhta tha, isliye ffmpeg na hone par bhi "ok" bolta — wizard button chalu rakhta aur har
+     baar `spawn ffmpeg ENOENT` par kaam marta. **Vercel par ye hamesha ki halat hai: wahan
+     ffmpeg hota hi nahi.** Ab jawab me wo baat saaf likhi hai, taaki UI "Apni awaaz upload
+     karo" wala raasta dikha sake — wahan wahi ekmatra sach hai.
+
+  4. **CTA** — logo chhota aur upar (0.20 scale), text 54 par (72 do line me toot kar poora
+     frame gher leta tha), patti aur patli.
+
+  5. **Text ka size** ab wizard me chunna ja sakta hai — Chhota / Normal / Bada, poori reel ke
+     liye ek. Per-scene nahi: ek hi reel me har scene ka alag size use judi hui dikha deta hai,
+     aur saat scene par saat faisle koi nahi leta.
+
+  Naap: core **585 + 56, 0 fail**; studio + worker typecheck saaf; `next build` saaf.
+
 - **2026-08-22 (raat, teesra daur)** — feedback ke baad ka batch.
 
   **Teen bug, teeno ki jad mili:**

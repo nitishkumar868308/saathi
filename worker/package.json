@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Render worker — reel_render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Do jagah chalta hai: tumhare PC pe (daemon) aur GitHub Actions ke runner pe (--once, drain mode). Vercel pe kabhi nahi jaata.",
+  "description": "Render worker \u00e2\u20ac\u201d reel_render_jobs table poll karta hai, Remotion se render karta hai, R2 pe upload karta hai. Do jagah chalta hai: tumhare PC pe (daemon) aur GitHub Actions ke runner pe (--once, drain mode). Vercel pe kabhi nahi jaata.",
   "main": "./src/index.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -23,7 +23,7 @@
     "transcribe:smoke": "tsx scripts/transcribe-smoke.ts",
     "beats:smoke": "tsx scripts/beats-smoke.ts",
     "render:mask": "tsx scripts/render-mask.ts",
-    "check": "tsx scripts/check-fonts.ts && tsx scripts/check-bundle-cache.ts"
+    "check": "tsx scripts/check-fonts.ts && tsx scripts/check-bundle-cache.ts && tsx scripts/check-wav.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
