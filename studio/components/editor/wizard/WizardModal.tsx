@@ -122,6 +122,10 @@ export function WizardModal({
     setDraft((previous) => (previous ? { ...previous, textColor: color } : previous));
   }
 
+  function setReplaceExisting(value: boolean): void {
+    setDraft((previous) => (previous ? { ...previous, replaceExisting: value } : previous));
+  }
+
   function fillEverything(): void {
     setDraft((previous) => (previous ? autoFill(previous) : previous));
   }
@@ -286,6 +290,7 @@ export function WizardModal({
               onChange={update}
               onTextScale={setTextScale}
               onTextColor={setTextColor}
+              onReplaceExisting={setReplaceExisting}
             />
           ) : null}
           {step === 1 ? <StepImage draft={draft} onChange={update} /> : null}

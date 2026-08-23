@@ -145,6 +145,23 @@ export interface WizardDraft {
    * Isliye rang tabhi likha jaata hai jab aadmi ne SACH ME chuna ho.
    */
   textColor: string | null;
+  /**
+   * Purane scene hata kar shuru se — `false` = aage jod do.
+   *
+   * WARNING: Default `false` hai aur wo badalna nahi chahiye. Wizard dobara
+   * chalana aam baat hai (kahani sudhaarne ke liye), aur us par project mit
+   * jaana wo galti hai jiski keemat sabse zyada hai.
+   *
+   * Par jodna bhi chup-chaap galat nateeja deta hai: doosri baar chalane par
+   * reel 30s ki jagah 56s ki ban jaati hai, jisme pehle 8 scene purane hain.
+   * Wo galti export ke baad hi dikhti hai. Isliye chunav saaf poochha jaata
+   * hai, aur poori reel ki lambai wizard me hi likhi rehti hai.
+   *
+   * ⚠️ Sirf **scene wale** items hatte hain. Jo item kisi scene ka nahi hai
+   * (background music, watermark) wo bacha rehta hai — aadmi ne wo alag se
+   * lagaya tha, aur wizard ka usse koi lena-dena nahi.
+   */
+  replaceExisting: boolean;
 }
 
 /* ------------------------------------------------------------ slot khojna */
@@ -264,6 +281,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
     summary: script.summary,
     textScale: 1,
     textColor: null,
+    replaceExisting: false,
     scenes: script.scenes.map((scene, index) => {
       const textSlot = textSlotId(scene.type);
       const rest: Record<string, string> = { ...scene.slots };
@@ -423,6 +441,18 @@ export interface ApplyWizardResult {
 export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizardResult {
   const live = args.draft.scenes.filter((scene) => !scene.removed);
 
+  /*
+   * Purane scene hatana — sabse pehle, taaki uske baad ka poora hisaab (naye
+   * scene pehchaanna, lambai, layout) saaf doc par chale.
+   */
+  const startDoc: Doc = args.draft.replaceExisting
+    ? {
+        ...args.doc,
+        scenes: [],
+        items: args.doc.items.filter((item) => !item.sceneId),
+      }
+    : args.doc;
+
   const assetByRole: Record<string, string> = {};
   const scenes: AiScene[] = live.map((scene, at) => {
     const type = effectiveType(scene);
@@ -472,7 +502,7 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
   });
 
   const script: AiScript = { summary: args.draft.summary, scenes };
-  const proposal = buildProposal({ doc: args.doc, script, mode: "append" });
+  const proposal = buildProposal({ doc: startDoc, script, mode: "append" });
 
   /*
    * ⚠️ Scene id pakadne ka ek hi bharosemand tarika hai: **pehle-baad ka farak**.
@@ -484,9 +514,9 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
    * `skipped` me chala jaaye to ginti khisak jaati hai aur animation galat scene
    * par lag jaati — bina kisi error ke.
    */
-  const before = new Set(args.doc.scenes.map((scene) => scene.id));
+  const before = new Set(startDoc.scenes.map((scene) => scene.id));
   const result = applyProposal({
-    doc: args.doc,
+    doc: startDoc,
     proposal,
     acceptedIds: proposal.entries.map((entry) => entry.id),
     assetByRole,

@@ -66,11 +66,13 @@ export function StepText({
   onChange,
   onTextScale,
   onTextColor,
+  onReplaceExisting,
 }: {
   draft: WizardDraft;
   onChange(index: number, patch: Partial<WizardScene>): void;
   onTextScale(scale: number): void;
   onTextColor(color: string | null): void;
+  onReplaceExisting(value: boolean): void;
 }) {
   const live = draft.scenes.filter((scene) => !scene.removed);
   const removed = draft.scenes.filter((scene) => scene.removed);
@@ -131,6 +133,35 @@ export function StepText({
           CTA ka button apne rang me hi rahega — terracotta par ye rang padhe nahi jaate.
         </span>
       </div>
+
+      {/*
+        ⚠️ Ye chunav pehle step par hai, aakhir me nahi — aur wo jaan-boojhkar
+        hai. "Sab mita do" jaisa faisla shuru me lena chahiye, jab aadmi ne abhi
+        kuch banaya nahi. Aakhir me poochhne par wo "Editor me daalo" ke bagal me
+        baithta hai, jahan aadmi jaldi me hota hai aur bina padhe daba deta hai.
+      */}
+      <label
+        className={clsx(
+          "flex cursor-pointer items-start gap-2 rounded border px-2 py-1.5",
+          draft.replaceExisting ? "border-amber/50 bg-amber/10" : "border-ink-600 bg-ink-900",
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={draft.replaceExisting}
+          onChange={(event) => onReplaceExisting(event.target.checked)}
+          className="mt-0.5 accent-terracotta"
+        />
+        <span className="min-w-0 text-[11px] leading-snug text-chalk-400">
+          <span className="text-chalk-100">Purane scene hata do</span> — project me jo pehle se
+          hai wo mit jaayega aur sirf ye nayi reel bachegi.
+          {draft.replaceExisting ? null : (
+            <span className="block text-chalk-500">
+              Abhi ye naye scene purane ke aage jud rahe hain.
+            </span>
+          )}
+        </span>
+      </label>
 
       {draft.summary ? (
         <p className="rounded border border-ink-600 bg-ink-900 px-2 py-1.5 text-[11px] leading-snug text-chalk-400">

@@ -1,6 +1,6 @@
 "use client";
 
-import { applyWizard, autoFill, type WizardDraft } from "@reel/core";
+import { applyWizard, autoFill, sceneSeconds, type WizardDraft } from "@reel/core";
 import { ReelComposition } from "@reel/remotion";
 import { Player } from "@remotion/player";
 import { useMemo } from "react";
@@ -62,6 +62,10 @@ export function StepPreview({ draft }: { draft: WizardDraft }) {
   }
 
   const { width, height, fps, durationInFrames } = previewDoc.project;
+  const wizardSeconds = draft.scenes
+    .filter((scene) => !scene.removed)
+    .reduce((sum, scene) => sum + sceneSeconds(scene), 0);
+  const hasOld = previewDoc.scenes.length > built.applied;
 
   return (
     <div className="space-y-2">
@@ -79,9 +83,28 @@ export function StepPreview({ draft }: { draft: WizardDraft }) {
         />
       </div>
 
+      {/*
+        ⚠️ Do number, aur dono zaroori hain. Player poori reel chalata hai — usme
+        project ke purane scene bhi hain. Sirf "8 scene · 56 second" likhne par
+        aadmi ko lagta hai ki wizard ne 56 second banaye, jabki usne 26 banaye
+        aur baaki pehle se pade the. Wo galti export ke baad hi dikhti hai.
+      */}
       <p className="text-center text-[11px] text-chalk-500">
-        {built.applied} scene · {Math.round(durationInFrames / fps)} second
+        {built.applied} naye scene
+        {wizardSeconds > 0 ? ` · ${Math.round(wizardSeconds)}s` : ""}
+        {" · "}
+        <span className={hasOld ? "text-amber" : undefined}>
+          poori reel {Math.round(durationInFrames / fps)}s
+        </span>
       </p>
+
+      {hasOld ? (
+        <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] leading-snug text-amber">
+          Is project me pehle se {previewDoc.scenes.length - built.applied} scene hain, aur naye
+          uske <strong>aage</strong> jud rahe hain. Sirf ye nayi reel chahiye to pehle step me
+          &ldquo;Purane scene hata do&rdquo; chun lo.
+        </p>
+      ) : null}
 
       {/*
         ⚠️ Jo asset nahi mili wo yahan likhi jaati hai, chhupayi nahi jaati. Bina

@@ -344,11 +344,6 @@ check(
   }).applied === 3,
 );
 
-console.log(`\n${passed} ok, ${failures.length} fail`);
-if (failures.length > 0) {
-  for (const line of failures) console.log(`  - ${line}`);
-  process.exit(1);
-}
 
 /* ==================================================================== */
 /*  Video, trim, aur "kitni badi tasveer chahiye" (26.16 / 26.18)       */
@@ -556,11 +551,6 @@ check("text neeche jaata hai", yBot > yMid, `neeche=${yBot}`);
 check("upar aur neeche barabar door", Math.abs(yMid - yTop) === Math.abs(yBot - yMid));
 
 
-console.log(`\n${passed} ok, ${failures.length} fail`);
-if (failures.length > 0) {
-  for (const line of failures) console.log(`  - ${line}`);
-  process.exit(1);
-}
 
 
 /* ==================================================================== */
@@ -788,3 +778,55 @@ check(
     scenes: aadhiAwaaz.scenes.map((sc) => ({ ...sc, voiceAssetId: "as_a", voiceSeconds: 3 })),
   }).some((a) => a.text.includes("awaaz nahi hai")),
 );
+
+
+/* ------------------------------------------------------ purane scene hatana */
+
+const withVoice0 = draftFromScript({
+  summary: "",
+  scenes: [
+    { type: "text", name: "A", durationSeconds: 3, slots: { text: "Pehli line" }, reason: "" },
+    { type: "text", name: "B", durationSeconds: 3, slots: { text: "Doosri line" }, reason: "" },
+  ],
+});
+
+console.log("\npurane scene hatana");
+
+const bharaHua = applyWizard({ doc: project, draft: withVoice0 });
+check("pehli baar ke scene ban gaye", bharaHua.doc.scenes.length > 0);
+
+const joda = applyWizard({ doc: bharaHua.doc, draft: withVoice0 });
+check(
+  "default me naye scene purane ke aage judte hain",
+  joda.doc.scenes.length === bharaHua.doc.scenes.length * 2,
+  `${bharaHua.doc.scenes.length} → ${joda.doc.scenes.length}`,
+);
+
+const badla = applyWizard({
+  doc: bharaHua.doc,
+  draft: { ...withVoice0, replaceExisting: true },
+});
+check(
+  "chunav lagane par sirf nayi reel bachti hai",
+  badla.doc.scenes.length === bharaHua.doc.scenes.length,
+  `${bharaHua.doc.scenes.length} → ${badla.doc.scenes.length}`,
+);
+check(
+  "purane scene ke items bhi gaye",
+  badla.doc.items.every((item) => !bharaHua.doc.scenes.some((sc) => sc.id === item.sceneId)),
+);
+
+/*
+ * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
+ *
+ * Pehle ye do jagah tha — beech me bhi, aur ant me bhi. Uska nateeja chup-chaap
+ * bura tha: jo jaanch is line ke BAAD likhi jaati, wo chalti to thi par ginti me
+ * aati hi nahi, aur uske fail hone par bhi script exit 0 deti thi. Yaani ek
+ * toota hua niyam poori tarah dikhta hua bhi "sab theek hai" ke saath nikal
+ * jaata — jo is poori file ke maqsad ka ulta hai.
+ */
+console.log(`\n${passed} ok, ${failures.length} fail`);
+if (failures.length > 0) {
+  for (const line of failures) console.log(`  - ${line}`);
+  process.exit(1);
+}
