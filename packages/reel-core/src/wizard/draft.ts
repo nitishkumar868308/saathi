@@ -660,6 +660,29 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
     };
   }
 
+  /*
+   * Project ki lambai reel ke bilkul aakhri frame par — na ek frame zyada.
+   *
+   * WARNING: Ye zaroori hai kyunki project ki lambai apne aap sirf **badhti**
+   * hai, ghatti nahi (`growDuration`). Naya project 30s ka banta hai; wizard 24s
+   * ki reel banata hai; aur MP4 30s ka nikalta hai — aakhri 6 second bilkul
+   * KAALA aur chup. Wo galti editor me nazar nahi aati (aadmi reel dekh kar khush
+   * ho jaata hai) aur render ke baad hi milti hai — aur tab tak wo reel bhej bhi
+   * di ja chuki hoti hai.
+   *
+   * Ops me ye ghatana jaan-boojhkar nahi hota, aur wo waajib hai: aadmi ne aage
+   * jagah chhodi ho to har chhoti edit use kha jaati. Par wizard ka poora maqsad
+   * "poori reel ek baar me" hai — yahan aage ki khaali jagah kabhi jaan-boojhkar
+   * nahi hoti.
+   */
+  const lastFrame = doc.items.reduce(
+    (max, item) => Math.max(max, item.startFrame + item.durationInFrames),
+    0,
+  );
+  if (lastFrame > 0) {
+    doc = { ...doc, project: { ...doc.project, durationInFrames: lastFrame } };
+  }
+
   return {
     doc,
     applied: result.applied,

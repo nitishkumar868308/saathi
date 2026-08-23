@@ -816,6 +816,26 @@ check(
   badla.doc.items.every((item) => !bharaHua.doc.scenes.some((sc) => sc.id === item.sceneId)),
 );
 
+/* ------------------------------------------------- reel ke ant me kaala nahi */
+
+console.log("\nreel ke ant me kaala nahi");
+
+const chhotiReel = applyWizard({
+  doc: project,
+  draft: { ...withVoice0, replaceExisting: true },
+});
+const antFrame = Math.max(...chhotiReel.doc.items.map((i) => i.startFrame + i.durationInFrames));
+check(
+  "project ki lambai aakhri frame par rukti hai",
+  chhotiReel.doc.project.durationInFrames === antFrame,
+  `project=${chhotiReel.doc.project.durationInFrames}f aakhri item=${antFrame}f`,
+);
+check(
+  "aur wo naye project ke default 30s se chhoti hai",
+  chhotiReel.doc.project.durationInFrames < project.project.durationInFrames,
+  `${(chhotiReel.doc.project.durationInFrames / 30).toFixed(1)}s < ${(project.project.durationInFrames / 30).toFixed(1)}s`,
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *
