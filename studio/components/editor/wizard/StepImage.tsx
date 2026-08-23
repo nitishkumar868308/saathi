@@ -10,7 +10,15 @@ import {
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Film, ImageOff, Loader2, Smartphone, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  Film,
+  Image as ImageIcon,
+  ImageOff,
+  Loader2,
+  Smartphone,
+  Upload,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
@@ -197,6 +205,9 @@ function SceneRow({
    *
    * Ab wo saaf likha jaata hai, dobara daalne ke raaste ke saath.
    */
+  /** Library me kya dhoondhna hai — `null` = jo is scene ke liye theek hai. */
+  const [libKind, setLibKind] = useState<"image" | "video" | null>(null);
+
   const [brokenId, setBrokenId] = useState<string | null>(null);
   const broken = brokenId !== null && brokenId === scene.visualAssetId;
 
@@ -303,11 +314,38 @@ function SceneRow({
             </button>
           ))}
 
+          {/*
+            ⚠️ Library ke liye kind ka apna switch hai, aur ye chala kar dekhne par
+            joda gaya. Pehle picker `picked ?? suggested` par chalta tha — yaani
+            jis scene ki sifaarish "tasveer" thi, wahan library me **sirf tasveerein**
+            dikhti thi. Aadmi apni recording pehle hi library me daal chuka ho, to
+            bhi wo use nahi kar sakta tha; uske paas ek hi raasta bachta tha — wahi
+            file dobara upload karna. Upload ke do button the, par library ka ek hi.
+          */}
+          <div className="flex items-center gap-0.5">
+            {(["image", "video"] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                onClick={() => setLibKind(kind)}
+                title={kind === "video" ? "Library me video dikhao" : "Library me tasveerein dikhao"}
+                className={clsx(
+                  "rounded border px-1 py-1 text-[10px] transition-colors",
+                  (libKind ?? picked ?? suggested) === kind
+                    ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                    : "border-ink-600 text-chalk-500 hover:border-chalk-500",
+                )}
+              >
+                {kind === "video" ? <Film size={9} /> : <ImageIcon size={9} />}
+              </button>
+            ))}
+          </div>
+
           <div className="min-w-0 max-w-[130px] flex-1">
             <AssetPickerButton
-              kind={picked ?? suggested}
+              kind={libKind ?? picked ?? suggested}
               assetId={scene.visualAssetId}
-              onPick={(assetId) => setImage(assetId, picked ?? suggested)}
+              onPick={(assetId) => setImage(assetId, libKind ?? picked ?? suggested)}
             />
           </div>
 
