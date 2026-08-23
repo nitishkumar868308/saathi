@@ -37,10 +37,18 @@ const SHORT_TEXT_CHARS = 30;
 /**
  * Is scene par kaunsi animation — `null` matlab koi nahi.
  *
- * ⚠️ Bina tasveer wale scene par animation ka sawaal hi nahi uthta, aur ye sirf
- * safai nahi hai: us haalat me koi bhi preset lagane par wo **text par** lag
- * jaata, aur "Dheema zoom" wala text hilta hua ajeeb lagta hai. Isliye jawab
- * saaf `null` hai — UI wahan wo chunav dikhati hi nahi.
+ * ⚠️ **Bina tasveer wale scene par bhi harkat hoti hai, aur ye baat badli hui
+ * hai.** Pehle yahan `null` lautta tha, is dalil par ki preset text par lag
+ * jaayega aur "Dheema zoom" wala hilta hua text ajeeb lagta hai. Wo dalil ek
+ * preset ke liye sach thi aur usse poori shreni band kar di gayi — nateeja ye
+ * hua ki jis reel me tasveerein nahi thi (yaani pehli har reel), wo 30 second
+ * tak **bilkul sthir** rahi. Har line achanak aati thi aur achanak chali jaati
+ * thi. Us reel me kami "animation kam thi" nahi thi; usme harkat thi hi nahi.
+ *
+ * Sahi jawab ye tha ki text ke liye text wala preset chuna jaaye: `slide-up-soft`
+ * (neeche se aana + fade) — wahi jo caption ke liye bana hai. Zoom wale preset
+ * ab bhi sifaarish me nahi aate; par aadmi chahe to chun sakta hai, aur wo uska
+ * haq hai.
  *
  * ⚠️ Sam/visham wala niyam neeche jaan-boojhkar hai. Ek hi preset har scene par
  * lagta rahe to har scene alag se theek dikhta hai, par poori reel sust lagti
@@ -48,8 +56,17 @@ const SHORT_TEXT_CHARS = 30;
  * lagi"). Do preset baari-baari se wo ek-jaisapan toot jaata hai.
  */
 export function suggestAnimation(scene: WizardSceneLike, index: number): string | null {
-  if (!scene.hasImage) return null;
   if (scene.type === "cta") return "pop-in";
+
+  if (!scene.hasImage) {
+    /*
+     * Text par sirf do hi preset theek baithte hain: chhoti line uchhal kar aaye,
+     * lambi line neeche se sarak kar. Baaki sab zoom hain, aur zoom ka matlab
+     * tasveer hoti hai — text par wo bas hilta hua dikhta hai.
+     */
+    return scene.text.trim().length <= SHORT_TEXT_CHARS ? "pop-in" : "slide-up-soft";
+  }
+
   if (scene.text.trim().length <= SHORT_TEXT_CHARS) return "pop-in";
   return index % 2 === 0 ? "kenburns-slow" : "cinematic-drift";
 }

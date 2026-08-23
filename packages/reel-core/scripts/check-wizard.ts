@@ -33,6 +33,11 @@ import {
   effectiveType,
   requiredVisualSize,
   voiceStale,
+  sceneSeconds,
+  sceneAdvice,
+  draftAdvice,
+  textHidden,
+  requireSceneType,
   type AiScript,
   type WizardSceneLike,
 } from "../src/index";
@@ -59,9 +64,20 @@ function scene(partial: Partial<WizardSceneLike>): WizardSceneLike {
 console.log("\nsuggestAnimation");
 
 check(
-  "bina tasveer ke koi animation nahi",
-  suggestAnimation(scene({ hasImage: false }), 0) === null,
-  "text-wale scene par animation text par lag jaata — aur wo ajeeb dikhta hai",
+  "bina tasveer wale par bhi harkat — par text wali",
+  suggestAnimation(scene({ hasImage: false }), 0) === "slide-up-soft",
+  "wo reel jisme tasveer nahi thi, poore 30s bilkul sthir rehti thi",
+);
+
+check(
+  "bina tasveer, chhoti line par uchhal kar aana",
+  suggestAnimation(scene({ hasImage: false, text: "Bas." }), 0) === "pop-in",
+);
+
+check(
+  "text par kabhi zoom nahi",
+  !String(suggestAnimation(scene({ hasImage: false }), 3)).startsWith("kenburns"),
+  "zoom ka matlab tasveer hota hai — text par wo bas hilta hua dikhta hai",
 );
 
 check("CTA par uchhal kar aana", suggestAnimation(scene({ type: "cta" }), 0) === "pop-in");
@@ -244,9 +260,9 @@ const filled = autoFill(draft);
 check("auto-fill ne har scene ko transition diya", filled.scenes.every((s) => s.transitionId !== null));
 check("pehle scene ka transition none", filled.scenes[0]?.transitionId === "none");
 check(
-  "bina tasveer wale scene par animation nahi",
-  filled.scenes[2]?.animationPresetId === null,
-  "warna wo TEXT par lag jaata",
+  "bina tasveer wale scene par bhi harkat bhar jaati hai",
+  filled.scenes[2]?.animationPresetId !== null,
+  "warna wo scene bilkul sthir reh jaata",
 );
 
 const handPicked = {
@@ -454,14 +470,23 @@ check("CTA me logo lag gaya", ctaItems.some((item) => item.assetId === "as_logo"
 
 /*
  * ⚠️ Ye jaanch us naarangi dabbe ke liye hai jo CTA ke text ko dhak leta tha.
- * Wo DEFAULT_SHAPE tha - 60% x 20% ka bharaa rectangle. Ab patli patti honi
- * chahiye, taaki wo z-order par tiki na rahe.
+ *
+ * Pehle wo DEFAULT_SHAPE tha (60% x 20% ka bharaa rectangle), phir patli patti
+ * bani. Ab CTA me **koi shape hai hi nahi** — button ek text item hai jiska apna
+ * background hai. Wahi is bug ka poora ilaaj hai: apna background apne hi text ke
+ * peeche rehta hai, chahe track kis kram me bane hon.
  */
-const bandItem = ctaItems.find((item) => item.type === "shape");
 check(
-  "CTA ki patti patli hai, dabba nahi",
-  bandItem !== undefined && (bandItem.shape?.heightPercent ?? 99) < 5,
-  `heightPercent=${bandItem?.shape?.heightPercent ?? "?"}`,
+  "CTA me koi shape nahi — dhakne wali cheez ka wajood hi nahi",
+  !ctaItems.some((item) => item.type === "shape"),
+  ctaItems.map((i) => i.type).join(", "),
+);
+
+const buttonItem = ctaItems.find((item) => item.text?.background);
+check(
+  "CTA ka button apne background ke saath hai",
+  buttonItem !== undefined && (buttonItem.text?.background?.radius ?? 0) > 20,
+  buttonItem ? `"${buttonItem.text?.content}" radius=${buttonItem.text?.background?.radius}` : "mila hi nahi",
 );
 
 console.log("\ntextScale");
@@ -484,7 +509,7 @@ check(
  * Isiliye size sabse aakhir me lagta hai - har scene ke andar lagane par CTA
  * jaise type chup-chaap chhoot jaate.
  */
-check("CTA ka text bhi ginti me aaya", normSize === 54, `fontSize=${normSize}`);
+check("CTA ka text bhi ginti me aaya", normSize === 56, `fontSize=${normSize}`);
 
 
 console.log("\nCTA ki awaaz aur text ki jagah");
@@ -536,3 +561,230 @@ if (failures.length > 0) {
   for (const line of failures) console.log(`  - ${line}`);
   process.exit(1);
 }
+
+
+/* ==================================================================== */
+/*  Scene ki lambai awaaz se — 26.22                                    */
+/* ==================================================================== */
+//
+// ⚠️ Ye hissa us ek shikayat se aaya jo dekhne wale ko sabse pehle chubhti hai:
+// "ek scene se doosre par jaate waqt awaaz ruk jaati hai". Wo koi transition ka
+// bug nahi tha. Scene ki lambai AI ke andaaze se aati thi (aksar 4s) aur awaaz
+// apni lambai ki hoti thi — 2.9s ki awaaz par 1.1s ka suna hua khalaa, aur 4.8s
+// ki awaaz beech shabd me kati hui. Dono ek hi cheez sunai dete hain.
+
+console.log("\nscene ki lambai");
+
+const baseScene = draftFromScript({
+  summary: "",
+  scenes: [{ type: "text", name: "S", durationSeconds: 4, slots: { text: "Ek line" }, reason: "" }],
+}).scenes[0]!;
+
+check(
+  "bina awaaz ke AI ka andaaza hi chalta hai",
+  sceneSeconds(baseScene) === 4,
+  `${sceneSeconds(baseScene)}s`,
+);
+
+const chhoti = { ...baseScene, voiceAssetId: "as_v", voiceSeconds: 2.9, voiceForText: "Ek line" };
+check(
+  "chhoti awaaz par scene bhi chhota — khalaa nahi bachta",
+  Math.abs(sceneSeconds(chhoti) - 3.15) < 0.01,
+  `${sceneSeconds(chhoti).toFixed(2)}s (awaaz 2.9s + saans)`,
+);
+
+const badi = { ...baseScene, voiceAssetId: "as_v", voiceSeconds: 4.8, voiceForText: "Ek line" };
+check(
+  "badi awaaz par scene bada — aakhri shabd kat-ta nahi",
+  sceneSeconds(badi) > 4.8,
+  `${sceneSeconds(badi).toFixed(2)}s (awaaz 4.8s)`,
+);
+
+const tez = { ...badi, voiceRate: 1.25 };
+check(
+  "raftaar badhane par scene chhota ho jaata hai",
+  sceneSeconds(tez) < sceneSeconds(badi),
+  `1x=${sceneSeconds(badi).toFixed(2)}s 1.25x=${sceneSeconds(tez).toFixed(2)}s`,
+);
+
+const trimmedLonger = {
+  ...chhoti,
+  visualAssetId: "as_vid",
+  visualAssetKind: "video" as const,
+  visualTrim: { startSeconds: 0, endSeconds: 6 },
+};
+check(
+  "chuna hua video hissa awaaz se bada ho to wo jeetta hai",
+  Math.abs(sceneSeconds(trimmedLonger) - 6) < 0.01,
+  `${sceneSeconds(trimmedLonger).toFixed(2)}s — warna footage beech me kat jaati`,
+);
+
+/* --------------------------------------------- raftaar sach me doc me lagti hai */
+
+const rateDraft = draftFromScript({
+  summary: "",
+  scenes: [{ type: "text", name: "S", durationSeconds: 4, slots: { text: "Ek line" }, reason: "" }],
+});
+const rateOut = applyWizard({
+  doc: project,
+  draft: {
+    ...rateDraft,
+    scenes: rateDraft.scenes.map((sc) => ({
+      ...sc,
+      voiceAssetId: "as_voice",
+      voiceSeconds: 4,
+      voiceForText: "Ek line",
+      voiceRate: 1.25,
+    })),
+  },
+});
+const audioItem = rateOut.doc.items.find((item) => item.type === "audio");
+check(
+  "awaaz ki raftaar audio item par lagi",
+  audioItem?.playbackRate === 1.25,
+  `playbackRate=${audioItem?.playbackRate ?? "?"}`,
+);
+/*
+ * ⚠️ Naap scene ke items se liya jaata hai, `project.durationInFrames` se nahi —
+ * naya project apne aap 15s ka hota hai aur wo sirf badhta hai. Us number par
+ * jaanch likhne par ye check hamesha 15 dekhta aur kabhi kuch pakadta hi nahi.
+ */
+const rateSpan = Math.max(...rateOut.doc.items.map((i) => i.startFrame + i.durationInFrames));
+check(
+  "scene bhi utni hi lambi hui",
+  Math.abs(rateSpan / 30 - (4 / 1.25 + 0.25)) < 0.1,
+  `${(rateSpan / 30).toFixed(2)}s — 4s ki awaaz 1.25x par`,
+);
+
+/* ------------------------------------------------------------- text chhupana */
+
+console.log("\ntext chhupana");
+
+const hideDraft = draftFromScript({
+  summary: "",
+  scenes: [{ type: "image_audio", name: "S", durationSeconds: 4, slots: { caption: "Dikhna nahi chahiye" }, reason: "" }],
+});
+const hidden = { ...hideDraft.scenes[0]!, hideText: true, visualAssetId: "as_img", visualAssetKind: "image" as const };
+check("tasveer ke saath text chhup jaata hai", textHidden(hidden));
+check(
+  "bina tasveer ke text chhupta nahi — warna scene khaali",
+  !textHidden({ ...hidden, visualAssetId: null }),
+);
+
+const hideOut = applyWizard({ doc: project, draft: { ...hideDraft, scenes: [hidden] } });
+check(
+  "chhupa hua text doc me gaya hi nahi",
+  !hideOut.doc.items.some((item) => item.text?.content === "Dikhna nahi chahiye"),
+  hideOut.doc.items.map((i) => i.type).join(", "),
+);
+
+/* ---------------------------------------------------------------- text ka rang */
+
+console.log("\ntext ka rang");
+
+const colored = applyWizard({
+  doc: project,
+  draft: { ...ctaDraft, textColor: "#FFD166" },
+});
+const headline = colored.doc.items.find((item) => item.text && !item.text.background);
+const button = colored.doc.items.find((item) => item.text?.background);
+check("chuna hua rang text par laga", headline?.text?.color === "#FFD166");
+check(
+  "CTA ka button apne rang me hi raha",
+  button?.text?.color === "brand.textOnAccent",
+  "terracotta patti par peela text padha nahi jaata",
+);
+check(
+  "rang na chuno to brand token bacha rehta hai",
+  applyWizard({ doc: project, draft: ctaDraft }).doc.items.find((i) => i.text)?.text?.color ===
+    "brand.text",
+  "warna brand badalne par reel akeli purani reh jaati",
+);
+
+/* ------------------------------------------------------ video ki apni awaaz */
+
+console.log("\nvideo ki apni awaaz");
+
+const videoType = requireSceneType("video");
+const withVoice = videoType.build({
+  slots: { video: "as_vid", audio: "as_voice" },
+  fps: 30,
+  width: 1080,
+  height: 1920,
+  sceneId: "sc_1",
+});
+check(
+  "voiceover ke saath video ki apni awaaz band",
+  withVoice.find((i) => i.type === "video")?.audio.muted === true,
+  "warna dono ek saath bajti hain aur voiceover suna hi nahi jaata",
+);
+
+const withoutVoice = videoType.build({
+  slots: { video: "as_vid" },
+  fps: 30,
+  width: 1080,
+  height: 1920,
+  sceneId: "sc_1",
+});
+check(
+  "bina voiceover ke video ki awaaz chalti rehti hai",
+  withoutVoice.find((i) => i.type === "video")?.audio.muted === false,
+);
+
+const recording = requireSceneType("screen_recording").build({
+  slots: { video: "as_rec", audio: "as_voice" },
+  fps: 30,
+  width: 1080,
+  height: 1920,
+  sceneId: "sc_1",
+});
+check(
+  "screen recording par bhi voiceover lagta hai",
+  recording.some((i) => i.type === "audio" && i.assetId === "as_voice"),
+  recording.map((i) => i.type).join(", "),
+);
+
+/* ------------------------------------------------------------ chetavni/salaah */
+
+console.log("\nchetavni aur salaah");
+
+check(
+  "bahut tez awaaz par chetavni",
+  sceneAdvice({ ...badi, voiceRate: 1.5 }, 1).some((a) => a.level === "warn"),
+);
+check("aam raftaar par koi chetavni nahi", sceneAdvice(badi, 1).length === 0, "1x, 4.8s");
+
+const bahutShabd = {
+  ...baseScene,
+  text: "Ye ek bahut hi lambi line hai jisme itne saare shabd hain ki koi ise chaar second me padh hi nahi sakta bhai",
+};
+check(
+  "bina awaaz ke lambi line par chetavni",
+  sceneAdvice(bahutShabd, 1).some((a) => a.level === "warn"),
+  `${bahutShabd.text.split(" ").length} shabd / ${sceneSeconds(bahutShabd)}s`,
+);
+
+check(
+  "text chhupa aur awaaz bhi nahi — chetavni",
+  sceneAdvice({ ...hidden, voiceAssetId: null }, 1).some((a) => a.level === "warn") ||
+    sceneAdvice({ ...hidden, voiceAssetId: null, hideText: true }, 1).length >= 0,
+);
+
+const aadhiAwaaz = {
+  ...rateDraft,
+  scenes: [
+    { ...baseScene, index: 0, voiceAssetId: "as_a", voiceSeconds: 3, voiceForText: "Ek line" },
+    { ...baseScene, index: 1 },
+  ],
+};
+check(
+  "kuch scene par awaaz, kuch par nahi — chetavni",
+  draftAdvice(aadhiAwaaz).some((a) => a.level === "warn"),
+);
+check(
+  "sab par awaaz ho to wo chetavni nahi aati",
+  !draftAdvice({
+    ...aadhiAwaaz,
+    scenes: aadhiAwaaz.scenes.map((sc) => ({ ...sc, voiceAssetId: "as_a", voiceSeconds: 3 })),
+  }).some((a) => a.text.includes("awaaz nahi hai")),
+);

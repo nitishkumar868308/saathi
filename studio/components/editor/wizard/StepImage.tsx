@@ -38,11 +38,8 @@ import { useUploader } from "@/lib/upload/uploader";
  * wali harkat), aur dono jagah alag likhne par wo ek din alag ho jaate hain:
  * nishaan kuch aur dikhata aur lagta kuch aur.
  */
-function recommendedAnimationFor(scene: WizardScene, at: number): string | null {
-  return suggestAnimation(
-    { type: scene.type, text: scene.text, hasImage: true },
-    at,
-  );
+function recommendedAnimationFor(scene: WizardScene, at: number, hasImage: boolean): string | null {
+  return suggestAnimation({ type: scene.type, text: scene.text, hasImage }, at);
 }
 
 /**
@@ -80,17 +77,15 @@ function SceneRow({
   /**
    * Tasveer lagti/hatti hai to **harkat bhi saath me** tay hoti hai.
    *
-   * ⚠️ Ye chala kar dekhne par nikla. Wizard khulte hi `autoFill` chalta hai, us
-   * waqt kisi scene par tasveer nahi hoti, isliye `suggestAnimation` sahi hi
-   * `null` deta hai. Phir aadmi tasveer daalta hai — aur "Harkat" ka khaana
-   * **khaali** reh jaata hai, jabki uske bagal me "Sifaarish" ka nishaan laga
-   * hota hai. Yaani screen ek sujhav dikhati hai jo laga hi nahi. Design ka
+   * ⚠️ Ye chala kar dekhne par nikla. Aadmi tasveer daalta hai aur "Harkat" ka
+   * khaana **khaali** reh jaata hai, jabki uske bagal me "Sifaarish" ka nishaan
+   * laga hota hai. Yaani screen ek sujhav dikhati hai jo laga hi nahi. Design ka
    * vaada iska ulta tha: "apne aap chun jaata hai, badalna ek tap".
    *
-   * ⚠️ Aur ulta bhi utna hi zaroori hai: tasveer hata dene par harkat **hat
-   * jaani chahiye**. Warna wo harkat text par jaakar lagti hai, aur hilta hua
-   * text ajeeb dikhta hai — theek wahi cheez jisse bachne ke liye
-   * `suggestAnimation` bina tasveer ke `null` deta hai.
+   * ⚠️ Tasveer hatne par harkat **null nahi hoti, text wali ho jaati hai**. Pehle
+   * wo null hoti thi (zoom text par na lag jaaye), aur uska nateeja ye tha ki
+   * bina tasveer wala scene bilkul sthir reh jaata tha. Ab `suggestAnimation`
+   * khud text ke liye text wala preset deta hai, isliye dono taraf jawab hai.
    */
   const [trimFor, setTrimFor] = useState<string | null>(null);
 
@@ -105,11 +100,17 @@ function SceneRow({
       visualAssetId: assetId,
       visualAssetKind: assetId ? kind : null,
       ...(assetId && kind === "video" ? {} : { visualTrim: null }),
-      ...(assetId
-        ? scene.animationPresetId
-          ? {}
-          : { animationPresetId: recommendedAnimationFor(scene, at) }
-        : { animationPresetId: null }),
+      /*
+       * ⚠️ Tasveer hatne par harkat ab **null nahi hoti, text wali ho jaati hai**.
+       * Pehle yahan `null` likha tha, is dar se ki zoom text par lag jaayega. Us
+       * dar ki keemat ye thi ki tasveer hatate hi wo scene bilkul sthir ho jaata
+       * tha — aur "Harkat" ka khaana khaali, jabki uske bagal me "Sifaarish" ka
+       * nishaan laga hota tha. Ab sifaarish khud text ke liye text wala preset
+       * chunti hai, isliye dono taraf jawab maujood hai.
+       */
+      ...(scene.animationPresetId && assetId
+        ? {}
+        : { animationPresetId: recommendedAnimationFor(scene, at, Boolean(assetId)) }),
     });
   }
 
@@ -298,19 +299,24 @@ function SceneRow({
         </div>
 
         {/*
-          ⚠️ Harkat ka chunav sirf tab dikhta hai jab tasveer ho. Bina tasveer ke
-          wo TEXT par lagti, aur hilta hua text ajeeb lagta hai — `suggestAnimation`
-          bhi wahan `null` deta hai. Ek chunav jo dabane par kuch galat kare, us
-          chunav se bura hai jo hai hi nahi.
+          ⚠️ Harkat ka chunav ab **hamesha** dikhta hai, tasveer ho ya na ho.
+
+          Pehle wo sirf tasveer wale scene par tha, is dalil par ki bina tasveer
+          ke preset TEXT par lag jaayega. Us dalil ki keemat chala kar dekhne par
+          samajh aayi: jis reel me tasveerein nahi thi (yaani shuru ki har reel),
+          usme 30 second tak koi harkat thi hi nahi — har line achanak aati thi
+          aur achanak chali jaati thi. Aur us aadmi ke paas use theek karne ka
+          koi raasta bhi nahi tha, kyunki chunav dikhta hi nahi tha.
+
+          Ab sifaarish khud text ke liye text wala preset deti hai (neeche se
+          aana / uchhal kar aana), aur zoom wale sirf tab jab tasveer ho.
         */}
-        {scene.visualAssetId ? (
-          <ChoicePicker
-            kind="animation"
-            value={scene.animationPresetId}
-            recommended={recommendedAnimation}
-            onPick={(id) => onChange(scene.index, { animationPresetId: id })}
-          />
-        ) : null}
+        <ChoicePicker
+          kind="animation"
+          value={scene.animationPresetId}
+          recommended={recommendedAnimation}
+          onPick={(id) => onChange(scene.index, { animationPresetId: id })}
+        />
 
         {/* Video ho to uska chuna hua hissa saaf dikhe, aur badla ja sake. */}
         {scene.visualAssetKind === "video" && scene.visualAssetId ? (
@@ -378,14 +384,7 @@ export function StepImage({
            * daalte hi sahi sifaarish badal jaati hai, par nishaan purane par
            * laga rehta.
            */
-          recommendedAnimation={suggestAnimation(
-            {
-              type: scene.type,
-              text: scene.text,
-              hasImage: Boolean(scene.visualAssetId),
-            },
-            at,
-          )}
+          recommendedAnimation={recommendedAnimationFor(scene, at, Boolean(scene.visualAssetId))}
           recommendedTransition={suggestTransition(
             at,
             Boolean(scene.visualAssetId),

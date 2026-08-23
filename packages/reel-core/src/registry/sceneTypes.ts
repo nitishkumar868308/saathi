@@ -296,20 +296,34 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       const duration = input.durationInFrames ?? durationFromSeconds(6, input.fps);
       const items: Item[] = [];
       const video = slotString(input.slots, "video");
+      const audio = slotString(input.slots, "audio");
 
       if (video) {
-        items.push(
-          createItem("video", {
-            fps: input.fps,
-            trackId: "",
-            name: "Video",
-            assetId: video,
-            startFrame: 0,
-            durationInFrames: duration,
-          }),
-        );
+        const clip = createItem("video", {
+          fps: input.fps,
+          trackId: "",
+          name: "Video",
+          assetId: video,
+          startFrame: 0,
+          durationInFrames: duration,
+        });
+        /*
+         * WARNING: Voiceover ho to video ki APNI awaaz band. Ye chala kar dekhne
+         * par mila aur pehle sunai nahi diya tha: dono awaazein poore volume par
+         * ek saath chalti thi. Phone ke speaker par uska nateeja ye hota hai ki
+         * voiceover sunai hi nahi deta — aadmi ko lagta hai ki uski banayi hui
+         * awaaz lagi hi nahi, jabki wo chal rahi hoti hai, bas video ke shor ke
+         * neeche dabi hui.
+         *
+         * Aur us halat me aadmi kar bhi kuch nahi sakta: video ka volume kahin
+         * poochha nahi jaata, aur "awaaz lag gayi" screen par likha aata hai.
+         *
+         * Yahan chup karna sahi default hai, kam volume nahi: voiceover wali reel
+         * me footage ki apni awaaz (hawa, bheed, camera ki khadak) kuch jodti
+         * nahi. Jise chahiye wo editor me ek switch se wapas la sakta hai.
+         */
+        items.push(audio ? { ...clip, audio: { ...clip.audio, muted: true } } : clip);
       }
-      const audio = slotString(input.slots, "audio");
       if (audio) {
         items.push(
           createItem("audio", {
@@ -336,6 +350,14 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     group: "media",
     slots: [
       { id: "video", label: "Recording", kind: "asset:video", required: true },
+      /*
+       * WARNING: Chauthi baar wahi galti. `text`, `video` aur `cta` — teeno me ye
+       * slot baad me is liye jodna pada ki uske bina wizard ki banayi hui awaaz
+       * CHUP-CHAAP gir jaati thi. Screen recording par to wo aur bhi zaroori hai:
+       * app ka screen dikhana hai aur uske upar bolna hai — wahi is scene ka poora
+       * matlab hai.
+       */
+      AUDIO_SLOT,
       CAPTION_SLOT,
       /*
        * Phone frame **default ON** (18.5).
@@ -401,6 +423,28 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
               },
         });
       }
+      /*
+       * Voiceover — video ki apni awaaz band karke. Wahi wajah jo `video` scene
+       * me likhi hai: dono ek saath chalein to voiceover suna hi nahi jaata.
+       */
+      const narration = slotString(input.slots, "audio");
+      if (narration) {
+        const last = items[items.length - 1];
+        if (last?.type === "video") {
+          items[items.length - 1] = { ...last, audio: { ...last.audio, muted: true } };
+        }
+        items.push(
+          createItem("audio", {
+            fps: input.fps,
+            trackId: "",
+            name: "Awaaz",
+            assetId: narration,
+            startFrame: 0,
+            durationInFrames: duration,
+          }),
+        );
+      }
+
       items.push(...captionItem(input, duration));
       return tag(items, input.sceneId);
     },
@@ -445,7 +489,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     id: "cta",
     label: "CTA",
     icon: "Square",
-    hint: "Aakhri call-to-action — text + peeche ek band",
+    hint: "Aakhri call-to-action — logo, ek line, aur ek button",
     group: "text",
     slots: [
       { id: "text", label: "CTA text", kind: "text", required: true, multiline: true },
@@ -454,7 +498,24 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
         label: "Logo",
         kind: "asset:image",
         required: false,
-        hint: "Brand ka logo — text ke upar. Khaali chhod sakte ho.",
+        hint: "Brand ka logo — sabse upar. Khaali chhod sakte ho.",
+      },
+      /*
+       * Button par kya likha ho.
+       *
+       * WARNING: Iska default khaali NAHI hai. CTA ka poora kaam ek hi hai —
+       * aadmi ko batana ki ab karna kya hai — aur wo baat aksar us lambi line me
+       * dabi reh jaati hai jo AI likhta hai ("Apka Saathi - aapka digital
+       * document manager. Abhi download karein."). Ek chhota, saaf button us
+       * baat ko poori line se alag kar deta hai. Khaali default rakhne par
+       * button kabhi bhara hi nahi jaata, aur CTA wapas ek paragraph ban jaata.
+       */
+      {
+        id: "button",
+        label: "Button ka text",
+        kind: "text",
+        required: false,
+        hint: 'Khaali chhodo to "Abhi download karein" lagta hai',
       },
       /*
        * WARNING: Ye slot teesri baar wahi galti pakadne ke baad aaya. Wizard me
@@ -467,100 +528,137 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       AUDIO_SLOT,
     ],
     defaultDurationSeconds: 3,
+    /**
+     * CTA ka layout — **teen cheezein, oopar se neeche** (26.21).
+     *
+     * WARNING: Yahan ek bhi `shape` item nahi hai, aur ye is poore build ka sabse
+     * zaroori faisla hai. Is system me z-order **track** se aata hai, aur track
+     * item ke TYPE se milta hai (`trackForItem`) — aur wo track tab banta hai jab
+     * us type ka pehla item aata hai. Yaani shape text ke upar aayega ya neeche,
+     * ye is baat par nirbhar karta hai ki poore doc me pehle text aaya tha ya
+     * shape. Ek CTA ke liye wo jawab poori reel ke banne ke tarike par tika hota
+     * hai — aur wahi wo bug tha jisme naarangi dabba text ko dhak leta tha.
+     *
+     * Button isliye ek `shape` + uske upar `text` nahi hai. Wo ek hi text item
+     * hai jiska apna `background` hai. Uska pallaa hamesha uske apne text ke
+     * peeche rehta hai, kyunki wo alag item hai hi nahi — ye baat kisi track ke
+     * kram par tiki hui nahi hai, aur toot bhi nahi sakti.
+     */
     build: (input) => {
       const duration = input.durationInFrames ?? durationFromSeconds(3, input.fps);
       const content = slotString(input.slots, "text");
       if (!content) return [];
 
-      /*
-       * WARNING: Pehle yahan `createItem("shape")` bina kisi naap ke banta tha,
-       * yaani DEFAULT_SHAPE lag jaata tha - 60% x 20% ka bharaa hua rectangle,
-       * brand ke rang me, bilkul beech me. Screen par wo "band" nahi, ek naarangi
-       * DABBA banta tha jo CTA ke text ke upar aa jaata tha aur use padhne hi
-       * nahi deta.
-       *
-       * Aur wo upar isliye aata tha ki track item ke TYPE se milta hai
-       * (`trackForItem`): shape aur text alag track par jaate hain, isliye
-       * "pehle band, phir text" wali tarteeb z-order tay karti hi nahi.
-       *
-       * Isliye ab wo patli patti hai - poori chaudai, 1.5% oonchi, text se
-       * neeche. Is shakl me wo z-order par tiki hui nahi hai: upar rahe ya
-       * neeche, wo text ko dhak hi nahi sakti.
-       */
-      const band = createItem("shape", {
-        fps: input.fps,
-        trackId: "",
-        name: "CTA patti",
-        startFrame: 0,
-        durationInFrames: duration,
-      });
-      const banded = {
-        ...band,
-        shape: { ...(band.shape as NonNullable<Item["shape"]>), widthPercent: 16, heightPercent: 0.7, radius: 4 },
-        transform: { ...band.transform, y: Math.round(input.height * 0.09) },
-      };
+      const items: Item[] = [];
 
-      // Logo - text ke upar, chhota. Slot khaali ho to kuch nahi.
+      /*
+       * Logo — sabse upar aur bada.
+       *
+       * WARNING: Pehle ye 0.17 scale par tha aur frame ke beech ke paas baithta
+       * tha. Screen par wo ek chhoti si chipki hui cheez lagti thi — brand nahi,
+       * ek nishaan. CTA wo ek frame hai jise aadmi screenshot leta hai; wahan
+       * logo ko jagah chahiye.
+       */
       const logoId = slotString(input.slots, "logo");
-      const logo = logoId
-        ? [
-            (() => {
-              const item = createItem("image", {
-                fps: input.fps,
-                trackId: "",
-                name: "Logo",
-                assetId: logoId,
-                startFrame: 0,
-                durationInFrames: duration,
-              });
-              return {
-                ...item,
-                transform: { ...item.transform, y: -Math.round(input.height * 0.13), scale: 0.17 },
-              };
-            })(),
-          ]
-        : [];
-      const base = createItem("text", {
+      if (logoId) {
+        const logo = createItem("image", {
+          fps: input.fps,
+          trackId: "",
+          name: "Logo",
+          assetId: logoId,
+          startFrame: 0,
+          durationInFrames: duration,
+        });
+        items.push({
+          ...logo,
+          transform: { ...logo.transform, y: -Math.round(input.height * 0.2), scale: 0.34 },
+        });
+      }
+
+      /*
+       * Asli line. Logo ho to wo thodi neeche khisakti hai — warna dono ek doosre
+       * ke gale me baith jaate hain.
+       */
+      const headBase = createItem("text", {
         fps: input.fps,
         trackId: "",
         name: content.slice(0, 40),
         startFrame: 0,
         durationInFrames: duration,
       });
+      const headSpec = headBase.text as NonNullable<Item["text"]>;
+      items.push({
+        ...headBase,
+        transform: {
+          ...headBase.transform,
+          y: logoId ? Math.round(input.height * 0.01) : -Math.round(input.height * 0.04),
+        },
+        text: {
+          ...headSpec,
+          content,
+          /*
+           * WARNING: 72 (default) par CTA ki line teen line me toot kar poora
+           * frame gher leti hai, aur logo ke saath wo bheed jaisa dikhta hai.
+           * 56 par wo do line me baithti hai aur phone par bhi saaf padhi jaati
+           * hai — CTA ki line waise bhi lambi nahi honi chahiye.
+           */
+          fontSize: 56,
+          lineHeight: 1.3,
+          maxWidthPercent: 78,
+        },
+      });
+
       /*
-       * WARNING: CTA ka text default 72 par bahut bada baithta hai - do line me
-       * toot kar poora frame gher leta hai, aur logo ke saath wo bheed jaisa
-       * dikhta hai. CTA ki line waise bhi chhoti hoti hai ("Apka Saathi"), use
-       * bada karne ki zaroorat hi nahi.
+       * Button. Ye ek text item hai jiska apna background hai — dekho upar wala
+       * note ki wo shape kyun nahi hai.
        */
-      const text = {
-        ...base,
-        text: { ...(base.text as NonNullable<Item["text"]>), fontSize: 54 },
-      };
+      const label = slotString(input.slots, "button") || "Abhi download karein";
+      const buttonBase = createItem("text", {
+        fps: input.fps,
+        trackId: "",
+        name: "CTA button",
+        startFrame: 0,
+        durationInFrames: duration,
+      });
+      const buttonSpec = buttonBase.text as NonNullable<Item["text"]>;
+      items.push({
+        ...buttonBase,
+        transform: { ...buttonBase.transform, y: Math.round(input.height * 0.17) },
+        text: {
+          ...buttonSpec,
+          content: label,
+          /*
+           * Button body font me hai, display (serif) me nahi — aur ye jaan-boojhkar
+           * hai. Button ek cheez hai jise dabaya jaata hai; serif me wo padhne
+           * wali line lagta hai, button nahi.
+           */
+          fontFamily: "brand.font.body",
+          fontSize: 38,
+          fontWeight: 700,
+          letterSpacing: 0.5,
+          lineHeight: 1,
+          maxWidthPercent: 86,
+          // Gehre rang par gehra text nahi — brand.textOnAccent isi ke liye hai.
+          color: "brand.textOnAccent",
+          background: { color: "brand.primary", paddingX: 56, paddingY: 28, radius: 60 },
+        },
+      });
 
       const ctaAudio = slotString(input.slots, "audio");
-      const voice = ctaAudio
-        ? [
-            createItem("audio", {
-              fps: input.fps,
-              trackId: "",
-              name: "Awaaz",
-              assetId: ctaAudio,
-              startFrame: 0,
-              durationInFrames: duration,
-            }),
-          ]
-        : [];
+      if (ctaAudio) {
+        items.push(
+          createItem("audio", {
+            fps: input.fps,
+            trackId: "",
+            name: "Awaaz",
+            assetId: ctaAudio,
+            startFrame: 0,
+            durationInFrames: duration,
+          }),
+        );
+      }
 
-      return tag(
-        [
-          banded,
-          ...logo,
-          { ...text, text: { ...(text.text as NonNullable<Item["text"]>), content } },
-          ...voice,
-        ],
-        input.sceneId,
-      );
+      return tag(items, input.sceneId);
     },
   },
 

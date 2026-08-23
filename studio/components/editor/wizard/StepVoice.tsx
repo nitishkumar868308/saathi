@@ -1,11 +1,18 @@
 "use client";
 
-import { voiceStale, type WizardDraft, type WizardScene } from "@reel/core";
+import {
+  sceneAdvice,
+  sceneSeconds,
+  voiceStale,
+  type WizardDraft,
+  type WizardScene,
+} from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Loader2, Mic, Upload } from "lucide-react";
+import { AlertTriangle, Info, Loader2, Mic, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
+import { useAssetDurations } from "@/lib/assetMeta";
 import { useUploader } from "@/lib/upload/uploader";
 import { forgetAssetMeta } from "@/lib/assetMeta";
 
@@ -23,6 +30,25 @@ import { forgetAssetMeta } from "@/lib/assetMeta";
  * to dono nayi banti hain), aur fail hone par ye batana namumkin ho jaata hai ki
  * kaunsi fail hui.
  */
+
+/**
+ * Awaaz ki raftaar ke chunav — **naam ke saath, number ke saath nahi**.
+ *
+ * WARNING: Ye `playbackRate` hai, TTS se dobara maangna nahi. Farak asli hai:
+ * yahan 1.15 ka matlab theek 1.15 guna hai aur scene ki lambai bhi usi hisaab se
+ * ghat jaati hai. Provider se "thoda tez bolo" maangne par nateeja kabhi 1.5x
+ * hota hai kabhi 1.05x — us andaaze par scene ki lambai bandhi nahi ja sakti.
+ *
+ * WARNING: Sabse tez 1.3x par ruk-ta hai. Usse aage shabd aapas me chipak jaate
+ * hain; wo slider par ek number ki tarah dikhta hai par sunne me toota hua lagta
+ * hai. Jo hadd nateeja kharab karti ho, use dena hi nahi chahiye.
+ */
+const VOICE_RATES = [
+  { rate: 0.85, label: "Dheemi", when: "Bhaari baat — sunne wale ko rukna chahiye" },
+  { rate: 1, label: "Normal", when: "Jaisi bani thi" },
+  { rate: 1.15, label: "Tez", when: "Reel ki aam raftaar — 30s me zyada baat" },
+  { rate: 1.3, label: "Bahut tez", when: "Sirf list ya ginti wali line par" },
+] as const;
 
 interface Category {
   id: string;
@@ -45,16 +71,39 @@ function VoiceRow({
   onChange(index: number, patch: Partial<WizardScene>): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  /*
+   * WARNING: Yahan se awaaz ki LAMBAI bhi aati hai, sirf id nahi. Scene ki lambai
+   * usi se banti hai; bina uske scene AI ke andaaze par chalta hai aur awaaz ya
+   * to beech me kat jaati hai ya uske baad chup baithi rehti hai. TTS to lambai
+   * jawab me hi de deta hai — upload aur library wali awaaz ke liye ye list se
+   * poochhni padti hai.
+   */
+  const meta = useAssetDurations(30);
+  const secondsOf = (assetId: string | null): number | null => {
+    const frames = meta.sourceFrames(assetId);
+    return frames === null ? null : frames / 30;
+  };
+
   const uploader = useUploader({
     tags: ["wizard"],
     onFinished: ({ assetId }) =>
-      onChange(scene.index, { voiceAssetId: assetId, voiceForText: scene.text }),
+      onChange(scene.index, {
+        voiceAssetId: assetId,
+        voiceForText: scene.text,
+        voiceSeconds: secondsOf(assetId),
+      }),
   });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const stale = voiceStale(scene);
+  /*
+   * `voiceStale` wali baat upar apni jagah alag se likhi hai (wo is step ki sabse
+   * zaroori line hai), isliye yahan usse hata diya jaata hai — ek hi baat do
+   * jagah likhi ho to dono ki keemat aadhi ho jaati hai.
+   */
+  const advice = sceneAdvice(scene, at).filter((entry) => !entry.text.startsWith("Awaaz banne"));
   const task = uploader.tasks[uploader.tasks.length - 1];
   const uploading = task && task.phase !== "done" && task.phase !== "duplicate" && task.phase !== "error";
 
@@ -69,7 +118,7 @@ function VoiceRow({
         body: JSON.stringify({ text: scene.text, categoryId }),
       });
       const json = (await response.json()) as {
-        asset?: { id: string };
+        asset?: { id: string; durationMs?: number | null };
         error?: string;
         reason?: string;
       };
@@ -83,7 +132,12 @@ function VoiceRow({
        */
       // Nayi asset bani — list taaza karo, warna Export "asset nahi mila" bolega.
       forgetAssetMeta();
-      onChange(scene.index, { voiceAssetId: json.asset.id, voiceForText: scene.text });
+      onChange(scene.index, {
+        voiceAssetId: json.asset.id,
+        voiceForText: scene.text,
+        // Lambai wahi jo abhi bani — scene ki lambai isi par bandhi hai.
+        voiceSeconds: json.asset.durationMs ? json.asset.durationMs / 1000 : null,
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -178,7 +232,11 @@ function VoiceRow({
             kind="audio"
             assetId={scene.voiceAssetId}
             onPick={(assetId) =>
-              onChange(scene.index, { voiceAssetId: assetId, voiceForText: scene.text })
+              onChange(scene.index, {
+                voiceAssetId: assetId,
+                voiceForText: scene.text,
+                voiceSeconds: secondsOf(assetId),
+              })
             }
           />
         </div>
@@ -186,7 +244,9 @@ function VoiceRow({
         {scene.voiceAssetId ? (
           <button
             type="button"
-            onClick={() => onChange(scene.index, { voiceAssetId: null, voiceForText: null })}
+            onClick={() =>
+              onChange(scene.index, { voiceAssetId: null, voiceForText: null, voiceSeconds: null })
+            }
             className="rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-400 transition-colors hover:border-chalk-500"
           >
             Hata do
@@ -195,6 +255,68 @@ function VoiceRow({
           <span className="text-[10px] text-chalk-500">ya chhod do</span>
         )}
       </div>
+
+      {/*
+        Raftaar — sirf tab jab awaaz ho.
+
+        ⚠️ Iske saath hi scene ki nayi lambai bhi likhi jaati hai, aur wo do
+        number ek saath dikhna zaroori hai. Raftaar akela ek andaaza hai; "1.15x
+        · scene 3.7s" ek nateeja hai. Jo cheez turant nateeja dikhati hai, usse
+        aadmi khelta hai aur seekh jaata hai — jo nahi dikhati, use wo chhoota hi
+        nahi.
+      */}
+      {scene.voiceAssetId ? (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 border-t border-ink-700 pt-1.5">
+          <span className="text-[10px] text-chalk-500">Raftaar:</span>
+          {VOICE_RATES.map((entry) => (
+            <button
+              key={entry.rate}
+              type="button"
+              title={entry.when}
+              onClick={() => onChange(scene.index, { voiceRate: entry.rate })}
+              className={clsx(
+                "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                Math.abs(scene.voiceRate - entry.rate) < 0.01
+                  ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                  : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+              )}
+            >
+              {entry.label}
+            </button>
+          ))}
+          <span className="min-w-0 flex-1 text-right font-mono text-[10px] text-chalk-500">
+            {scene.voiceSeconds
+              ? `${scene.voiceRate.toFixed(2)}x · scene ${sceneSeconds(scene).toFixed(1)}s`
+              : "lambai pata nahi"}
+          </span>
+        </div>
+      ) : null}
+
+      {/*
+        ⚠️ Salaah yahin dikhti hai, us scene ke saath — ek jama ki hui list me
+        nahi. List me "scene 4 par awaaz bahut tez hai" padh kar aadmi ko pehle
+        scene 4 dhoondhna padta hai, aur wo aksar dhoondhta hi nahi.
+      */}
+      {advice.length > 0 ? (
+        <div className="mt-1 space-y-0.5">
+          {advice.map((entry) => (
+            <p
+              key={entry.text}
+              className={clsx(
+                "flex items-start gap-1 text-[10px] leading-snug",
+                entry.level === "warn" ? "text-amber" : "text-chalk-500",
+              )}
+            >
+              {entry.level === "warn" ? (
+                <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+              ) : (
+                <Info size={10} className="mt-0.5 shrink-0" />
+              )}
+              {entry.text}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

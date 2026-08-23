@@ -3,14 +3,16 @@
 import {
   applyWizard,
   autoFill,
+  draftAdvice,
   draftFromScript,
   draftProgress,
+  sceneSeconds,
   type AiScript,
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import { Loader2, Wand2 } from "lucide-react";
+import { AlertTriangle, Info, Loader2, Wand2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -89,6 +91,15 @@ export function WizardModal({
 
   const progress = draftProgress(draft);
   const current = STEPS[step] ?? STEPS[0];
+  /*
+   * ⚠️ Lambai wahi ginti hai jo `applyWizard` lagayega (`sceneSeconds`), AI ka
+   * andaaza nahi. Do alag hisaab rakhne par footer "30 second" bolta aur reel 36
+   * ki banti — aur wo farak sirf export ke baad pakda jaata.
+   */
+  const totalSeconds = draft.scenes
+    .filter((scene) => !scene.removed)
+    .reduce((sum, scene) => sum + sceneSeconds(scene), 0);
+  const advice = draftAdvice(draft);
 
   function update(index: number, patch: Partial<WizardScene>): void {
     setDraft((previous) =>
@@ -105,6 +116,10 @@ export function WizardModal({
 
   function setTextScale(scale: number): void {
     setDraft((previous) => (previous ? { ...previous, textScale: scale } : previous));
+  }
+
+  function setTextColor(color: string | null): void {
+    setDraft((previous) => (previous ? { ...previous, textColor: color } : previous));
   }
 
   function fillEverything(): void {
@@ -167,8 +182,8 @@ export function WizardModal({
       footer={
         <div className="flex w-full items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[11px] text-chalk-500">
-            {progress.total} scene · {progress.withImage} par tasveer · {progress.withVoice} par
-            awaaz
+            {progress.total} scene · {Math.round(totalSeconds)}s · {progress.withImage} par tasveer
+            · {progress.withVoice} par awaaz
             {progress.staleVoice > 0 ? (
               <span className="text-amber"> · {progress.staleVoice} awaaz purani</span>
             ) : null}
@@ -237,8 +252,42 @@ export function WizardModal({
           </p>
         ) : null}
 
+        {/*
+          Poori reel par jo baat hai wo yahan — har step par dikhti hai.
+
+          ⚠️ Scene-dar-scene wali baatein yahan JAAN-BOOJHKAR nahi hain; wo apne
+          scene ke saath dikhti hain. Sab kuch ek jagah jama kar dene par "scene 4
+          par awaaz bahut tez hai" padh kar aadmi ko scene 4 dhoondhna padta hai,
+          aur wo aksar dhoondhta hi nahi.
+        */}
+        {advice.map((entry) => (
+          <p
+            key={entry.text}
+            className={clsx(
+              "flex items-start gap-1.5 rounded border px-2 py-1.5 text-[11px] leading-snug",
+              entry.level === "warn"
+                ? "border-amber/40 bg-amber/10 text-amber"
+                : "border-ink-600 bg-ink-900 text-chalk-400",
+            )}
+          >
+            {entry.level === "warn" ? (
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+            ) : (
+              <Info size={12} className="mt-0.5 shrink-0" />
+            )}
+            {entry.text}
+          </p>
+        ))}
+
         <div className="max-h-[52vh] space-y-2 overflow-y-auto pr-1">
-          {step === 0 ? <StepText draft={draft} onChange={update} onTextScale={setTextScale} /> : null}
+          {step === 0 ? (
+            <StepText
+              draft={draft}
+              onChange={update}
+              onTextScale={setTextScale}
+              onTextColor={setTextColor}
+            />
+          ) : null}
           {step === 1 ? <StepImage draft={draft} onChange={update} /> : null}
           {step === 2 ? <StepVoice draft={draft} onChange={update} /> : null}
           {step === 3 ? <StepPreview draft={draft} /> : null}
