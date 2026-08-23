@@ -264,6 +264,29 @@ le — bina kisi se poochhe, aur bina ek baar bhi timeline chhue.
 
 ## Progress log
 
+- **2026-08-23 (teesra daur)** — screenshot ke feedback ka batch. Chaar cheezein.
+
+  1. **CTA ki awaaz chup-chaap gir rahi thi — wahi shakl, teesri baar.** Wizard me aadmi CTA par
+     awaaz banata tha, screen par "awaaz lag gayi" bhi likha aata tha, aur apply par wo gayab ho
+     jaati thi: `cta` scene type me audio ka slot hi nahi tha. Reel banti, CTA dikhta, bas
+     aakhri line boli nahi jaati. Pehle `text` ke saath hua tha (`text_audio` bana), phir
+     `video` ke saath, ab yahan. Ab `AUDIO_SLOT` teeno me hai, aur uski apni jaanch bhi.
+
+  2. **Toota hua thumbnail** — wo tasveer ka masla tha hi nahi. DB me row thi aur **file R2 me
+     thi hi nahi** (har wo upload jo CORS theek hone se pehle ki gayi: row ban gayi, PUT block
+     ho gaya). UI use toota hua `<img>` bana kar dikhati thi, isliye aadmi ko lagta tha ki
+     wizard kharab hai. Ab `onError` par saaf likha jaata hai ki file storage me nahi mili, aur
+     ye bhi ki isse **render bhi fail hoga** — dobara daalo.
+
+  3. **CTA ka layout kasa** — logo text ke paas (0.13 par, 0.17 scale), patti bhi paas aur
+     patli. Pehle teeno cheezein door-door thi aur screen bikhri hui lagti thi.
+
+  4. **Text ki jagah ab har scene me chunni ja sakti hai** — Upar / Beech / Neeche. Ye per-scene
+     hai jabki baaki chunav poori reel ke liye ek hain, aur wajah saaf hai: jagah **tasveer** se
+     tay hoti hai, reel se nahi. Chehra beech me ho to beech wala text usi par chadh jaata hai.
+
+  Naap: core **585 + 60**, worker **15** (WAV header), typecheck + build saaf.
+
 - **2026-08-23 (baad me)** — **"Awaaz banao" ab Vercel par bhi chalti hai (26.19).**
 
   Pichhle daur me maine likha tha ki Vercel par ffmpeg nahi hai, isliye wahan awaaz nahi ban

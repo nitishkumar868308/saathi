@@ -23,6 +23,12 @@ import { RotateCcw, Trash2 } from "lucide-react";
  * hai. Aur ye chunav yahin hai, Shabd wale step me — kyunki text yahi likha ja
  * raha hai, aur uska size wahi dekh kar tay hota hai.
  */
+const TEXT_PLACES = [
+  { id: "top", label: "Upar" },
+  { id: "center", label: "Beech" },
+  { id: "bottom", label: "Neeche" },
+] as const;
+
 const TEXT_SIZES = [
   { scale: 0.8, label: "Chhota", when: "Lambi line, ya jab tasveer hi asli baat ho" },
   { scale: 1, label: "Normal", when: "Aam reel ke liye" },
@@ -103,6 +109,29 @@ export function StepText({
             placeholder="Is scene par kya likha/bola jaayega"
             className="w-full resize-y rounded border border-ink-600 bg-ink-950 px-2 py-1.5 text-xs text-chalk-100 outline-none focus:border-terracotta"
           />
+
+          {/*
+            Text kahan baithe — per scene, kyunki ye tasveer par nirbhar hai.
+            Chehra beech me ho to beech wala text usi par chadh jaata hai.
+          */}
+          <div className="mt-1 flex items-center gap-1">
+            <span className="text-[10px] text-chalk-500">Text:</span>
+            {TEXT_PLACES.map((place) => (
+              <button
+                key={place.id}
+                type="button"
+                onClick={() => onChange(scene.index, { textPosition: place.id })}
+                className={clsx(
+                  "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                  scene.textPosition === place.id
+                    ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                    : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                )}
+              >
+                {place.label}
+              </button>
+            ))}
+          </div>
         </div>
       ))}
 

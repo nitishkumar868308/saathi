@@ -456,6 +456,15 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
         required: false,
         hint: "Brand ka logo — text ke upar. Khaali chhod sakte ho.",
       },
+      /*
+       * WARNING: Ye slot teesri baar wahi galti pakadne ke baad aaya. Wizard me
+       * aadmi CTA par awaaz banata hai, screen par "awaaz lag gayi" bhi likha
+       * aata hai — aur apply ke waqt wo CHUP-CHAAP GIR jaati hai, kyunki is type
+       * me audio ka slot hi nahi tha. Reel banti hai, CTA dikhta hai, bas aakhri
+       * line boli nahi jaati. Pehle `text` ke saath hua tha (`text_audio` bana),
+       * phir `video` ke saath, ab yahan.
+       */
+      AUDIO_SLOT,
     ],
     defaultDurationSeconds: 3,
     build: (input) => {
@@ -487,8 +496,8 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       });
       const banded = {
         ...band,
-        shape: { ...(band.shape as NonNullable<Item["shape"]>), widthPercent: 22, heightPercent: 0.9, radius: 4 },
-        transform: { ...band.transform, y: Math.round(input.height * 0.16) },
+        shape: { ...(band.shape as NonNullable<Item["shape"]>), widthPercent: 16, heightPercent: 0.7, radius: 4 },
+        transform: { ...band.transform, y: Math.round(input.height * 0.09) },
       };
 
       // Logo - text ke upar, chhota. Slot khaali ho to kuch nahi.
@@ -506,7 +515,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
               });
               return {
                 ...item,
-                transform: { ...item.transform, y: -Math.round(input.height * 0.22), scale: 0.20 },
+                transform: { ...item.transform, y: -Math.round(input.height * 0.13), scale: 0.17 },
               };
             })(),
           ]
@@ -529,11 +538,26 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
         text: { ...(base.text as NonNullable<Item["text"]>), fontSize: 54 },
       };
 
+      const ctaAudio = slotString(input.slots, "audio");
+      const voice = ctaAudio
+        ? [
+            createItem("audio", {
+              fps: input.fps,
+              trackId: "",
+              name: "Awaaz",
+              assetId: ctaAudio,
+              startFrame: 0,
+              durationInFrames: duration,
+            }),
+          ]
+        : [];
+
       return tag(
         [
           banded,
           ...logo,
           { ...text, text: { ...(text.text as NonNullable<Item["text"]>), content } },
+          ...voice,
         ],
         input.sceneId,
       );

@@ -64,6 +64,16 @@ export interface WizardScene {
    */
   voiceForText: string | null;
 
+  /**
+   * Text frame me kahan baithe.
+   *
+   * WARNING: Default `center` hai aur wo har tasveer par theek nahi baithta -
+   * chehra beech me ho to text usi par chadh jaata hai. Ye chunav per-scene hai
+   * (baaki chunav poori reel ke liye ek hain), kyunki jagah tasveer se tay hoti
+   * hai, reel se nahi.
+   */
+  textPosition: "top" | "center" | "bottom";
+
   /** `null` = abhi kuch nahi chuna (auto-fill isi ko bharta hai). */
   animationPresetId: string | null;
   transitionId: string | null;
@@ -188,6 +198,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         visualAssetId: null,
         visualAssetKind: null,
         visualTrim: null,
+        textPosition: "center",
         voiceAssetId: null,
         voiceForText: null,
         animationPresetId: null,
@@ -399,6 +410,28 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         type: source.transitionId,
       });
     }
+  });
+
+  /*
+   * Text ki jagah — har scene ki apni.
+   *
+   * WARNING: Ye `applyProposal` ke baad lagti hai, us scene ke text items par.
+   * Scene ke `build()` ke andar karna mumkin nahi: wahan har type ka apna layout
+   * hai (CTA me logo aur patti bhi hain), aur ek hi niyam sab par thopne se wo
+   * layout toot jaata.
+   */
+  created.forEach((scene, at) => {
+    const src = madeFrom[at];
+    if (!src || src.textPosition === "center") return;
+    const shift = Math.round(doc.project.height * (src.textPosition === "top" ? -0.28 : 0.28));
+    doc = {
+      ...doc,
+      items: doc.items.map((item) =>
+        item.sceneId === scene.id && item.text
+          ? { ...item, transform: { ...item.transform, y: item.transform.y + shift } }
+          : item,
+      ),
+    };
   });
 
   /*

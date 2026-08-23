@@ -487,6 +487,50 @@ check(
 check("CTA ka text bhi ginti me aaya", normSize === 54, `fontSize=${normSize}`);
 
 
+console.log("\nCTA ki awaaz aur text ki jagah");
+
+/*
+ * WARNING: Ye jaanch teesri baar wahi galti pakadne ke baad likhi gayi. Wizard me
+ * CTA par awaaz banti thi, screen par "awaaz lag gayi" bhi likha aata tha, aur
+ * apply par wo CHUP-CHAAP gir jaati thi - kyunki us scene type me audio ka slot
+ * hi nahi tha. Reel banti, CTA dikhta, bas aakhri line boli nahi jaati.
+ */
+const ctaVoice = applyWizard({
+  doc: project,
+  draft: {
+    ...ctaDraft,
+    scenes: ctaDraft.scenes.map((sc) => ({
+      ...sc,
+      visualAssetId: "as_logo",
+      visualAssetKind: "image" as const,
+      voiceAssetId: "as_cta_voice",
+      voiceForText: sc.text,
+    })),
+  },
+});
+const ctaAll = ctaVoice.doc.items.filter((i) => i.sceneId === ctaVoice.doc.scenes[0]!.id);
+check(
+  "CTA me awaaz bhi lagi",
+  ctaAll.some((i) => i.type === "audio" && i.assetId === "as_cta_voice"),
+  ctaAll.map((i) => `${i.type}:${String(i.assetId)}`).join(", "),
+);
+
+/* Text ki jagah — upar/neeche sach me hilna chahiye, aur beech par kuch nahi. */
+function textY(pos: "top" | "center" | "bottom"): number {
+  const out = applyWizard({
+    doc: project,
+    draft: { ...ctaDraft, scenes: ctaDraft.scenes.map((sc) => ({ ...sc, textPosition: pos })) },
+  });
+  return out.doc.items.find((i) => i.text)?.transform.y ?? 0;
+}
+const yTop = textY("top");
+const yMid = textY("center");
+const yBot = textY("bottom");
+check("text upar jaata hai", yTop < yMid, `top=${yTop} beech=${yMid}`);
+check("text neeche jaata hai", yBot > yMid, `neeche=${yBot}`);
+check("upar aur neeche barabar door", Math.abs(yMid - yTop) === Math.abs(yBot - yMid));
+
+
 console.log(`\n${passed} ok, ${failures.length} fail`);
 if (failures.length > 0) {
   for (const line of failures) console.log(`  - ${line}`);

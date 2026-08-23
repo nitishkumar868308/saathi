@@ -159,6 +159,18 @@ function SceneRow({
   const tooSmall =
     source && (source.width < need.width || source.height < need.height) ? need : null;
 
+  /*
+   * WARNING: File R2 me hai bhi ya nahi — ye alag sawaal hai, aur wizard ise
+   * pehle poochhta hi nahi tha. DB me row ho aur file na ho (aisa har us upload
+   * ke saath hua jo CORS theek hone se pehle ki thi: row ban gayi, PUT block ho
+   * gaya), to `<img>` toota hua nishaan dikhata tha. Aadmi ko lagta tha ki
+   * wizard kharab hai, jabki uski file wahan kabhi pahunchi hi nahi.
+   *
+   * Ab wo saaf likha jaata hai, dobara daalne ke raaste ke saath.
+   */
+  const [brokenId, setBrokenId] = useState<string | null>(null);
+  const broken = brokenId !== null && brokenId === scene.visualAssetId;
+
   const task = uploader.tasks[uploader.tasks.length - 1];
   const uploading = task && task.phase !== "done" && task.phase !== "duplicate" && task.phase !== "error";
 
@@ -171,9 +183,16 @@ function SceneRow({
         ) : scene.visualAssetKind === "video" && scene.visualAssetId ? (
           // Video ko <img> me dikhaya nahi ja sakta — uska apna nishaan.
           <Film size={16} className="text-chalk-500" />
+        ) : broken ? (
+          <ImageOff size={14} className="text-red-400" />
         ) : url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-full w-full object-cover" />
+          <img
+            src={url}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setBrokenId(scene.visualAssetId)}
+          />
         ) : (
           <ImageOff size={14} className="text-ink-500" />
         )}
@@ -193,7 +212,18 @@ function SceneRow({
           <p className="text-[10px] text-red-300">{task.error}</p>
         ) : null}
 
-        {tooSmall && source ? (
+        {broken ? (
+          <p className="flex items-start gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-1 text-[10px] leading-snug text-red-300">
+            <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+            <span>
+              Is file ka data storage me nahi mila — library me naam to hai par file nahi. Ye
+              aksar us upload ke saath hota hai jo poori nahi ho paayi thi. Isse render bhi
+              fail hoga: <strong>dobara daalo</strong> ya koi doosri file chuno.
+            </span>
+          </p>
+        ) : null}
+
+        {!broken && tooSmall && source ? (
           <p className="flex items-start gap-1 rounded border border-amber/40 bg-amber/10 px-1.5 py-1 text-[10px] leading-snug text-amber">
             <AlertTriangle size={10} className="mt-0.5 shrink-0" />
             <span>
