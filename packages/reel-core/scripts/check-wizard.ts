@@ -18,9 +18,21 @@
 
 import {
   ANIMATION_PLAIN_NAMES,
+  EFFECT_PLAIN_NAMES,
   TRANSITION_PLAIN_NAMES,
   applyWizard,
   autoFill,
+  blankScene,
+  canMoveScene,
+  draftProgress,
+  draftTotalSeconds,
+  estimateSpeechSeconds,
+  insertSceneAfter,
+  libraryTabForKind,
+  moveScene,
+  nextSceneIndex,
+  plainEffect,
+  voiceMismatch,
   createEmptyProject,
   draftFromScript,
   missingPlainNames,
@@ -972,6 +984,276 @@ check(
   ctaBtn !== undefined,
   "terracotta patti par chuna hua rang padha nahi jaata",
 );
+
+/* ============================================================== 26.24
+ *
+ * Scene jodna/khiskaana, lambai haath se, gap, effect, music aur level.
+ *
+ * ⚠️ Ye sab UI se chalte hain par unka **hisaab yahan** hai, aur wahi wajah hai
+ * ki ye jaanchein zaroori hain: inme se aadhi galtiyan aisi hain jo screen par
+ * bilkul theek dikhti hain (scene khisak gaya, lambai badal gayi) aur sirf bani
+ * hui reel dekhne/sunne par pakdi jaati hain.
+ */
+
+console.log("\nscene jodna aur upar-neeche");
+
+const orderDraft = draftFromScript(script);
+
+check("naya scene aakhir me judta hai", insertSceneAfter(orderDraft, null).scenes.length === 5);
+check(
+  "naye scene ka number kabhi dobara nahi aata",
+  (() => {
+    const withRemoved = {
+      ...orderDraft,
+      scenes: orderDraft.scenes.map((s, i) => (i === 3 ? { ...s, removed: true } : s)),
+    };
+    const grown = insertSceneAfter(withRemoved, null);
+    return new Set(grown.scenes.map((s) => s.index)).size === grown.scenes.length;
+  })(),
+  "ginti `length` se karne par hataye hue scene ka number dobara ban jaata aur do scene ek saath badalte",
+);
+check(
+  "beech me joda hua scene apni jagah par baithta hai",
+  insertSceneAfter(orderDraft, 1).scenes[2]?.index === nextSceneIndex(orderDraft),
+);
+check("naya scene text wala hai", blankScene(9).type === "text", "image_audio ka slot required hai — wo scene bharaa bina bante hi nahi");
+
+const moved = moveScene(orderDraft, orderDraft.scenes[2]!.index, -1);
+check(
+  "scene ek kadam upar chala gaya",
+  moved.scenes[1]?.index === orderDraft.scenes[2]?.index &&
+    moved.scenes[2]?.index === orderDraft.scenes[1]?.index,
+);
+check(
+  "hataya hua scene beech me ho to uske paar jaata hai",
+  (() => {
+    const withHole = {
+      ...orderDraft,
+      scenes: orderDraft.scenes.map((s, i) => (i === 1 ? { ...s, removed: true } : s)),
+    };
+    const jumped = moveScene(withHole, withHole.scenes[2]!.index, -1);
+    return jumped.scenes[0]?.index === withHole.scenes[2]?.index;
+  })(),
+  "warna 'upar karo' dabane par kuch hota hua dikhta hi nahi — wo hataye hue scene se jagah badal leta hai",
+);
+check("pehla scene aur upar nahi ja sakta", !canMoveScene(orderDraft, orderDraft.scenes[0]!.index, -1));
+check("aakhri scene aur neeche nahi ja sakta", !canMoveScene(orderDraft, orderDraft.scenes[3]!.index, 1));
+check(
+  "apply me scene usi kram me bante hain jo draft me hai",
+  (() => {
+    const swapped = moveScene(autoFill(orderDraft), orderDraft.scenes[0]!.index, 1);
+    const built = applyWizard({ doc: project, draft: { ...swapped, replaceExisting: true } });
+    const first = [...built.doc.scenes].sort((a, b) => a.order - b.order)[0];
+    return first?.name === "Papa";
+  })(),
+  "tarteeb sirf list ki hoti hai — `index` pehchaan hai, kram nahi",
+);
+
+console.log("\nlambai haath se, aur awaaz se mel");
+
+const voiced = {
+  ...filled.scenes[0]!,
+  voiceSeconds: 6,
+  voiceRate: 1,
+};
+check("bina chunav ke lambai awaaz jitni", Math.abs(sceneSeconds(voiced) - 6.25) < 0.01);
+check(
+  "haath se likhi lambai awaaz se bhi jeetti hai",
+  sceneSeconds({ ...voiced, durationOverrideSeconds: 3 }) === 3,
+  "warna 'scene chhota karo' ka koi matlab nahi rehta jab awaaz badi ho",
+);
+check("haath wali lambai bhi hadd me aati hai", sceneSeconds({ ...voiced, durationOverrideSeconds: 0.1 }) > 1,);
+check(
+  "chhoti lambai par 'awaaz kat jaayegi' ki chetavni",
+  voiceMismatch({ ...voiced, durationOverrideSeconds: 3 })?.kind === "cut",
+);
+check(
+  "badi lambai par 'beech me chuppi' ki chetavni",
+  voiceMismatch({ ...voiced, durationOverrideSeconds: 12 })?.kind === "silence",
+);
+check("mel theek ho to koi chetavni nahi", voiceMismatch(voiced) === null);
+check(
+  "chetavni scene ki apni salaah me bhi aati hai",
+  sceneAdvice({ ...voiced, durationOverrideSeconds: 3 }, 1).some((a) => a.text.includes("KAT")),
+);
+check(
+  "footer ki ginti wahi hisaab use karti hai",
+  draftProgress({
+    ...filled,
+    scenes: [{ ...voiced, durationOverrideSeconds: 3 }, ...filled.scenes.slice(1)],
+  }).mismatch === 1,
+  "do alag hadd rakhne par footer 2 bolta aur scene par ek hi nishaan dikhta",
+);
+
+check("khaali text ka andaaza 0", estimateSpeechSeconds("") === 0);
+check(
+  "lambi line ka andaaza chhoti se bada",
+  estimateSpeechSeconds("ek do teen chaar paanch chhe saat") > estimateSpeechSeconds("ek do"),
+);
+check(
+  "tez raftaar par andaaza ghat jaata hai",
+  estimateSpeechSeconds("ek do teen chaar", 1.5) < estimateSpeechSeconds("ek do teen chaar", 1),
+);
+
+console.log("\nscene ke beech saans (gap)");
+
+const gapped = { ...filled, gapSeconds: 0.4, replaceExisting: true };
+const noGap = { ...filled, gapSeconds: 0, replaceExisting: true };
+check(
+  "gap poori reel me judta hai — par aakhri scene par nahi",
+  Math.abs(draftTotalSeconds(gapped) - draftTotalSeconds(noGap) - 0.4 * 3) < 0.01,
+  "aakhri par gap reel ke ant me thehra hua frame ban jaata",
+);
+check(
+  "aur wahi lambai doc me bhi lagti hai",
+  (() => {
+    const a = applyWizard({ doc: project, draft: noGap }).doc.project.durationInFrames;
+    const b = applyWizard({ doc: project, draft: gapped }).doc.project.durationInFrames;
+    return b > a && Math.abs((b - a) / project.project.fps - 1.2) < 0.15;
+  })(),
+  "footer ka hisaab aur doc ka hisaab ek hi function se aana chahiye",
+);
+check("gap ki hadd lagti hai", draftTotalSeconds({ ...filled, gapSeconds: 99 }) < draftTotalSeconds({ ...filled, gapSeconds: 1.5 }) + 0.01);
+
+console.log("\ntext chhupana");
+
+check(
+  "sirf awaaz wale scene par bhi text chhup sakta hai",
+  textHidden({ ...filled.scenes[2]!, hideText: true }),
+  "pehle sirf tasveer ginti thi — chunav dabta tha par lagta nahi tha",
+);
+check(
+  "bina tasveer aur bina awaaz ke text chhupta nahi",
+  !textHidden({
+    ...filled.scenes[3]!,
+    hideText: true,
+    visualAssetId: null,
+    voiceAssetId: null,
+  }),
+  "warna scene me kuch bachta hi nahi — ek kaala frame",
+);
+
+console.log("\nrang / effect");
+
+check(
+  "har effect preset ka aam bhasha wala naam hai",
+  missing.effects.length === 0,
+  missing.effects.length > 0 ? `chhoot gaye: ${missing.effects.join(", ")}` : "",
+);
+check("effect ki list me 'kuch nahi' ka raasta hai", EFFECT_PLAIN_NAMES.some((e) => e.id === "none"));
+check("plainEffect lookup chalta hai", plainEffect("bw")?.label === "Safed-kaala");
+
+const withEffect = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    scenes: filled.scenes.map((s, i) => (i === 0 ? { ...s, effectPresetId: "bw" } : s)),
+  },
+});
+const effectScene = [...withEffect.doc.scenes].sort((a, b) => a.order - b.order)[0];
+const effectItem = primarySceneItem(withEffect.doc, effectScene!.id);
+check(
+  "chuna hua effect dikhne wale item par laga",
+  (effectItem?.effects.length ?? 0) > 0,
+  "wizard me chunav dikhe aur reel me na lage — wo sabse bura wala nateeja hai",
+);
+check(
+  "anjaan effect poore wizard ko nahi girata",
+  applyWizard({
+    doc: project,
+    draft: {
+      ...filled,
+      replaceExisting: true,
+      scenes: filled.scenes.map((s, i) => (i === 0 ? { ...s, effectPresetId: "aisa-koi-nahi" } : s)),
+    },
+  }).applied === 4,
+);
+
+console.log("\nmusic aur har scene ka level");
+
+const withMusic = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    musicAssetId: "as_music",
+    musicVolume: 0.15,
+    scenes: filled.scenes.map((s, i) =>
+      i === 2 ? { ...s, musicVolume: 0, voiceVolume: 0.6 } : s,
+    ),
+  },
+});
+const musicItems = withMusic.doc.items.filter((item) => item.assetId === "as_music");
+check("har scene ka apna music tukda banta hai", musicItems.length === 4);
+check(
+  "music track apni hai, awaaz wali nahi",
+  musicItems.every(
+    (item) => withMusic.doc.tracks.find((t) => t.id === item.trackId)?.type === "music",
+  ),
+);
+check(
+  "tukde scene se jude hue hain",
+  musicItems.every((item) => item.sceneId !== null),
+  "bina iske dobara wizard chalane par purana music bacha reh jaata — do gaane ek saath",
+);
+check(
+  "dhun aage badhti hai, har scene par shuru se nahi",
+  [...musicItems].sort((a, b) => a.startFrame - b.startFrame).every((item, at, list) => {
+    if (at === 0) return item.trimStartFrame === 0;
+    const previous = list[at - 1]!;
+    return item.trimStartFrame === previous.trimStartFrame + previous.durationInFrames;
+  }),
+  "har tukda 0 se shuru hone par ek hi dhun baar-baar shuru hoti hui sunai deti",
+);
+check(
+  "jis scene par music band kaha wahan wo chup hai",
+  (() => {
+    const third = [...withMusic.doc.scenes].sort((a, b) => a.order - b.order)[2];
+    const clip = musicItems.find((item) => item.sceneId === third?.id);
+    return clip?.audio.muted === true && clip.audio.volume === 0;
+  })(),
+);
+check(
+  "fade sirf pehle aur aakhri tukde par",
+  (() => {
+    const ordered = [...musicItems].sort((a, b) => a.startFrame - b.startFrame);
+    return (
+      ordered[0]!.audio.fadeInFrames > 0 &&
+      ordered[ordered.length - 1]!.audio.fadeOutFrames > 0 &&
+      ordered[1]!.audio.fadeInFrames === 0 &&
+      ordered[1]!.audio.fadeOutFrames === 0
+    );
+  })(),
+  "har tukde par fade lagane se music 'ghar-ghar' karta hua sunai deta hai",
+);
+check(
+  "scene ka awaaz level us scene ke audio item par laga",
+  (() => {
+    const third = [...withMusic.doc.scenes].sort((a, b) => a.order - b.order)[2];
+    const voice = withMusic.doc.items.find(
+      (item) => item.sceneId === third?.id && item.type === "audio" && item.assetId !== "as_music",
+    );
+    return voice !== undefined && Math.abs(voice.audio.volume - 0.6) < 0.01;
+  })(),
+);
+check(
+  "music na chuna ho to koi music item nahi",
+  applyWizard({ doc: project, draft: { ...filled, replaceExisting: true } }).doc.items.every(
+    (item) => item.assetId !== "as_music",
+  ),
+);
+
+console.log("\nlibrary ka tab (kind se)");
+
+check("image ka tab", libraryTabForKind("image")?.id === "images");
+check("video ka tab", libraryTabForKind("video")?.id === "videos");
+check(
+  "audio ka tab 'audio' hai, 'audios' nahi",
+  libraryTabForKind("audio")?.id === "audio",
+  "yahi wo galti thi jiski wajah se Awaaz wala picker hamesha 400 deta tha",
+);
+check("bina tag wala tab chunta hai", libraryTabForKind("audio")?.tag === null, "warna 'music' mil jaata aur bina tag wali awaazein dikhti hi nahi");
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.

@@ -10,16 +10,8 @@ import {
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import {
-  AlertTriangle,
-  Film,
-  Image as ImageIcon,
-  ImageOff,
-  Loader2,
-  Smartphone,
-  Upload,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Film, ImageOff, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
@@ -27,7 +19,6 @@ import { VideoTrimDialog } from "@/components/editor/wizard/VideoTrimDialog";
 import { useAssetUrl } from "@/lib/assetUrls";
 import { useAssetDurations } from "@/lib/assetMeta";
 import { useEditorStore } from "@/lib/store";
-import { useUploader } from "@/lib/upload/uploader";
 
 /**
  * Step 2 — **Tasveer** (26.6 / 26.7).
@@ -55,11 +46,12 @@ function recommendedAnimationFor(scene: WizardScene, at: number, hasImage: boole
 /**
  * Ek scene ki qatar.
  *
- * ⚠️ Har qatar ka **apna** uploader hai, aur ye jaan-boojhkar hai. Ek saanjha
- * uploader rakhne par ye sawaal bacha reh jaata hai ki jo file abhi chadhi wo
- * **kis scene** ki thi — `addFiles()` koi id nahi lautata. Us sawaal ka jawab
- * "aakhri wala scene" maan kar dena bilkul chalta dikhta hai aur do file ek
- * saath chunne par chup-chaap galat scene par tasveer laga deta hai.
+ * ⚠️ Upload ab yahan nahi hota — wo picker ke dialog ke andar hai (`AssetPicker`).
+ * Pehle har qatar ka apna uploader tha, is dalil par ki tab "ye file kis scene ki
+ * thi" wala sawaal hi nahi uthta. Wo dalil sahi thi par uska hal ab isse behtar
+ * hai: dialog ek hi scene ke liye khulta hai, isliye jawab waise bhi pakka rehta
+ * hai — aur badle me gallery aur upload ek hi jagah aa jaate hain, do alag raaston
+ * ki jagah.
  */
 function SceneRow({
   scene,
@@ -82,8 +74,6 @@ function SceneRow({
   project: { width: number; height: number };
   onChange(index: number, patch: Partial<WizardScene>): void;
 }) {
-  const input = useRef<HTMLInputElement>(null);
-
   /**
    * Tasveer lagti/hatti hai to **harkat bhi saath me** tay hoti hai.
    *
@@ -135,12 +125,6 @@ function SceneRow({
     });
   }
 
-  /** Kaunsa button daba tha — file aane par yahi kind lagti hai. */
-  const uploadKind = useRef<"image" | "video">("image");
-  const uploader = useUploader({
-    tags: ["wizard"],
-    onFinished: ({ assetId }) => setImage(assetId, uploadKind.current),
-  });
   /*
    * WARNING: Yahan pehle `{ thumb: true }` tha, aur wo har uploaded tasveer par
    * toota hua nishaan dikhata tha. Thumbnail sirf **bani hui reel** ka banta hai;
@@ -151,6 +135,10 @@ function SceneRow({
    * Poori tasveer 54px ke dabbe me dikhane ka kharcha kuch bhi nahi hai.
    */
   const { url } = useAssetUrl(scene.visualAssetKind === "video" ? null : scene.visualAssetId);
+  /** Video ki jhalak ke liye alag — `<img>` isme kaam nahi karta. */
+  const { url: videoUrl } = useAssetUrl(
+    scene.visualAssetKind === "video" ? scene.visualAssetId : null,
+  );
 
   /*
    * ⚠️ Kuch scene tasveer maangte hain aur kuch video (`screen_recording`). Sirf
@@ -216,23 +204,32 @@ function SceneRow({
    *
    * Ab wo saaf likha jaata hai, dobara daalne ke raaste ke saath.
    */
-  /** Library me kya dhoondhna hai — `null` = jo is scene ke liye theek hai. */
-  const [libKind, setLibKind] = useState<"image" | "video" | null>(null);
-
   const [brokenId, setBrokenId] = useState<string | null>(null);
   const broken = brokenId !== null && brokenId === scene.visualAssetId;
-
-  const task = uploader.tasks[uploader.tasks.length - 1];
-  const uploading = task && task.phase !== "done" && task.phase !== "duplicate" && task.phase !== "error";
 
   return (
     <div className="flex gap-2 rounded border border-ink-600 bg-ink-900 p-2">
       {/* Tasveer ki jhalak — 9:16 me, taaki reel me kaisi lagegi wo dikhe. */}
       <div className="flex h-24 w-[54px] shrink-0 items-center justify-center overflow-hidden rounded border border-ink-700 bg-ink-950">
-        {uploading ? (
-          <Loader2 size={14} className="animate-spin text-chalk-500" />
+        {scene.visualAssetKind === "video" && scene.visualAssetId && videoUrl ? (
+          /*
+           * Video ki jhalak — uska pehla frame.
+           *
+           * ⚠️ Pehle yahan sirf ek film ka icon tha, is dalil par ki `<img>` video
+           * nahi dikha sakta. Wo dalil sahi thi par jawab adhoora: aath scene par
+           * aath ek jaise icon dikhte the, aur ye batane ka koi tarika nahi tha ki
+           * kis scene par kaunsi recording lagi hai. `<video preload="metadata">`
+           * poori file nahi utaarta — sirf utna jitna ek frame dikhane ko chahiye.
+           */
+          // eslint-disable-next-line jsx-a11y/media-has-caption
+          <video
+            src={`${videoUrl}#t=0.1`}
+            preload="metadata"
+            muted
+            playsInline
+            className="h-full w-full object-cover"
+          />
         ) : scene.visualAssetKind === "video" && scene.visualAssetId ? (
-          // Video ko <img> me dikhaya nahi ja sakta — uska apna nishaan.
           <Film size={16} className="text-chalk-500" />
         ) : broken ? (
           <ImageOff size={14} className="text-red-400" />
@@ -259,10 +256,6 @@ function SceneRow({
           </span>
         </div>
 
-        {task?.phase === "error" ? (
-          <p className="text-[10px] text-red-300">{task.error}</p>
-        ) : null}
-
         {broken ? (
           <p className="flex items-start gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-1 text-[10px] leading-snug text-red-300">
             <AlertTriangle size={10} className="mt-0.5 shrink-0" />
@@ -287,76 +280,35 @@ function SceneRow({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <input
-            ref={input}
-            type="file"
-            accept={uploadKind.current === "video" ? "video/*" : "image/*"}
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) uploader.addFiles([file]);
-              // Wahi file dobara chunne par `change` nahi chalta — isliye khaali.
-              event.target.value = "";
-            }}
-          />
-
-          {(["image", "video"] as const).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              onClick={() => {
-                uploadKind.current = kind;
-                input.current?.click();
-              }}
-              title={
-                kind === suggested
-                  ? "Is scene ke liye yahi sabse theek baithta hai"
-                  : "Ye bhi chal jaayega — scene ka type apne aap badal jaayega"
-              }
-              className="flex items-center gap-1 rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-300 transition-colors hover:border-terracotta hover:text-chalk-100"
-            >
-              {kind === "video" ? <Film size={9} /> : <Upload size={9} />}
-              {kind === "video" ? "Video daalo" : "Tasveer daalo"}
-              {kind === suggested ? (
-                <span className="rounded bg-terracotta/20 px-1 text-[9px] text-terracotta">
-                  Sifaarish
-                </span>
-              ) : null}
-            </button>
-          ))}
-
           {/*
-            ⚠️ Library ke liye kind ka apna switch hai, aur ye chala kar dekhne par
-            joda gaya. Pehle picker `picked ?? suggested` par chalta tha — yaani
-            jis scene ki sifaarish "tasveer" thi, wahan library me **sirf tasveerein**
-            dikhti thi. Aadmi apni recording pehle hi library me daal chuka ho, to
-            bhi wo use nahi kar sakta tha; uske paas ek hi raasta bachta tha — wahi
-            file dobara upload karna. Upload ke do button the, par library ka ek hi.
-          */}
-          <div className="flex items-center gap-0.5">
-            {(["image", "video"] as const).map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => setLibKind(kind)}
-                title={kind === "video" ? "Library me video dikhao" : "Library me tasveerein dikhao"}
-                className={clsx(
-                  "rounded border px-1 py-1 text-[10px] transition-colors",
-                  (libKind ?? picked ?? suggested) === kind
-                    ? "border-terracotta bg-terracotta/10 text-chalk-100"
-                    : "border-ink-600 text-chalk-500 hover:border-chalk-500",
-                )}
-              >
-                {kind === "video" ? <Film size={9} /> : <ImageIcon size={9} />}
-              </button>
-            ))}
-          </div>
+            ⚠️ **Ek hi raasta: gallery — aur upload usi ke andar** (26.24).
 
-          <div className="min-w-0 max-w-[130px] flex-1">
+            Pehle yahan chaar button the: "Tasveer daalo", "Video daalo", aur
+            library ke liye do chhote kind-switch. Do alag raaste hone ka nateeja
+            har baar ek hi tha — aadmi upload wala button dabata tha, kyunki wo
+            bada aur pehle likha tha. Wahi file har reel me dobara chadhti thi, aur
+            library dhire-dhire ek hi tasveer ki chaar copy se bhar jaati thi.
+
+            Ab pehle gallery khulti hai (jo pehle se hai wo dikhta hai), aur usi
+            dialog me "Nayi file upload karo" hai. Chadhi hui file library me jaati
+            hai, isliye agli baar wo wahin milti hai — aur ye baat dialog me likhi
+            bhi hai.
+
+            ⚠️ Kism ab picker se lautti hai (`onPick` ka doosra hissa), yahan ke
+            kisi switch se nahi. Pehle wo "aakhri bar kaunsa button daba tha" se
+            aati thi, aur wo andaaza galat ho jaane par `image` ka item ek video ki
+            id le kar baith jaata tha — render me khaali frame, bina kisi error ke.
+          */}
+          <div className="min-w-0 flex-1">
             <AssetPickerButton
-              kind={libKind ?? picked ?? suggested}
+              kind={picked ?? suggested}
+              kinds={["image", "video"]}
+              allowUpload
+              uploadTags={["wizard"]}
               assetId={scene.visualAssetId}
-              onPick={(assetId) => setImage(assetId, libKind ?? picked ?? suggested)}
+              onPick={(assetId, kind) =>
+                setImage(assetId, kind === "video" ? "video" : "image")
+              }
             />
           </div>
 
@@ -394,6 +346,34 @@ function SceneRow({
           recommended={recommendedAnimation}
           onPick={(id) => onChange(scene.index, { animationPresetId: id })}
         />
+
+        {/*
+          Rang / effect — **harkat ke theek neeche** (26.24).
+
+          ⚠️ Ye chunav wizard me tha hi nahi, jabki editor me hai (Effects panel).
+          Nateeja ye tha ki wizard se bani reel me har tasveer jaisi ki waisi lagti
+          thi, aur use badalne ke liye aadmi ko poora editor sikhna padta — yaani
+          theek wo cheez jisse bachne ke liye wizard bana hai.
+
+          ⚠️ Iski koi "Sifaarish" nahi hai, aur wo jaan-boojhkar hai. Har scene par
+          apne aap ek effect laga dena poori reel ka rang badal deta hai, aur aadmi
+          ko wajah kabhi samajh nahi aati ("meri tasveerein aisi thi hi nahi").
+          Harkat ka na hona reel ko mari hui bana deta hai; rang ka na hona nahi.
+
+          ⚠️ Sirf tasveer/video wale scene par. Bina tasveer ke effect **text** par
+          lagta hai, aur wahan "Safed-kaala" ka matlab hota safed text ka bhoora
+          pad jaana — ek chunav jo dabta hai aur ulta nateeja deta hai.
+        */}
+        {scene.visualAssetId ? (
+          <ChoicePicker
+            kind="effect"
+            value={scene.effectPresetId ?? "none"}
+            recommended={null}
+            onPick={(id) =>
+              onChange(scene.index, { effectPresetId: id === "none" ? null : id })
+            }
+          />
+        ) : null}
 
         {/*
           Fit ka faisla saaf likha hua — warna wo chup-chaap hota hai aur aadmi ko

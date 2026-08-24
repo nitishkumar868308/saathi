@@ -2,8 +2,10 @@
 
 import {
   ANIMATION_PLAIN_NAMES,
+  EFFECT_PLAIN_NAMES,
   TRANSITION_PLAIN_NAMES,
   plainAnimation,
+  plainEffect,
   plainTransition,
   type PlainName,
 } from "@reel/core";
@@ -65,13 +67,27 @@ function Row({
   );
 }
 
+/**
+ * Har kism ka apna khaana — list, naam dhoondhne ka tarika, aur patti ka label.
+ *
+ * ⚠️ Ye teen cheezein ek jagah hain, teen `if` me nahi. Pehle yahan `kind ===
+ * "animation" ? … : …` tha, aur teesri kism (effect) jodte hi wo teen jagah
+ * badalna padta — jinme se ek jagah bhool jaane par UI "Pichhle scene se: Safed-
+ * kaala" jaisa kuch dikhata, bina kisi error ke.
+ */
+const KINDS = {
+  animation: { list: ANIMATION_PLAIN_NAMES, find: plainAnimation, label: "Harkat" },
+  transition: { list: TRANSITION_PLAIN_NAMES, find: plainTransition, label: "Pichhle scene se" },
+  effect: { list: EFFECT_PLAIN_NAMES, find: plainEffect, label: "Rang / effect" },
+} as const;
+
 export function ChoicePicker({
   kind,
   value,
   recommended,
   onPick,
 }: {
-  kind: "animation" | "transition";
+  kind: keyof typeof KINDS;
   value: string | null;
   /** Jo `suggest*` ne diya tha — uspar "Sifaarish" ka nishaan lagta hai. */
   recommended: string | null;
@@ -79,9 +95,8 @@ export function ChoicePicker({
 }) {
   const [open, setOpen] = useState(false);
 
-  const list = kind === "animation" ? ANIMATION_PLAIN_NAMES : TRANSITION_PLAIN_NAMES;
-  const chosen = value ? (kind === "animation" ? plainAnimation(value) : plainTransition(value)) : null;
-  const label = kind === "animation" ? "Harkat" : "Pichhle scene se";
+  const { list, find: findName, label } = KINDS[kind];
+  const chosen = value ? findName(value) : null;
 
   return (
     <div>

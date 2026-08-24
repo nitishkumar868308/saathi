@@ -2,7 +2,15 @@ import type { AiScene, AiScript } from "../ai/types";
 import { applyProposal, buildProposal } from "../ai/proposal";
 import { getSceneType, requireSceneType } from "../registry/sceneTypes";
 import type { Doc } from "../schema/project";
-import { applyAnimationPreset, setTransition, trimItemToSourceRange } from "../timeline/ops";
+import { createItem } from "../schema/factory";
+import {
+  addItem,
+  addTrack,
+  applyAnimationPreset,
+  applyEffectPreset,
+  setTransition,
+  trimItemToSourceRange,
+} from "../timeline/ops";
 import { primarySceneItem } from "../scenes/primary";
 import { suggestAnimation, suggestTransition, type WizardSceneLike } from "./suggest";
 
@@ -31,6 +39,22 @@ export interface WizardScene {
   type: string;
   name: string;
   durationSeconds: number;
+  /**
+   * Aadmi ne haath se tay ki hui lambai — `null` = apne aap (awaaz/AI se).
+   *
+   * ⚠️ Ye `durationSeconds` se alag field hai, aur wo farak zaroori hai.
+   * `durationSeconds` AI ka andaaza hai; ise badalne par pata nahi chalta ki
+   * lambai kisne chuni — aadmi ne ya AI ne. Do alag field rehne se "apne aap"
+   * par wapas jaana ek tap hai, aur wizard bata sakta hai ki abhi kaun chala
+   * raha hai.
+   *
+   * ⚠️ Aadmi ka likha hua number **jeetta hai** — awaaz se bhi bada. Wajah:
+   * reel ki lambai kaabu me rakhna is chunav ka poora maqsad hai, aur "tumhara
+   * number maana nahi gaya kyunki awaaz badi thi" ka matlab hota ki control hai
+   * hi nahi. Par us halat me awaaz kat sakti hai — isliye wahan `sceneAdvice`
+   * saaf chetavni deta hai, chup-chaap kaatne ki jagah.
+   */
+  durationOverrideSeconds: number | null;
   /** Screen par dikhne wala / bola jaane wala text. Aadmi badal sakta hai. */
   text: string;
   /** AI ke diye baaki slots (role naam ke saath), jaise ke waise. */
@@ -111,6 +135,25 @@ export interface WizardScene {
    */
   voiceRate: number;
   /**
+   * Is scene par awaaz kitni tez — 1 = jaisi bani thi, 0 = chup.
+   *
+   * ⚠️ Ye per-scene hai (baaki awaaz ke chunav poori reel ke liye ek hain), aur
+   * wo jaan-boojhkar hai: "is line par zor do" aur "ye line dhime se" ek scene ka
+   * faisla hai, poori reel ka nahi. Aur 0 ka apna matlab hai — us scene par sirf
+   * music aur tasveer, koi bolne wala nahi.
+   */
+  voiceVolume: number;
+  /**
+   * Is scene par music kitna tez — `null` = poori reel wala (draft ka).
+   *
+   * ⚠️ `null` aur `0` do alag cheezein hain, aur ye farak zaroori hai. `null`
+   * matlab "isme kuch khaas nahi, jo poori reel me chal raha hai wahi" — baad me
+   * poori reel ka music kam karo to ye scene bhi saath me kam ho jaata hai. `0`
+   * matlab "yahan music **band**", chahe baaki reel me kuch bhi chal raha ho — wo
+   * aksar us scene par lagta hai jahan koi zaroori baat boli ja rahi hai.
+   */
+  musicVolume: number | null;
+  /**
    * Kis text se awaaz bani thi.
    *
    * ⚠️ Iske bina 26.9 ka nishaan lagana namumkin hai: text badalne ke baad bani
@@ -131,6 +174,16 @@ export interface WizardScene {
   /** `null` = abhi kuch nahi chuna (auto-fill isi ko bharta hai). */
   animationPresetId: string | null;
   transitionId: string | null;
+  /**
+   * Rang ka effect — `EFFECT_PRESETS` ka id. `null` = koi nahi.
+   *
+   * ⚠️ Ye `autoFill` se **kabhi nahi** bharta, aur wo animation se ulta hai. Har
+   * scene par apne aap ek effect laga dena poori reel ka rang badal deta hai, aur
+   * aadmi ko wajah kabhi samajh nahi aati ("tasveerein aisi thi hi nahi") — jabki
+   * animation ka na hona reel ko sthir aur mari hui bana deta hai. Isliye harkat
+   * ki sifaarish hai, rang ki nahi.
+   */
+  effectPresetId: string | null;
 
   /**
    * Screen par text mat dikhao — sirf bolo.
@@ -187,6 +240,46 @@ export interface WizardDraft {
    * lagaya tha, aur wizard ka usse koi lena-dena nahi.
    */
   replaceExisting: boolean;
+  /**
+   * Do scene ke beech ki saans (second) — 0 = ek ke baad ek, bilkul chipke hue.
+   *
+   * ⚠️ Ye **khaali (kaala) waqt nahi hai**, aur ye farak is poore field ki jaan
+   * hai. Beech me sach me gap chhodne par reel me ek kaala frame aata hai aur wo
+   * "video atak gayi" jaisa lagta hai — sabse bura wala nateeja. Yahan gap us
+   * scene ki apni lambai me jud jaata hai: tasveer utni der aur thehri rehti hai,
+   * awaaz apne waqt par khatam ho jaati hai. Yaani saans milti hai, khalaa nahi.
+   *
+   * ⚠️ Aakhri scene par gap nahi lagta. Wahan wo reel ke ant me ek thehra hua
+   * frame ban jaata hai, jise dekhne wala "khatam ho gaya par ruka hua hai"
+   * samajhta hai.
+   *
+   * ⚠️ Default 0 hai. Reels ki chaal tez hoti hai; har scene ke baad aadha second
+   * jodna 8 scene par 4 second bekaar ke jod deta hai.
+   */
+  gapSeconds: number;
+  /**
+   * Poori reel ke peeche chalne wala music — `null` = koi nahi.
+   *
+   * ⚠️ Music **ek** hai, per-scene nahi. Har scene par alag gaana lagana reel ko
+   * jode hue tukdon ka dher bana deta hai; jo cheez per-scene honi chahiye wo
+   * uski **awaaz ka level** hai (`WizardScene.musicVolume`), gaana nahi.
+   *
+   * ⚠️ Ye wizard me isliye hai ki bina iske reel ka aadha asar hi nahi banta —
+   * chup reel dekhne wale ko adhoori lagti hai — aur uske liye aadmi ko poora
+   * editor kholna padta tha: track banao, clip daalo, volume set karo, loop
+   * karo. Wizard ka poora vaada hi ye hai ki wo na karna pade.
+   */
+  musicAssetId: string | null;
+  /**
+   * Music ka level — 0 se 1. Default halka hai, aur wo jaan-boojhkar hai.
+   *
+   * ⚠️ 0.15 par music **peeche** rehta hai. Uske upar wo bolne wale se ladta hai,
+   * aur us ladai me hamesha bolne wala haarta hai: dekhne wale ko lagta hai ki
+   * "awaaz saaf nahi hai", jabki awaaz bilkul saaf hoti hai — music tez hota hai.
+   * Ye galti banane wale ko kabhi sunai nahi deti, kyunki use pata hota hai ki
+   * kya bola ja raha hai.
+   */
+  musicVolume: number;
 }
 
 /* ------------------------------------------------------------ slot khojna */
@@ -309,6 +402,9 @@ export function draftFromScript(script: AiScript): WizardDraft {
     textScale: 1,
     textColor: null,
     replaceExisting: false,
+    gapSeconds: 0,
+    musicAssetId: null,
+    musicVolume: 0.15,
     scenes: script.scenes.map((scene, index) => {
       const textSlot = textSlotId(scene.type);
       const rest: Record<string, string> = { ...scene.slots };
@@ -319,6 +415,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         type: scene.type,
         name: scene.name,
         durationSeconds: scene.durationSeconds,
+        durationOverrideSeconds: null,
         text: (textSlot ? scene.slots[textSlot] : "") ?? "",
         slots: rest,
         visualAssetId: null,
@@ -330,14 +427,134 @@ export function draftFromScript(script: AiScript): WizardDraft {
         voiceAssetId: null,
         voiceSeconds: null,
         voiceRate: 1,
+        voiceVolume: 1,
+        musicVolume: null,
         voiceForText: null,
         hideText: false,
         animationPresetId: null,
         transitionId: null,
+        effectPresetId: null,
         removed: false,
       };
     }),
   };
+}
+
+/* --------------------------------------------- scene jodna aur upar-neeche */
+
+/**
+ * Naye scene ka number.
+ *
+ * ⚠️ `scenes.length` se ginna galat hai aur wo galti chup-chaap kaam karti hui
+ * dikhti hai: hataye hue scene bhi list me pade rehte hain, aur ek scene hata kar
+ * naya jodne par wahi number dobara ban jaata. Do scene ka ek hi `index` hone par
+ * `update()` dono ko badalta hai — aadmi ek scene ka text likhta hai aur wo do
+ * jagah likha jaata hai. Isliye ginti **sabse bade number se aage** hoti hai.
+ */
+export function nextSceneIndex(draft: WizardDraft): number {
+  return draft.scenes.reduce((max, scene) => Math.max(max, scene.index), -1) + 1;
+}
+
+/**
+ * Ek khaali scene — jise aadmi khud bharega.
+ *
+ * ⚠️ Type `text` hai, `image_audio` nahi. Naya scene banate waqt aadmi ke paas
+ * abhi kuch nahi hota; `image_audio` ka tasveer wala slot **required** hai, aur us
+ * scene par kuch daale bina "Editor me daalo" dabane par wo chup-chaap chhoot
+ * jaata ("zaroori slot khaali"). `text` har haalat me ban jaata hai, aur tasveer
+ * ya awaaz lagte hi `effectiveType()` khud use upar chadha deta hai.
+ */
+export function blankScene(index: number): WizardScene {
+  return {
+    index,
+    type: "text",
+    name: `Scene ${index + 1}`,
+    /*
+     * 3 second — ek line padhne layak. Ye `getSceneType("text")` ke default se
+     * jaan-boojhkar alag nahi hai; wahi number lena theek hai par yahan likha
+     * hona zaroori hai, warna khaali scene 0s ka ban kar timeline me dikhta hi
+     * nahi.
+     */
+    durationSeconds: 3,
+    durationOverrideSeconds: null,
+    text: "",
+    slots: {},
+    visualAssetId: null,
+    visualAssetKind: null,
+    visualSize: null,
+    visualTrim: null,
+    phoneFrame: false,
+    textPosition: "center",
+    voiceAssetId: null,
+    voiceSeconds: null,
+    voiceRate: 1,
+    voiceVolume: 1,
+    musicVolume: null,
+    voiceForText: null,
+    hideText: false,
+    animationPresetId: null,
+    transitionId: null,
+    effectPresetId: null,
+    removed: false,
+  };
+}
+
+/**
+ * Naya scene daalo — kisi maujooda scene ke **theek baad**.
+ *
+ * ⚠️ Jagah `index` se nahi, list ki asli position se tay hoti hai. `index` sirf
+ * pehchaan hai (wo kabhi nahi badalta), isliye usse "kaunsa scene teesra hai" ka
+ * jawab nahi milta — aur upar-neeche karne ke baad to bilkul nahi.
+ *
+ * `afterIndex` `null` ho to sabse aakhir me.
+ */
+export function insertSceneAfter(draft: WizardDraft, afterIndex: number | null): WizardDraft {
+  const fresh = blankScene(nextSceneIndex(draft));
+  if (afterIndex === null) return { ...draft, scenes: [...draft.scenes, fresh] };
+
+  const at = draft.scenes.findIndex((scene) => scene.index === afterIndex);
+  if (at === -1) return { ...draft, scenes: [...draft.scenes, fresh] };
+
+  const scenes = [...draft.scenes];
+  scenes.splice(at + 1, 0, fresh);
+  return { ...draft, scenes };
+}
+
+/**
+ * Scene ko ek kadam upar / neeche karo (`delta` = -1 / +1).
+ *
+ * ⚠️ Padosi **bacha hua** (non-removed) scene hai, list ka seedha padosi nahi. Ye
+ * chala kar dekhne par nikla: beech ka ek scene hata dene ke baad "upar karo"
+ * dabane par kuch hota hi nahi dikhta — wo hataye hue scene se jagah badal leta
+ * hai, jo screen par kahin dikhta hi nahi. Aadmi dobara dabata hai, phir dobara,
+ * aur samajhta hai ki button toota hua hai.
+ *
+ * ⚠️ Hataye hue scene apni jagah par pade rehte hain (unhe khiskaya nahi jaata) —
+ * "wapas laao" par wo apne purane padosi ke paas hi wapas aate hain.
+ */
+export function moveScene(draft: WizardDraft, index: number, delta: -1 | 1): WizardDraft {
+  const from = draft.scenes.findIndex((scene) => scene.index === index);
+  if (from === -1 || draft.scenes[from]?.removed) return draft;
+
+  let to = from + delta;
+  while (to >= 0 && to < draft.scenes.length && draft.scenes[to]?.removed) to += delta;
+  if (to < 0 || to >= draft.scenes.length) return draft;
+
+  const scenes = [...draft.scenes];
+  const a = scenes[from];
+  const b = scenes[to];
+  if (!a || !b) return draft;
+  scenes[from] = b;
+  scenes[to] = a;
+  return { ...draft, scenes };
+}
+
+/** Ye scene upar/neeche ja sakta hai? — UI ke button isse mard/zinda hote hain. */
+export function canMoveScene(draft: WizardDraft, index: number, delta: -1 | 1): boolean {
+  const live = draft.scenes.filter((scene) => !scene.removed);
+  const at = live.findIndex((scene) => scene.index === index);
+  if (at === -1) return false;
+  return delta === -1 ? at > 0 : at < live.length - 1;
 }
 
 /**
@@ -356,13 +573,23 @@ export function voiceStale(scene: WizardScene): boolean {
 /**
  * Is scene par text sach me chhupega?
  *
- * WARNING: `hideText` akela kaafi nahi hai. Bina tasveer wale scene par text
- * chhupane ka matlab hai ek KHAALI scene - kaala frame, jispar bas awaaz chalti
- * hai. Aadmi wo maangta nahi; wo aksar tab hota hai jab usne pehle text chhupaya
- * aur baad me tasveer hata di. Isliye do shart hain, ek nahi.
+ * WARNING: `hideText` akela kaafi nahi hai. Bina kisi cheez ke text chhupane ka
+ * matlab hai ek KHAALI scene - kaala frame jispar kuch nahi. Aadmi wo maangta
+ * nahi; wo aksar tab hota hai jab usne pehle text chhupaya aur baad me tasveer
+ * hata di. Isliye do shart hain, ek nahi.
+ *
+ * ⚠️ Awaaz bhi ginti hai, sirf tasveer nahi — aur ye badla hua hai. Pehle yahan
+ * sirf `visualAssetId` dekha jaata tha, jiska nateeja ye tha ki jis scene par
+ * sirf awaaz thi wahan text chhupaya hi nahi ja sakta tha: aadmi "chhupa do"
+ * dabata, screen par "Chhupa hua" likha aata, aur reel me text phir bhi dikhta.
+ * Ek chunav jo dabta hai par lagta nahi, toote hue button jaisa hi hai.
+ *
+ * Sirf awaaz wala scene jaan-boojhkar chalne diya jaata hai: kuch line aisi hoti
+ * hain jo sirf suni jaani chahiye (brand ka background frame me rehta hai, kaala
+ * nahi). Jahan awaaz bhi na ho, wahan `sceneAdvice` chetavni deta hai.
  */
 export function textHidden(scene: WizardScene): boolean {
-  return scene.hideText && Boolean(scene.visualAssetId);
+  return scene.hideText && Boolean(scene.visualAssetId || scene.voiceAssetId);
 }
 
 /**
@@ -429,7 +656,48 @@ export function voiceSeconds(scene: WizardScene): number | null {
   return scene.voiceSeconds / rate + VOICE_TAIL_SECONDS;
 }
 
+/** Scene itne se lamba bhi nahi — haath se likha number bhi is hadd me aata hai. */
+export const MAX_SCENE_SECONDS = 30;
+
+/**
+ * Bolne me kitna waqt lagega — **awaaz banne se pehle** (26.24).
+ *
+ * ⚠️ Ye andaaza hai, naap nahi, aur ye farak har jagah likha jaata hai ("~"). Par
+ * andaaza bhi kuch na hone se bahut behtar hai: is field ke bina aadmi ek scene
+ * par teen line likh deta hai, "Awaaz banao" dabata hai, aur tab pata chalta hai
+ * ki wo ek line 11 second ki hai — yaani poori reel ka hisaab bigad gaya. Ab wo
+ * likhte hi dikh jaata hai.
+ *
+ * ⚠️ Raftaar (`words/second`) Hindi-Hinglish bolne ki hai, angrezi ki nahi.
+ * TTS ki aawaz aaram se bolti hai — 2.3 shabd/second naap kar liya gaya hai
+ * (Gemini ki awaaz, aam reel wali line). Angrezi ke liye aam number ~2.8 hai;
+ * usse hisaab lagane par har scene chhota andaaza deta aur wo galti hamesha ek hi
+ * taraf hoti — reel lambi banti.
+ */
+const WORDS_PER_SECOND = 2.3;
+
+export function estimateSpeechSeconds(text: string, rate = 1): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  if (words === 0) return 0;
+  const speed = rate > 0 ? rate : 1;
+  return words / WORDS_PER_SECOND / speed + VOICE_TAIL_SECONDS;
+}
+
 export function sceneSeconds(scene: WizardScene): number {
+  /*
+   * ⚠️ Aadmi ka likha hua number sabse pehle, aur wo awaaz se bhi jeetta hai.
+   * Ulta karne par (awaaz ko jitane dene par) "scene 4 second ka karo" ka koi
+   * matlab nahi rehta jab awaaz 7 second ki ho — aur yahi wo halat hai jisme
+   * aadmi lambai badalta hai. Awaaz kat sakti hai; uski chetavni `sceneAdvice`
+   * deta hai, chup-chaap kaatna nahi hota.
+   */
+  if (scene.durationOverrideSeconds !== null) {
+    return Math.min(
+      MAX_SCENE_SECONDS,
+      Math.max(MIN_SCENE_SECONDS, scene.durationOverrideSeconds),
+    );
+  }
+
   const trimmed = scene.visualTrim
     ? Math.max(0.5, scene.visualTrim.endSeconds - scene.visualTrim.startSeconds)
     : null;
@@ -438,6 +706,87 @@ export function sceneSeconds(scene: WizardScene): number {
 
   if (voice === null) return trimmed ?? scene.durationSeconds;
   return Math.max(MIN_SCENE_SECONDS, voice, trimmed ?? 0);
+}
+
+/** Gap itne se zyada nahi — usse aage reel me "atak gayi" jaisa lagta hai. */
+export const MAX_GAP_SECONDS = 1.5;
+
+/** Draft ka gap, hadd me baandha hua — UI kuch bhi bhej de to bhi. */
+export function gapSecondsOf(draft: WizardDraft): number {
+  const gap = draft.gapSeconds;
+  if (!Number.isFinite(gap) || gap <= 0) return 0;
+  return Math.min(MAX_GAP_SECONDS, gap);
+}
+
+/**
+ * Is scene ki poori lambai — gap ke saath.
+ *
+ * `isLast` par gap nahi lagta (reel ke ant me wo ek thehra hua frame ban jaata
+ * hai, jise dekhne wala "atak gayi" samajhta hai).
+ *
+ * ⚠️ Ye function wahi hai jo `applyWizard` lagata hai aur wahi jo footer me
+ * dikhta hai. Do jagah hisaab likhne par wizard "30 second" bolta aur reel 34 ki
+ * banti — aur wo farak sirf export ke baad pakda jaata.
+ */
+export function sceneSecondsWithGap(
+  scene: WizardScene,
+  draft: WizardDraft,
+  isLast: boolean,
+): number {
+  return sceneSeconds(scene) + (isLast ? 0 : gapSecondsOf(draft));
+}
+
+/**
+ * Awaaz aur scene ki lambai ka mel — **ek hi jagah ka hisaab** (26.24).
+ *
+ * `null` = mel theek hai (ya awaaz hi nahi). Warna:
+ *  - `cut` — scene chhota hai, awaaz beech me kat jaayegi
+ *  - `silence` — scene bada hai, awaaz ke baad chup baithi rahegi
+ *
+ * ⚠️ Ye function alag isliye hai ki jawab **do jagah** chahiye: us scene ki
+ * chetavni me, aur poore wizard ke footer ki ginti me ("2 scene par mel nahi").
+ * Dono jagah alag hadd likhne par footer 2 bolta aur scene par ek hi nishaan
+ * dikhta — aur us farak ko koi kabhi samajh nahi paata.
+ *
+ * ⚠️ Hadd dono taraf alag hai, aur ye jaan-boojhkar hai. Awaaz katna hamesha
+ * bura hai, isliye wahan hadd bahut chhoti (0.15s — ek shabd ka hissa). Awaaz ke
+ * baad ki chuppi thodi der theek lagti hai (saans), isliye wahan 1.2s tak koi
+ * chetavni nahi. Dono taraf ek hi hadd rakhne par ya to aadhi galtiyan chhoot
+ * jaati, ya har scene par ek jhoothi chetavni lagti.
+ */
+export interface VoiceMismatch {
+  kind: "cut" | "silence";
+  voiceSeconds: number;
+  sceneSeconds: number;
+  offBySeconds: number;
+}
+
+const CUT_TOLERANCE_SECONDS = 0.15;
+const SILENCE_TOLERANCE_SECONDS = 1.2;
+
+export function voiceMismatch(scene: WizardScene): VoiceMismatch | null {
+  const voice = voiceSeconds(scene);
+  if (voice === null) return null;
+
+  const seconds = sceneSeconds(scene);
+  const spare = seconds - voice;
+
+  if (spare < -CUT_TOLERANCE_SECONDS) {
+    return { kind: "cut", voiceSeconds: voice, sceneSeconds: seconds, offBySeconds: -spare };
+  }
+  if (spare > SILENCE_TOLERANCE_SECONDS) {
+    return { kind: "silence", voiceSeconds: voice, sceneSeconds: seconds, offBySeconds: spare };
+  }
+  return null;
+}
+
+/** Poori reel kitni lambi banegi — gap jod kar. */
+export function draftTotalSeconds(draft: WizardDraft): number {
+  const live = draft.scenes.filter((scene) => !scene.removed);
+  return live.reduce(
+    (sum, scene, at) => sum + sceneSecondsWithGap(scene, draft, at === live.length - 1),
+    0,
+  );
 }
 
 /**
@@ -551,12 +900,17 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       type,
       name: scene.name,
       /*
-       * WARNING: Lambai ka poora hisaab `sceneSeconds()` me hai, yahan nahi.
-       * Wo hisaab UI ko bhi chahiye (aadmi ko reel ki asli lambai dikhani hai),
-       * aur do jagah likhne par ek din wizard "30 second" bolta aur reel 34 ki
-       * banti - wo farak sirf ban jaane ke baad pakda jaata.
+       * WARNING: Lambai ka poora hisaab `sceneSecondsWithGap()` me hai, yahan
+       * nahi. Wo hisaab UI ko bhi chahiye (aadmi ko reel ki asli lambai dikhani
+       * hai), aur do jagah likhne par ek din wizard "30 second" bolta aur reel 34
+       * ki banti - wo farak sirf ban jaane ke baad pakda jaata.
+       *
+       * ⚠️ Gap isi lambai me juda hua hai, do scene ke beech ki khaali jagah ke
+       * roop me nahi. Timeline me scenes hamesha ek ke baad ek chipke rehte hain
+       * (`relayoutScenes`); beech me sach me jagah chhodne ka koi tarika hai bhi
+       * nahi, aur hota to wahan kaala frame aata.
        */
-      durationSeconds: sceneSeconds(scene),
+      durationSeconds: sceneSecondsWithGap(scene, args.draft, at === live.length - 1),
       slots,
       reason: `wizard · scene ${at + 1}`,
     };
@@ -678,6 +1032,30 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       });
     }
 
+    /*
+     * Rang ka effect — sirf **dikhne wale** item par (26.24).
+     *
+     * ⚠️ Ye `primary` par lagta hai, poore scene par nahi. Text ke item par
+     * grayscale/sepia lagana bekaar nahi, ulta nuksaan hai: "B & W" chunne par
+     * safed text bhi bhoora pad jaata hai aur aadmi ko lagta hai ki rang ka
+     * chunav toota hua hai. Effect tasveer ka gun hai, poore scene ka nahi.
+     *
+     * ⚠️ Anjaan id par `applyEffectPreset` phat'ta hai (`TimelineOpError`), aur
+     * use yahan pakadna zaroori hai — warna ek purana draft (jisme koi hataya hua
+     * preset likha hai) poore wizard ko gira deta, aur wo galti "Editor me daalo"
+     * dabane par hi dikhti.
+     */
+    if (source.effectPresetId) {
+      try {
+        doc = applyEffectPreset(doc, {
+          itemIds: [primary.id],
+          presetId: source.effectPresetId,
+        });
+      } catch {
+        // Effect na lagna reel ko rokne layak baat nahi — baaki sab lagta rehta hai.
+      }
+    }
+
     if (source.transitionId && source.transitionId !== "none") {
       doc = setTransition(doc, {
         itemIds: [primary.id],
@@ -697,16 +1075,109 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
    */
   created.forEach((scene, at) => {
     const src = madeFrom[at];
-    if (!src || src.voiceRate === 1) return;
+    if (!src) return;
+    if (src.voiceRate === 1 && src.voiceVolume === 1) return;
     doc = {
       ...doc,
       items: doc.items.map((item) =>
         item.sceneId === scene.id && item.type === "audio"
-          ? { ...item, playbackRate: src.voiceRate }
+          ? {
+              ...item,
+              playbackRate: src.voiceRate,
+              /*
+               * ⚠️ Level yahin lagta hai, aur `muted` bhi saath me. Sirf volume 0
+               * kar dena kaafi lagta hai par nahi hai: properties panel me clip
+               * "chal rahi" dikhti hai aur uska volume slider 0 par hota hai, jise
+               * aadmi ek galti samajh kar wapas 1 kar deta hai. `muted: true` wo
+               * baat saaf kehta hai — "ye jaan-boojhkar chup hai".
+               */
+              audio: {
+                ...item.audio,
+                volume: Math.max(0, Math.min(1, src.voiceVolume)),
+                muted: src.voiceVolume <= 0,
+              },
+            }
           : item,
       ),
     };
   });
+
+  /*
+   * ------------------------------------------------------------------ music
+   *
+   * ⚠️ **Har scene ka apna music clip banta hai, ek lamba clip nahi** (26.24).
+   *
+   * Ek hi clip poori reel par daalna aasan tha aur ek cheez namumkin bana deta:
+   * "is scene par music band karo". Uske liye volume par keyframes lagane padte,
+   * jo wizard ke aadmi ke liye ek naya aur bekaar sawaal hai.
+   *
+   * Ab har scene ke saath uska tukda hai, aur har tukda **wahin se** chalta hai
+   * jahan pichhla chhoda tha (`trimStartFrame` aage badhta hai). Yaani sunne me
+   * ek hi dhun chalti hai, par har scene par uska level alag ho sakta hai — aur
+   * "yahan music band" ek tap hai, ek keyframe nahi.
+   *
+   * ⚠️ Clips scene se **judi hui** hain (`sceneId`). Isliye scene hatane par uska
+   * music bhi jaata hai, scene upar-neeche karne par music saath chalta hai, aur
+   * "purane scene hata do" par purana music bhi mit'ta hai. Bina `sceneId` ke wo
+   * doosri baar wizard chalane par jama hote rehte — do gaane ek saath.
+   */
+  if (args.draft.musicAssetId && created.length > 0) {
+    const musicTrack =
+      doc.tracks.find((track) => track.type === "music") ??
+      (() => {
+        doc = addTrack(doc, { typeId: "music" });
+        return doc.tracks.find((track) => track.type === "music");
+      })();
+
+    if (musicTrack) {
+      /** Source ke andar kahan tak baj chuka — agla tukda yahin se uthta hai. */
+      let sourceCursor = 0;
+
+      created.forEach((scene, at) => {
+        const src = madeFrom[at];
+        if (!src) return;
+
+        const items = doc.items.filter((item) => item.sceneId === scene.id);
+        if (items.length === 0) return;
+
+        const start = Math.min(...items.map((item) => item.startFrame));
+        const end = Math.max(...items.map((item) => item.startFrame + item.durationInFrames));
+        const duration = end - start;
+        if (duration <= 0) return;
+
+        const volume = src.musicVolume ?? args.draft.musicVolume;
+        const fade = Math.round(doc.project.fps * 0.5);
+
+        const music = createItem("audio", {
+          fps: doc.project.fps,
+          trackId: musicTrack.id,
+          sceneId: scene.id,
+          name: "Music",
+          assetId: args.draft.musicAssetId,
+          startFrame: start,
+          durationInFrames: duration,
+          trimStartFrame: sourceCursor,
+          audio: {
+            volume: Math.max(0, Math.min(1, volume)),
+            muted: volume <= 0,
+            /*
+             * Reel ke shuru me music aata hua, ant me jaata hua.
+             *
+             * ⚠️ Fade sirf pehle aur aakhri tukde par hai, har tukde par nahi —
+             * warna beech ke har scene par music dab kar wapas uthta, aur wo
+             * "ghar ghar" ki tarah sunai deta hai. Beech ke jode bilkul chipke
+             * hue hone chahiye.
+             */
+            fadeInFrames: at === 0 ? fade : 0,
+            fadeOutFrames: at === created.length - 1 ? fade : 0,
+          },
+        });
+
+        doc = addItem(doc, { item: music });
+        sourceCursor += duration;
+      });
+    }
+  }
 
   /*
    * Text ki jagah — har scene ki apni.
@@ -905,6 +1376,40 @@ export function sceneAdvice(scene: WizardScene, at: number): WizardAdvice[] {
     });
   }
 
+  /*
+   * Awaaz aur scene ki lambai ka mel — **ban jaane se pehle** (26.24).
+   *
+   * ⚠️ Ye chetavni tabhi ban sakti hai jab dono number alag ho sakte hon, aur
+   * wo halat haath se lambai likhne (ya video trim karne) se banti hai. Bina is
+   * chetavni ke wo galti sirf sun kar pakdi jaati hai: aakhri do shabd gayab, ya
+   * scene ke ant me ek suna hua khalaa. Dekhne wale ko dono ek hi cheez lagti
+   * hain — "awaaz ruk jaati hai" — aur wo poori reel ko tooti hui bana deta hai.
+   */
+  const mismatch = voiceMismatch(scene);
+  if (mismatch) {
+    out.push({
+      level: "warn",
+      text:
+        mismatch.kind === "cut"
+          ? `Awaaz ${mismatch.voiceSeconds.toFixed(1)}s ki hai par scene ${mismatch.sceneSeconds.toFixed(1)}s ka — aakhri ${mismatch.offBySeconds.toFixed(1)}s BEECH ME KAT jaayega. Ya lambai badhao, ya raftaar tez karo, ya line chhoti karo.`
+          : `Awaaz ${mismatch.voiceSeconds.toFixed(1)}s me khatam ho jaati hai par scene ${mismatch.sceneSeconds.toFixed(1)}s chalta hai — beech me ${mismatch.offBySeconds.toFixed(1)}s chup rahega, jo "atak gaya" jaisa lagta hai.`,
+    });
+  } else if (voiceSeconds(scene) === null && words > 0) {
+    /*
+     * Awaaz abhi nahi bani — to bata do ki banne par lambai kya ho jaayegi.
+     * Warna aadmi ek scene ki lambai 3s par set karta hai, phir Awaaz wale step
+     * par jaata hai, aur wahan wo 7s ki ban jaati hai. Us farak ka pata do step
+     * baad chalta hai, jab wo peeche aakar dobara sab dekhta hai.
+     */
+    const guess = estimateSpeechSeconds(scene.text, scene.voiceRate);
+    if (guess > seconds + 0.6) {
+      out.push({
+        level: "tip",
+        text: `Is line ko bolne me ~${guess.toFixed(1)}s lagenge, par scene ${seconds.toFixed(1)}s ka hai. Awaaz lagate hi lambai apne aap badh jaayegi (jab tak tumne haath se tay na ki ho).`,
+      });
+    }
+  }
+
   if (scene.voiceAssetId && scene.voiceSeconds === null) {
     out.push({
       level: "tip",
@@ -926,10 +1431,24 @@ export function sceneAdvice(scene: WizardScene, at: number): WizardAdvice[] {
     });
   }
 
-  if (textHidden(scene) && !scene.voiceAssetId) {
+  /*
+   * Text chhupane ke teen anjaam hain, aur teen alag baatein — ek hi chetavni me
+   * jama kar dene par har halat par galat line dikhti hai.
+   */
+  if (scene.hideText && !scene.visualAssetId && !scene.voiceAssetId) {
     out.push({
-      level: "warn",
-      text: "Text chhupa hua hai aur awaaz bhi nahi — is scene par koi baat pahunchegi hi nahi.",
+      level: "tip",
+      text: "Text chhupane ke liye scene me tasveer ya awaaz honi chahiye — abhi dono nahi hain, isliye text phir bhi dikhega.",
+    });
+  } else if (textHidden(scene) && !scene.voiceAssetId) {
+    out.push({
+      level: "tip",
+      text: "Is scene par sirf tasveer chalegi — na likha hua, na bola hua. B-roll ke liye theek hai; baat kehni ho to awaaz laga do.",
+    });
+  } else if (textHidden(scene) && !scene.visualAssetId) {
+    out.push({
+      level: "tip",
+      text: "Screen par kuch nahi dikhega, sirf awaaz chalegi — background hi dikhta rahega.",
     });
   }
 
@@ -939,10 +1458,24 @@ export function sceneAdvice(scene: WizardScene, at: number): WizardAdvice[] {
 /** Poori reel par ek nazar — scene-dar-scene wali baatein `sceneAdvice` me hain. */
 export function draftAdvice(draft: WizardDraft): WizardAdvice[] {
   const live = draft.scenes.filter((scene) => !scene.removed);
-  const total = live.reduce((sum, scene) => sum + sceneSeconds(scene), 0);
+  const total = draftTotalSeconds(draft);
   const out: WizardAdvice[] = [];
 
   if (live.length === 0) return [{ level: "warn", text: "Ek bhi scene nahi bacha." }];
+
+  /*
+   * Gap ka jama hua kharcha — ek scene par wo chhota lagta hai, poori reel par
+   * nahi. 8 scene par 0.5s ka gap 3.5 second jodta hai, aur wo 3.5 second bilkul
+   * thehre hue frame ke hote hain. Ye ginti aadmi khud kabhi nahi karta.
+   */
+  const gap = gapSecondsOf(draft);
+  if (gap > 0 && live.length > 1) {
+    const added = gap * (live.length - 1);
+    out.push({
+      level: gap >= 0.8 ? "warn" : "tip",
+      text: `Scene ke beech ${gap.toFixed(2)}s ki saans hai — poori reel me ${added.toFixed(1)}s isi ke hain, jisme tasveer thehri rehti hai. Reels ki chaal tez hoti hai; 0.2-0.4s se zyada aksar sust lagta hai.`,
+    });
+  }
 
   if (total > 90) {
     out.push({
@@ -985,6 +1518,8 @@ export function draftProgress(draft: WizardDraft): {
   withImage: number;
   withVoice: number;
   staleVoice: number;
+  /** Jin scene par awaaz aur lambai ka mel nahi (`voiceMismatch`). */
+  mismatch: number;
   needsChoice: number;
 } {
   const live = draft.scenes.filter((scene) => !scene.removed);
@@ -993,6 +1528,7 @@ export function draftProgress(draft: WizardDraft): {
     withImage: live.filter((scene) => scene.visualAssetId).length,
     withVoice: live.filter((scene) => scene.voiceAssetId).length,
     staleVoice: live.filter(voiceStale).length,
+    mismatch: live.filter((scene) => voiceMismatch(scene) !== null).length,
     needsChoice: live.filter(
       (scene) => scene.transitionId === null || (scene.visualAssetId && !scene.animationPresetId),
     ).length,

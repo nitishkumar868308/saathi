@@ -6,7 +6,9 @@ import {
   draftAdvice,
   draftFromScript,
   draftProgress,
-  sceneSeconds,
+  draftTotalSeconds,
+  insertSceneAfter,
+  moveScene,
   type AiScript,
   type WizardDraft,
   type WizardScene,
@@ -49,7 +51,7 @@ const STEPS = [
   {
     id: 2,
     label: "Awaaz",
-    hint: "Kis scene par kaunsi awaaz. Likha hua text bol kar sunaya ja sakta hai.",
+    hint: "Kis scene par kaunsi awaaz, peeche kaunsa music, aur kahan kitna tez — sab yahin.",
   },
   { id: 3, label: "Dekho", hint: "Poori reel yahin chala kar dekh lo, phir editor me daalo." },
 ] as const;
@@ -92,13 +94,12 @@ export function WizardModal({
   const progress = draftProgress(draft);
   const current = STEPS[step] ?? STEPS[0];
   /*
-   * ⚠️ Lambai wahi ginti hai jo `applyWizard` lagayega (`sceneSeconds`), AI ka
-   * andaaza nahi. Do alag hisaab rakhne par footer "30 second" bolta aur reel 36
-   * ki banti — aur wo farak sirf export ke baad pakda jaata.
+   * ⚠️ Lambai wahi ginti hai jo `applyWizard` lagayega (`draftTotalSeconds`), AI
+   * ka andaaza nahi. Do alag hisaab rakhne par footer "30 second" bolta aur reel
+   * 36 ki banti — aur wo farak sirf export ke baad pakda jaata. Isi wajah se
+   * scene ke beech ki saans bhi usi function me judti hai, yahan nahi.
    */
-  const totalSeconds = draft.scenes
-    .filter((scene) => !scene.removed)
-    .reduce((sum, scene) => sum + sceneSeconds(scene), 0);
+  const totalSeconds = draftTotalSeconds(draft);
   const advice = draftAdvice(draft);
 
   function update(index: number, patch: Partial<WizardScene>): void {
@@ -112,6 +113,35 @@ export function WizardModal({
           }
         : previous,
     );
+  }
+
+  /**
+   * Scene ki tarteeb aur nayi qatarein.
+   *
+   * ⚠️ Poora hisaab `@reel/core` me hai (`moveScene`, `insertSceneAfter`), yahan
+   * sirf `setDraft`. Wajah wahi hai jo poore wizard ki: hataye hue scene beech me
+   * pade rehte hain, aur "padosi" ka matlab list ka agla khaana nahi hota. Wo
+   * hisaab UI me likhne par sirf haath se hi jaancha ja sakta tha — yaani har
+   * badlav par aath scene ka wizard dobara bharna, jo koi nahi karta.
+   */
+  function move(index: number, delta: -1 | 1): void {
+    setDraft((previous) => (previous ? moveScene(previous, index, delta) : previous));
+  }
+
+  function addScene(afterIndex: number | null): void {
+    setDraft((previous) => (previous ? insertSceneAfter(previous, afterIndex) : previous));
+  }
+
+  function setGap(seconds: number): void {
+    setDraft((previous) => (previous ? { ...previous, gapSeconds: seconds } : previous));
+  }
+
+  function setMusic(assetId: string | null): void {
+    setDraft((previous) => (previous ? { ...previous, musicAssetId: assetId } : previous));
+  }
+
+  function setMusicVolume(volume: number): void {
+    setDraft((previous) => (previous ? { ...previous, musicVolume: volume } : previous));
   }
 
   function setTextScale(scale: number): void {
@@ -168,9 +198,22 @@ export function WizardModal({
    * bina padhe daba deta hai.
    */
   function requestClose(): void {
-    const touched = draft?.scenes.some(
-      (scene) => scene.visualAssetId || scene.voiceAssetId || scene.removed,
-    );
+    /*
+     * ⚠️ Yahan har wo cheez ginni jaati hai jise dobara karna padega — sirf
+     * asset nahi. Naya scene jodna, tarteeb badalna, lambai haath se tay karna:
+     * teeno me mehnat lagti hai, aur teeno chup-chaap chale jaate the, kyunki ye
+     * jaanch unhe dekhti hi nahi thi.
+     */
+    const touched =
+      draft?.musicAssetId !== null ||
+      draft.scenes.some(
+        (scene) =>
+          scene.visualAssetId ||
+          scene.voiceAssetId ||
+          scene.removed ||
+          scene.durationOverrideSeconds !== null ||
+          scene.effectPresetId !== null,
+      );
     if (touched && !window.confirm("Wizard band kar dein? Yahan kiya hua kaam chala jaayega.")) {
       return;
     }
@@ -190,6 +233,18 @@ export function WizardModal({
             · {progress.withVoice} par awaaz
             {progress.staleVoice > 0 ? (
               <span className="text-amber"> · {progress.staleVoice} awaaz purani</span>
+            ) : null}
+            {/*
+              ⚠️ Mel na khaane wali ginti footer me hai, kisi step ke andar nahi —
+              wo har step par dikhni chahiye. Ye wahi galti hai jo sirf sun kar
+              pakdi jaati hai (awaaz beech me kat gayi, ya scene ke ant me chuppi),
+              aur us waqt tak reel bhej di ja chuki hoti hai.
+            */}
+            {progress.mismatch > 0 ? (
+              <span className="text-amber">
+                {" "}
+                · {progress.mismatch} par awaaz aur lambai ka mel nahi
+              </span>
             ) : null}
           </span>
 
@@ -291,10 +346,20 @@ export function WizardModal({
               onTextScale={setTextScale}
               onTextColor={setTextColor}
               onReplaceExisting={setReplaceExisting}
+              onGap={setGap}
+              onMove={move}
+              onAdd={addScene}
             />
           ) : null}
           {step === 1 ? <StepImage draft={draft} onChange={update} /> : null}
-          {step === 2 ? <StepVoice draft={draft} onChange={update} /> : null}
+          {step === 2 ? (
+            <StepVoice
+              draft={draft}
+              onChange={update}
+              onMusic={setMusic}
+              onMusicVolume={setMusicVolume}
+            />
+          ) : null}
           {step === 3 ? <StepPreview draft={draft} /> : null}
         </div>
       </div>

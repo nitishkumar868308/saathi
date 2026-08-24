@@ -1,4 +1,5 @@
 import { ANIMATION_PRESETS } from "../config/animationPresets";
+import { EFFECT_PRESETS } from "../config/effectPresets";
 import { TRANSITIONS } from "../registry/transitions";
 
 /**
@@ -49,6 +50,31 @@ export const TRANSITION_PLAIN_NAMES: readonly PlainName[] = [
   { id: "wipe", label: "Parda khisakna", when: "Ek hissa khatam, doosra shuru" },
 ];
 
+/**
+ * Rang ke effect — aam bhasha me (26.24).
+ *
+ * ⚠️ Pehla option `none` hai, aur wo list me **hona** chahiye. Bina uske "koi
+ * effect nahi" par wapas jaane ka koi raasta nahi bachta: aadmi ek baar "B & W"
+ * chun le to poori reel ke liye wo phans jaata hai, aur uske paas ek hi tarika
+ * bachta hai — wizard dobara chalana. Transition ki list me `none` isi wajah se
+ * hai.
+ *
+ * ⚠️ `when` me "kab" likha hai, "kya" nahi. "Sepia 0.45 + saturation 0.75" wo
+ * baat hai jo preset ke andar likhi hai; aadmi ko ye jaanna hai ki uski tasveeron
+ * par ye theek baithega ya nahi.
+ */
+export const EFFECT_PLAIN_NAMES: readonly PlainName[] = [
+  { id: "none", label: "Jaisa hai", when: "Asli rang — sabse surakshit" },
+  { id: "soft-glow", label: "Narm chamak", when: "Chehre aur product — thoda saaf aur ujla" },
+  {
+    id: "cinematic-contrast",
+    label: "Filmy",
+    when: "Gehra look — kahani wali reel par",
+  },
+  { id: "bw", label: "Safed-kaala", when: "Purani yaad, ya jab rang bikhre hue hon" },
+  { id: "vintage", label: "Purana", when: "Bhoora, halka pheeka — nostalgia wali baat par" },
+];
+
 function find(list: readonly PlainName[], id: string): PlainName | null {
   return list.find((entry) => entry.id === id) ?? null;
 }
@@ -61,6 +87,10 @@ export function plainTransition(id: string): PlainName | null {
   return find(TRANSITION_PLAIN_NAMES, id);
 }
 
+export function plainEffect(id: string): PlainName | null {
+  return find(EFFECT_PLAIN_NAMES, id);
+}
+
 /**
  * Jinke naam nahi likhe — jaanch ke liye.
  *
@@ -68,10 +98,15 @@ export function plainTransition(id: string): PlainName | null {
  * aur ye yahin rehta hai (script me nahi) taaki dono list ke paas rahe: naya
  * preset jodne wala aadmi isi file me hai, aur uski nazar isi par padegi.
  */
-export function missingPlainNames(): { animations: string[]; transitions: string[] } {
+export function missingPlainNames(): {
+  animations: string[];
+  transitions: string[];
+  effects: string[];
+} {
   const named = (list: readonly PlainName[]) => new Set(list.map((entry) => entry.id));
   const animationNames = named(ANIMATION_PLAIN_NAMES);
   const transitionNames = named(TRANSITION_PLAIN_NAMES);
+  const effectNames = named(EFFECT_PLAIN_NAMES);
 
   return {
     animations: ANIMATION_PRESETS.filter((preset) => !animationNames.has(preset.id)).map(
@@ -80,5 +115,8 @@ export function missingPlainNames(): { animations: string[]; transitions: string
     transitions: TRANSITIONS.list()
       .filter((entry) => !transitionNames.has(entry.id))
       .map((entry) => entry.id),
+    effects: EFFECT_PRESETS.filter((preset) => !effectNames.has(preset.id)).map(
+      (preset) => preset.id,
+    ),
   };
 }

@@ -1,14 +1,28 @@
 "use client";
 
 import {
+  canMoveScene,
+  estimateSpeechSeconds,
   getSceneType,
   sceneAdvice,
   sceneSeconds,
+  voiceSeconds,
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Eye, EyeOff, Info, RotateCcw, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Eye,
+  EyeOff,
+  Info,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
+import { useState } from "react";
 
 /**
  * Step 1 — **Shabd** (26.5).
@@ -21,6 +35,12 @@ import { AlertTriangle, Eye, EyeOff, Info, RotateCcw, Trash2 } from "lucide-reac
  *
  * (Aadmi phir bhi peeche aakar badal sakta hai — us par step 3 me laal nishaan
  * lagta hai, dekho `voiceStale`.)
+ *
+ * ⚠️ Scene ki tarteeb (upar-neeche, jodna) bhi yahin hai, aur wo jaan-boojhkar
+ * hai: kahani ka kram shabdon ka sawaal hai, tasveer ka nahi. Tasveer wale step
+ * par ise rakhne par aadmi pehle aath tasveerein daalta hai aur uske baad
+ * samajhta hai ki scene 3 ko scene 5 ke baad hona chahiye tha — aur tab tak
+ * tasveerein us kram me chun li ja chuki hoti hain.
  */
 /**
  * Text ka size — poori reel ke liye ek.
@@ -36,14 +56,14 @@ const TEXT_PLACES = [
 ] as const;
 
 /**
- * Text ke rang — **ginti ke, poori palette nahi**.
+ * Text ke rang — **ginti ke, aur ek apna**.
  *
- * WARNING: Yahan color picker jaan-boojhkar nahi hai. Poori palette dene par log
- * wo rang chun lete hain jo kaale par padhe hi nahi jaate (gehra neela, laal) ya
- * jo brand se bilkul alag khade dikhte hain. Ye chaar rang brand ke hi hain aur
- * chaaron gehre background par saaf padhe jaate hain.
+ * WARNING: Ye chaar rang brand ke hi hain aur chaaron gehre background par saaf
+ * padhe jaate hain. Inke baad "apna rang" ka khaana hai — wo aadmi ke maangne par
+ * joda gaya, aur uske saath ek chetavni bhi rehti hai: apna rang chunne par uska
+ * padha jaana aadmi ki zimmedari hai (gehra neela kaale par gayab ho jaata hai).
  *
- * WARNING: Pehla chunav `null` hai, koi hex nahi — aur wo farak asli hai. `null`
+ * WARNING: Pehla chunav `null` hai, koi hex nahi — aur ye farak asli hai. `null`
  * rehne par item me `brand.text` likha rehta hai, yaani brand badalte hi reel ka
  * text uske saath badal jaata hai. Hex likh dene par wo naata toot jaata hai aur
  * reel hamesha ke liye usi rang me jam jaati hai.
@@ -61,21 +81,136 @@ const TEXT_SIZES = [
   { scale: 1.25, label: "Bada", when: "Chhoti punchy line — phone par door se bhi padhi jaaye" },
 ] as const;
 
+/**
+ * Scene ke beech ki saans.
+ *
+ * ⚠️ Ye khaali (kaala) waqt nahi hai — us scene ki tasveer utni der aur thehri
+ * rehti hai (dekho `gapSeconds` ka comment). Default 0 hai: reels ki chaal tez
+ * hoti hai, aur har scene ke baad aadha second 8 scene par 3.5 second bekaar ka
+ * jod deta hai.
+ */
+const GAPS = [
+  { seconds: 0, label: "Bilkul nahi", when: "Tez reel — ek scene khatam, doosra shuru" },
+  { seconds: 0.2, label: "Zara si", when: "Aam reel — kaatna jhatka nahi lagta" },
+  { seconds: 0.4, label: "Thodi", when: "Bhaari baat — sunne wale ko sochne ka waqt" },
+  { seconds: 0.8, label: "Lambi", when: "Sirf jab har line par rukna zaroori ho" },
+] as const;
+
+/**
+ * Ek scene ki lambai ka khaana.
+ *
+ * ⚠️ Iska apna text state hai, aur wo zaroori hai. Seedha `number` par bandhne
+ * par "4" mita kar "12" likhna namumkin ho jaata hai: khaali khaana `NaN` deta
+ * hai, jo turant `1.2` (sabse chhoti hadd) par gir jaata hai — aur aadmi ki
+ * ungli ke neeche number badalta rehta hai.
+ *
+ * ⚠️ "Apne aap" ek alag halat hai, koi number nahi. Uspar khaana **band** rehta
+ * hai aur usme wahi ginti dikhti hai jo lagegi, taaki aadmi ko pata ho ki apne
+ * aap ka matlab kya hai — khaali khaana dikhane par wo har baar khud hisaab
+ * lagata (aur galat lagata).
+ */
+function DurationField({
+  scene,
+  onChange,
+}: {
+  scene: WizardScene;
+  onChange(index: number, patch: Partial<WizardScene>): void;
+}) {
+  const auto = scene.durationOverrideSeconds === null;
+  const shown = sceneSeconds(scene);
+  const [text, setText] = useState<string | null>(null);
+
+  function commit(raw: string): void {
+    const value = Number.parseFloat(raw);
+    setText(null);
+    if (!Number.isFinite(value)) return;
+    onChange(scene.index, { durationOverrideSeconds: value });
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] text-chalk-500">Lambai:</span>
+
+      <input
+        type="number"
+        step={0.5}
+        min={1.2}
+        max={30}
+        disabled={auto}
+        value={text ?? (auto ? shown.toFixed(1) : String(scene.durationOverrideSeconds))}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={(event) => commit(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") commit((event.target as HTMLInputElement).value);
+        }}
+        className="w-16 rounded border border-ink-600 bg-ink-950 px-1.5 py-0.5 text-right text-[11px] text-chalk-100 outline-none focus:border-terracotta disabled:opacity-50"
+      />
+      <span className="text-[10px] text-chalk-500">s</span>
+
+      {auto ? (
+        <button
+          type="button"
+          onClick={() => onChange(scene.index, { durationOverrideSeconds: Number(shown.toFixed(1)) })}
+          title="Lambai khud tay karo — reel lambi ho rahi ho to yahi kaam aata hai"
+          className="rounded border border-ink-600 px-1.5 py-0.5 text-[10px] text-chalk-400 transition-colors hover:border-terracotta hover:text-chalk-100"
+        >
+          Haath se tay karo
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onChange(scene.index, { durationOverrideSeconds: null })}
+          title="Wapas apne aap par — awaaz jitni lambi, wahi scene ki lambai"
+          className="flex items-center gap-1 rounded border border-terracotta bg-terracotta/10 px-1.5 py-0.5 text-[10px] text-chalk-100"
+        >
+          <RotateCcw size={9} />
+          apne aap par wapas
+        </button>
+      )}
+
+      <span className="min-w-0 flex-1 truncate text-right text-[10px] text-chalk-500">
+        {auto
+          ? scene.voiceAssetId
+            ? "apne aap — awaaz jitni"
+            : "apne aap — AI ke andaaze se"
+          : "tumhara chuna hua"}
+      </span>
+    </div>
+  );
+}
+
 export function StepText({
   draft,
   onChange,
   onTextScale,
   onTextColor,
   onReplaceExisting,
+  onGap,
+  onMove,
+  onAdd,
 }: {
   draft: WizardDraft;
   onChange(index: number, patch: Partial<WizardScene>): void;
   onTextScale(scale: number): void;
   onTextColor(color: string | null): void;
   onReplaceExisting(value: boolean): void;
+  onGap(seconds: number): void;
+  onMove(index: number, delta: -1 | 1): void;
+  /** `null` = sabse aakhir me jodo. */
+  onAdd(afterIndex: number | null): void;
 }) {
   const live = draft.scenes.filter((scene) => !scene.removed);
   const removed = draft.scenes.filter((scene) => scene.removed);
+
+  /*
+   * "Sab par text chhupa do" ek button hai, ek naya field nahi.
+   *
+   * ⚠️ Draft me `hideAllText` rakhna aasan lagta tha aur galat hota: phir do
+   * jagah sach hota (poore draft ka aur har scene ka), aur ek scene par text wapas
+   * dikhate hi wo dono ek doosre se ulat jaate. Yahan button sirf har scene ka
+   * apna chunav badal deta hai — sach ek hi jagah rehta hai.
+   */
+  const allHidden = live.length > 0 && live.every((scene) => scene.hideText);
 
   return (
     <>
@@ -102,9 +237,32 @@ export function StepText({
             ) : null}
           </button>
         ))}
-        <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
-          Poori reel ke liye ek hi — har scene ka alag size reel ko judi hui dikha deta hai.
-        </span>
+
+        {/*
+          ⚠️ "Sab par chhupa do" yahin hai, text ke chunav ke saath — har scene par
+          ek-ek karke chhupana wo kaam hai jise aadmi teesre scene par chhod deta
+          hai, aur aadhi reel par text laga reh jaata hai.
+        */}
+        <button
+          type="button"
+          onClick={() => {
+            for (const scene of live) onChange(scene.index, { hideText: !allHidden });
+          }}
+          title={
+            allHidden
+              ? "Sab scene par text wapas dikhao"
+              : "Kisi bhi scene par text mat dikhao — bola phir bhi jaayega"
+          }
+          className={clsx(
+            "ml-auto flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+            allHidden
+              ? "border-terracotta bg-terracotta/10 text-chalk-100"
+              : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+          )}
+        >
+          {allHidden ? <Eye size={9} /> : <EyeOff size={9} />}
+          {allHidden ? "Sab par text wapas" : "Sab par text chhupa do"}
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 rounded border border-ink-600 bg-ink-900 px-2 py-1.5">
@@ -129,8 +287,70 @@ export function StepText({
             {entry.label}
           </button>
         ))}
+
+        {/*
+          Apna rang — aadmi ke maangne par.
+
+          ⚠️ `<input type="color">` ka `onChange` **kheenchte waqt** har hilne par
+          chalta hai. Isse seedha draft me likhne par ek hi ghaseetne me 40-50
+          badlav jate hain, aur uske saath poora preview dobara banta hai. Isliye
+          yahan `onBlur` par likha jaata hai — jab picker band hota hai.
+        */}
+        <label
+          className={clsx(
+            "flex cursor-pointer items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+            draft.textColor && !TEXT_COLORS.some((entry) => entry.value === draft.textColor)
+              ? "border-terracotta bg-terracotta/10 text-chalk-100"
+              : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+          )}
+          title="Apna rang chuno — dhyan rakho ki wo tasveer par padha jaaye"
+        >
+          <input
+            type="color"
+            value={draft.textColor ?? "#FFFFFF"}
+            onBlur={(event) => onTextColor(event.target.value.toUpperCase())}
+            className="h-3 w-3 cursor-pointer border-0 bg-transparent p-0"
+          />
+          Apna rang
+        </label>
+
         <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
           CTA ka button apne rang me hi rahega — terracotta par ye rang padhe nahi jaate.
+        </span>
+      </div>
+
+      {/*
+        Scene ke beech ki saans — poori reel ke liye ek.
+
+        ⚠️ Ye per-scene nahi hai, aur wo jaan-boojhkar hai: alag-alag gap reel ki
+        chaal ko ladkhadaata hua bana dete hain, aur us kharabi ki wajah dekhne
+        wale ko kabhi samajh nahi aati.
+      */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded border border-ink-600 bg-ink-900 px-2 py-1.5">
+        <span className="text-[10px] text-chalk-500">Scene ke beech saans:</span>
+        {GAPS.map((entry) => (
+          <button
+            key={entry.label}
+            type="button"
+            title={entry.when}
+            onClick={() => onGap(entry.seconds)}
+            className={clsx(
+              "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+              Math.abs(draft.gapSeconds - entry.seconds) < 0.01
+                ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+            )}
+          >
+            {entry.label}
+            {entry.seconds === 0 ? (
+              <span className="ml-1 rounded bg-terracotta/20 px-1 text-[9px] text-terracotta">
+                Sifaarish
+              </span>
+            ) : null}
+          </button>
+        ))}
+        <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
+          Yahan khaali (kaala) waqt nahi aata — tasveer utni der aur thehri rehti hai.
         </span>
       </div>
 
@@ -169,146 +389,213 @@ export function StepText({
         </p>
       ) : null}
 
-      {live.map((scene, at) => (
-        <div key={scene.index} className="rounded border border-ink-600 bg-ink-900 p-2">
-          <div className="mb-1 flex items-center gap-2">
-            <span className="text-[10px] font-medium uppercase tracking-wide text-chalk-500">
-              Scene {at + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[10px] text-chalk-500">
-              {getSceneType(scene.type)?.label ?? scene.type} · {sceneSeconds(scene).toFixed(1)}s
-              {scene.voiceAssetId ? " (awaaz jitna)" : ""}
-            </span>
-            <button
-              type="button"
-              onClick={() => onChange(scene.index, { removed: true })}
-              title="Ye scene hata do"
-              className="shrink-0 rounded p-1 text-chalk-500 transition-colors hover:bg-red-500/10 hover:text-red-300"
-            >
-              <Trash2 size={11} />
-            </button>
-          </div>
+      {live.map((scene, at) => {
+        const voice = voiceSeconds(scene);
+        const guess = estimateSpeechSeconds(scene.text, scene.voiceRate);
 
-          <textarea
-            value={scene.text}
-            onChange={(event) => onChange(scene.index, { text: event.target.value })}
-            rows={2}
-            placeholder="Is scene par kya likha/bola jaayega"
-            className="w-full resize-y rounded border border-ink-600 bg-ink-950 px-2 py-1.5 text-xs text-chalk-100 outline-none focus:border-terracotta"
-          />
+        return (
+          <div key={scene.index} className="rounded border border-ink-600 bg-ink-900 p-2">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-chalk-500">
+                Scene {at + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[10px] text-chalk-500">
+                {getSceneType(scene.type)?.label ?? scene.type} · {sceneSeconds(scene).toFixed(1)}s
+                {scene.durationOverrideSeconds !== null
+                  ? " (haath se)"
+                  : scene.voiceAssetId
+                    ? " (awaaz jitna)"
+                    : ""}
+              </span>
 
-          {/*
-            Text kahan baithe — per scene, kyunki ye tasveer par nirbhar hai.
-            Chehra beech me ho to beech wala text usi par chadh jaata hai.
-          */}
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            <span className="text-[10px] text-chalk-500">Text:</span>
-            {TEXT_PLACES.map((place) => (
+              {/*
+                ⚠️ Upar-neeche ke button yahan hain, drag-and-drop nahi. Drag phone
+                par (aur is chhote dabbe me) theek se chalta hi nahi, aur uska koi
+                nishaan nahi hota ki wo ho sakta hai. Do teer hamesha dikhte hain
+                aur unka matlab poochhna nahi padta.
+              */}
               <button
-                key={place.id}
                 type="button"
-                disabled={scene.hideText}
-                onClick={() => onChange(scene.index, { textPosition: place.id })}
+                disabled={!canMoveScene(draft, scene.index, -1)}
+                onClick={() => onMove(scene.index, -1)}
+                title="Ek kadam upar"
+                className="shrink-0 rounded p-1 text-chalk-500 transition-colors hover:bg-ink-700 hover:text-chalk-100 disabled:opacity-25 disabled:hover:bg-transparent"
+              >
+                <ArrowUp size={11} />
+              </button>
+              <button
+                type="button"
+                disabled={!canMoveScene(draft, scene.index, 1)}
+                onClick={() => onMove(scene.index, 1)}
+                title="Ek kadam neeche"
+                className="shrink-0 rounded p-1 text-chalk-500 transition-colors hover:bg-ink-700 hover:text-chalk-100 disabled:opacity-25 disabled:hover:bg-transparent"
+              >
+                <ArrowDown size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onAdd(scene.index)}
+                title="Iske theek neeche naya scene jodo"
+                className="shrink-0 rounded p-1 text-chalk-500 transition-colors hover:bg-ink-700 hover:text-chalk-100"
+              >
+                <Plus size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange(scene.index, { removed: true })}
+                title="Ye scene hata do"
+                className="shrink-0 rounded p-1 text-chalk-500 transition-colors hover:bg-red-500/10 hover:text-red-300"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+
+            <textarea
+              value={scene.text}
+              onChange={(event) => onChange(scene.index, { text: event.target.value })}
+              rows={2}
+              placeholder="Is scene par kya likha/bola jaayega"
+              className="w-full resize-y rounded border border-ink-600 bg-ink-950 px-2 py-1.5 text-xs text-chalk-100 outline-none focus:border-terracotta"
+            />
+
+            {/*
+              Bolne me kitna waqt lagega — **likhte hi** (26.24).
+
+              ⚠️ Awaaz ban chuki ho to naapi hui lambai dikhti hai, andaaza nahi.
+              Dono ek jaise dikhane par (dono "~" ke saath) aadmi ko pata hi nahi
+              chalta ki kaunsa number pakka hai — aur wo pakka number hi scene ki
+              lambai tay karta hai.
+            */}
+            {scene.text.trim() ? (
+              <p className="mt-1 text-[10px] text-chalk-500">
+                {voice !== null
+                  ? `Awaaz ${voice.toFixed(1)}s ki hai (naapi hui)`
+                  : `Bolne me ~${guess.toFixed(1)}s lagenge (andaaza)`}
+                {" · "}
+                {scene.text.trim().split(/\s+/).filter(Boolean).length} shabd
+              </p>
+            ) : null}
+
+            <div className="mt-1 border-t border-ink-700 pt-1.5">
+              <DurationField scene={scene} onChange={onChange} />
+            </div>
+
+            {/*
+              Text kahan baithe — per scene, kyunki ye tasveer par nirbhar hai.
+              Chehra beech me ho to beech wala text usi par chadh jaata hai.
+            */}
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              <span className="text-[10px] text-chalk-500">Text:</span>
+              {TEXT_PLACES.map((place) => (
+                <button
+                  key={place.id}
+                  type="button"
+                  disabled={scene.hideText}
+                  onClick={() => onChange(scene.index, { textPosition: place.id })}
+                  className={clsx(
+                    "rounded border px-1.5 py-0.5 text-[10px] transition-colors disabled:opacity-30",
+                    scene.textPosition === place.id
+                      ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                      : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                  )}
+                >
+                  {place.label}
+                </button>
+              ))}
+
+              {/*
+                ⚠️ "Text mat dikhao" ka matlab "text mita do" NAHI hai — likha hua
+                text yahin rehta hai, aur usi se awaaz banti hai. Do alag kaam hain:
+                screen par kya dikhe, aur kaan me kya jaaye. Ise mitane wale button
+                ke saath rakhne par log kahani ka wo hissa hi kho dete jise wo sirf
+                chhupana chahte the.
+              */}
+              <button
+                type="button"
+                onClick={() => onChange(scene.index, { hideText: !scene.hideText })}
+                title={
+                  scene.hideText
+                    ? "Screen par text wapas dikhao"
+                    : "Screen par text mat dikhao — bola phir bhi jaayega"
+                }
                 className={clsx(
-                  "rounded border px-1.5 py-0.5 text-[10px] transition-colors disabled:opacity-30",
-                  scene.textPosition === place.id
+                  "ml-auto flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                  scene.hideText
                     ? "border-terracotta bg-terracotta/10 text-chalk-100"
                     : "border-ink-600 text-chalk-400 hover:border-chalk-500",
                 )}
               >
-                {place.label}
+                {scene.hideText ? <EyeOff size={9} /> : <Eye size={9} />}
+                {scene.hideText ? "Chhupa hua" : "Dikhega"}
               </button>
-            ))}
+            </div>
 
             {/*
-              ⚠️ "Text mat dikhao" ka matlab "text mita do" NAHI hai — likha hua
-              text yahin rehta hai, aur usi se awaaz banti hai. Do alag kaam hain:
-              screen par kya dikhe, aur kaan me kya jaaye. Ise mitane wale button
-              ke saath rakhne par log kahani ka wo hissa hi kho dete jise wo sirf
-              chhupana chahte the.
+              ⚠️ CTA ka button — sirf CTA wale scene par.
+
+              Ye alag khaana isliye hai ki CTA ka poora kaam ek hi hai: batana ki ab
+              karna kya hai. Wo baat aksar AI ki likhi lambi line me dab jaati hai
+              ("Apka Saathi - aapka digital document manager. Abhi download
+              karein."). Button us baat ko line se alag kar deta hai.
+
+              Khaali chhodne par "Abhi download karein" lagta hai — default khaali
+              rakhne par button kabhi bharaa hi nahi jaata aur CTA wapas ek paragraph
+              ban jaata hai.
             */}
-            <button
-              type="button"
-              onClick={() => onChange(scene.index, { hideText: !scene.hideText })}
-              title={
-                scene.hideText
-                  ? "Screen par text wapas dikhao"
-                  : "Screen par text mat dikhao — bola phir bhi jaayega"
-              }
-              className={clsx(
-                "ml-auto flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
-                scene.hideText
-                  ? "border-terracotta bg-terracotta/10 text-chalk-100"
-                  : "border-ink-600 text-chalk-400 hover:border-chalk-500",
-              )}
-            >
-              {scene.hideText ? <EyeOff size={9} /> : <Eye size={9} />}
-              {scene.hideText ? "Chhupa hua" : "Dikhega"}
-            </button>
+            {scene.type === "cta" ? (
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="shrink-0 text-[10px] text-chalk-500">Button:</span>
+                <input
+                  value={scene.slots.button ?? ""}
+                  onChange={(event) =>
+                    onChange(scene.index, {
+                      slots: { ...scene.slots, button: event.target.value },
+                    })
+                  }
+                  placeholder="Abhi download karein"
+                  className="min-w-0 flex-1 rounded border border-ink-600 bg-ink-950 px-2 py-1 text-[11px] text-chalk-100 outline-none focus:border-terracotta"
+                />
+              </div>
+            ) : null}
+
+            {sceneAdvice(scene, at).map((entry) => (
+              <p
+                key={entry.text}
+                className={clsx(
+                  "mt-1 flex items-start gap-1 text-[10px] leading-snug",
+                  entry.level === "warn" ? "text-amber" : "text-chalk-500",
+                )}
+              >
+                {entry.level === "warn" ? (
+                  <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+                ) : (
+                  <Info size={10} className="mt-0.5 shrink-0" />
+                )}
+                {entry.text}
+              </p>
+            ))}
           </div>
+        );
+      })}
 
-          {/*
-            ⚠️ CTA ka button — sirf CTA wale scene par.
-
-            Ye alag khaana isliye hai ki CTA ka poora kaam ek hi hai: batana ki ab
-            karna kya hai. Wo baat aksar AI ki likhi lambi line me dab jaati hai
-            ("Apka Saathi - aapka digital document manager. Abhi download
-            karein."). Button us baat ko line se alag kar deta hai.
-
-            Khaali chhodne par "Abhi download karein" lagta hai — default khaali
-            rakhne par button kabhi bharaa hi nahi jaata aur CTA wapas ek paragraph
-            ban jaata hai.
-          */}
-          {scene.type === "cta" ? (
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="shrink-0 text-[10px] text-chalk-500">Button:</span>
-              <input
-                value={scene.slots.button ?? ""}
-                onChange={(event) =>
-                  onChange(scene.index, {
-                    slots: { ...scene.slots, button: event.target.value },
-                  })
-                }
-                placeholder="Abhi download karein"
-                className="min-w-0 flex-1 rounded border border-ink-600 bg-ink-950 px-2 py-1 text-[11px] text-chalk-100 outline-none focus:border-terracotta"
-              />
-            </div>
-          ) : null}
-
-          {/*
-            Chhupane ka chunav tabhi kaam karta hai jab scene me tasveer ho —
-            warna scene me kuch bachta hi nahi. Ye baat yahin likhi hai, us jagah
-            jahan chunav kiya jaata hai, na ki baad me ek chetavni me.
-          */}
-          {scene.hideText && !scene.visualAssetId ? (
-            <p className="mt-1 text-[10px] leading-snug text-chalk-500">
-              Is scene par abhi tasveer nahi hai — is liye text phir bhi dikhega. Agle step me
-              tasveer daalo, tab ye chunav lag jaayega.
-            </p>
-          ) : null}
-
-          {sceneAdvice(scene, at).map((entry) => (
-            <p
-              key={entry.text}
-              className={clsx(
-                "mt-1 flex items-start gap-1 text-[10px] leading-snug",
-                entry.level === "warn" ? "text-amber" : "text-chalk-500",
-              )}
-            >
-              {entry.level === "warn" ? (
-                <AlertTriangle size={10} className="mt-0.5 shrink-0" />
-              ) : (
-                <Info size={10} className="mt-0.5 shrink-0" />
-              )}
-              {entry.text}
-            </p>
-          ))}
-        </div>
-      ))}
+      {/*
+        ⚠️ Naya scene jodne ka button neeche bhi hai, sirf har qatar par nahi.
+        Aakhir me ek scene jodna sabse aam kaam hai (CTA, ya ek line jo chhoot
+        gayi), aur uske liye aakhri qatar ka chhota "+" dhoondhna padta tha.
+      */}
+      <button
+        type="button"
+        onClick={() => onAdd(null)}
+        className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-ink-600 px-2 py-2 text-[11px] text-chalk-400 transition-colors hover:border-terracotta hover:text-chalk-100"
+      >
+        <Plus size={11} />
+        Naya scene jodo
+      </button>
 
       {live.length === 0 ? (
         <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">
-          Saare scene hata diye. Kam se kam ek chahiye — neeche se koi wapas le aao.
+          Saare scene hata diye. Kam se kam ek chahiye — upar se naya jodo, ya neeche se koi
+          wapas le aao.
         </p>
       ) : null}
 

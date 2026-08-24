@@ -290,6 +290,28 @@ export function getLibraryTab(id: string): LibraryTabEntry | undefined {
   return LIBRARY_TABS.find((tab) => tab.id === id);
 }
 
+/**
+ * Ek kind ke liye kaunsa tab — **registry se, naam jod kar nahi** (26.24).
+ *
+ * ⚠️ Ye function ek asli, chup-chaap chalne wale bug ke baad aaya. Do jagah tab
+ * ka id `${kind}s` likh kar banaya jaata tha, jo `image`/`video` par sanjog se
+ * chalta hai (`images`, `videos`) aur `audio` par TOOT jaata hai — us tab ka id
+ * `audio` hai, `audios` nahi. Nateeja: wizard ke Awaaz wale step me library ka
+ * picker HAMESHA `400 "audios naam ka koi tab nahi hai"` dikhata tha. Yaani
+ * "library se apni awaaz chuno" wala raasta kabhi chala hi nahi, aur upar se wo
+ * ek "kuch toot gaya" wala error dikhata tha — jiski wajah aadmi ko kabhi
+ * samajh nahi aa sakti thi.
+ *
+ * ⚠️ Sirf wahi tab jiska `tag` khaali hai — warna `audio` ki jagah `music`
+ * mil sakta hai (kind wahi hai), aur tab bina tag wali awaazein list me aati hi
+ * nahi.
+ */
+export function libraryTabForKind(kind: string): LibraryTabEntry | undefined {
+  return LIBRARY_TABS.find(
+    (tab) => tab.tag === null && tab.kinds.length === 1 && tab.kinds[0] === kind,
+  );
+}
+
 /** Jo tag kisi tab me use hote hain — detail panel me yahi chips dikhte hain. */
 export function libraryTags(): readonly string[] {
   return [...new Set(LIBRARY_TABS.map((tab) => tab.tag).filter((tag): tag is string => !!tag))];

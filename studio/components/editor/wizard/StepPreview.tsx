@@ -1,6 +1,6 @@
 "use client";
 
-import { applyWizard, autoFill, sceneSeconds, type WizardDraft } from "@reel/core";
+import { applyWizard, autoFill, draftTotalSeconds, type WizardDraft } from "@reel/core";
 import { ReelComposition } from "@reel/remotion";
 import { Player } from "@remotion/player";
 import { useMemo } from "react";
@@ -62,9 +62,12 @@ export function StepPreview({ draft }: { draft: WizardDraft }) {
   }
 
   const { width, height, fps, durationInFrames } = previewDoc.project;
-  const wizardSeconds = draft.scenes
-    .filter((scene) => !scene.removed)
-    .reduce((sum, scene) => sum + sceneSeconds(scene), 0);
+  /*
+   * ⚠️ Wahi ek hisaab jo footer me dikhta hai aur jo `applyWizard` lagata hai
+   * (`draftTotalSeconds` — gap samet). Yahan alag se jodne par preview "26s"
+   * likhta aur reel 29s ki banti, aur wo farak sirf export ke baad pakda jaata.
+   */
+  const wizardSeconds = draftTotalSeconds(draft);
   const hasOld = previewDoc.scenes.length > built.applied;
 
   return (

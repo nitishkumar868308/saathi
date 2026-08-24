@@ -24,6 +24,14 @@ export const AudioItem: React.FC<ItemComponentProps> = ({ item, track, doc, asse
       // Speed badalne par awaaz ki pitch na badle (15.7). Remotion ye seedha
       // deta hai; iske bina 2x par awaaz chipmunk jaisi ho jaati hai.
       preservePitch
+      /*
+       * ⚠️ Awaaz load na ho paayi ho to player ruk kar intezaar kare (26.24).
+       * Iske bina scene chalta rehta hai aur uski pehli line **kat kar** shuru
+       * hoti hai — awaaz beech se sunai deti hai. Wo galti sirf preview me hoti
+       * hai (render me file poori padhi jaati hai), aur wahi use sabse dhokhe
+       * wali banati hai: aadmi samajhta hai ki reel hi aisi bani hai.
+       */
+      pauseWhenBuffering
       volume={itemVolume(doc, item, track)}
     />
   );

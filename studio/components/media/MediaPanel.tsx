@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AssetCard } from "@/components/media/AssetCard";
 import { AssetDetailDialog } from "@/components/media/AssetDetailDialog";
+import { DeleteAssetDialog } from "@/components/media/DeleteAssetDialog";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import type { Asset } from "@/lib/assets";
@@ -38,6 +39,15 @@ export function MediaPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<Asset | null>(null);
+  /**
+   * Kis file par "mitao" daba hai — `null` = koi nahi.
+   *
+   * ⚠️ Ye `open` se alag state hai, aur wo jaan-boojhkar hai. Ek hi state rakhne
+   * par mitane ki tasdeek detail dialog ke upar khulti, aur uske peeche wahi file
+   * poori khuli hui dikhti — mitane ke baad ek dialog wahan pada reh jaata jo ab
+   * na-maujood file dikha raha hota.
+   */
+  const [deleting, setDeleting] = useState<Asset | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +240,7 @@ export function MediaPanel() {
                 target={project}
                 selected={open?.id === asset.id}
                 onOpen={setOpen}
+                onDelete={setDeleting}
               />
             ))}
           </div>
@@ -243,11 +254,21 @@ export function MediaPanel() {
                 target={project}
                 selected={open?.id === asset.id}
                 onOpen={setOpen}
+                onDelete={setDeleting}
               />
             ))}
           </div>
         )}
       </div>
+
+      <DeleteAssetDialog
+        asset={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={(assetId) => {
+          if (open?.id === assetId) setOpen(null);
+          setAssets((list) => list.filter((entry) => entry.id !== assetId));
+        }}
+      />
 
       <AssetDetailDialog
         asset={open}

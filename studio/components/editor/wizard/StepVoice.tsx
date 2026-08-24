@@ -1,20 +1,20 @@
 "use client";
 
 import {
+  estimateSpeechSeconds,
   sceneAdvice,
   sceneSeconds,
+  voiceSeconds,
   voiceStale,
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Info, Loader2, Mic, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Info, Loader2, Mic } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
-import { useAssetDurations } from "@/lib/assetMeta";
-import { useUploader } from "@/lib/upload/uploader";
-import { forgetAssetMeta } from "@/lib/assetMeta";
+import { forgetAssetMeta, useAssetDurations } from "@/lib/assetMeta";
 
 /**
  * Step 3 — **Awaaz** (26.9).
@@ -43,6 +43,36 @@ import { forgetAssetMeta } from "@/lib/assetMeta";
  * hain; wo slider par ek number ki tarah dikhta hai par sunne me toota hua lagta
  * hai. Jo hadd nateeja kharab karti ho, use dena hi nahi chahiye.
  */
+/**
+ * Ek scene par awaaz kitni tez — **naam se, number se nahi**.
+ *
+ * ⚠️ "Chup" ek asli chunav hai, koi galti nahi. Kuch scene sirf dikhne ke liye
+ * hote hain (b-roll, ek tasveer jispar music chalta hai), aur wahan bolne wala
+ * ulta rukavat banta hai. Bina is chunav ke aadmi ko us scene ki awaaz **hatani**
+ * padti thi — aur uske saath uska likha hua text bhi chala jaata tha.
+ */
+const VOICE_LEVELS = [
+  { volume: 1, label: "Normal", when: "Aam line — jaisi bani hai" },
+  { volume: 1.3, label: "Tez", when: "Zor dene wali line par (thoda oopar)" },
+  { volume: 0.6, label: "Dheemi", when: "Peeche ki baat, ya jab tasveer hi asli baat ho" },
+  { volume: 0, label: "Chup", when: "Is scene par kuch bola na jaaye — sirf music/tasveer" },
+] as const;
+
+/** Poori reel me music ka level. */
+const MUSIC_LEVELS = [
+  { volume: 0.08, label: "Bahut halka", when: "Sirf khaali jagah bharne ke liye" },
+  { volume: 0.15, label: "Halka", when: "Bolne wale ke peeche — sabse surakshit" },
+  { volume: 0.3, label: "Sunai dene layak", when: "Jab bolne wala kam ho" },
+  { volume: 0.6, label: "Tez", when: "Sirf bina awaaz wali reel par" },
+] as const;
+
+/** Ek scene par music ka level — `null` = poori reel wala. */
+const SCENE_MUSIC = [
+  { volume: null, label: "Reel jaisa", when: "Jo poori reel me chal raha hai" },
+  { volume: 0.05, label: "Bahut kam", when: "Zaroori baat boli ja rahi ho" },
+  { volume: 0, label: "Band", when: "Is scene par music bilkul nahi" },
+] as const;
+
 const VOICE_RATES = [
   { rate: 0.85, label: "Dheemi", when: "Bhaari baat — sunne wale ko rukna chahiye" },
   { rate: 1, label: "Normal", when: "Jaisi bani thi" },
@@ -61,6 +91,7 @@ function VoiceRow({
   at,
   categoryId,
   ttsUsable,
+  hasMusic,
   onChange,
 }: {
   scene: WizardScene;
@@ -68,9 +99,10 @@ function VoiceRow({
   categoryId: string | null;
   /** Koi provider chalne layak hai? Nahi to "Awaaz banao" dabna hi nahi chahiye. */
   ttsUsable: boolean;
+  /** Reel par music laga hai? Nahi to per-scene music ka chunav dikhta hi nahi. */
+  hasMusic: boolean;
   onChange(index: number, patch: Partial<WizardScene>): void;
 }) {
-  const input = useRef<HTMLInputElement>(null);
   /*
    * WARNING: Yahan se awaaz ki LAMBAI bhi aati hai, sirf id nahi. Scene ki lambai
    * usi se banti hai; bina uske scene AI ke andaaze par chalta hai aur awaaz ya
@@ -84,28 +116,49 @@ function VoiceRow({
     return frames === null ? null : frames / 30;
   };
 
-  const uploader = useUploader({
-    tags: ["wizard"],
-    onFinished: ({ assetId }) =>
-      onChange(scene.index, {
-        voiceAssetId: assetId,
-        voiceForText: scene.text,
-        voiceSeconds: secondsOf(assetId),
-      }),
-  });
-
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Library / upload se chuni hui awaaz lagao — **uski lambai ke saath**.
+   *
+   * ⚠️ Sirf `secondsOf()` par bharosa nahi kiya ja sakta, aur ye chala kar dekhne
+   * par nikla. Wo list ek module-level cache se aati hai; abhi-abhi chadhi hui
+   * file usme hoti hi nahi. Cache girta hai aur nayi list **async** aati hai,
+   * yaani is pal wo abhi purani hi hai — aur scene ki lambai chup-chaap AI ke
+   * andaaze par reh jaati (aksar 4s), jabki awaaz 9s ki hoti.
+   *
+   * Isliye na mile to seedha us ek asset se poochh lo. Ek chhoti request, aur
+   * uske badle wo galti jo sirf reel sun kar pakdi jaati hai.
+   */
+  async function pickVoice(assetId: string): Promise<void> {
+    let seconds = secondsOf(assetId);
+    if (seconds === null) {
+      try {
+        const response = await fetch(`/api/assets/${assetId}`);
+        const json = (await response.json()) as { asset?: { durationMs?: number | null } };
+        const ms = json.asset?.durationMs;
+        if (ms) seconds = ms / 1000;
+      } catch {
+        // Na pata chale to `null` — uspar apni alag salaah pehle se likhi hai.
+      }
+    }
+    onChange(scene.index, {
+      voiceAssetId: assetId,
+      voiceForText: scene.text,
+      voiceSeconds: seconds,
+    });
+  }
+
   const stale = voiceStale(scene);
+  /** Bani hui awaaz ki asli lambai (raftaar aur saans ke saath) — `null` = hai hi nahi. */
+  const measured = voiceSeconds(scene);
   /*
    * `voiceStale` wali baat upar apni jagah alag se likhi hai (wo is step ki sabse
    * zaroori line hai), isliye yahan usse hata diya jaata hai — ek hi baat do
    * jagah likhi ho to dono ki keemat aadhi ho jaati hai.
    */
   const advice = sceneAdvice(scene, at).filter((entry) => !entry.text.startsWith("Awaaz banne"));
-  const task = uploader.tasks[uploader.tasks.length - 1];
-  const uploading = task && task.phase !== "done" && task.phase !== "duplicate" && task.phase !== "error";
 
   async function generate(): Promise<void> {
     if (!scene.text.trim() || !categoryId) return;
@@ -165,6 +218,27 @@ function VoiceRow({
       </div>
 
       {/*
+        Ye line kitni lambi hai — **banane se pehle** (26.24).
+
+        ⚠️ Awaaz banne se pehle yahan andaaza dikhta hai, uske baad naapi hui
+        lambai. Dono ka farak saaf likha hai ("~" aur "naapi hui"), kyunki wahi
+        farak scene ki lambai tay karta hai: naapi hui lambai par scene bandhta
+        hai, andaaze par nahi.
+
+        ⚠️ Iske bina aadmi ko ye ginti kahin milti hi nahi thi. Wo teen line likh
+        deta tha, "Sab ki awaaz banao" dabata tha, aur 30 second ki soch kar banayi
+        gayi reel 70 second ki nikalti thi — wo bhi tab, jab saari awaazein ban
+        chuki hoti thi.
+      */}
+      <p className="mb-1 text-[10px] text-chalk-500">
+        {measured !== null
+          ? `Awaaz ${measured.toFixed(1)}s ki hai (naapi hui) · scene ${sceneSeconds(scene).toFixed(1)}s`
+          : scene.text.trim()
+            ? `Bolne me ~${estimateSpeechSeconds(scene.text, scene.voiceRate).toFixed(1)}s lagenge (andaaza) · scene abhi ${sceneSeconds(scene).toFixed(1)}s`
+            : "Is scene par koi text nahi — bolne ko kuch nahi hai."}
+      </p>
+
+      {/*
         ⚠️ Ye chetavni is poore step ki sabse zaroori line hai. Text badalne ke
         baad bani hui awaaz purane shabdon ki reh jaati hai, aur us galti ka
         koi nishaan kahin nahi hota: reel banti hai, chalti hai, export bhi ho
@@ -207,37 +281,22 @@ function VoiceRow({
           {stale ? "Dobara banao" : "Awaaz banao"}
         </button>
 
-        <input
-          ref={input}
-          type="file"
-          accept="audio/*"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) uploader.addFiles([file]);
-            event.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => input.current?.click()}
-          className="flex items-center gap-1 rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-300 transition-colors hover:border-chalk-500"
-        >
-          {uploading ? <Loader2 size={9} className="animate-spin" /> : <Upload size={9} />}
-          Apni awaaz
-        </button>
+        {/*
+          ⚠️ Apni awaaz bhi isi ek raaste se aati hai — gallery kholo, aur wahin
+          "Nayi file upload karo". Pehle upload ka apna button tha aur library ka
+          apna; do raaste hone se wahi ek awaaz har reel me dobara chadhti thi.
 
-        <div className="min-w-0 max-w-[150px] flex-1">
+          ⚠️ Library wala picker pehle Awaaz par **kabhi chala hi nahi**: wo tab ka
+          id `${kind}s` jod kar banata tha, yaani `audios` — jo hai hi nahi, aur
+          server saaf 400 deta tha. Ab id registry se aati hai (`libraryTabForKind`).
+        */}
+        <div className="min-w-0 max-w-[170px] flex-1">
           <AssetPickerButton
             kind="audio"
+            allowUpload
+            uploadTags={["wizard"]}
             assetId={scene.voiceAssetId}
-            onPick={(assetId) =>
-              onChange(scene.index, {
-                voiceAssetId: assetId,
-                voiceForText: scene.text,
-                voiceSeconds: secondsOf(assetId),
-              })
-            }
+            onPick={(assetId) => void pickVoice(assetId)}
           />
         </div>
 
@@ -293,6 +352,65 @@ function VoiceRow({
       ) : null}
 
       {/*
+        Is scene par awaaz kitni tez — **raftaar se alag** (26.24).
+
+        ⚠️ Raftaar (kitni jaldi bola jaayega) aur level (kitna tez sunai dega) do
+        alag cheezein hain, aur unhe ek hi patti me daalna galat samajh paida karta
+        hai. Raftaar scene ki lambai badalti hai, level nahi.
+      */}
+      {scene.voiceAssetId ? (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-chalk-500">Awaaz ka level:</span>
+          {VOICE_LEVELS.map((entry) => (
+            <button
+              key={entry.label}
+              type="button"
+              title={entry.when}
+              onClick={() => onChange(scene.index, { voiceVolume: entry.volume })}
+              className={clsx(
+                "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                Math.abs(scene.voiceVolume - entry.volume) < 0.01
+                  ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                  : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+              )}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/*
+        ⚠️ Music ka per-scene chunav tabhi dikhta hai jab reel par music laga ho.
+        Bina music ke ye teen button dabte to hain par kuch nahi karte — aur ek
+        button jo kuch na kare, toote hue button jaisa hi hai (README rule 5).
+      */}
+      {hasMusic ? (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-chalk-500">Music yahan:</span>
+          {SCENE_MUSIC.map((entry) => (
+            <button
+              key={entry.label}
+              type="button"
+              title={entry.when}
+              onClick={() => onChange(scene.index, { musicVolume: entry.volume })}
+              className={clsx(
+                "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                (entry.volume === null && scene.musicVolume === null) ||
+                  (entry.volume !== null &&
+                    scene.musicVolume !== null &&
+                    Math.abs(scene.musicVolume - entry.volume) < 0.01)
+                  ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                  : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+              )}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {/*
         ⚠️ Salaah yahin dikhti hai, us scene ke saath — ek jama ki hui list me
         nahi. List me "scene 4 par awaaz bahut tez hai" padh kar aadmi ko pehle
         scene 4 dhoondhna padta hai, aur wo aksar dhoondhta hi nahi.
@@ -324,9 +442,14 @@ function VoiceRow({
 export function StepVoice({
   draft,
   onChange,
+  onMusic,
+  onMusicVolume,
 }: {
   draft: WizardDraft;
   onChange(index: number, patch: Partial<WizardScene>): void;
+  /** `null` = music hata do. */
+  onMusic(assetId: string | null): void;
+  onMusicVolume(volume: number): void;
 }) {
   const live = draft.scenes.filter((scene) => !scene.removed);
 
@@ -398,10 +521,25 @@ export function StepVoice({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: scene.text, categoryId }),
         });
-        const json = (await response.json()) as { asset?: { id: string } };
+        const json = (await response.json()) as {
+          asset?: { id: string; durationMs?: number | null };
+        };
         if (response.ok && json.asset) {
           forgetAssetMeta();
-          onChange(scene.index, { voiceAssetId: json.asset.id, voiceForText: scene.text });
+          onChange(scene.index, {
+            voiceAssetId: json.asset.id,
+            voiceForText: scene.text,
+            /*
+             * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
+             * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
+             * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
+             * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
+             * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
+             * uske baad chuppi aati thi. Screen par "awaaz lag gayi" likha aata
+             * tha, isliye galti kahin dikhti bhi nahi thi.
+             */
+            voiceSeconds: json.asset.durationMs ? json.asset.durationMs / 1000 : null,
+          });
         }
       } catch {
         // Ek ka fail hona baaki ko nahi rokta — nishaan us qatar par dikhta hai.
@@ -451,6 +589,76 @@ export function StepVoice({
         </p>
       ) : null}
 
+      {/*
+        Peeche chalne wala music — **poori reel ke liye ek** (26.24).
+
+        ⚠️ Ye wizard me isliye aaya ki bina iske reel aadhi lagti hai, aur use
+        lagane ka ek hi raasta tha: poora editor kholo, music track banao, clip
+        daalo, volume 0.15 par lao, loop karo. Wizard ka poora vaada hi ye hai ki
+        aadmi ko editor sikhna na pade.
+
+        ⚠️ Music library se aata hai (ya wahin se upload hota hai), aur uspar
+        "music" ka tag lagta hai — isliye wo Media panel ke Music tab me apne aap
+        aa jaata hai, aur agli reel me seedha wahan mil jaata hai.
+      */}
+      <div className="space-y-1.5 rounded border border-ink-600 bg-ink-900 px-2 py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-chalk-500">Peeche music:</span>
+          <div className="min-w-0 max-w-[190px] flex-1">
+            <AssetPickerButton
+              kind="audio"
+              allowUpload
+              uploadTags={["music", "wizard"]}
+              assetId={draft.musicAssetId}
+              onPick={(assetId) => onMusic(assetId)}
+            />
+          </div>
+          {draft.musicAssetId ? (
+            <button
+              type="button"
+              onClick={() => onMusic(null)}
+              className="rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-400 transition-colors hover:border-chalk-500"
+            >
+              Hata do
+            </button>
+          ) : (
+            <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
+              ya chhod do — reel bina music ke bhi banti hai
+            </span>
+          )}
+        </div>
+
+        {draft.musicAssetId ? (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-ink-700 pt-1.5">
+            <span className="text-[10px] text-chalk-500">Music ka level:</span>
+            {MUSIC_LEVELS.map((entry) => (
+              <button
+                key={entry.label}
+                type="button"
+                title={entry.when}
+                onClick={() => onMusicVolume(entry.volume)}
+                className={clsx(
+                  "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                  Math.abs(draft.musicVolume - entry.volume) < 0.01
+                    ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                    : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                )}
+              >
+                {entry.label}
+                {Math.abs(entry.volume - 0.15) < 0.01 ? (
+                  <span className="ml-1 rounded bg-terracotta/20 px-1 text-[9px] text-terracotta">
+                    Sifaarish
+                  </span>
+                ) : null}
+              </button>
+            ))}
+            <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
+              Har scene par ise alag bhi kar sakte ho — neeche &ldquo;Music yahan&rdquo;.
+            </span>
+          </div>
+        ) : null}
+      </div>
+
       {live.map((scene, at) => (
         <VoiceRow
           key={scene.index}
@@ -458,6 +666,7 @@ export function StepVoice({
           at={at}
           categoryId={categoryId}
           ttsUsable={ttsUsable}
+          hasMusic={draft.musicAssetId !== null}
           onChange={onChange}
         />
       ))}

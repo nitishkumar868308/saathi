@@ -51,6 +51,20 @@ export const VideoItem: React.FC<ItemComponentProps> = ({ item, track, doc, asse
         trimBefore={item.trimStartFrame}
         playbackRate={item.playbackRate}
         preservePitch
+        /*
+         * ⚠️ Buffer khatam ho to **ruk jao**, aage mat bhaago (26.24).
+         *
+         * Remotion 4 me iska default `false` hai, aur uska nateeja preview me
+         * sabse buri shakl leta hai: player waqt ke saath aage badhta rehta hai
+         * jabki video wahi ka wahi khada rehta hai. Screen par wo "video atak gayi"
+         * dikhta hai — par asal me chal rahi hai reel, ruki hai sirf tasveer, aur
+         * uske baad awaaz aur video ka mel bhi bigad jaata hai.
+         *
+         * `true` par player thodi der thehr jaata hai aur phir dono saath chalte
+         * hain. Ye sirf preview ka mamla hai: render ke waqt frames FFmpeg se
+         * nikalte hain, wahan buffering hoti hi nahi.
+         */
+        pauseWhenBuffering
         volume={itemVolume(doc, item, track)}
         style={{ width: "100%", height: "100%", objectFit: objectFitFor(item) }}
       />

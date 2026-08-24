@@ -629,3 +629,195 @@ Picker sirf us kind ki files dikhata tha jo scene ki sifaarish thi. Jis scene pa
 sifaarish thi wahan library me sirf tasveerein dikhti thi — aadmi apni recording pehle hi
 library me daal chuka ho to bhi wo use nahi kar sakta tha; ek hi raasta bachta tha, wahi file
 dobara upload karna. Upload ke do button the, library ka ek hi.
+
+---
+
+## 26.24 — kahani ka kram, waqt ka kaabu, aur awaaz ka mix (2026-08-24)
+
+Doosri baar asli media ke saath poori reel banayi. Is baar jo kami nikli wo "kaisa dikhta hai"
+ki nahi thi — **"main ise badal hi nahi sakta"** ki thi. Wizard scene banata tha, par unka kram,
+lambai aur awaaz ka level sab uske apne haath me tha; aadmi ke paas sirf "hata do" tha.
+
+### Scene jodna aur upar-neeche karna
+
+Delete pehle se tha, jodna aur khiskaana nahi. Yaani AI ne jo aath scene diye wahi aakhri sach
+the: ek line chhoot gayi to poora wizard dobara chalao, aur scene 3 ko scene 5 ke baad chahiye
+to koi raasta hi nahi.
+
+Ab dono Shabd wale step par hain (kahani ka kram shabdon ka sawaal hai, tasveer ka nahi) —
+har qatar par do teer aur ek `+`, aur list ke ant me "Naya scene jodo".
+
+⚠️ Poora hisaab `@reel/core` me hai (`insertSceneAfter`, `moveScene`, `canMoveScene`), UI me
+sirf `setDraft`. Do baatein isme chhupi hui hain, aur dono jaanch me likhi hain:
+
+- **Padosi = bacha hua padosi.** Hataye hue scene list me pade rehte hain. Seedha `at ± 1` karne
+  par "upar karo" dabane par kuch hota hua dikhta hi nahi — scene ek aise scene se jagah badal
+  leta hai jo screen par hai hi nahi. Aadmi dobara dabata hai, phir dobara, aur maan leta hai ki
+  button toota hua hai.
+- **Naya number `length` se nahi banta.** Ek scene hata kar naya jodne par wahi `index` dobara
+  ban jaata, aur do scene ka ek hi number hone par `update()` dono ko badalta — aadmi ek jagah
+  text likhta aur wo do jagah likha jaata.
+
+### Lambai ab haath me hai — aur mel na khaane par saaf chetavni
+
+Scene ki lambai awaaz se aati thi (`sceneSeconds`), aur wo theek hai — par uske upar koi kaabu
+nahi tha. Reel 70 second ki ban jaaye to chhota karne ka koi raasta nahi tha.
+
+Ab har scene par `durationOverrideSeconds` hai. **Aadmi ka number awaaz se bhi jeetta hai** —
+ulta karne par "scene 4 second ka karo" ka koi matlab hi nahi rehta jab awaaz 7 second ki ho.
+Par us halat me awaaz kat sakti hai, isliye:
+
+- `voiceMismatch()` — ek hi jagah ka hisaab, do jawab: `cut` (scene chhota, awaaz katti hai) aur
+  `silence` (scene bada, beech me chuppi). Hadd dono taraf alag hai: katna hamesha bura hai
+  (0.15s), chuppi thodi der theek lagti hai (1.2s). Ek hadd rakhne par ya aadhi galtiyan chhoot
+  jaati, ya har scene par ek jhoothi chetavni lagti.
+- Wahi hisaab footer ki ginti bhi chalata hai ("2 par awaaz aur lambai ka mel nahi") — do jagah
+  likhne par footer 2 bolta aur scene par ek nishaan dikhta.
+
+Aur `estimateSpeechSeconds()` — **awaaz banne se pehle** hi likhi hui line ka waqt dikh jaata
+hai (~2.3 shabd/second, Hindi-Hinglish bolne ki raftaar). Pehle ye ginti kahin thi hi nahi: aadmi
+teen line likhta, "Sab ki awaaz banao" dabata, aur 30 second ki soch kar banayi reel 70 ki
+nikalti — wo bhi tab jab saari awaazein ban chuki hoti.
+
+### "Sab ki awaaz banao" lambai likhta hi nahi tha
+
+Ek-ek karke banane wala raasta `voiceSeconds` likhta tha, par batch wala nahi — jabki aam aadmi
+wahi dabata hai. Nateeja chup-chaap bura tha: har scene AI ke andaaze (aksar 4s) par reh jaata,
+aur awaaz ya to katti thi ya uske baad chuppi aati thi. Screen par "awaaz lag gayi" likha aata
+tha, isliye galti kahin dikhti bhi nahi thi.
+
+Library/upload wali awaaz par ek aur parat thi: `useAssetDurations` ka cache module-level hai aur
+abhi chadhi hui file usme hoti hi nahi — cache girta hai par nayi list **async** aati hai. Ab na
+mile to us ek asset se seedha poochh liya jaata hai.
+
+### Scene ke beech saans (gap) — par kaala frame nahi
+
+`gapSeconds` poori reel ke liye ek chunav hai, aur wo **scene ki apni lambai me judta hai**:
+tasveer utni der aur thehri rehti hai, awaaz apne waqt par khatam ho jaati hai. Beech me sach me
+khaali waqt chhodne par wahan kaala frame aata — "video atak gayi" wala sabse bura nateeja.
+Aakhri scene par gap nahi lagta (wo reel ke ant me thehra hua frame ban jaata hai).
+
+Default 0 hai. Reels ki chaal tez hoti hai; 8 scene par 0.5s ka gap 3.5 second bekaar ka jodta
+hai — aur ye ginti aadmi khud kabhi nahi karta, isliye `draftAdvice` wo saaf likh deta hai.
+
+### Rang / effect wizard me tha hi nahi
+
+Editor me Effects panel hai, wizard me kuch nahi — yaani wizard se bani har reel me har tasveer
+jaisi ki waisi rehti thi, aur badalne ke liye poora editor sikhna padta. Ab `EFFECT_PLAIN_NAMES`
+(aam bhasha me, `none` samet) aur per-scene `effectPresetId`.
+
+⚠️ Iski koi "Sifaarish" nahi hai — animation ke ulta. Harkat ka na hona reel ko mari hui bana
+deta hai; rang ka na hona nahi. Aur effect **sirf tasveer/video wale scene par** dikhta hai:
+bina tasveer ke wo text par lagta, jahan "Safed-kaala" ka matlab hota safed text ka bhoora pad
+jaana.
+
+### Text chhupana sirf tasveer wale scene par chalta tha
+
+`textHidden()` me shart `hideText && visualAssetId` thi. Jis scene par sirf awaaz thi wahan
+chunav **dabta tha par lagta nahi tha** — "Chhupa hua" likha aata aur reel me text phir bhi
+dikhta. Ab awaaz bhi ginti hai. Jahan dono nahi hain wahan text chhupta nahi (warna kaala frame),
+aur wo baat wahin likhi jaati hai jahan chunav hota hai.
+
+Saath me "Sab par text chhupa do" — ek button, koi naya field nahi. `hideAllText` draft me rakhne
+par sach do jagah hota, aur ek scene par text wapas dikhate hi dono ulat jaate.
+
+Text ka apna rang bhi jud gaya (chaar brand rang + `<input type="color">`). ⚠️ Rang `onBlur`
+par likha jaata hai, `onChange` par nahi: picker kheenchte waqt `onChange` har hilne par chalta
+hai — ek ghaseetne me 40-50 badlav, aur har badlav par poora preview dobara.
+
+### Music, aur har scene par kiska level kya
+
+Wizard me music tha hi nahi. Lagane ka ek hi raasta tha: editor kholo, music track banao, clip
+daalo, volume 0.15 par lao. Ab Awaaz wale step par music chunna (gallery se ya wahin se upload)
+aur uska level — plus **har scene par** awaaz ka level (Normal / Tez / Dheemi / Chup) aur music
+ka level (Reel jaisa / Bahut kam / Band).
+
+⚠️ **Har scene ka apna music tukda banta hai, ek lamba clip nahi.** Ek clip par "is scene par
+music band karo" ke liye volume par keyframes lagane padte — wizard ke aadmi ke liye ek naya aur
+bekaar sawaal. Har tukda wahin se uthta hai jahan pichhla chhoda tha (`trimStartFrame` aage
+badhta hai), isliye sunne me ek hi dhun chalti hai.
+
+⚠️ Tukde scene se **jude hue** hain (`sceneId`): scene hatane par music bhi jaata hai, scene
+khiskane par saath chalta hai, aur "purane scene hata do" par purana music bhi mit jaata hai.
+Bina `sceneId` ke doosri baar wizard chalane par do gaane ek saath bajte.
+
+⚠️ Fade sirf pehle aur aakhri tukde par — har tukde par lagane se music "ghar-ghar" karta hua
+sunai deta hai.
+
+### Gallery pehle, upload usi ke andar
+
+Picker me chaar button the: "Tasveer daalo", "Video daalo", aur library ke do kind-switch.
+Nateeja har baar ek hi tha — aadmi upload wala button dabata tha (wo bada aur pehle likha tha),
+aur wahi file har reel me dobara chadhti thi. Library dhire-dhire ek hi tasveer ki chaar copy se
+bhar jaati thi.
+
+Ab ek hi raasta hai: gallery kholo (jo pehle se hai wo dikhta hai), aur usi dialog me "Nayi file
+upload karo". Upload ka chakkar wahi ek hook (`useUploader`) chalata hai, isliye tag,
+duplicate-detect aur probe waise ke waise hain — aur chadhi hui file **library me hi jaati hai**.
+Ye baat dialog me likhi bhi hai, kyunki wizard ka bharosa isi par tikta hai.
+
+Kism ab picker se lautti hai (`onPick(assetId, kind)`), "aakhri baar kaunsa button daba tha" se
+nahi — wo andaaza galat ho jaane par `image` ka item ek video ki id le kar baith jaata tha, yaani
+render me khaali frame, bina kisi error ke.
+
+### `audios` naam ka koi tab nahi hai
+
+Picker tab ka id kind ke saath `s` jod kar banata tha. `image`/`video` par wo sanjog se chalta
+hai (`images`, `videos`) aur `audio` par TOOT jaata hai — us tab ka id `audio` hai. Yaani wizard
+ke Awaaz wale step me library ka picker **hamesha** `400 "audios naam ka koi tab nahi hai"`
+dikhata tha: "library se apni awaaz chuno" wala raasta kabhi chala hi nahi, aur upar se wo ek
+"kuch toot gaya" wala error dikhata tha.
+
+Ab `libraryTabForKind()` registry se tab dhoondhta hai (aur sirf wahi jiska `tag` khaali hai —
+warna `audio` ki jagah `music` mil jaata aur bina tag wali awaazein dikhti hi nahi).
+
+### Library me har file ek khaali dabba dikhti thi
+
+`thumbKey` sirf **bani hui reel** ka banta hai; aam upload ka thumbnail kabhi banta hi nahi.
+Yaani fallback icon halat ka apwaad nahi tha — wo har uploaded file par lagta tha, aur poori
+library naam ke alawa bina pehchaan ke padi rehti thi.
+
+Ab thumbnail na ho to asli file dikhti hai. Video par `<video preload="metadata">` aur src ke ant
+me `#t=0.1` — poori file nahi utarti, aur us fragment ke bina bahut se video ka pehla frame kaala
+hota hai.
+
+### Mitane ka raasta card par, aur wo saaf batata hai ki kya mit raha hai
+
+`DELETE /api/assets/[id]` pehle se tha par sirf detail dialog ke andar — library me pehchaan hi
+nahi hoti thi ki wo wahan hai. Ab card ke kone par nishaan hai (hover/focus par), aur tasdeek ek
+alag dialog karta hai jo teen baatein saaf likhta hai: file **storage se** (R2/disk), row
+**DB se**, aur koi trash nahi — Ctrl+Z yahan kaam nahi karta (wo doc ke andar ka itihaas hai,
+file doc ke bahar hai).
+
+Aur "kahan-kahan laga hai" **pehle** dikhta hai, mitane ke baad nahi. Server bhi rokta hai (409
+bina `?force=true` ke), par sirf rok dena kaafi nahi: aadmi ko dikhna chahiye ki kaunsi reel
+tootegi, warna wo "phir bhi mitao" bina samjhe daba deta hai — aur us reel ka render mahinon baad
+"asset nahi mila" par phat jaata hai, jab yaad bhi nahi hota ki kya mitaya tha.
+
+### Video "ruk ke" aati thi — teen wajah, teeno alag jagah
+
+Preview me har video wala scene atak kar shuru hota tha. Teen alag cheezein thi, aur teeno ka
+ilaaj alag file me hai:
+
+1. **`/api/local-media` range nahi maanta tha.** Bina `Accept-Ranges` ke browser file ke beech se
+   padh hi nahi sakta — har seek par (aur har baar us scene par lautne par) wo **poori file shuru
+   se** utaarta hai. 40MB ki recording par wo har baar ka intezaar hai. Ab 206 + `content-range`.
+2. **`cache-control: no-store`.** Utari hui file rakhi bhi nahi jaati thi, yaani wahi kaam har
+   baar dobara. Ab jis key ka maal kabhi badalta hi nahi (`permanent/assets/…`, `temp/tts/…`) wo
+   `immutable` hai. ⚠️ `force-dynamic` Next ke apne cache ke liye hai, browser ke liye nahi —
+   dono ko ek samajhna hi wo galti thi.
+3. **Sequence theek us frame par mount hoti thi jab scene shuru hota tha**, aur usi pal browser
+   file maangna shuru karta tha. Ab `premountFor` un items par lagta hai **jinki koi file hai**
+   (`item.assetId` — "ye video hai?" nahi, isliye Dynamic rule 3 nahi tootta): wo ek second pehle
+   chupke se mount ho jaate hain. Remotion premount ko render ke waqt khud band kar deta hai, to
+   MP4 par na ek frame badalta hai na ek second lagta hai.
+
+Saath me `pauseWhenBuffering` (video aur audio dono par). Remotion 4 me uska default `false` hai,
+aur uska nateeja sabse dhokhe wala hai: player waqt ke saath aage badhta rehta hai jabki video
+wahi khadi rehti hai, aur uske baad awaaz-video ka mel bhi bigad jaata hai — dekhne wale ko lagta
+hai ki reel hi aisi bani hai.
+
+### Jaanch
+
+`check-wizard.ts` ab **148 assertions** (`check.ts` ke apne alawa) — naye hisse me scene ka kram,
+haath wali lambai, mel ki chetavni, gap, effect, music ke tukde aur library ke tab sab hain.

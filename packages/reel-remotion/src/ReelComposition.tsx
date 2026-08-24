@@ -111,6 +111,31 @@ export const ReelComposition: React.FC<ReelCompositionProps> = ({ doc, assets, f
                 key={item.id}
                 name={`${track.name} / ${item.name}`}
                 from={item.startFrame}
+                /*
+                 * ⚠️ **Media ko waqt se pehle mount karo** (26.24).
+                 *
+                 * Bina iske preview me har video/awaaz wala scene "atak kar" shuru
+                 * hota hai: Sequence theek us frame par mount hoti hai jab scene
+                 * shuru hota hai, aur usi pal browser file maangna shuru karta hai.
+                 * Jitni der wo maangta hai, utni der scene ruka hua dikhta hai —
+                 * aur wo har baar hota hai, har scene par.
+                 *
+                 * `premountFor` us item ko ek second pehle chupke se mount kar deta
+                 * hai (`display: none`), taaki wo apna maal utaar le. Frame ka
+                 * hisaab isse nahi badalta — scene apne hi waqt par shuru hota hai.
+                 *
+                 * ⚠️ Ye **sirf preview** ka mamla hai: Remotion premount ko render
+                 * ke waqt khud band kar deta hai (`environment.isRendering`),
+                 * isliye MP4 ke waqt na ek extra frame banta hai na ek extra second
+                 * lagta hai.
+                 *
+                 * ⚠️ Sirf un items par jinki koi file hai. Text aur shape ko kuch
+                 * utaarna hi nahi hota; unhe pehle mount karna sirf ek aur chhupi
+                 * hui parat banata hai — kaam kuch nahi karta. (Yahan `item.type`
+                 * nahi dekha ja raha, isliye Dynamic rule 3 bhi nahi tootta: sawaal
+                 * "iski koi file hai?" hai, "ye video hai?" nahi.)
+                 */
+                premountFor={item.assetId ? doc.project.fps : 0}
                 // Project ke bahar nikla hua item kaat diya jaata hai — warna
                 // Remotion aakhri frame ke baad bhi use draw karne ki koshish
                 // karta hai aur duration ka hisaab bigad jaata hai.
