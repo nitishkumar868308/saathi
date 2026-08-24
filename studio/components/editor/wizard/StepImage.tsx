@@ -20,6 +20,8 @@ import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
 import { VideoTrimDialog } from "@/components/editor/wizard/VideoTrimDialog";
 import { useAssetUrl } from "@/lib/assetUrls";
 import { forgetAssetMeta, useAssetDurations } from "@/lib/assetMeta";
+import { fitImageInBrowser } from "@/lib/fitInBrowser";
+import { uploadBlob } from "@/lib/upload/uploadBlob";
 import { useEditorStore } from "@/lib/store";
 
 /**
@@ -32,6 +34,13 @@ import { useEditorStore } from "@/lib/store";
  * chunav par kaam lagta hai.
  */
 const FIT_DEBOUNCE_MS = 500;
+
+/** `/api/assets/[id]/fit` ka jawab — kaamyab aur nakaam, dono ka ek hi shape. */
+interface FitReply {
+  asset?: { id: string };
+  error?: string;
+  reason?: string;
+}
 
 /**
  * Step 2 — **Tasveer** (26.6 / 26.7).
@@ -279,42 +288,92 @@ function SceneRow({
     asked.current = wantFit;
 
     const assetId = scene.visualAssetId;
+    const isVideo = scene.visualAssetKind === "video";
+    const sourceName = scene.visualAssetId;
     let alive = true;
     setFitState({ key: wantFit, status: "busy" });
 
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const response = await fetch(`/api/assets/${assetId}/fit`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              width: project.width,
-              height: project.height,
-              animationPresetId: scene.animationPresetId,
-              trim: scene.visualTrim,
-            }),
-          });
-          const json = (await response.json()) as {
-            asset?: { id: string };
-            error?: string;
-            reason?: string;
-          };
-          if (!response.ok || !json.asset) {
-            throw new Error(json.reason || json.error || `HTTP ${response.status}`);
+          /*
+           * ⚠️ Do raaste, aur wo bantwara **jaan-boojhkar** hai (26.26).
+           *
+           * Studio do jagah chalta hai: tumhare PC par (jahan ffmpeg hai) aur
+           * Vercel par (jahan wo hai hi nahi — serverless me binary install karne
+           * ka koi raasta nahi hota, aur koi env var use la nahi sakta). Pehle
+           * dono kism ki file server par fit hoti thi, isliye live par har fit
+           * ek hi line par marti thi: `spawn ffmpeg ENOENT`.
+           *
+           * Tasveer ke liye ffmpeg ki zaroorat hai hi nahi — canvas wahi kaam
+           * karta hai, usi machine par jahan aadmi baitha hai, turant aur bina
+           * kisi kharche ke. Isliye tasveer **hamesha** browser me fit hoti hai,
+           * chahe studio kahin bhi chal raha ho.
+           *
+           * Video canvas me nahi ho sakti (har frame kheencho, phir encode karo —
+           * browser me wo ya 30MB ka ffmpeg.wasm hai ya poora WebCodecs pipeline).
+           * Uske liye server hi raasta hai, aur wo tabhi chalega jab ffmpeg wahan
+           * ho. Na ho to saaf likha jaata hai — asli file lag jaati hai aur reel
+           * phir bhi ban jaati hai.
+           */
+          let fittedId: string;
+
+          if (isVideo) {
+            const response = await fetch(`/api/assets/${assetId}/fit`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                width: project.width,
+                height: project.height,
+                animationPresetId: scene.animationPresetId,
+                trim: scene.visualTrim,
+              }),
+            });
+            const raw = await response.text();
+            let json: FitReply | null = null;
+            try {
+              json = JSON.parse(raw) as FitReply;
+            } catch {
+              json = null;
+            }
+            if (!json) {
+              throw new Error(
+                `Server ne aisa jawab diya jo samajh nahi aaya (HTTP ${response.status}) — ` +
+                  `aksar iska matlab hota hai ki request beech me hi kat gayi.`,
+              );
+            }
+            if (!response.ok || !json.asset) {
+              throw new Error(json.reason || json.error || `HTTP ${response.status}`);
+            }
+            fittedId = json.asset.id;
+            forgetAssetMeta();
+          } else {
+            const blob = await fitImageInBrowser({ assetId, plan });
+            const uploaded = await uploadBlob({
+              blob,
+              filename: fittedName(sourceName, plan.target),
+              /*
+               * ⚠️ `fit` ka tag hi wo cheez hai jisse ye file library me pehchani
+               * jaati hai; `wizard` isliye ki wo wahin dikhe jahan baaki wizard
+               * wali file dikhti hai. Yahi wo hissa hai jo aadmi ne maanga tha —
+               * agli reel me seedha ye fit ki hui file chun li jaaye.
+               */
+              tags: ["fit", "wizard"],
+              width: plan.target.width,
+              height: plan.target.height,
+            });
+            fittedId = uploaded.assetId;
           }
+
           if (!alive) return;
-          // Nayi asset library me aa gayi — list taaza karo, warna wo dikhegi hi nahi.
-          forgetAssetMeta();
           setFitState({ key: wantFit, status: "done" });
-          onChange(scene.index, { visualFitAssetId: json.asset.id, visualFitKey: wantFit });
+          onChange(scene.index, { visualFitAssetId: fittedId, visualFitKey: wantFit });
         } catch (cause) {
           if (!alive) return;
           /*
            * ⚠️ Fail hona scene ko nahi girata — asli file waise ki waisi lagi
-           * rehti hai aur reel ban jaati hai. Par wajah chup nahi rehti: ffmpeg
-           * na mile ya file ka naap na pata ho, to wo yahin likha jaata hai,
-           * warna aadmi ko lagta hai ki fit ho chuki hai.
+           * rehti hai aur reel ban jaati hai. Par wajah chup nahi rehti, warna
+           * aadmi ko lagta hai ki fit ho chuki hai.
            */
           setFitState({
             key: wantFit,
@@ -329,7 +388,13 @@ function SceneRow({
       alive = false;
       clearTimeout(timer);
     };
-  }, [wantFit, scene.visualFitOff, scene.visualFitKey, scene.visualFitAssetId]);
+  }, [
+    wantFit,
+    scene.visualFitOff,
+    scene.visualFitKey,
+    scene.visualFitAssetId,
+    scene.visualAssetKind,
+  ]);
 
   /** Fit hata do — asli file hi reel me jaayegi. */
   function turnFitOff(): void {
@@ -640,6 +705,17 @@ function SceneRow({
       </div>
     </div>
   );
+}
+
+/**
+ * Library me dikhne wala naam.
+ *
+ * ⚠️ Naam me naap likha hai, aur wo sajawat nahi hai: gallery me ek hi tasveer ki
+ * asli aur fit ki hui copy bagal-bagal dikhti hain, aur bina naap ke unme farak
+ * karne ka koi tarika nahi hota.
+ */
+function fittedName(assetId: string, target: { width: number; height: number }): string {
+  return `fit-${target.width}x${target.height}-${assetId.slice(0, 8)}.jpg`;
 }
 
 /**

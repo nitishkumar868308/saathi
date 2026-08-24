@@ -11,7 +11,7 @@ import {
   ttsCacheKey,
   voiceIdFor,
 } from "@reel/core";
-import { getTtsAdapter, synthesize } from "@reel/media";
+import { TtsHttpError, getTtsAdapter, synthesize } from "@reel/media";
 import { z } from "zod";
 
 import { fail, handle, ok, readBody } from "@/lib/api";
@@ -42,6 +42,26 @@ import { recordReelUsage } from "@/lib/usage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Vercel par is function ko kitna waqt milta hai (26.26).
+ *
+ * ⚠️ Bina is line ke default **10 second** hai, aur wo TTS ke liye kaafi nahi.
+ * Gemini aam din ~3.5s me jawab deta hai par kabhi-kabhi 100s+ le leta hai; us
+ * halat me Vercel function ko beech me maar deta hai aur client ko **JSON ki
+ * jagah ek HTML error page** milta hai. Uska nateeja UI me aisa dikhta tha:
+ *
+ *     Unexpected token 'A', "An error o"... is not valid JSON
+ *
+ * — yaani ek aisa message jisse na wajah pata chalti hai na ilaaj. 60 Vercel ke
+ * free (Hobby) plan ki poori hadd hai; usse aage ka jawab paisa maangta hai.
+ *
+ * ⚠️ Iske saath hi adapter me se **saara intezaar hata diya gaya hai**. Function
+ * ke andar 429 par rukna do tarah se bura tha: rukna bhi isi 60s me se kat'ta
+ * tha, aur per-minute hadd 60s me khulti bhi nahi. Rukna ab client karta hai,
+ * jispar koi hadd nahi.
+ */
+export const maxDuration = 60;
 
 const GenerateSchema = z.object({
   text: z.string().min(1, "bolne ke liye text chahiye"),
@@ -252,6 +272,44 @@ export async function POST(request: Request): Promise<Response> {
       });
 
       return ok({ asset, cached: false, providerId, voiceId, categoryId: category.id });
+    } catch (cause) {
+      /*
+       * ⚠️ Provider ka HTTP jawab **jaisa ka waisa** client tak jaata hai — khaas
+       * kar 429 aur uske saath aayi `retryAfterSeconds`. Ise ek aam 500 me badal
+       * dena sabse mehnga chhupav tha: client ko sirf "kuch galat hua" milta tha,
+       * isliye wo turant dobara bhejta tha, jisse hadd aur pakki ho jaati thi —
+       * aur free quota ki ginti bina ek bhi awaaz bane khatam ho jaati thi.
+       *
+       * ⚠️ Nakaam koshish bhi likhi jaati hai (`ok: false`). Warna admin me sirf
+       * kaamyab call dikhti hain aur "quota kahan gaya" ka jawab kahin nahi hota.
+       */
+      if (cause instanceof TtsHttpError) {
+        void recordReelUsage({
+          kind: "tts",
+          units: 0,
+          ok: false,
+          meta: {
+            providerId,
+            voiceId,
+            categoryId: category.id,
+            status: cause.status,
+            quotaExhausted: cause.quotaExhausted,
+            chars: text.length,
+            ms: Date.now() - startedAt,
+          },
+        });
+
+        return Response.json(
+          {
+            error: cause.status === 429 ? "awaaz banane ki hadd lag gayi" : "TTS ne mana kiya",
+            reason: cause.message,
+            retryAfterSeconds: cause.retryAfterSeconds,
+            quotaExhausted: cause.quotaExhausted,
+          },
+          { status: cause.status },
+        );
+      }
+      throw cause;
     } finally {
       // Scratch har haal me jaata hai — fail hone par bhi. Warna har nakaam
       // koshish disk par ek adhoori wav chhod jaati hai.

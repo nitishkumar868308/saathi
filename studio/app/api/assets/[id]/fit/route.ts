@@ -192,6 +192,39 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
         sourceAssetId: source.id,
         probeError: probed.error,
       });
+    } catch (cause) {
+      /*
+       * ⚠️ ffmpeg ka na milna ek **alag** baat hai, aur uspar alag jawab chahiye.
+       *
+       * Purana message `run()` se aata tha aur wo local machine ke liye likha hai:
+       * "FFmpeg install hai? Naya terminal khola tha? Ya REEL_FFMPEG_PATH set
+       * karo." Studio jab Vercel par chalta hai to teenon salaah bekaar hain —
+       * serverless me na binary install hoti hai, na terminal hota hai, aur koi
+       * env var ffmpeg ko wahan la nahi sakta. Wo message aadmi ko ghanton us
+       * cheez ke peeche laga deta hai jo ho hi nahi sakti.
+       *
+       * Tasveer ab is raaste se guzarti hi nahi (wo browser me canvas par fit hoti
+       * hai), isliye yahan tak sirf video aati hai — aur video ke liye sach yahi
+       * hai: is server par nahi ho sakti. Reel phir bhi theek banti hai, kyunki
+       * render ke waqt wahi cover/contain lagta hai; sirf gallery wali fit copy
+       * nahi banti.
+       */
+      const message = cause instanceof Error ? cause.message : String(cause);
+      if (message.includes("ENOENT") || message.includes("chala hi nahi")) {
+        return Response.json(
+          {
+            error: "is server par video fit nahi ho sakti",
+            reason:
+              "Video ka fit ffmpeg se hota hai, aur ye server uske bina chal raha hai. " +
+              "Asli file hi lagegi — reel phir bhi theek banegi, kyunki render ke waqt " +
+              "wahi cover/contain lagta hai. (Apne PC par studio chala rahe ho to ffmpeg " +
+              "install karke dev server naye terminal se chalao, ya REEL_FFMPEG_PATH set karo.)",
+            ffmpegMissing: true,
+          },
+          { status: 501 },
+        );
+      }
+      throw cause;
     } finally {
       // Beech ka maal har haal me jaata hai — fail hone par bhi.
       await rm(scratch, { recursive: true, force: true });

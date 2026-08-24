@@ -137,54 +137,36 @@ export const edgeTtsAdapter: TtsAdapter = {
 
 /* ----------------------------------------------------------------- Gemini */
 
-const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts";
+/**
+ * Default model — **3.1**, aur ye chunav naap kar liya gaya hai (26.26).
+ *
+ * Dono model ek hi raftaar par jawab dete hain (~3.5s ek line), par har model ka
+ * **apna free quota** hota hai (`...PerModel-FreeTier`). Yaani model badalna sirf
+ * awaaz ka chunav nahi, ek alag hadd bhi hai.
+ *
+ * Badalna ho to `GEMINI_TTS_MODEL` se — code chhune ki zaroorat nahi.
+ */
+const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? "gemini-3.1-flash-tts-preview";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /**
- * Kitni baar dobara koshish — aur kyun (26.25).
+ * Ek hi reel me ek hi bolne wala — **par bolna asli lage** (26.26).
  *
- * ⚠️ Gemini ka TTS model kabhi-kabhi audio ki jagah **text** lauta deta hai, ya
- * ek khaali candidate. Wo aksar ek pal ki baat hoti hai: wahi text turant dobara
- * bhejne par awaaz aa jaati hai. Pehle yahan koi retry nahi tha, isliye ek scene
- * par wo ek pal poore batch ko tod deta tha — aur upar se message ye kehta tha ki
- * `GEMINI_TTS_MODEL` galat hai, jabki usi model se baaki chhe scene ki awaaz
- * abhi-abhi ban chuki hoti thi. Aadmi env file kholta tha, jahan kuch galat tha
- * hi nahi.
+ * ⚠️ Yahan pehle likha tha "koi acting nahi, koi utaar-chadhav nahi", aur wo
+ * seedha galat tha: wo model ko **flat padhne** ka nirdesh hai. Nateeja ek jaisi
+ * awaaz to deta hai, par wo reel me machine jaisi sunai deti hai — aur reel ka
+ * poora asar wahin mar jaata hai.
  *
- * ⚠️ Rok-tok (429) par bhi dobara koshish hoti hai, par lambe intezaar ke saath —
- * "Sab ki awaaz banao" saat request ek ke baad ek bhejta hai, aur muft wali key
- * par wo hadd aam hai.
+ * Ek hi cheez ek rakhni hai: **kaun bol raha hai** (wahi andaaz, wahi raftaar).
+ * Bolne ka dhang natural rehna chahiye. Do alag baatein hain, aur unhe ek samajh
+ * lena hi wo galti thi.
+ *
+ * ⚠️ Ye line jaan-boojhkar **chhoti** hai. Har call me ye prompt tokens me billti
+ * hai, aur audio ke tokens (~60-90 ek line ke) ke saamne ek lambi Hindi hidayat
+ * poore kharche ko lagbhag dugna kar deti hai. Free quota par wo farak seedha
+ * "aaj kitni reel ban sakti hai" me dikhta hai.
  */
-const GEMINI_ATTEMPTS = 3;
-const GEMINI_RETRY_MS = [700, 2500] as const;
-
-/**
- * Ek hi reel me har scene par **ek jaisi** awaaz (26.25).
- *
- * ⚠️ Ye sirf shabdon ka khel nahi hai, ek asli shikayat ka ilaaj hai: aadmi ne
- * saare scene ek hi awaaz (`Charon`) par banaye the, phir bhi sunne me har scene
- * ka bolne wala thoda alag lagta tha. Wajah ye hai ki har scene ek **alag call**
- * hai, aur model har call me apne hisaab se andaaz chun leta hai — ek line par
- * utsaahi, agli par thehra hua. Voice ka naam ek hone se sirf gala ek rehta hai,
- * andaaz nahi.
- *
- * Do cheezein ise baandhti hain, aur dono zaroori hain:
- *
- *  1. Har call me saaf likha jaata hai ki ye **ek hi narration ka ek hissa** hai
- *     aur andaaz har hisse me ek jaisa rehna chahiye.
- *  2. `temperature: 0` — yaani model ke paas "aaj thoda alag padhta hoon" wali
- *     jagah bachti hi nahi. Yahi wo ek line hai jo scene-dar-scene ke utaar-
- *     chadhav ko sabse zyada kam karti hai.
- *
- * ⚠️ Nirdesh aur bola jaane wala text ek hi line me, quotes ke saath jaate hain —
- * yahi Gemini ka apna documented tarika hai. Pehle nirdesh alag paragraph me upar
- * likha jaata tha, aur us shakl me model use kabhi-kabhi **sawaal** samajh kar
- * uska jawab likh deta tha — yaani theek wahi halat jisme "koi audio nahi tha"
- * wala error aata hai.
- */
-const GEMINI_CONSISTENCY =
-  "Ye ek hi reel ke narration ka ek hissa hai. Har hisse me bilkul EK JAISI awaaz, " +
-  "ek jaisa andaaz aur ek jaisi raftaar rakho — koi acting nahi, koi utaar-chadhav nahi.";
+const GEMINI_CONSISTENCY = "Poori reel me wahi ek narrator, wahi raftaar. Natural bolo.";
 
 interface GeminiPart {
   text?: string;
@@ -196,10 +178,73 @@ interface GeminiResponse {
   promptFeedback?: { blockReason?: string };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((done) => {
-    setTimeout(done, ms);
-  });
+/**
+ * Provider ne HTTP par mana kiya — **kitni der baad dobara** ke saath.
+ *
+ * ⚠️ `retryAfterSeconds` is class ki poori wajah hai. 429 par andaaze se dobara
+ * bhejna free quota ka sabse tez kharch hai: hadd **per-minute** hoti hai, aur
+ * 700ms baad dobara bhejna sirf ek aur 429 kamata hai. Google khud batata hai ki
+ * kitni der rukna hai (`RetryInfo.retryDelay`) — wo number yahan tak lana zaroori
+ * hai, taaki rukne ka faisla andaaze par na ho.
+ */
+export class TtsHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly retryAfterSeconds: number | null,
+    /** `true` = ye hadd aaj bhar ki hai (per-day), aur rukne se theek nahi hogi. */
+    readonly quotaExhausted: boolean,
+  ) {
+    super(message);
+    this.name = "TtsHttpError";
+  }
+}
+
+interface GoogleErrorBody {
+  error?: {
+    message?: string;
+    details?: {
+      "@type"?: string;
+      retryDelay?: string;
+      violations?: { quotaId?: string; quotaValue?: string }[];
+    }[];
+  };
+}
+
+/**
+ * Google ke 429 me se asli kaam ki do cheezein nikaalo.
+ *
+ * ⚠️ Ye body sirf ek lamba message nahi hai — usme `RetryInfo` aur `QuotaFailure`
+ * dono hote hain, aur unme wo jawab hai jo warna andaaze se lagana padta:
+ * **kitni der** aur **kis kism ki hadd**. Per-minute hadd ek minute me khul jaati
+ * hai; per-day wali aaj khulegi hi nahi. Dono par ek jaisa bartaav karne ka
+ * matlab hai ya to bekaar intezaar, ya bekaar koshish.
+ */
+function readGoogleError(raw: string): { retryAfterSeconds: number | null; perDay: boolean } {
+  let body: GoogleErrorBody;
+  try {
+    body = JSON.parse(raw) as GoogleErrorBody;
+  } catch {
+    return { retryAfterSeconds: null, perDay: false };
+  }
+
+  let retryAfterSeconds: number | null = null;
+  let perDay = false;
+
+  for (const detail of body.error?.details ?? []) {
+    const type = detail["@type"] ?? "";
+    if (type.endsWith("RetryInfo") && detail.retryDelay) {
+      const seconds = Number.parseFloat(detail.retryDelay.replace(/s$/, ""));
+      if (Number.isFinite(seconds)) retryAfterSeconds = Math.ceil(seconds);
+    }
+    if (type.endsWith("QuotaFailure")) {
+      for (const violation of detail.violations ?? []) {
+        if (/PerDay/i.test(violation.quotaId ?? "")) perDay = true;
+      }
+    }
+  }
+
+  return { retryAfterSeconds, perDay };
 }
 
 /** Jawab me audio ka hissa — mila to uske saath uska mime bhi chahiye. */
@@ -217,8 +262,7 @@ function geminiAudioPart(json: GeminiResponse): { part: GeminiPart; data: string
  * ek andaaza ban jaata hai. Purana message har haalat par ek hi baat kehta tha
  * ("model TTS wala nahi hai — GEMINI_TTS_MODEL dekho"), aur wo aksar galat hoti
  * thi: asli wajah kabhi `finishReason` hoti hai, kabhi model ka likh kar jawab de
- * dena, kabhi bas ek khaali candidate. Teeno ke ilaaj alag hain, isliye teeno ki
- * line alag hai.
+ * dena, kabhi bas ek khaali candidate. Teeno ke ilaaj alag hain.
  */
 function geminiWhyNoAudio(json: GeminiResponse): string {
   const blocked = json.promptFeedback?.blockReason;
@@ -272,80 +316,117 @@ export const geminiTtsAdapter: TtsAdapter = {
     return { ok: true, detail: `gemini (${GEMINI_TTS_MODEL})` };
   },
 
+  /**
+   * Ek call, aur bas.
+   *
+   * ⚠️ Yahan **koi intezaar nahi hota** — na 429 par, na kisi aur par. Ye function
+   * ek serverless request ke andar chalta hai jiski apni hadd (Vercel par 60s)
+   * hai, aur us hadd ke andar rukna do tarah se bura hai: request beech me kat
+   * jaati hai (client ko HTML ka error page milta hai, JSON nahi), aur rukne ka
+   * waqt bhi zaya hota hai. Rukna **client ka kaam** hai — uspar koi hadd nahi.
+   *
+   * ⚠️ Sirf ek halat me dobara koshish hoti hai: jawab 200 aaya par usme audio na
+   * ho. Wo sach me ek pal ki baat hoti hai aur turant dobara bhejne par ban jaati
+   * hai. Baaki har halat (429, 4xx, 5xx) seedha upar jaati hai, apni wajah ke
+   * saath — kyunki unme dobara bhejna sirf quota aur waqt kharch karta hai.
+   */
   async synthesize(args) {
     const key = process.env.GEMINI_API_KEY?.trim();
     if (!key) throw new Error("GEMINI_API_KEY set nahi hai");
 
     /*
      * Gemini me rate/pitch ka koi parameter hai hi nahi — andaaz **shabdon me**
-     * batana padta hai. Isliye style ka nirdesh text ke saath jaata hai.
+     * batana padta hai.
      *
      * ⚠️ Ye ek asli hadd hai aur ise chhupana nahi chahiye: slider se rate 1.5
-     * karne par Gemini ki awaaz theek 1.5x tez **nahi** hogi, wo bas "tez bolo"
-     * samajhta hai. Jise sach me exact raftaar chahiye wo baad me speed change
-     * (Phase 15) se karega, jo naapa hua hai.
+     * karne par Gemini ki awaaz theek 1.5x tez **nahi** hogi. Jise sach me exact
+     * raftaar chahiye wo `voiceRate` se karega, jo naapa hua hai.
      */
-    const speed =
-      args.rate > 1.15 ? " Thoda tez bolo." : args.rate < 0.85 ? " Thoda dheeme bolo." : "";
+    const speed = args.rate > 1.15 ? " Thoda tez." : args.rate < 0.85 ? " Thoda dheere." : "";
     const style = `${args.stylePrompt ?? ""}${speed} ${GEMINI_CONSISTENCY}`.trim();
-    const prompt = `${style}\nYe line bilkul jaisi likhi hai waisi bolo: "${args.text}"`;
+    const prompt = `${style}\nBolo: "${args.text}"`;
 
     const body = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseModalities: ["AUDIO"],
         /*
-         * ⚠️ 0 — aur ye sajawat nahi hai. Isse hi scene-dar-scene andaaz badalna
-         * band hota hai; default par har call apni marzi ka utaar-chadhav chunti
-         * hai, aur poori reel me bolne wala badalta hua sunai deta hai.
+         * ⚠️ 0.35 — jaan-boojhkar na 0, na default.
+         *
+         * 0 par har call bilkul ek jaisi aati hai (jo chahiye tha) par bolna
+         * chapta aur machine jaisa ho jaata hai. Default par har call apna andaaz
+         * chun leti hai aur poori reel me bolne wala badalta hua sunai deta hai —
+         * wahi shikayat jisse ye poora daur shuru hua. Neeche wali jagah dono se
+         * bachati hai: awaaz aur raftaar tikti hai, par line apni saans ke saath
+         * boli jaati hai.
          */
-        temperature: 0,
+        temperature: 0.35,
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: args.voiceId } },
         },
       },
     });
 
-    let lastError = "";
-    for (let attempt = 1; attempt <= GEMINI_ATTEMPTS; attempt += 1) {
-      const response = await fetch(
-        `${GEMINI_BASE}/${GEMINI_TTS_MODEL}:generateContent?key=${encodeURIComponent(key)}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body },
-      );
+    const url = `${GEMINI_BASE}/${GEMINI_TTS_MODEL}:generateContent?key=${encodeURIComponent(key)}`;
 
-      if (response.ok) {
-        const json = (await response.json()) as GeminiResponse;
-        const audio = geminiAudioPart(json);
+    /** Sirf "200 par audio nadaarad" wali halat ke liye — 2 se aage kabhi nahi. */
+    const EMPTY_AUDIO_TRIES = 2;
+    let lastEmpty = "";
 
-        if (audio) {
-          // Raw PCM — iska naap sirf mime me hota hai, isliye wahin se padha jaata hai.
-          const pcm = requirePcmMime(audio.part.inlineData?.mimeType ?? "");
-          const raw = resolve(args.scratchDir, `tts-gemini-${Date.now()}-${attempt}.pcm`);
-          await writeFile(raw, Buffer.from(audio.data, "base64"));
-          return { path: raw, pcm };
+    for (let attempt = 1; attempt <= EMPTY_AUDIO_TRIES; attempt += 1) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      if (!response.ok) {
+        const raw = await response.text();
+        const { retryAfterSeconds, perDay } = readGoogleError(raw);
+
+        if (response.status === 429) {
+          throw new TtsHttpError(
+            429,
+            perDay
+              ? `Aaj ka free quota khatam ho gaya (${GEMINI_TTS_MODEL}). Kal reset hoga — ` +
+                `tab tak apni awaaz upload kar sakte ho.`
+              : `Ek minute me itni awaazein nahi ban sakti (free quota ki hadd). ` +
+                `${retryAfterSeconds ?? 30} second baad apne aap dobara koshish hogi.`,
+            retryAfterSeconds,
+            perDay,
+          );
         }
 
-        lastError = geminiWhyNoAudio(json);
-
-        /*
-         * ⚠️ Kuch wajahein dobara koshish se theek nahi hoti — Google ne text hi
-         * rok diya ho, ya model TTS wala hi na ho. Un par teen baar wahi call
-         * bhejna sirf waqt aur paisa hai, aur aadmi ko teen guna der intezaar
-         * karwata hai.
-         */
-        if (lastError.includes("rok diya") || lastError.includes("GEMINI_TTS_MODEL")) break;
-      } else {
-        const text = await response.text();
-        lastError = `HTTP ${response.status}. ${text.slice(0, 300)}`;
-        // 4xx (429 ke alawa) dobara bhejne par bhi wahi jawab dega.
-        if (response.status !== 429 && response.status < 500) break;
+        throw new TtsHttpError(
+          response.status,
+          `Gemini ne mana kiya — HTTP ${response.status}. ${raw.slice(0, 300)}`,
+          retryAfterSeconds,
+          false,
+        );
       }
 
-      const wait = GEMINI_RETRY_MS[attempt - 1];
-      if (attempt < GEMINI_ATTEMPTS && wait !== undefined) await sleep(wait);
+      const json = (await response.json()) as GeminiResponse;
+      const audio = geminiAudioPart(json);
+
+      if (audio) {
+        // Raw PCM — iska naap sirf mime me hota hai, isliye wahin se padha jaata hai.
+        const pcm = requirePcmMime(audio.part.inlineData?.mimeType ?? "");
+        const raw = resolve(args.scratchDir, `tts-gemini-${Date.now()}-${attempt}.pcm`);
+        await writeFile(raw, Buffer.from(audio.data, "base64"));
+        return { path: raw, pcm };
+      }
+
+      lastEmpty = geminiWhyNoAudio(json);
+
+      /*
+       * ⚠️ Kuch wajahein dobara bhejne se theek nahi hoti — Google ne text hi rok
+       * diya ho, ya model TTS wala hi na ho. Un par dobara bhejna sirf quota
+       * kharch karta hai, aur free tier par wo quota ginti ka hai.
+       */
+      if (lastEmpty.includes("rok diya") || lastEmpty.includes("GEMINI_TTS_MODEL")) break;
     }
 
-    throw new Error(`Gemini se awaaz nahi bani (${GEMINI_ATTEMPTS} koshish). ${lastError}`);
+    throw new Error(`Gemini se awaaz nahi bani. ${lastEmpty}`);
   },
 };
 

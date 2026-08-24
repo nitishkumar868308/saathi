@@ -492,6 +492,48 @@ check(
   "wizard chetavni fit wali dikhata aur reel me asli chali jaati — wo farak dikhta hi nahi",
 );
 
+/* ------------------------------------------- logo apne aap (26.26) */
+
+/*
+ * ⚠️ Wizard me logo chunne ka khaana kabhi tha hi nahi, isliye CTA wala scene
+ * hamesha bina logo ke banta tha — jabki logo project ke brand me pehle se pada
+ * hota hai. Aadmi ko wo baad me editor kholkar lagana padta tha.
+ */
+const logoDraft = draftFromScript({
+  summary: "logo test",
+  scenes: [
+    { type: "cta", name: "CTA", durationSeconds: 4, slots: { text: "Abhi download karo" } },
+  ],
+});
+const logoDoc = {
+  ...project,
+  brand: { ...project.brand, logoAssetId: "as_logo" },
+};
+
+const logoOut = applyWizard({ doc: logoDoc, draft: autoFill(logoDraft) });
+check(
+  "CTA par brand ka logo apne aap lag jaata hai",
+  logoOut.doc.items.some((item) => item.assetId === "as_logo"),
+  "bina iske har reel ka aakhri scene bina logo ke banta tha",
+);
+check(
+  "logo par contain rehta hai, cover nahi",
+  logoOut.doc.items.find((item) => item.assetId === "as_logo")?.fit.mode === "contain",
+  "chaukor logo cover karne par uske kinare kat jaate hain",
+);
+check(
+  "logo ke peeche dhundhli copy nahi lagti",
+  logoOut.doc.items.find((item) => item.assetId === "as_logo")?.fit.background.kind !==
+    "blurred-asset",
+  "logo ke peeche uski hi dhundhli copy ek dhabba bana deti hai",
+);
+check(
+  "brand me logo na ho to koi logo item nahi banta",
+  !applyWizard({ doc: project, draft: autoFill(logoDraft) }).doc.items.some(
+    (item) => item.assetId === "as_logo",
+  ),
+);
+
 /* ----------------------------------------------------------------- apply */
 
 const out = applyWizard({ doc: project, draft: filled });

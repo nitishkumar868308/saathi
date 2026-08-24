@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { useAssetDurations } from "@/lib/assetMeta";
-import { generateVoice } from "@/lib/voiceGen";
+import { VoiceError, generateVoice } from "@/lib/voiceGen";
 
 /**
  * Step 3 — **Awaaz** (26.9).
@@ -91,14 +91,34 @@ interface Category {
 /**
  * "Sab ki awaaz banao" me do call ke beech ka thehrav.
  *
- * ⚠️ Ye bina wajah ka intezaar nahi hai. Muft wali Gemini key par TTS ki hadd
- * kuch hi request per minute hai; saat request seedhe peeche-peeche bhejne par
- * beech wali 429 par gir jaati hai — aur wo ek scene reel ke beech se chup ho
- * jaata hai. Aadhe second ka thehrav saat scene par 3.5 second jodta hai, aur
- * uske badle wo galti nahi hoti jise theek karne ke liye poora batch dobara
- * chalana padta hai.
+ * ⚠️ Ye 500ms tha, aur wo **naapa hua galat** nikla. Free quota par Gemini ki
+ * hadd per-minute hai (teen-chaar call), isliye aadhe second ke gap se chhe scene
+ * bhejne par pehle do-teen ban jaate the aur baaki har ek 429 par gir jaata tha.
+ * Aadmi ke liye ye "aadhi reel par awaaz hai" jaisa dikhta tha, bina kisi wajah ke.
+ *
+ * ⚠️ Ye sirf shuruaati chaal hai, hadd nahi. Asli rukna 429 ke jawab me hota hai,
+ * jahan Google khud batata hai ki kitni der (`retryAfterSeconds`) — andaaze se
+ * rukna ya to bekaar intezaar hai ya bekaar koshish.
  */
-const BETWEEN_CALLS_MS = 500;
+const BETWEEN_CALLS_MS = 4_000;
+
+/**
+ * Ek scene par kitni baar rukein.
+ *
+ * ⚠️ Do ke baad haar maan li jaati hai, aur ye jaan-boojhkar hai: teesri baar tak
+ * baat hadd ki nahi rehti (wo to khul chuki hoti hai), kuch aur galat hota hai —
+ * aur wahan aur rukna aadmi ko sirf intezaar karwana hai.
+ */
+const RATE_LIMIT_WAITS = 2;
+
+/** Google `retryDelay` na bataye to itna. */
+const DEFAULT_RETRY_SECONDS = 30;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((done) => {
+    setTimeout(done, ms);
+  });
+}
 
 function VoiceRow({
   scene,
@@ -510,6 +530,17 @@ export function StepVoice({
   const ttsUsable = ttsOff === null;
   const [running, setRunning] = useState(false);
   const [failed, setFailed] = useState<{ at: number; reason: string }[]>([]);
+  /**
+   * Batch abhi kahan hai — **ek line me**.
+   *
+   * ⚠️ Iske bina "Sab ki awaaz banao" sirf ek ghoomta hua chakkar tha. Ek scene
+   * 3 second bhi le sakta hai aur (jab provider dheema ho) minute bhar bhi; hadd
+   * lagne par beech me 30 second ka intezaar bhi aata hai. Un teeno halaton me
+   * screen bilkul ek jaisi dikhti thi, isliye aadmi ke paas "atak gaya" ke alawa
+   * koi natija tha hi nahi — aur wo wizard band kar deta tha, jisse aadhi bani
+   * awaazein bhi chali jaati thi.
+   */
+  const [progress, setProgress] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -568,62 +599,99 @@ export function StepVoice({
    * saat chhod dena sabse chidhane wali baat hoti — aadmi ko phir se sab chalana
    * padta.
    */
+  /**
+   * Sab ki awaaz — **ek-ek karke, aur provider ki hadd ke hisaab se**.
+   *
+   * ⚠️ Poora bartaav 429 ke asli jawab par chalta hai, kisi andaaze par nahi.
+   * Teen cheezein isme zaroori hain:
+   *
+   *  1. **Hadd lagne par rukna, na ki agli scene par bhaagna.** Pehle 429 ko ek
+   *     aam nakami maan kar aage badh jaate the — nateeja ye ki chhe me se do
+   *     scene ban'te the aur chaar par wahi error, kyunki hadd to lagi hi rehti
+   *     thi. Ab utni der ruka jaata hai jitni Google batata hai, aur **wahi scene**
+   *     dobara chalti hai.
+   *  2. **Din bhar ki hadd par poora batch rok dena.** Wo rukne se khulti hi
+   *     nahi; baaki paanch scene bhejna sirf paanch aur nakaam call hai.
+   *  3. **Har halat ka nishaan.** Chup-chaap chhoot jaana wo galti hai jo sirf
+   *     reel sun kar pakdi jaati hai.
+   */
   async function runAll(): Promise<void> {
     if (!categoryId) return;
     setRunning(true);
     setFailed([]);
+    setProgress(null);
 
     const problems: { at: number; reason: string }[] = [];
+    const queue = live.filter(
+      (scene) => scene.text.trim() && (!scene.voiceAssetId || voiceStale(scene, draft)),
+    );
 
-    for (const [at, scene] of live.entries()) {
-      if (!scene.text.trim()) continue;
-      if (scene.voiceAssetId && !voiceStale(scene, draft)) continue;
+    let done = 0;
+    let stopped = false;
 
-      try {
-        const made = await generateVoice({ text: scene.text, categoryId, providerId });
-        onChange(scene.index, {
-          voiceAssetId: made.assetId,
-          voiceForText: scene.text,
-          voiceCategoryId: categoryId,
-          /*
-           * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
-           * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
-           * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
-           * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
-           * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
-           * uske baad chuppi aati thi. Screen par "awaaz lag gayi" likha aata
-           * tha, isliye galti kahin dikhti bhi nahi thi.
-           */
-          voiceSeconds: made.seconds,
-        });
-      } catch (cause) {
-        /*
-         * ⚠️ Ek fail hone par baaki rukti nahi. Beech ke ek scene ki wajah se
-         * aage ke saat chhod dena sabse chidhane wali baat hoti — aadmi ko phir
-         * se sab chalana padta.
-         *
-         * ⚠️ Par wajah ab **chup nahi rehti**. Pehle ye `catch` khaali tha:
-         * scene 7 par awaaz banti hi nahi thi aur us qatar par kuch bhi nahi
-         * dikhta tha — na error, na nishaan. Aadmi ko lagta tha ki ban gayi.
-         */
-        problems.push({
-          at: at + 1,
-          reason: cause instanceof Error ? cause.message : String(cause),
-        });
+    for (const scene of queue) {
+      if (stopped) break;
+      const at = live.indexOf(scene) + 1;
+      let waits = 0;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        setProgress(`Scene ${at} ki awaaz ban rahi hai… (${done}/${queue.length} ho chuki)`);
+
+        try {
+          const made = await generateVoice({ text: scene.text, categoryId, providerId });
+          onChange(scene.index, {
+            voiceAssetId: made.assetId,
+            voiceForText: scene.text,
+            voiceCategoryId: categoryId,
+            /*
+             * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
+             * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
+             * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
+             * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
+             * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
+             * uske baad chuppi aati thi.
+             */
+            voiceSeconds: made.seconds,
+          });
+          done += 1;
+          break;
+        } catch (cause) {
+          const error =
+            cause instanceof VoiceError ? cause : new VoiceError(String(cause), "other");
+
+          if (error.kind === "quota-over") {
+            /*
+             * Aaj bhar ki hadd — rukne se nahi khulegi. Baaki scene bhejna sirf
+             * utni aur nakaam call hai, aur har nakaam call bhi ginti me aati hai.
+             */
+            problems.push({ at, reason: error.message });
+            stopped = true;
+            break;
+          }
+
+          if (error.kind === "rate-limit" && waits < RATE_LIMIT_WAITS) {
+            waits += 1;
+            const seconds = error.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS;
+            for (let left = seconds; left > 0; left -= 1) {
+              setProgress(
+                `Free quota ki hadd lag gayi — ${left}s baad scene ${at} dobara ` +
+                  `(${done}/${queue.length} ho chuki).`,
+              );
+              await sleep(1000);
+            }
+            continue;
+          }
+
+          problems.push({ at, reason: error.message });
+          break;
+        }
       }
 
-      /*
-       * ⚠️ Do call ke beech thodi saans. Muft wali Gemini key par TTS ki hadd
-       * chhoti hai (kuch hi request per minute), aur saat request seedhe peeche-
-       * peeche bhejne par beech wali 429 par gir jaati thi. Wo ek scene reel ke
-       * beech se chup ho jaata tha — theek wo halat jise `draftAdvice` "toota hua
-       * lagta hai" kehta hai.
-       */
-      await new Promise((done) => {
-        setTimeout(done, BETWEEN_CALLS_MS);
-      });
+      if (!stopped) await sleep(BETWEEN_CALLS_MS);
     }
 
+    setProgress(null);
     setFailed(problems);
     setRunning(false);
   }
@@ -671,6 +739,13 @@ export function StepVoice({
       {ttsOff ? (
         <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">
           {ttsOff}
+        </p>
+      ) : null}
+
+      {progress ? (
+        <p className="flex items-center gap-1.5 rounded border border-ink-600 bg-ink-900 px-2 py-1.5 text-[11px] text-chalk-300">
+          <Loader2 size={11} className="shrink-0 animate-spin" />
+          {progress}
         </p>
       ) : null}
 

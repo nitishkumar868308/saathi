@@ -1078,6 +1078,32 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       delete slots[visualSlot];
     }
 
+    /*
+     * Logo — **apne aap, project ke brand se** (26.26).
+     *
+     * ⚠️ Wizard me logo chunne ka koi khaana kabhi tha hi nahi, isliye CTA wala
+     * scene hamesha bina logo ke banta tha — jabki logo project ke brand me pehle
+     * se pada hota hai (`doc.brand.logoAssetId`). Aadmi ko wo baad me editor
+     * kholkar haath se lagana padta tha, yaani theek wo cheez jisse bachne ke liye
+     * wizard bana hai.
+     *
+     * ⚠️ AI ne kuch likha ho to uspar **nahi** likha jaata. Wo aadmi ka (ya script
+     * ka) chunav hai, aur uske upar chup-chaap apna faisla thop dena wahi galti
+     * hai jisse `autoFill` bachta hai.
+     *
+     * ⚠️ Logo par fit ka hisaab **nahi** lagta, aur ye zaroori hai. `sceneTypes`
+     * use jaan-boojhkar `contain` par rakhta hai bina dhundhle background ke —
+     * chaukor logo ko cover karne par uske kinare kat jaate hain, aur uske peeche
+     * uski hi dhundhli copy ek dhabba bana deti hai. Dono galtiyan dikhti nahi,
+     * bas logo "thoda ajeeb" lagta hai.
+     */
+    const logoSlot = getSceneType(type)?.slots.find((slot) => slot.id === "logo");
+    if (logoSlot && !slots.logo && args.doc.brand.logoAssetId) {
+      const role = `logo:${scene.index}`;
+      slots.logo = role;
+      assetByRole[role] = args.doc.brand.logoAssetId;
+    }
+
     const audioSlot = audioSlotId(type);
     if (audioSlot && scene.voiceAssetId) {
       const role = `voice:${scene.index}`;
