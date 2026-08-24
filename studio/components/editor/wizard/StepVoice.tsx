@@ -4,8 +4,9 @@ import {
   estimateSpeechSeconds,
   sceneAdvice,
   sceneSeconds,
-  voiceSeconds,
+  usableVoiceSeconds,
   voiceStale,
+  voiceStaleReason,
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
@@ -14,7 +15,8 @@ import { AlertTriangle, Info, Loader2, Mic } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
-import { forgetAssetMeta, useAssetDurations } from "@/lib/assetMeta";
+import { useAssetDurations } from "@/lib/assetMeta";
+import { generateVoice } from "@/lib/voiceGen";
 
 /**
  * Step 3 — **Awaaz** (26.9).
@@ -86,17 +88,35 @@ interface Category {
   hint?: string;
 }
 
+/**
+ * "Sab ki awaaz banao" me do call ke beech ka thehrav.
+ *
+ * ⚠️ Ye bina wajah ka intezaar nahi hai. Muft wali Gemini key par TTS ki hadd
+ * kuch hi request per minute hai; saat request seedhe peeche-peeche bhejne par
+ * beech wali 429 par gir jaati hai — aur wo ek scene reel ke beech se chup ho
+ * jaata hai. Aadhe second ka thehrav saat scene par 3.5 second jodta hai, aur
+ * uske badle wo galti nahi hoti jise theek karne ke liye poora batch dobara
+ * chalana padta hai.
+ */
+const BETWEEN_CALLS_MS = 500;
+
 function VoiceRow({
   scene,
   at,
+  draft,
   categoryId,
+  providerId,
   ttsUsable,
   hasMusic,
   onChange,
 }: {
   scene: WizardScene;
   at: number;
+  /** Poori reel ka awaaz wala chunav yahin se aata hai — us par nishaan lagta hai. */
+  draft: WizardDraft;
   categoryId: string | null;
+  /** Poori reel ke liye ek hi provider — har scene apna faisla na kare. */
+  providerId: string | null;
   /** Koi provider chalne layak hai? Nahi to "Awaaz banao" dabna hi nahi chahiye. */
   ttsUsable: boolean;
   /** Reel par music laga hai? Nahi to per-scene music ka chunav dikhta hi nahi. */
@@ -147,49 +167,48 @@ function VoiceRow({
       voiceAssetId: assetId,
       voiceForText: scene.text,
       voiceSeconds: seconds,
+      /*
+       * ⚠️ `null` — aur ye jaan-boojhkar hai. Ye aadmi ki apni file hai; uspar
+       * "ye us chunav ki nahi hai jo abhi laga hai" wala nishaan lagana jhooth
+       * hoga, kyunki uska koi chunav tha hi nahi. Aur wo nishaan lagne ka matlab
+       * hota ki "Sab ki awaaz banao" uski apni file ko chup-chaap TTS se badal
+       * de — yaani wo file jo usne khud record ki thi.
+       */
+      voiceCategoryId: null,
     });
   }
 
-  const stale = voiceStale(scene);
-  /** Bani hui awaaz ki asli lambai (raftaar aur saans ke saath) — `null` = hai hi nahi. */
-  const measured = voiceSeconds(scene);
+  const staleReason = voiceStaleReason(scene, draft);
+  const stale = staleReason !== null;
+  /** Bani hui awaaz ki asli lambai — `null` = hai hi nahi, ya wo purane shabdon ki hai. */
+  const measured = usableVoiceSeconds(scene);
   /*
    * `voiceStale` wali baat upar apni jagah alag se likhi hai (wo is step ki sabse
    * zaroori line hai), isliye yahan usse hata diya jaata hai — ek hi baat do
    * jagah likhi ho to dono ki keemat aadhi ho jaati hai.
    */
-  const advice = sceneAdvice(scene, at).filter((entry) => !entry.text.startsWith("Awaaz banne"));
+  const advice = sceneAdvice(scene, at, draft).filter(
+    (entry) => !entry.text.startsWith("Awaaz banne") && !entry.text.startsWith("Ye awaaz us chunav"),
+  );
 
   async function generate(): Promise<void> {
     if (!scene.text.trim() || !categoryId) return;
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: scene.text, categoryId }),
-      });
-      const json = (await response.json()) as {
-        asset?: { id: string; durationMs?: number | null };
-        error?: string;
-        reason?: string;
-      };
-      if (!response.ok || !json.asset) {
-        throw new Error(json.reason || json.error || `HTTP ${response.status}`);
-      }
+      const made = await generateVoice({ text: scene.text, categoryId, providerId });
       /*
-       * ⚠️ `voiceForText` yahin likha jaata hai — us text ke saath jisse awaaz
-       * SACH ME bani. Baad me kahin se copy karne par wo do jagah alag ho sakte
-       * hain, aur tab "awaaz purani hai" wala nishaan jhootha ho jaata.
+       * ⚠️ `voiceForText` aur `voiceCategoryId` yahin likhe jaate hain — us text
+       * aur us chunav ke saath jisse awaaz SACH ME bani. Baad me kahin se copy
+       * karne par wo alag ho sakte hain, aur tab "awaaz purani hai" wala nishaan
+       * jhootha ho jaata.
        */
-      // Nayi asset bani — list taaza karo, warna Export "asset nahi mila" bolega.
-      forgetAssetMeta();
       onChange(scene.index, {
-        voiceAssetId: json.asset.id,
+        voiceAssetId: made.assetId,
         voiceForText: scene.text,
+        voiceCategoryId: categoryId,
         // Lambai wahi jo abhi bani — scene ki lambai isi par bandhi hai.
-        voiceSeconds: json.asset.durationMs ? json.asset.durationMs / 1000 : null,
+        voiceSeconds: made.seconds,
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -245,11 +264,23 @@ function VoiceRow({
         jaati hai — bas awaaz kuch aur bolti hai aur screen par kuch aur likha
         hota hai. Wo tab pata chalta hai jab reel bhej di ja chuki hoti hai.
       */}
-      {stale ? (
+      {staleReason === "text" ? (
         <p className="mb-1 flex items-start gap-1 text-[10px] leading-snug text-amber">
           <AlertTriangle size={10} className="mt-0.5 shrink-0" />
           Ye awaaz purane shabdon ki hai — text badal chuka hai. Dobara banao, warna reel me
           awaaz aur likha hua alag-alag honge.
+        </p>
+      ) : staleReason === "choice" ? (
+        /*
+         * ⚠️ Alag line, kyunki alag baat hai. Bola gaya text bilkul theek hai —
+         * bas ye us awaaz ka hai jo ab nahi chuni. Ek hi line dono par dikhane par
+         * aadha waqt wo galat hoti, aur galat chetavni ko log padhna chhod dete
+         * hain.
+         */
+        <p className="mb-1 flex items-start gap-1 text-[10px] leading-snug text-amber">
+          <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+          Ye awaaz pehle wale chunav ki hai — upar se doosri awaaz chuni ja chuki hai. Dobara
+          banao, warna reel ke beech me bolne wala badal jaayega.
         </p>
       ) : null}
 
@@ -344,7 +375,7 @@ function VoiceRow({
             </button>
           ))}
           <span className="min-w-0 flex-1 text-right font-mono text-[10px] text-chalk-500">
-            {scene.voiceSeconds
+            {measured !== null
               ? `${scene.voiceRate.toFixed(2)}x · scene ${sceneSeconds(scene).toFixed(1)}s`
               : "lambai pata nahi"}
           </span>
@@ -444,20 +475,41 @@ export function StepVoice({
   onChange,
   onMusic,
   onMusicVolume,
+  onVoiceCategory,
 }: {
   draft: WizardDraft;
   onChange(index: number, patch: Partial<WizardScene>): void;
   /** `null` = music hata do. */
   onMusic(assetId: string | null): void;
   onMusicVolume(volume: number): void;
+  /** Poori reel ki awaaz — draft me jaati hai, yahan ke state me nahi. */
+  onVoiceCategory(categoryId: string): void;
 }) {
   const live = draft.scenes.filter((scene) => !scene.removed);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryId, setCategoryId] = useState<string | null>(null);
+  /*
+   * ⚠️ Chunav **draft se** aata hai, is component ke `useState` se nahi — aur ye
+   * ek asli bug ka ilaaj hai. Pehle wo yahin rehta tha, aur ye step har baar naye
+   * sire se banta hai: aadmi "Aurat" chunta, teen scene banata, "Dekho" par jaata
+   * aur wapas aata — chunav chup-chaap pehli category ("Aadmi") par gir jaata tha,
+   * aur baaki chaar scene us doosri awaaz me ban jaate the. Screen par kahin kuch
+   * galat nahi dikhta tha; wo galti sirf reel sun kar pakdi jaati hai.
+   */
+  const categoryId = draft.voiceCategoryId;
   const [ttsOff, setTtsOff] = useState<string | null>(null);
+  /**
+   * Poori reel ke liye ek hi provider — **ek baar chuna, phir wahi**.
+   *
+   * ⚠️ Bina iske har request par server dobara faisla karta hai ki kaun chalne
+   * layak hai, aur us faisle ka badalna reel ke beech se bolne wala badal deta
+   * hai. Ye us "har scene me awaaz alag lagti hai" wali shikayat ka doosra
+   * hissa hai (pehla `draft.voiceCategoryId` tha).
+   */
+  const [providerId, setProviderId] = useState<string | null>(null);
   const ttsUsable = ttsOff === null;
   const [running, setRunning] = useState(false);
+  const [failed, setFailed] = useState<{ at: number; reason: string }[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -471,7 +523,13 @@ export function StepVoice({
         };
         if (!alive) return;
         setCategories(data.categories ?? []);
-        setCategoryId((previous) => previous ?? data.categories?.[0]?.id ?? null);
+        /*
+         * Pehli baar par pehli category — par sirf **pehli baar**. Draft me pehle
+         * se kuch likha ho to use haath nahi lagana: wo aadmi ka chunav hai, aur
+         * uspar likh dena hi wo bug tha jisse har scene ki awaaz badal jaati thi.
+         */
+        const first = data.categories?.[0]?.id;
+        if (!draft.voiceCategoryId && first) onVoiceCategory(first);
 
         /*
          * ⚠️ Field ka naam `available` hai, `ok` nahi — aur ye galti maine ki
@@ -487,6 +545,7 @@ export function StepVoice({
          */
         const generators = (data.providers ?? []).filter((entry) => entry.kind !== "manual");
         const usable = generators.filter((entry) => entry.available);
+        setProviderId(usable[0]?.id ?? null);
         if (generators.length > 0 && usable.length === 0) {
           setTtsOff(
             `Koi TTS provider chalne layak nahi hai — apni awaaz upload kar sakte ho. ` +
@@ -512,43 +571,66 @@ export function StepVoice({
   async function runAll(): Promise<void> {
     if (!categoryId) return;
     setRunning(true);
-    for (const scene of live) {
+    setFailed([]);
+
+    const problems: { at: number; reason: string }[] = [];
+
+    for (const [at, scene] of live.entries()) {
       if (!scene.text.trim()) continue;
-      if (scene.voiceAssetId && !voiceStale(scene)) continue;
+      if (scene.voiceAssetId && !voiceStale(scene, draft)) continue;
+
       try {
-        const response = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: scene.text, categoryId }),
+        const made = await generateVoice({ text: scene.text, categoryId, providerId });
+        onChange(scene.index, {
+          voiceAssetId: made.assetId,
+          voiceForText: scene.text,
+          voiceCategoryId: categoryId,
+          /*
+           * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
+           * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
+           * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
+           * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
+           * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
+           * uske baad chuppi aati thi. Screen par "awaaz lag gayi" likha aata
+           * tha, isliye galti kahin dikhti bhi nahi thi.
+           */
+          voiceSeconds: made.seconds,
         });
-        const json = (await response.json()) as {
-          asset?: { id: string; durationMs?: number | null };
-        };
-        if (response.ok && json.asset) {
-          forgetAssetMeta();
-          onChange(scene.index, {
-            voiceAssetId: json.asset.id,
-            voiceForText: scene.text,
-            /*
-             * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
-             * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
-             * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
-             * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
-             * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
-             * uske baad chuppi aati thi. Screen par "awaaz lag gayi" likha aata
-             * tha, isliye galti kahin dikhti bhi nahi thi.
-             */
-            voiceSeconds: json.asset.durationMs ? json.asset.durationMs / 1000 : null,
-          });
-        }
-      } catch {
-        // Ek ka fail hona baaki ko nahi rokta — nishaan us qatar par dikhta hai.
+      } catch (cause) {
+        /*
+         * ⚠️ Ek fail hone par baaki rukti nahi. Beech ke ek scene ki wajah se
+         * aage ke saat chhod dena sabse chidhane wali baat hoti — aadmi ko phir
+         * se sab chalana padta.
+         *
+         * ⚠️ Par wajah ab **chup nahi rehti**. Pehle ye `catch` khaali tha:
+         * scene 7 par awaaz banti hi nahi thi aur us qatar par kuch bhi nahi
+         * dikhta tha — na error, na nishaan. Aadmi ko lagta tha ki ban gayi.
+         */
+        problems.push({
+          at: at + 1,
+          reason: cause instanceof Error ? cause.message : String(cause),
+        });
       }
+
+      /*
+       * ⚠️ Do call ke beech thodi saans. Muft wali Gemini key par TTS ki hadd
+       * chhoti hai (kuch hi request per minute), aur saat request seedhe peeche-
+       * peeche bhejne par beech wali 429 par gir jaati thi. Wo ek scene reel ke
+       * beech se chup ho jaata tha — theek wo halat jise `draftAdvice` "toota hua
+       * lagta hai" kehta hai.
+       */
+      await new Promise((done) => {
+        setTimeout(done, BETWEEN_CALLS_MS);
+      });
     }
+
+    setFailed(problems);
     setRunning(false);
   }
 
-  const pending = live.filter((scene) => scene.text.trim() && (!scene.voiceAssetId || voiceStale(scene)));
+  const pending = live.filter(
+    (scene) => scene.text.trim() && (!scene.voiceAssetId || voiceStale(scene, draft)),
+  );
 
   return (
     <>
@@ -556,7 +638,9 @@ export function StepVoice({
         <span className="text-[10px] text-chalk-500">Awaaz:</span>
         <select
           value={categoryId ?? ""}
-          onChange={(event) => setCategoryId(event.target.value || null)}
+          onChange={(event) => {
+            if (event.target.value) onVoiceCategory(event.target.value);
+          }}
           className="rounded border border-ink-600 bg-ink-950 px-1.5 py-1 text-[11px] text-chalk-100 outline-none focus:border-terracotta"
         >
           {categories.length === 0 ? <option value="">(koi nahi)</option> : null}
@@ -567,7 +651,8 @@ export function StepVoice({
           ))}
         </select>
         <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
-          Poori reel ke liye ek hi — har scene par alag bolne wala reel ko tooti hui dikha deta hai.
+          Poori reel ke liye ek hi — har scene par alag bolne wala reel ko tooti hui dikha deta
+          hai. Ise badalne par pehle se bani awaazon par nishaan lag jaayega.
         </span>
 
         {pending.length > 0 && ttsUsable ? (
@@ -587,6 +672,28 @@ export function StepVoice({
         <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[11px] text-amber">
           {ttsOff}
         </p>
+      ) : null}
+
+      {/*
+        ⚠️ "Sab ki awaaz banao" me jo fail hui unki list — yahan, upar.
+
+        Pehle ye kahin dikhti hi nahi thi (`catch` khaali tha). Sab kuch chal jaane
+        jaisa lagta tha, aur ek scene chup reh jaata tha; wo sirf reel sun kar
+        pakda jaata. Ab ginti bhi hai aur wajah bhi, us scene ke number ke saath —
+        taaki neeche jaakar seedha wahi qatar dobara chalayi ja sake.
+      */}
+      {failed.length > 0 ? (
+        <div className="space-y-0.5 rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5">
+          <p className="text-[11px] text-red-300">
+            {failed.length} scene par awaaz nahi ban paayi — neeche unki qatar par
+            &ldquo;Awaaz banao&rdquo; dobara dabao.
+          </p>
+          {failed.map((entry) => (
+            <p key={entry.at} className="text-[10px] leading-snug text-red-300/80">
+              Scene {entry.at}: {entry.reason}
+            </p>
+          ))}
+        </div>
       ) : null}
 
       {/*
@@ -664,7 +771,9 @@ export function StepVoice({
           key={scene.index}
           scene={scene}
           at={at}
+          draft={draft}
           categoryId={categoryId}
+          providerId={providerId}
           ttsUsable={ttsUsable}
           hasMusic={draft.musicAssetId !== null}
           onChange={onChange}

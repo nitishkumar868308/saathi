@@ -6,7 +6,8 @@ import {
   getSceneType,
   sceneAdvice,
   sceneSeconds,
-  voiceSeconds,
+  usableVoiceSeconds,
+  voiceStaleReason,
   type WizardDraft,
   type WizardScene,
 } from "@reel/core";
@@ -18,11 +19,15 @@ import {
   Eye,
   EyeOff,
   Info,
+  Loader2,
+  Mic,
   Plus,
   RotateCcw,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
+
+import { generateVoice } from "@/lib/voiceGen";
 
 /**
  * Step 1 — **Shabd** (26.5).
@@ -169,12 +174,100 @@ function DurationField({
       )}
 
       <span className="min-w-0 flex-1 truncate text-right text-[10px] text-chalk-500">
+        {/*
+          ⚠️ "Awaaz jitni" tabhi likha jaata hai jab awaaz sach me is text ki ho.
+          Purane shabdon wali file par ye line jhooth bolti thi: lambai us purani
+          awaaz ki dikhti thi aur likha hota tha ki wo abhi wali awaaz jitni hai.
+        */}
         {auto
-          ? scene.voiceAssetId
+          ? usableVoiceSeconds(scene) !== null
             ? "apne aap — awaaz jitni"
-            : "apne aap — AI ke andaaze se"
+            : scene.voiceAssetId
+              ? "apne aap — abhi andaaze se (awaaz purani hai)"
+              : "apne aap — likhe hue ke andaaze se"
           : "tumhara chuna hua"}
       </span>
+    </div>
+  );
+}
+
+/**
+ * Text badalne ke baad awaaz ko **yahin** theek karne ka raasta (26.25).
+ *
+ * ⚠️ Ye patti is poore step ka sabse zaroori hissa hai, aur wo ek asli shikayat
+ * se aayi: "awaaz banane ke baad text badalta hoon to kuch hota hi nahi." Baat
+ * sach thi. Text badal jaata tha, par uska koi nateeja is step par dikhta hi nahi
+ * tha — upar "Awaaz 5.2s ki hai (naapi hui)" waise ka waisa likha rehta tha
+ * (jabki wo 5.2s ab kisi aur text ka tha), scene ki lambai bhi wahin jami rehti
+ * thi, aur awaaz dobara banane ka koi button yahan tha hi nahi. Theek karne ke
+ * liye do step aage jaakar us qatar ko dhoondhna padta tha — aur aadmi aksar
+ * dhoondhta hi nahi.
+ *
+ * Ab teen cheezein ek saath hoti hain: naapi hui lambai **girti hai** (upar wala
+ * `usableVoiceSeconds`), scene naye shabdon ke andaaze par aa jaata hai, aur
+ * dobara banane ka button theek us line ke neeche hota hai jise abhi badla gaya.
+ *
+ * ⚠️ Awaaz ka chunav (`draft.voiceCategoryId`) na ho to button dikhta hi nahi —
+ * uski jagah raasta likha hota hai. Bina chunav ke wo call 400 deti, aur ek button
+ * jo dabane par kabhi kaam na kare, toote hue button jaisa hi hai (README rule 5).
+ */
+function StaleVoiceFix({
+  scene,
+  categoryId,
+  onVoiceMade,
+}: {
+  scene: WizardScene;
+  categoryId: string | null;
+  onVoiceMade(index: number, patch: Partial<WizardScene>): void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function remake(): Promise<void> {
+    if (!categoryId || !scene.text.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const made = await generateVoice({ text: scene.text, categoryId });
+      onVoiceMade(scene.index, {
+        voiceAssetId: made.assetId,
+        voiceForText: scene.text,
+        voiceCategoryId: categoryId,
+        voiceSeconds: made.seconds,
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-1 space-y-1 rounded border border-amber/40 bg-amber/10 px-1.5 py-1">
+      <p className="flex items-start gap-1 text-[10px] leading-snug text-amber">
+        <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+        Is scene ki awaaz purane shabdon ki hai. Jab tak dobara nahi banti, reel me awaaz kuch
+        aur bolegi aur screen par kuch aur likha hoga — aur scene ki lambai bhi abhi andaaze par
+        chal rahi hai.
+      </p>
+
+      {categoryId ? (
+        <button
+          type="button"
+          onClick={() => void remake()}
+          disabled={busy || !scene.text.trim()}
+          className="flex items-center gap-1 rounded border border-amber/50 px-1.5 py-0.5 text-[10px] text-amber transition-colors hover:bg-amber/10 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? <Loader2 size={9} className="animate-spin" /> : <Mic size={9} />}
+          {busy ? "Ban rahi hai…" : "Awaaz dobara banao"}
+        </button>
+      ) : (
+        <p className="text-[10px] text-amber/80">
+          Awaaz wale step par jaakar ek awaaz chuno — uske baad ye yahin se dobara ban jaayegi.
+        </p>
+      )}
+
+      {error ? <p className="text-[10px] leading-snug text-red-300">{error}</p> : null}
     </div>
   );
 }
@@ -182,6 +275,7 @@ function DurationField({
 export function StepText({
   draft,
   onChange,
+  onVoiceMade,
   onTextScale,
   onTextColor,
   onReplaceExisting,
@@ -191,6 +285,14 @@ export function StepText({
 }: {
   draft: WizardDraft;
   onChange(index: number, patch: Partial<WizardScene>): void;
+  /**
+   * Awaaz yahin se dobara ban jaaye to uska nateeja draft me likhne ke liye.
+   *
+   * ⚠️ Ye `onChange` se alag naam par isliye hai ki call site par saaf dikhe ki
+   * ye ek **asset ban jaane** ka nateeja hai, kisi input ka nahi. Kaam dono ka
+   * ek hi hai, par padhne wale ke liye wo farak hi sab kuch hai.
+   */
+  onVoiceMade(index: number, patch: Partial<WizardScene>): void;
   onTextScale(scale: number): void;
   onTextColor(color: string | null): void;
   onReplaceExisting(value: boolean): void;
@@ -390,8 +492,15 @@ export function StepText({
       ) : null}
 
       {live.map((scene, at) => {
-        const voice = voiceSeconds(scene);
+        /*
+         * ⚠️ `usableVoiceSeconds` — `voiceSeconds` nahi. Farak wahi hai jispar is
+         * step ki poori shikayat khadi thi: text badalne ke baad purani file ki
+         * naapi hui lambai dikhate rehna matlab screen par ek pakka number rakhna
+         * jo ab kisi aur text ka hai.
+         */
+        const voice = usableVoiceSeconds(scene);
         const guess = estimateSpeechSeconds(scene.text, scene.voiceRate);
+        const staleReason = voiceStaleReason(scene, draft);
 
         return (
           <div key={scene.index} className="rounded border border-ink-600 bg-ink-900 p-2">
@@ -558,22 +667,45 @@ export function StepText({
               </div>
             ) : null}
 
-            {sceneAdvice(scene, at).map((entry) => (
-              <p
-                key={entry.text}
-                className={clsx(
-                  "mt-1 flex items-start gap-1 text-[10px] leading-snug",
-                  entry.level === "warn" ? "text-amber" : "text-chalk-500",
-                )}
-              >
-                {entry.level === "warn" ? (
-                  <AlertTriangle size={10} className="mt-0.5 shrink-0" />
-                ) : (
-                  <Info size={10} className="mt-0.5 shrink-0" />
-                )}
-                {entry.text}
-              </p>
-            ))}
+            {/*
+              Awaaz purani ho gayi — theek karne ka raasta yahin, us line ke neeche
+              jise abhi badla gaya hai.
+            */}
+            {staleReason !== null ? (
+              <StaleVoiceFix
+                scene={scene}
+                categoryId={draft.voiceCategoryId}
+                onVoiceMade={onVoiceMade}
+              />
+            ) : null}
+
+            {/*
+              ⚠️ Stale wali chetavni yahan se hata di jaati hai — wo upar apni
+              poori patti me hai, dobara banane ke button ke saath. Do jagah ek hi
+              baat likhne par dono ki keemat aadhi ho jaati hai.
+            */}
+            {sceneAdvice(scene, at, draft)
+              .filter(
+                (entry) =>
+                  !entry.text.startsWith("Awaaz banne ke baad") &&
+                  !entry.text.startsWith("Ye awaaz us chunav"),
+              )
+              .map((entry) => (
+                <p
+                  key={entry.text}
+                  className={clsx(
+                    "mt-1 flex items-start gap-1 text-[10px] leading-snug",
+                    entry.level === "warn" ? "text-amber" : "text-chalk-500",
+                  )}
+                >
+                  {entry.level === "warn" ? (
+                    <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+                  ) : (
+                    <Info size={10} className="mt-0.5 shrink-0" />
+                  )}
+                  {entry.text}
+                </p>
+              ))}
           </div>
         );
       })}

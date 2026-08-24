@@ -71,6 +71,48 @@ export interface WizardScene {
    */
   visualAssetKind: "image" | "video" | null;
   /**
+   * Usi file ki **frame me fit ki hui** copy — `null` = abhi nahi bani (ya nahi chahiye).
+   *
+   * ⚠️ `visualAssetId` wahi rehti hai jo aadmi ne chuni thi, aur wo jaan-boojhkar
+   * hai: picker me uski apni file dikhni chahiye, humari banayi hui nahi. Reel me
+   * jo sach me jaata hai wo `visualAssetOf()` deta hai — fit wali, ho to.
+   *
+   * ⚠️ Fit ki hui file asli ke **upar** nahi likhi jaati, uske bagal me banti hai.
+   * Upar likh dene par aadmi ki apni file hamesha ke liye kat/dab kar reh jaati,
+   * aur harkat badalne par usi kati hui file se dobara fit hoti — nuksaan har
+   * baar jud'ta jaata. Alag rakhne se fit hatana ek tap hai.
+   */
+  visualFitAssetId: string | null;
+  /**
+   * Fit karna hi nahi hai — aadmi ne asli file par wapas jaana chuna.
+   *
+   * ⚠️ Ye field is liye hai ki "abhi tak fit nahi hui" aur "fit nahi karni hai"
+   * do alag halat hain, aur dono me `visualFitAssetId` `null` hota hai. Bina iske
+   * fit hatate hi wo apne aap dobara ban jaati thi — yaani wo button dabta tha
+   * par lagta nahi tha (README rule 5), aur har baar ek naya encode bhi kharch
+   * hota tha.
+   *
+   * ⚠️ Ye per-scene hai, poori reel ka nahi. Ek hi reel me ek chaudi tasveer ko
+   * fit karna theek hota hai aur ek poster ko nahi — wo faisla us tasveer ka hai,
+   * reel ka nahi.
+   */
+  visualFitOff: boolean;
+  /**
+   * Jo fit abhi lagi hai, wo **kis maang par** bani thi.
+   *
+   * ⚠️ Ye sirf hisaab bachane ke liye nahi hai. Iske bina UI ko ye pata hi nahi
+   * chalta ki maujooda fit abhi wali maang ki hai ya kisi purani ki — aur uska
+   * ek hi imaandaar jawab bachta tha: har baar dobara poochho. Nateeja ye tha ki
+   * Tasveer wale step par lautte hi har qatar "fit ho rahi hai…" dikhati thi,
+   * jabki kuch ho hi nahi raha hota tha (server cache se turant wahi file
+   * lautati thi). Ek nishaan jo bina kaam ke chamakta ho, wo dhire-dhire padha
+   * jaana band ho jaata hai.
+   *
+   * Isme wahi cheezein hain jo `fitCacheKey` me hain — file, naap, cover/contain,
+   * aur video ka chuna hua hissa.
+   */
+  visualFitKey: string | null;
+  /**
    * Chuni hui file ka apna naap — `null` = pata nahi.
    *
    * WARNING: Ye "kitni badi tasveer chahiye" wali chetavni ke liye nahi hai
@@ -160,6 +202,22 @@ export interface WizardScene {
    * hui awaaz purane shabdon ki reh jaati hai, aur wo galti kahin dikhti nahi.
    */
   voiceForText: string | null;
+  /**
+   * Kis awaaz (category) se ye bani thi — `VOICE_CATEGORIES` ka id.
+   *
+   * ⚠️ `null` ke do matlab hain aur dono theek hain: ya to awaaz aadmi ki apni
+   * file hai (upload/library), ya wo tab bani thi jab ye field tha hi nahi.
+   * Dono me "kaunsi awaaz thi" ka jawab hai hi nahi, isliye uspar chetavni bhi
+   * nahi lagti — jhoothi chetavni ka anjaam hamesha ek hi hota hai.
+   *
+   * ⚠️ Iske bina 26.9 ka doosra aadha hissa pakda hi nahi jaata. Text badalne
+   * par nishaan lagta tha, par **awaaz ka chunav** badalne par nahi: aadmi
+   * "Aurat" par teen scene banata, dropdown "Aadmi" par le jaata (ya step
+   * badalne par wo khud reset ho jaata tha), baaki chaar banata — aur reel me
+   * beech se bolne wala badal jaata tha. Wo galti sirf reel sun kar pakdi jaati
+   * hai.
+   */
+  voiceCategoryId: string | null;
 
   /**
    * Text frame me kahan baithe.
@@ -280,6 +338,21 @@ export interface WizardDraft {
    * kya bola ja raha hai.
    */
   musicVolume: number;
+  /**
+   * Poori reel ki awaaz ka chunav — `VOICE_CATEGORIES` ka id, `null` = abhi nahi chuna.
+   *
+   * ⚠️ Ye draft me hai, kisi step ke `useState` me nahi — aur wo ek asli bug ka
+   * ilaaj hai. Pehle ye Awaaz wale step ke andar rehta tha: aadmi "Aurat" chunta,
+   * teen scene banata, "Dekho" par jaakar wapas aata — aur step dobara banne par
+   * chunav pehli category ("Aadmi") par gir jaata tha. Baaki chaar scene us nayi
+   * awaaz me ban jaate the, aur reel ke beech se bolne wala badal jaata tha.
+   * Screen par kahin kuch galat nahi dikhta tha; wo galti sirf reel sun kar
+   * pakdi jaati hai.
+   *
+   * ⚠️ Ye per-scene nahi hai, aur wo jaan-boojhkar hai — ek hi reel me har scene
+   * ka bolne wala badalta rahe to wo reel tooti hui lagti hai.
+   */
+  voiceCategoryId: string | null;
 }
 
 /* ------------------------------------------------------------ slot khojna */
@@ -405,6 +478,14 @@ export function draftFromScript(script: AiScript): WizardDraft {
     gapSeconds: 0,
     musicAssetId: null,
     musicVolume: 0.15,
+    /*
+     * ⚠️ Yahan `null` hai, koi default category nahi — aur wo farak asli hai.
+     * Koi ek awaaz pehle se chun dene par UI ke paas ye batane ka tarika nahi
+     * rehta ki aadmi ne wo sach me chuni thi ya wo bas pehli likhi hui thi. Step
+     * khulte hi pehli maujood category is field me likh di jaati hai, aur uske
+     * baad wo wahin tikti hai.
+     */
+    voiceCategoryId: null,
     scenes: script.scenes.map((scene, index) => {
       const textSlot = textSlotId(scene.type);
       const rest: Record<string, string> = { ...scene.slots };
@@ -420,6 +501,9 @@ export function draftFromScript(script: AiScript): WizardDraft {
         slots: rest,
         visualAssetId: null,
         visualAssetKind: null,
+        visualFitAssetId: null,
+        visualFitOff: false,
+        visualFitKey: null,
         visualSize: null,
         visualTrim: null,
         phoneFrame: false,
@@ -430,6 +514,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         voiceVolume: 1,
         musicVolume: null,
         voiceForText: null,
+        voiceCategoryId: null,
         hideText: false,
         animationPresetId: null,
         transitionId: null,
@@ -481,6 +566,9 @@ export function blankScene(index: number): WizardScene {
     slots: {},
     visualAssetId: null,
     visualAssetKind: null,
+    visualFitAssetId: null,
+    visualFitOff: false,
+    visualFitKey: null,
     visualSize: null,
     visualTrim: null,
     phoneFrame: false,
@@ -491,6 +579,7 @@ export function blankScene(index: number): WizardScene {
     voiceVolume: 1,
     musicVolume: null,
     voiceForText: null,
+    voiceCategoryId: null,
     hideText: false,
     animationPresetId: null,
     transitionId: null,
@@ -558,16 +647,62 @@ export function canMoveScene(draft: WizardDraft, index: number, delta: -1 | 1): 
 }
 
 /**
- * Bani hui awaaz ab purane shabdon ki hai? (26.9)
+ * Bani hui awaaz **kis wajah se** purani ho chuki hai (26.9 / 26.25).
  *
- * ⚠️ Trim kar ke milaya jaata hai — aage-peeche ka space badal jaana aam hai
+ * `null` = taaza hai. Warna do me se ek wajah:
+ *
+ *  - `"text"`   — awaaz banne ke baad shabd badal gaye
+ *  - `"choice"` — shabd wahi hain, par ab poori reel par doosri awaaz chuni hai
+ *
+ * ⚠️ Do wajah alag rakhi gayi hain kyunki unke **ilaaj alag hain aur nateeje
+ * bhi**. Text badalne par awaaz aur likha hua ek doosre se ulat jaate hain (sabse
+ * bura wala nateeja, aur scene ki lambai bhi jhoothi ho jaati hai). Chunav badalne
+ * par jo bola gaya hai wo bilkul theek hai — bas reel ke beech se bolne wala badal
+ * jaata hai. Dono par ek hi line dikhana matlab aadhi baat har baar galat dikhana.
+ *
+ * ⚠️ Text trim kar ke milaya jaata hai — aage-peeche ka space badal jaana aam hai
  * (aadmi text ke ant me enter daba deta hai), aur uspar "awaaz purani hai" ka
  * laal nishaan dikhana ek jhoothi chetavni hai. Jhoothi chetavni ka anjaam
  * hamesha ek hi hota hai: kuch dinon me use koi padhta hi nahi.
+ *
+ * ⚠️ Jis awaaz ka `voiceCategoryId` `null` hai uspar chunav wali chetavni kabhi
+ * nahi lagti. Wo aadmi ki apni upload ki hui file hai (ya us waqt ki bani hui jab
+ * ye field tha hi nahi) — uske liye "kaunsi awaaz thi" ka jawab hai hi nahi, aur
+ * na hone ko galat bata dena jhooth hai.
  */
-export function voiceStale(scene: WizardScene): boolean {
-  if (!scene.voiceAssetId || scene.voiceForText === null) return false;
-  return scene.voiceForText.trim() !== scene.text.trim();
+export type VoiceStaleReason = "text" | "choice";
+
+export function voiceStaleReason(
+  scene: WizardScene,
+  draft?: Pick<WizardDraft, "voiceCategoryId"> | null,
+): VoiceStaleReason | null {
+  if (!scene.voiceAssetId) return null;
+  if (scene.voiceForText !== null && scene.voiceForText.trim() !== scene.text.trim()) {
+    return "text";
+  }
+  const want = draft?.voiceCategoryId ?? null;
+  if (want && scene.voiceCategoryId && scene.voiceCategoryId !== want) return "choice";
+  return null;
+}
+
+/**
+ * Sirf **shabd** badle hain? — lambai ka hisaab isi par chalta hai.
+ *
+ * ⚠️ Ye `voiceStale` se alag hai aur alag hona zaroori hai. Awaaz ka chunav
+ * badalne par file ki lambai bilkul sahi rehti hai (wahi shabd, doosri awaaz),
+ * isliye scene ki lambai usse hilni nahi chahiye. Text badalne par wo lambai
+ * purane shabdon ki ho jaati hai — aur usi par scene bandha ho to reel chup-chaap
+ * galat lambai ki ban jaati hai.
+ */
+export function voiceTextStale(scene: WizardScene): boolean {
+  return voiceStaleReason(scene) === "text";
+}
+
+export function voiceStale(
+  scene: WizardScene,
+  draft?: Pick<WizardDraft, "voiceCategoryId"> | null,
+): boolean {
+  return voiceStaleReason(scene, draft) !== null;
 }
 
 /**
@@ -590,6 +725,18 @@ export function voiceStale(scene: WizardScene): boolean {
  */
 export function textHidden(scene: WizardScene): boolean {
   return scene.hideText && Boolean(scene.visualAssetId || scene.voiceAssetId);
+}
+
+/**
+ * Reel me sach me kaunsi file jaayegi — fit wali, ya asli (26.25).
+ *
+ * ⚠️ Ye ek hi jagah hai jahan ye faisla hota hai, aur wahi iski poori wajah hai.
+ * Do jagah likhne par wo ek din alag ho jaate hain: wizard fit ki hui file ki
+ * chetavni dikhata aur reel me asli chali jaati — aur wo farak sirf bani hui reel
+ * dekh kar pakda jaata.
+ */
+export function visualAssetOf(scene: WizardScene): string | null {
+  return scene.visualFitAssetId ?? scene.visualAssetId;
 }
 
 /**
@@ -656,6 +803,28 @@ export function voiceSeconds(scene: WizardScene): number | null {
   return scene.voiceSeconds / rate + VOICE_TAIL_SECONDS;
 }
 
+/**
+ * Wahi lambai — **par sirf tab jab wo abhi bhi sach ho** (26.25).
+ *
+ * `null` = ya to awaaz hai hi nahi, ya wo purane shabdon ki hai.
+ *
+ * ⚠️ Ye function ek asli, chup-chaap chalne wali galti rokta hai. Text badalne ke
+ * baad file wahi purani padi rehti hai, aur uski naapi hui lambai bhi wahi. Us
+ * lambai par scene bandha rehne ka nateeja ye tha ki **Shabd wale step me kuch
+ * badalta hi nahi dikhta**: aadmi 12 shabd ki line ko 30 shabd ka bana deta tha
+ * aur scene 5.2s ka hi likha rehta tha, uspar "naapi hui" ka thappa bhi laga
+ * hota tha. Yaani screen wo number pakka bata rahi thi jo ab kisi aur text ka
+ * tha.
+ *
+ * Ab wo lambai girte hi scene naye shabdon ke andaaze par aa jaata hai (`~`
+ * ke saath), aur awaaz dobara banate hi wapas naap par. Yaani ek hi niyam: jo
+ * number dikh raha hai wo hamesha usi text ka hai jo abhi likha hai.
+ */
+export function usableVoiceSeconds(scene: WizardScene): number | null {
+  if (voiceTextStale(scene)) return null;
+  return voiceSeconds(scene);
+}
+
 /** Scene itne se lamba bhi nahi — haath se likha number bhi is hadd me aata hai. */
 export const MAX_SCENE_SECONDS = 30;
 
@@ -702,9 +871,19 @@ export function sceneSeconds(scene: WizardScene): number {
     ? Math.max(0.5, scene.visualTrim.endSeconds - scene.visualTrim.startSeconds)
     : null;
 
-  const voice = voiceSeconds(scene);
+  const voice = usableVoiceSeconds(scene);
 
-  if (voice === null) return trimmed ?? scene.durationSeconds;
+  /*
+   * ⚠️ Awaaz purane shabdon ki ho to uski lambai **nahi** ginti, par AI ka
+   * andaaza bhi nahi lagta — naye shabdon ka apna andaaza lagta hai. AI ka
+   * `durationSeconds` us script ka hai jo ab badal chuki hai; uspar girne se wo
+   * scene aksar 4s par chipak jaata tha chahe aadmi ne usme kitna bhi likh diya
+   * ho.
+   */
+  if (voice === null) {
+    const guess = voiceTextStale(scene) ? estimateSpeechSeconds(scene.text, scene.voiceRate) : 0;
+    return Math.max(MIN_SCENE_SECONDS, guess, trimmed ?? scene.durationSeconds);
+  }
   return Math.max(MIN_SCENE_SECONDS, voice, trimmed ?? 0);
 }
 
@@ -765,7 +944,13 @@ const CUT_TOLERANCE_SECONDS = 0.15;
 const SILENCE_TOLERANCE_SECONDS = 1.2;
 
 export function voiceMismatch(scene: WizardScene): VoiceMismatch | null {
-  const voice = voiceSeconds(scene);
+  /*
+   * ⚠️ Purane shabdon wali awaaz par mel ka hisaab lagana bekaar hai — wo file
+   * dobara banegi aur uski lambai badal jaayegi. Us halat me "aakhri 2.1s kat
+   * jaayega" dikhana ek aisi ginti hai jo ab kisi cheez ki nahi hai, aur uske
+   * saath asli chetavni ("awaaz purani hai") dab jaati hai.
+   */
+  const voice = usableVoiceSeconds(scene);
   if (voice === null) return null;
 
   const seconds = sceneSeconds(scene);
@@ -879,10 +1064,16 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * na milne par slot khaali reh jaata — bina kisi error ke.
      */
     const visualSlot = visualSlotId(type);
-    if (visualSlot && scene.visualAssetId) {
+    /*
+     * ⚠️ Reel me fit ki hui file jaati hai, asli nahi (`visualAssetOf`). Asli
+     * `visualAssetId` sirf ye yaad rakhne ke liye hai ki aadmi ne kya chuna tha —
+     * usse dobara fit hoti hai jab harkat badalti hai.
+     */
+    const visualId = visualAssetOf(scene);
+    if (visualSlot && visualId) {
       const role = `visual:${scene.index}`;
       slots[visualSlot] = role;
-      assetByRole[role] = scene.visualAssetId;
+      assetByRole[role] = visualId;
     } else if (visualSlot) {
       delete slots[visualSlot];
     }
@@ -998,7 +1189,19 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * Yahan ka kaam sirf ek halat sudhaarna hai — bahut zyada phailna — na ki
      * har item ka fit tay karna.
      */
-    if (source.visualAssetId && primary.assetId === source.visualAssetId && !source.phoneFrame) {
+    /*
+     * ⚠️ Fit ki hui file par ye hisaab **nahi** lagta, aur wo zaroori hai. Wo file
+     * pehle se theek frame ke naap ki hai; uspar `visualSize` (asli file ka naap)
+     * se contain+blur lagana matlab ek hi kaam do baar — tasveer frame ke andar
+     * dobara chhoti ho kar baith jaati hai, kinare par dhundhli patti ke saath.
+     */
+    const fitVisual = visualAssetOf(source);
+    if (
+      fitVisual &&
+      source.visualFitAssetId === null &&
+      primary.assetId === fitVisual &&
+      !source.phoneFrame
+    ) {
       const fit = fitFor(source.visualSize, doc.project);
       if (fit.mode === "contain") {
         doc = {
@@ -1024,7 +1227,12 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * Video ka chuna hua hissa. Ye `applyAnimationPreset` se **pehle** nahi, baad
      * me lagta hai - dono alag cheezein hain aur ek doosre ko chhoote nahi.
      */
-    if (source.visualTrim && primary.assetId === source.visualAssetId) {
+    /*
+     * ⚠️ Fit ki hui video me trim **pehle se laga hua** hai (fit usi hisse ko
+     * kaat kar banti hai), isliye uspar dobara trim nahi lagta — warna chuna hua
+     * hissa apne hi andar se dobara kat jaata hai.
+     */
+    if (source.visualTrim && source.visualFitAssetId === null && primary.assetId === fitVisual) {
       doc = trimItemToSourceRange(doc, {
         itemId: primary.id,
         startSeconds: source.visualTrim.startSeconds,
@@ -1338,17 +1546,28 @@ export interface WizardAdvice {
  * hai. Sab kuch laal kar dene par kuch dinon me laal ka matlab hi khatam ho
  * jaata hai — aur phir asli wali bhi anpadhi jaati hai.
  */
-export function sceneAdvice(scene: WizardScene, at: number): WizardAdvice[] {
+export function sceneAdvice(
+  scene: WizardScene,
+  at: number,
+  /** Poori reel ka awaaz wala chunav — na do to sirf text wali jaanch chalti hai. */
+  draft?: Pick<WizardDraft, "voiceCategoryId"> | null,
+): WizardAdvice[] {
   const out: WizardAdvice[] = [];
   if (scene.removed) return out;
 
   const seconds = sceneSeconds(scene);
   const words = scene.text.trim().split(/\s+/).filter(Boolean).length;
 
-  if (voiceStale(scene)) {
+  const staleReason = voiceStaleReason(scene, draft);
+  if (staleReason === "text") {
     out.push({
       level: "warn",
       text: "Awaaz banne ke baad text badla hai — reel me kuch aur bolega, screen par kuch aur likha hoga. Dobara banao.",
+    });
+  } else if (staleReason === "choice") {
+    out.push({
+      level: "warn",
+      text: "Ye awaaz us chunav ki hai jo ab badal chuka hai — reel ke beech me bolne wala badal jaayega. Dobara banao.",
     });
   }
 
@@ -1527,7 +1746,7 @@ export function draftProgress(draft: WizardDraft): {
     total: live.length,
     withImage: live.filter((scene) => scene.visualAssetId).length,
     withVoice: live.filter((scene) => scene.voiceAssetId).length,
-    staleVoice: live.filter(voiceStale).length,
+    staleVoice: live.filter((scene) => voiceStale(scene, draft)).length,
     mismatch: live.filter((scene) => voiceMismatch(scene) !== null).length,
     needsChoice: live.filter(
       (scene) => scene.transitionId === null || (scene.visualAssetId && !scene.animationPresetId),

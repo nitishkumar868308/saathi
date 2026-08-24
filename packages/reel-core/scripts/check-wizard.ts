@@ -46,6 +46,13 @@ import {
   fitFor,
   requiredVisualSize,
   voiceStale,
+  voiceStaleReason,
+  voiceTextStale,
+  usableVoiceSeconds,
+  visualAssetOf,
+  planFit,
+  fitCacheKey,
+  animationZoom,
   sceneSeconds,
   sceneAdvice,
   draftAdvice,
@@ -299,6 +306,190 @@ check(
 check(
   "sirf space badalne par jhoothi chetavni nahi",
   !voiceStale({ ...filled.scenes[0]!, text: `  ${filled.scenes[0]!.text}\n` }),
+);
+
+/* ----------------------------- awaaz ka chunav badalna (26.25) */
+
+/*
+ * ⚠️ Ye wo bug hai jiski shikayat asli reel sun kar aayi: har scene me bolne wala
+ * thoda alag lagta tha. Wajah ye thi ki awaaz ka chunav step ke andar rehta tha
+ * aur step dobara khulne par pehli category par gir jaata tha — aadhi reel ek
+ * awaaz me banti thi aur aadhi doosri, bina kahin kuch galat dikhe.
+ */
+const sameVoice = {
+  ...filled.scenes[0]!,
+  voiceAssetId: "as_v1",
+  voiceSeconds: 4,
+  voiceForText: filled.scenes[0]!.text,
+  voiceCategoryId: "female",
+};
+const femaleDraft = { ...filled, voiceCategoryId: "female", scenes: [sameVoice] };
+const maleDraft = { ...femaleDraft, voiceCategoryId: "male" };
+
+check("wahi chunav ho to koi nishaan nahi", !voiceStale(sameVoice, femaleDraft));
+check(
+  "chunav badalne par awaaz par nishaan lagta hai",
+  voiceStaleReason(sameVoice, maleDraft) === "choice",
+  "bina iske aadhi reel ek awaaz me banti thi aur aadhi doosri",
+);
+check(
+  "text badalna 'choice' se pehle aata hai",
+  voiceStaleReason({ ...sameVoice, text: "kuch aur" }, maleDraft) === "text",
+  "dono ke ilaaj alag hain, isliye pehle wo dikhna chahiye jo zyada bura hai",
+);
+check(
+  "apni upload ki hui awaaz par chunav wala nishaan kabhi nahi",
+  !voiceStale({ ...sameVoice, voiceCategoryId: null }, maleDraft),
+  "uska koi chunav tha hi nahi — nishaan lagne par batch use TTS se badal deta",
+);
+check(
+  "draft ka chunav na diya ho to sirf text wali jaanch chalti hai",
+  !voiceStale(sameVoice),
+);
+check(
+  "progress chunav wale nishaan bhi ginta hai",
+  draftProgress(maleDraft).staleVoice === 1,
+  "footer ki ginti aur scene ka nishaan ek hi hisaab se aane chahiye",
+);
+
+/* -------------------- text badalne par lambai bhi badalti hai (26.25) */
+
+/*
+ * ⚠️ Ye "text badalta hoon to kuch hota hi nahi" wali shikayat ka dil hai. Awaaz
+ * ki naapi hui lambai purane shabdon ki thi, aur scene usi par bandha rehta tha:
+ * aadmi ek line ko teen guna lamba kar deta tha aur scene wahi 4.2s ka likha
+ * rehta tha, uspar "naapi hui" ka thappa bhi laga hota tha.
+ */
+const longer = { ...sameVoice, text: `${sameVoice.text} ${"aur ek line ".repeat(12)}` };
+check(
+  "purane shabdon wali lambai girti hai",
+  usableVoiceSeconds(longer) === null && usableVoiceSeconds(sameVoice) !== null,
+);
+check("voiceTextStale sirf text par lagta hai", voiceTextStale(longer) && !voiceTextStale(sameVoice));
+check(
+  "text lamba karne par scene bhi lamba hota hai",
+  sceneSeconds(longer) > sceneSeconds(sameVoice),
+  `${sceneSeconds(sameVoice).toFixed(1)}s -> ${sceneSeconds(longer).toFixed(1)}s`,
+);
+check(
+  "purani awaaz par 'kat jaayega' wali jhoothi ginti nahi aati",
+  voiceMismatch(longer) === null,
+  "wo ginti ab kisi cheez ki nahi hai — asli chetavni 'awaaz purani hai' hai",
+);
+check(
+  "chunav badalne se scene ki lambai nahi hilti",
+  sceneSeconds(sameVoice) === sceneSeconds({ ...sameVoice, voiceCategoryId: "male" }),
+  "doosri awaaz me wahi shabd hain — file ki lambai sach hi rehti hai",
+);
+
+/* ------------------------------------------------- fit ka hisaab (26.25) */
+
+const frame1080 = { width: 1080, height: 1920 };
+
+check(
+  "harkat ka zoom target naap me judta hai",
+  planFit({ source: { width: 2160, height: 3840 }, frame: frame1080, animationPresetId: null })!
+    .target.height === 1920,
+);
+check(
+  "bina naap ke fit ka koi faisla nahi",
+  planFit({ source: null, frame: frame1080, animationPresetId: null }) === null,
+  "andaaza laga kar kaat dena wahi upscale wala jhooth hai",
+);
+
+const wide = planFit({
+  source: { width: 1698, height: 926 },
+  frame: frame1080,
+  animationPresetId: null,
+})!;
+check("bahut chaudi tasveer contain par jaati hai", wide.mode === "contain");
+check("contain par kinare dhundhle bharte hain", wide.blurredEdges);
+check("contain par kuch kat'ta nahi", wide.cropped.width === 0 && wide.cropped.height === 0);
+
+const tall = planFit({
+  source: { width: 1080, height: 1920 },
+  frame: frame1080,
+  animationPresetId: null,
+})!;
+check("theek naap wali tasveer bilkul nahi phailti", Math.abs(tall.upscale - 1) < 0.001);
+check(
+  "theek baithne par koi laal chetavni nahi",
+  tall.warnings.every((entry) => entry.level === "tip"),
+  "har halat par peeli patti dikhane par kuch dinon me use koi padhta hi nahi",
+);
+
+const small = planFit({
+  source: { width: 540, height: 960 },
+  frame: frame1080,
+  animationPresetId: null,
+})!;
+check(
+  "chhoti tasveer par saaf chetavni",
+  small.warnings.some((entry) => entry.level === "warn" && entry.text.includes("phailegi")),
+  `${small.upscale.toFixed(2)}x`,
+);
+
+check(
+  "target hamesha sam (even) hota hai",
+  small.target.width % 2 === 0 && small.target.height % 2 === 0,
+  "H.264 vishm chaudai par encode hi nahi hota",
+);
+
+/* fit ki cache key — wahi soch jo TTS ki hai */
+
+const keyA = fitCacheKey({
+  sourceAssetId: "as_1",
+  target: frame1080,
+  mode: "cover",
+  blurredEdges: false,
+  trim: null,
+});
+check(
+  "wahi maang par wahi key",
+  keyA ===
+    fitCacheKey({
+      sourceAssetId: "as_1",
+      target: frame1080,
+      mode: "cover",
+      blurredEdges: false,
+      trim: null,
+    }),
+  "warna har chunav par ek naya encode lagta aur gallery copies se bhar jaati",
+);
+check(
+  "naap badalne par key badalti hai",
+  keyA !==
+    fitCacheKey({
+      sourceAssetId: "as_1",
+      target: { width: 1242, height: 2208 },
+      mode: "cover",
+      blurredEdges: false,
+      trim: null,
+    }),
+);
+check(
+  "video ka chuna hua hissa bhi key me hai",
+  keyA !==
+    fitCacheKey({
+      sourceAssetId: "as_1",
+      target: frame1080,
+      mode: "cover",
+      blurredEdges: false,
+      trim: { startSeconds: 2, endSeconds: 6 },
+    }),
+  "bina iske trim badalne par purani hi file lautti",
+);
+
+check("bina harkat ke zoom 1 hai", animationZoom(null) === 1);
+
+/* reel me kaunsi file jaati hai */
+
+const picked = { ...blankScene(0), visualAssetId: "as_orig" };
+check("fit na bani ho to asli file", visualAssetOf(picked) === "as_orig");
+check(
+  "fit bani ho to wahi jaati hai",
+  visualAssetOf({ ...picked, visualFitAssetId: "as_fit" }) === "as_fit",
+  "wizard chetavni fit wali dikhata aur reel me asli chali jaati — wo farak dikhta hi nahi",
 );
 
 /* ----------------------------------------------------------------- apply */

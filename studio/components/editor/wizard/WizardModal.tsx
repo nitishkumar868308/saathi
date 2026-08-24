@@ -144,6 +144,17 @@ export function WizardModal({
     setDraft((previous) => (previous ? { ...previous, musicVolume: volume } : previous));
   }
 
+  /**
+   * Poori reel ki awaaz ka chunav.
+   *
+   * ⚠️ Ye draft me rehta hai, Awaaz wale step ke andar nahi — aur wo ek asli bug
+   * ka ilaaj hai. Step ke andar rehne par wo har baar step khulne par pehli
+   * category par gir jaata tha, aur aadhi reel doosri awaaz me ban jaati thi.
+   */
+  function setVoiceCategory(categoryId: string): void {
+    setDraft((previous) => (previous ? { ...previous, voiceCategoryId: categoryId } : previous));
+  }
+
   function setTextScale(scale: number): void {
     setDraft((previous) => (previous ? { ...previous, textScale: scale } : previous));
   }
@@ -209,6 +220,7 @@ export function WizardModal({
       draft.scenes.some(
         (scene) =>
           scene.visualAssetId ||
+          scene.visualFitAssetId ||
           scene.voiceAssetId ||
           scene.removed ||
           scene.durationOverrideSeconds !== null ||
@@ -343,6 +355,7 @@ export function WizardModal({
             <StepText
               draft={draft}
               onChange={update}
+              onVoiceMade={update}
               onTextScale={setTextScale}
               onTextColor={setTextColor}
               onReplaceExisting={setReplaceExisting}
@@ -358,6 +371,7 @@ export function WizardModal({
               onChange={update}
               onMusic={setMusic}
               onMusicVolume={setMusicVolume}
+              onVoiceCategory={setVoiceCategory}
             />
           ) : null}
           {step === 3 ? <StepPreview draft={draft} /> : null}

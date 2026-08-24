@@ -15,6 +15,7 @@ export * from "./ffmpeg";
 export * from "./loudness";
 export * from "./probe";
 export * from "./thumbnails";
+export * from "./fit";
 export * from "./reverse";
 export * from "./voice";
 export * from "./tts/providers";

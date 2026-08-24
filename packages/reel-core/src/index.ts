@@ -47,6 +47,9 @@ export * from "./ai/cost";
 // Keyframes — value nikalna (poora engine Phase 13 me)
 export * from "./keyframes/interpolate";
 
+// Media — fit ka hisaab (ffmpeg @reel/media me, faisla yahan)
+export * from "./media/fitPlan";
+
 // Quality — Section 3A ka naapne wala hissa (poora validator Phase 20 me)
 export * from "./quality/assetQuality";
 export * from "./quality/preflight";
