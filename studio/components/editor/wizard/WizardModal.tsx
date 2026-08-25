@@ -5,6 +5,7 @@ import {
   autoFill,
   draftAdvice,
   draftFromScript,
+  emptyDraft,
   draftProgress,
   draftTotalSeconds,
   insertSceneAfter,
@@ -85,6 +86,24 @@ export function WizardModal({
   if (script && script !== seenScript) {
     setSeenScript(script);
     setDraft(autoFill(draftFromScript(script)));
+    setStep(0);
+    setError(null);
+  }
+
+  /*
+   * Bina script ke bhi wizard khulta hai — ek khaali scene ke saath (26.27).
+   *
+   * ⚠️ Ye us halat ka ilaaj hai jahan aadmi ko sirf ek scene khud banana tha aur
+   * uske liye bhi ek AI call chalti thi. Wo call paise leti thi, waqt leti thi,
+   * aur uska nateeja wo turant mita deta tha — kyunki use apna text likhna tha,
+   * AI ka nahi.
+   *
+   * ⚠️ Shart me `open` bhi hai. Iske bina ye component mount hote hi (bina khule)
+   * draft bana leta, aur "wizard dobara kholo" wala raasta us khaali draft par
+   * ja girta — yaani AI ki bani hui script chup-chaap gayab.
+   */
+  if (open && !script && !draft) {
+    setDraft(emptyDraft());
     setStep(0);
     setError(null);
   }

@@ -189,6 +189,97 @@ export function planFit(args: {
   return { target, mode, blurredEdges: mode === "contain", zoom, upscale, cropped, warnings };
 }
 
+/**
+ * Ek line ka faisla — **file chunte hi, fit hone se pehle** (26.26).
+ *
+ * ⚠️ Ye `plan.warnings` ka duplicate nahi hai, uska sar hai. Warnings me poora
+ * hisaab hota hai (kitne pixel, kitna phailega, kitna kat jaayega) — wo zaroori
+ * hai par wo **jawab nahi** hai. Aadmi ka sawaal ek hi hota hai: "ye file theek
+ * hai ya nahi?" Wo jawab teen number padh kar khud nikalna padta tha, aur aksar
+ * koi nikalta hi nahi tha — file lag jaati thi aur kharabi reel ban jaane ke baad
+ * dikhti thi.
+ *
+ * ⚠️ Teen darje hain, do nahi. "Chalega par sabse achha nahi" aur "ye file is
+ * reel ke liye galat hai" ko ek hi laal rang me daal dena dono ko bekaar kar deta
+ * hai: pehla har doosri file par lagta hai (isliye log padhna chhod dete hain),
+ * aur uske saath doosra bhi anpadha reh jaata hai.
+ */
+export interface FitVerdict {
+  /**
+   * `good`  — bina kisi nuksaan ke baithegi
+   * `weak`  — baith jaayegi, par kuch keemat hai (halki narmi, thoda crop)
+   * `bad`   — is reel ke liye ye file sach me theek nahi hai
+   */
+  level: "good" | "weak" | "bad";
+  /** Ek line, aam bhasha me — yahi sabse pehle dikhta hai. */
+  headline: string;
+}
+
+export function fitVerdict(
+  plan: FitPlan,
+  source: FitSize,
+  /** Tasveer hai ya video — line usi hisaab se likhi jaati hai. */
+  kind: "image" | "video" = "image",
+): FitVerdict {
+  const what = kind === "video" ? "video" : "tasveer";
+  const crop = Math.max(plan.cropped.width, plan.cropped.height);
+
+  /*
+   * Sabse pehle wahi jo sabse bura hai: itna phailna ki saaf na rahe. Ye ek hi
+   * kharabi hai jise baad me theek nahi kiya ja sakta — kata hua hissa wapas
+   * laaya ja sakta hai (fit hatao, ya doosri harkat chuno), gaye hue pixel nahi.
+   */
+  if (plan.upscale > MAX_CLEAN_UPSCALE) {
+    return {
+      level: "bad",
+      headline:
+        `Ye ${what} is reel ke liye chhoti hai — ${source.width}x${source.height} ki hai aur ` +
+        `${plan.upscale.toFixed(1)} guna phailegi, isliye dhundhli dikhegi.`,
+    };
+  }
+
+  if (crop > 0.45) {
+    return {
+      level: "bad",
+      headline:
+        `Ye ${what} frame se bahut alag aakaar ki hai — bharne me iska ` +
+        `${Math.round(crop * 100)}% hissa kat jaayega.`,
+    };
+  }
+
+  if (plan.mode === "contain") {
+    return {
+      level: "weak",
+      headline:
+        `Ye ${what} frame se bahut chaudi hai — poori to dikhegi, par upar-neeche ` +
+        `uski hi dhundhli copy bharegi.`,
+    };
+  }
+
+  if (plan.upscale > 1.02) {
+    return {
+      level: "weak",
+      headline:
+        `Ye ${what} thodi chhoti hai — ${plan.upscale.toFixed(2)} guna phailegi, ` +
+        `zara si narm lagegi (aankh se pakadna mushkil).`,
+    };
+  }
+
+  if (crop > CROP_WARN) {
+    return {
+      level: "weak",
+      headline:
+        `Ye ${what} theek baithegi, par kinaron ka ${Math.round(crop * 100)}% kat jaayega — ` +
+        `dekh lo ki zaroori cheez kinare par to nahi.`,
+    };
+  }
+
+  return {
+    level: "good",
+    headline: `Ye ${what} is reel ke liye theek hai — saaf aur poori baithegi.`,
+  };
+}
+
 function evenUp(value: number): number {
   const rounded = Math.ceil(value);
   return rounded % 2 === 0 ? rounded : rounded + 1;

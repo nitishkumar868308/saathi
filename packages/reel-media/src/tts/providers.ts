@@ -138,15 +138,30 @@ export const edgeTtsAdapter: TtsAdapter = {
 /* ----------------------------------------------------------------- Gemini */
 
 /**
- * Default model — **3.1**, aur ye chunav naap kar liya gaya hai (26.26).
+ * Default model — **2.5**, aur ye 26.26 ka faisla ulta karta hai (26.27).
  *
- * Dono model ek hi raftaar par jawab dete hain (~3.5s ek line), par har model ka
- * **apna free quota** hota hai (`...PerModel-FreeTier`). Yaani model badalna sirf
- * awaaz ka chunav nahi, ek alag hadd bhi hai.
+ * ⚠️ **Ye ek line ₹393 ki thi.** 26.26 me default 3.1 kar diya gaya tha, is
+ * dalil par ki har model ka apna free quota hota hai — jo free tier par sach
+ * bhi tha. Par account paid (Tier 1) hone ke baad wo dalil bekaar ho gayi aur
+ * neeche wali baat bach gayi, jo kisi ne naapi hi nahi thi:
  *
- * Badalna ho to `GEMINI_TTS_MODEL` se — code chhune ki zaroorat nahi.
+ *     Gemini 3.1 Flash TTS —   9 call  →  ₹393.81   (~₹44 per call)
+ *     Gemini 2.5 Flash TTS —  97 call  →  ₹ 16.95   (~₹0.17 per call)
+ *
+ * Yaani ek hi kaam, **~260 guna** keemat. Ye 24 Aug 2026 ke bill se nikla hai,
+ * andaaza nahi hai.
+ *
+ * ⚠️ Sabse buri baat ye thi ki isme kuch "toota" hua nahi dikhta. Awaaz banti
+ * thi, achhi banti thi, koi error nahi aata tha. Farak sirf bill me tha — aur
+ * bill koi roz nahi dekhta. Isliye default hamesha **sasta** hona chahiye; jise
+ * mehnga chahiye wo `GEMINI_TTS_MODEL` se maange, taaki wo ek soch kar liya gaya
+ * faisla ho, chup-chaap laga hua default nahi.
+ *
+ * ⚠️ Preview model ki keemat bina khabar ke badal sakti hai. Naya model chunne
+ * se pehle billing par uska **per-call kharcha** dekh lo — "naya hai" ya "tez
+ * hai" iski wajah nahi hai.
  */
-const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? "gemini-3.1-flash-tts-preview";
+const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /**

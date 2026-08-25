@@ -31,20 +31,32 @@ export interface TtsProviderEntry {
 }
 
 export const TTS_PROVIDERS: readonly TtsProviderEntry[] = [
-  {
-    id: "gemini",
-    label: "Gemini (Google)",
-    hint: "Sabse achhi awaaz. Text Google ke server par jaata hai aur iska paisa lagta hai.",
-    kind: "cloud",
-    needsApiKey: true,
-    envKey: "GEMINI_API_KEY",
-  },
+  /*
+   * ⚠️ Muft wala **pehle** likha hai, aur ye tarteeb sirf dikhne ki nahi hai —
+   * `/api/tts` bina provider ke aane par is list ka **pehla chalne layak**
+   * provider chunta hai (26.27). Pehle Gemini upar tha, yaani default hamesha
+   * paise wala tha, aur wo faisla kisi ne kabhi liya nahi tha — wo bas likhne ki
+   * tarteeb thi. Ek din ka ₹407 ka bill isi "bas tarteeb" se bana.
+   *
+   * ⚠️ Ye Gemini ko band nahi karta. Gemini ki awaaz behtar hai aur jise wo
+   * chahiye wo upar se chun sakta hai — bas ab wo **chunna** padta hai, apne aap
+   * nahi lag jaata. Aur `pip install edge-tts` na ho to ye chalne layak hi nahi
+   * hai, isliye wahan Gemini par apne aap wapas chala jaata hai.
+   */
   {
     id: "edge",
     label: "edge-tts (muft)",
-    hint: "Muft, par text Microsoft ke server par jaata hai. `pip install edge-tts` chahiye.",
+    hint: "Muft. Text Microsoft ke server par jaata hai. `pip install edge-tts` chahiye — Vercel par ye nahi chalta.",
     kind: "cloud",
     needsApiKey: false,
+  },
+  {
+    id: "gemini",
+    label: "Gemini (Google)",
+    hint: "Sabse achhi awaaz — par har awaaz ka paisa lagta hai (Google ka bill).",
+    kind: "cloud",
+    needsApiKey: true,
+    envKey: "GEMINI_API_KEY",
   },
   {
     id: "upload",

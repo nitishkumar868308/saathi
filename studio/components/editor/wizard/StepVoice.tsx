@@ -14,6 +14,8 @@ import clsx from "clsx";
 import { AlertTriangle, Info, Loader2, Mic } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { AudioPreview } from "@/components/media/AudioPreview";
+
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { useAssetDurations } from "@/lib/assetMeta";
 import { VoiceError, generateVoice } from "@/lib/voiceGen";
@@ -101,6 +103,27 @@ interface Category {
  * rukna ya to bekaar intezaar hai ya bekaar koshish.
  */
 const BETWEEN_CALLS_MS = 4_000;
+
+/**
+ * Ek saath kitni awaazein banti hain (26.27).
+ *
+ * ⚠️ Pehle ye 1 thi — har scene ek-ek karke, aur har do ke beech 4 second ka
+ * gap. Saat scene ki reel par wo **50 second** ka intezaar tha, jisme se aadha
+ * waqt kuch ho hi nahi raha tha. Aur wo gap har baar lagta tha, chahe provider
+ * ne ek baar bhi mana na kiya ho — yaani jo hadd kabhi lagi hi nahi, uski keemat
+ * har reel chukati thi.
+ *
+ * ⚠️ 3 hai, 6 nahi. Ye TTS ki hadd ka andaaza nahi hai — ye wo ginti hai jispar
+ * fail hone ki keemat kam rehti hai. Hadd lagni hi hai to teen call par lagegi,
+ * aur teen ko dobara bhejna sasta hai; chhe par hadd lagne ka matlab hai chhe
+ * bekaar call, jo free quota par ginti me bhi aati hain.
+ *
+ * ⚠️ Ye sirf **shuruaat** hai. Pehli 429 par hi ye 1 par aa jaati hai aur gap
+ * wapas lag jaata hai — dekho `slow`. Yehi is badlaav ki asli baat hai: tez
+ * chalna default hai, aur dheema hona provider ke mana karne par hota hai, pehle
+ * se dar kar nahi.
+ */
+const LANES = 3;
 
 /**
  * Ek scene par kitni baar rukein.
@@ -367,6 +390,22 @@ function VoiceRow({
       </div>
 
       {/*
+        Sun kar dekho — **wahin jahan awaaz banti hai** (26.27).
+
+        ⚠️ Ye pehle nahi tha, aur uski keemat har baar lagti thi. Awaaz ban jaane
+        ke baad use sunne ka ek hi tarika tha: wizard band karo, timeline par
+        jao, us clip ko dhoondho, phir chalao. Yaani jaanchne ki keemat itni thi
+        ki koi jaanchta hi nahi tha — sab "awaaz lag gayi" padh kar aage badh
+        jaate the, aur galat awaaz ya kata hua text export ke baad pata chalta tha.
+
+        ⚠️ Player sirf tab jab awaaz ho. Khaali player dikhana (jo dabta hai par
+        kuch bajta nahi) toote hue button jaisa hi hai.
+      */}
+      {scene.voiceAssetId ? (
+        <AudioPreview assetId={scene.voiceAssetId} className="mt-1" />
+      ) : null}
+
+      {/*
         Raftaar — sirf tab jab awaaz ho.
 
         ⚠️ Iske saath hi scene ki nayi lambai bhi likhi jaati hai, aur wo do
@@ -600,11 +639,15 @@ export function StepVoice({
    * padta.
    */
   /**
-   * Sab ki awaaz — **ek-ek karke, aur provider ki hadd ke hisaab se**.
+   * Sab ki awaaz — **teen ek saath, aur provider mana kare to ek-ek karke**.
    *
    * ⚠️ Poora bartaav 429 ke asli jawab par chalta hai, kisi andaaze par nahi.
    * Teen cheezein isme zaroori hain:
    *
+   *  0. **Tez chalna default hai.** Teen lane ek saath chalti hain aur beech ka
+   *     gap tab tak lagta hi nahi jab tak provider ek baar mana na kar de (26.27).
+   *     Pehle ulta tha — har reel har baar sabse dheemi chaal se banti thi, us
+   *     hadd se bachne ke liye jo aksar lagti hi nahi thi.
    *  1. **Hadd lagne par rukna, na ki agli scene par bhaagna.** Pehle 429 ko ek
    *     aam nakami maan kar aage badh jaate the — nateeja ye ki chhe me se do
    *     scene ban'te the aur chaar par wahi error, kyunki hadd to lagi hi rehti
@@ -612,87 +655,155 @@ export function StepVoice({
    *     dobara chalti hai.
    *  2. **Din bhar ki hadd par poora batch rok dena.** Wo rukne se khulti hi
    *     nahi; baaki paanch scene bhejna sirf paanch aur nakaam call hai.
-   *  3. **Har halat ka nishaan.** Chup-chaap chhoot jaana wo galti hai jo sirf
-   *     reel sun kar pakdi jaati hai.
+   *  3. **Har halat ka nishaan, aur wo bhi turant.** Chup-chaap chhoot jaana wo
+   *     galti hai jo sirf reel sun kar pakdi jaati hai. Nakami ab **usi waqt**
+   *     likhi jaati hai jab hoti hai, batch ke ant me nahi — warna aadmi paanch
+   *     scene ka intezaar poori ummeed se karta hai aur ant me pata chalta hai ki
+   *     pehli hi scene gir chuki thi.
    */
   async function runAll(): Promise<void> {
     if (!categoryId) return;
+    /*
+     * ⚠️ Chunav ek local const me utha liya jaata hai. Upar wala guard TypeScript
+     * ke liye kaafi nahi hai — `lane()` ek alag function hai, aur uske andar tak
+     * wo narrowing nahi pahunchti. Isse bada faayda ye hai ki poore batch ke
+     * dauraan awaaz **wahi** rehti hai jo shuru me chuni thi, chahe beech me upar
+     * se koi doosri chun le: warna aadhi reel ek aadmi ki awaaz me hoti aur aadhi
+     * doosre ki.
+     */
+    const voice = categoryId;
     setRunning(true);
     setFailed([]);
     setProgress(null);
 
-    const problems: { at: number; reason: string }[] = [];
     const queue = live.filter(
       (scene) => scene.text.trim() && (!scene.voiceAssetId || voiceStale(scene, draft)),
     );
 
+    /** Agli scene kaunsi — saari lane isi ek ginti se uthaati hain. */
+    let cursor = 0;
     let done = 0;
     let stopped = false;
+    /**
+     * Provider ne ek baar mana kar diya — ab ek-ek karke aur gap ke saath.
+     *
+     * ⚠️ Ye ek tarfa hai: `true` hone ke baad wapas `false` nahi hota. Hadd
+     * khulne par dobara tez ho jaana aasan lagta hai, par wo seedha usi hadd me
+     * wapas ja girta hai — aur har girna ginti me aata hai.
+     */
+    let slow = false;
+    const inFlight = new Set<number>();
 
-    for (const scene of queue) {
-      if (stopped) break;
-      const at = live.indexOf(scene) + 1;
-      let waits = 0;
+    const tick = (message?: string): void => {
+      if (message) {
+        setProgress(message);
+        return;
+      }
+      const busyNow = [...inFlight].sort((a, b) => a - b);
+      setProgress(
+        busyNow.length === 0
+          ? `${done}/${queue.length} ho chuki`
+          : `Scene ${busyNow.join(", ")} ki awaaz ban rahi hai… (${done}/${queue.length} ho chuki)`,
+      );
+    };
 
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        setProgress(`Scene ${at} ki awaaz ban rahi hai… (${done}/${queue.length} ho chuki)`);
+    async function lane(laneNo: number): Promise<void> {
+      while (!stopped) {
+        // Dheeme mode me sirf pehli lane bachti hai; baaki apna kaam khatam
+        // karke chup-chaap nikal jaati hain.
+        if (slow && laneNo > 0) return;
 
-        try {
-          const made = await generateVoice({ text: scene.text, categoryId, providerId });
-          onChange(scene.index, {
-            voiceAssetId: made.assetId,
-            voiceForText: scene.text,
-            voiceCategoryId: categoryId,
-            /*
-             * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
-             * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
-             * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
-             * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
-             * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
-             * uske baad chuppi aati thi.
-             */
-            voiceSeconds: made.seconds,
-          });
-          done += 1;
-          break;
-        } catch (cause) {
-          const error =
-            cause instanceof VoiceError ? cause : new VoiceError(String(cause), "other");
+        const mine = cursor;
+        cursor += 1;
+        if (mine >= queue.length) return;
+        const scene = queue[mine];
+        if (!scene) return;
 
-          if (error.kind === "quota-over") {
-            /*
-             * Aaj bhar ki hadd — rukne se nahi khulegi. Baaki scene bhejna sirf
-             * utni aur nakaam call hai, aur har nakaam call bhi ginti me aati hai.
-             */
-            problems.push({ at, reason: error.message });
-            stopped = true;
+        const at = live.indexOf(scene) + 1;
+        let waits = 0;
+        inFlight.add(at);
+        tick();
+
+        while (!stopped) {
+          try {
+            const made = await generateVoice({
+              text: scene.text,
+              categoryId: voice,
+              providerId,
+            });
+            onChange(scene.index, {
+              voiceAssetId: made.assetId,
+              voiceForText: scene.text,
+              voiceCategoryId: voice,
+              /*
+               * ⚠️ Lambai yahan bhi likhni **zaroori** hai, aur ye ek asli bug tha.
+               * Ek-ek karke banane wala raasta (`generate`) ise likhta tha, par
+               * "Sab ki awaaz banao" wala nahi — jabki aam aadmi wahi dabata hai.
+               * Nateeja chup-chaap bura tha: har scene ki lambai AI ke andaaze par
+               * reh jaati thi (aksar 4s), aur awaaz ya to beech me kat'ti thi ya
+               * uske baad chuppi aati thi.
+               */
+              voiceSeconds: made.seconds,
+            });
+            done += 1;
+            break;
+          } catch (cause) {
+            const error =
+              cause instanceof VoiceError ? cause : new VoiceError(String(cause), "other");
+
+            if (error.kind === "quota-over") {
+              /*
+               * Aaj bhar ki hadd — rukne se nahi khulegi. Baaki scene bhejna sirf
+               * utni aur nakaam call hai, aur har nakaam call bhi ginti me aati hai.
+               */
+              setFailed((prev) => [...prev, { at, reason: error.message }]);
+              stopped = true;
+              break;
+            }
+
+            if (error.kind === "rate-limit") {
+              /*
+               * ⚠️ Pehli 429 par hi ikattha bhejna band — us scene ko chhodne se
+               * pehle. Ye tarteeb maayne rakhti hai: agar ye line retry ke baad
+               * hoti, to baaki do lane us poore intezaar ke dauraan naye call
+               * bhejti rehti aur hadd kabhi khulti hi nahi.
+               */
+              slow = true;
+
+              if (waits >= RATE_LIMIT_WAITS) {
+                setFailed((prev) => [...prev, { at, reason: error.message }]);
+                break;
+              }
+              waits += 1;
+              const seconds = error.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS;
+              for (let left = seconds; left > 0 && !stopped; left -= 1) {
+                tick(
+                  `Hadd lag gayi — ${left}s baad scene ${at} dobara ` +
+                    `(${done}/${queue.length} ho chuki).`,
+                );
+                await sleep(1000);
+              }
+              continue;
+            }
+
+            setFailed((prev) => [...prev, { at, reason: error.message }]);
             break;
           }
-
-          if (error.kind === "rate-limit" && waits < RATE_LIMIT_WAITS) {
-            waits += 1;
-            const seconds = error.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS;
-            for (let left = seconds; left > 0; left -= 1) {
-              setProgress(
-                `Free quota ki hadd lag gayi — ${left}s baad scene ${at} dobara ` +
-                  `(${done}/${queue.length} ho chuki).`,
-              );
-              await sleep(1000);
-            }
-            continue;
-          }
-
-          problems.push({ at, reason: error.message });
-          break;
         }
-      }
 
-      if (!stopped) await sleep(BETWEEN_CALLS_MS);
+        inFlight.delete(at);
+        tick();
+        // Gap sirf tab jab provider ek baar mana kar chuka ho. Warna ye har reel
+        // par lagne wala bina wajah ka intezaar hai.
+        if (slow && !stopped) await sleep(BETWEEN_CALLS_MS);
+      }
     }
 
+    await Promise.all(
+      Array.from({ length: Math.max(1, Math.min(LANES, queue.length)) }, (_, i) => lane(i)),
+    );
+
     setProgress(null);
-    setFailed(problems);
     setRunning(false);
   }
 

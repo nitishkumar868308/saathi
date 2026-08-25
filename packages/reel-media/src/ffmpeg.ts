@@ -23,6 +23,36 @@ export function ffprobePath(): string {
   return process.env.REEL_FFPROBE_PATH?.trim() || "ffprobe";
 }
 
+/**
+ * FFmpeg is machine par chalta bhi hai ya nahi — **poochho, maano mat** (26.27).
+ *
+ * ⚠️ Ye is liye zaroori hai ki studio do bilkul alag jagah chalta hai. Tumhare
+ * PC par ffmpeg hai; Vercel ke serverless function me wo hai hi nahi aur kabhi
+ * hoga bhi nahi (250MB ki hadd me wo aata nahi). Bina is jaanch ke UI dono jagah
+ * ek hi kaam ki koshish karti thi, aur Vercel par har video par ye dikhta tha:
+ *
+ *     "ffmpeg" chala hi nahi (spawn ffmpeg ENOENT)
+ *     FFmpeg install hai? Naya terminal khola tha?
+ *
+ * — yaani ek aisi salah jo us jagah par poori tarah bekaar hai. Aadmi ffmpeg
+ * install karne ki koshish karta rehta, aur wo kabhi kaam nahi aata.
+ *
+ * ⚠️ Jawab cache hota hai. Ye ek process spawn karta hai; har scene par ise
+ * dobara chalane ka matlab hai ek hi sawaal ka jawab bees baar kharidna, jabki
+ * ek hi process ke andar uska badalna namumkin hai.
+ */
+let ffmpegReady: Promise<boolean> | null = null;
+
+export function ffmpegAvailable(): Promise<boolean> {
+  ffmpegReady ??= new Promise<boolean>((done) => {
+    const child = spawn(ffmpegPath(), ["-version"], { stdio: "ignore" });
+    // `error` tab aata hai jab binary mila hi nahi (ENOENT) — yehi asli jawab hai.
+    child.on("error", () => done(false));
+    child.on("close", (code) => done(code === 0));
+  });
+  return ffmpegReady;
+}
+
 export class FfmpegError extends Error {
   constructor(
     readonly command: string,

@@ -9,6 +9,7 @@ import {
   requireVoiceCategory,
   storageKey,
   ttsCacheKey,
+  ttsFilename,
   voiceIdFor,
 } from "@reel/core";
 import { TtsHttpError, getTtsAdapter, synthesize } from "@reel/media";
@@ -17,7 +18,7 @@ import { z } from "zod";
 import { fail, handle, ok, readBody } from "@/lib/api";
 import { createAsset, findAssetByCacheKey } from "@/lib/assets";
 import { scratchDir, storage } from "@/lib/storage";
-import { recordReelUsage } from "@/lib/usage";
+import { overDailyLimit, recordReelUsage } from "@/lib/usage";
 
 /**
  * `GET  /api/tts` — kaun sa provider chalne layak hai (UI isse tay karti hai)
@@ -209,6 +210,16 @@ export async function POST(request: Request): Promise<Response> {
 
     /* ------------------------------------------------------- ab hi banao */
 
+    /*
+     * ⚠️ Roz ki hadd **yahan** lagti hai — cache dekhne ke baad, provider ko
+     * bulane se pehle. Ye jagah soch kar chuni hai. Isse upar lagane par cache
+     * se aane wali awaaz bhi ruk jaati, jo muft hai; isse neeche lagane par call
+     * ja chuki hoti aur paisa lag chuka hota — yaani hadd sirf ye batati ki
+     * kharcha ho gaya hai, use rokti nahi.
+     */
+    const capped = await overDailyLimit("tts");
+    if (capped) return fail("aaj ki hadd poori ho gayi", 429, capped);
+
     const check = await getTtsAdapter(providerId).available();
     if (!check.ok) return fail("TTS abhi chal nahi sakta", 503, check.detail);
 
@@ -242,7 +253,12 @@ export async function POST(request: Request): Promise<Response> {
          * play nahi hoti, aur cleanup use dhoondh hi nahi paata.
          */
         key,
-        filename: `${category.id}-${assetId.slice(0, 8)}.wav`,
+        /*
+         * ⚠️ Naam me bola gaya text jaata hai, id nahi (26.27). Library me ye
+         * hi wo ek cheez hai jisse aadmi apni awaaz pehchanta hai — `male-3f2a91bc`
+         * se koi kabhi nahi pehchan paaya.
+         */
+        filename: ttsFilename(category.label, text),
         mime: "audio/wav",
         bytes: bytes.byteLength,
         durationMs: Math.round(result.durationSeconds * 1000),

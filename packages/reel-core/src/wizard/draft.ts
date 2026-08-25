@@ -468,6 +468,42 @@ function asSceneLike(scene: WizardScene): WizardSceneLike {
 
 /* -------------------------------------------------------------- draft banao */
 
+/**
+ * Bina AI ke khaali draft — ek saada scene, aur bas (26.27).
+ *
+ * ⚠️ Ye wizard ko AI se **alag** karta hai, aur yehi is function ka poora maqsad
+ * hai. Pehle wizard sirf tab khulta tha jab AI ki script aa chuki ho, yaani ek
+ * scene khud likhne ke liye bhi ek API call karni padti thi — aur wo call paise
+ * bhi leti thi aur waqt bhi. Jise sirf apni tasveer aur apna text lagana hai,
+ * usse AI ki keemat kyun chukwayi jaaye.
+ *
+ * ⚠️ Pehla scene `blankScene()` se aata hai — wahi function jo "+" wala button
+ * chalata hai. Ise alag se likhna aasan tha, par tab pehla scene aur joda hua
+ * scene do alag cheezein ban jaate: ek din unme se ek me koi naya field chhoot
+ * jaata, aur wo galti "khaali wizard me feature X kaam hi nahi karta" bankar
+ * aati — sirf pehle scene par, jise pakadna sabse mushkil hota hai.
+ *
+ * ⚠️ `summary` khaali hai, koi bhara hua vaakya nahi. Wo hissa UI me tabhi
+ * dikhta hai jab usme kuch ho, aur yahan dikhane ko kuch hai bhi nahi — AI ne
+ * kuch socha hi nahi. "Apni reel banao" jaisi line wahan bhar dena us jagah ko
+ * ek bekaar heading bana deta jise aadmi doosri baar se padhna chhod deta hai.
+ */
+export function emptyDraft(): WizardDraft {
+  return {
+    summary: "",
+    textScale: 1,
+    textColor: null,
+    replaceExisting: false,
+    gapSeconds: 0,
+    musicAssetId: null,
+    musicVolume: 0.15,
+    // `draftFromScript` ki tarah yahan bhi `null` — awaaz ka chunav Awaaz wala
+    // step khulte hi hota hai, pehle se koi default thopna nahi.
+    voiceCategoryId: null,
+    scenes: [blankScene(0)],
+  };
+}
+
 /** AI ke script se pehla draft. */
 export function draftFromScript(script: AiScript): WizardDraft {
   return {

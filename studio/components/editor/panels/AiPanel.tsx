@@ -10,7 +10,7 @@ import {
   type AiTone,
   type AiUsage,
 } from "@reel/core";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, PenLine, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { WizardModal } from "@/components/editor/wizard/WizardModal";
@@ -152,14 +152,54 @@ export function AiPanel() {
           />
         </div>
 
+        {/*
+          Khaali prompt par AI ko **bulaya hi nahi jaata** (26.27).
+
+          ⚠️ Pehle ye button khaali prompt par bas dabta nahi tha. Wo galat nahi
+          tha, par wo ek aisa darwaza band karta tha jo khula rehna chahiye: bahut
+          baar aadmi ko AI chahiye hi nahi hoti — use do scene khud likhne hote
+          hain, apni tasveer ke saath. Uske liye pehle ek jhooti prompt likhni
+          padti thi, AI ki script aane ka intezaar karna padta tha, aur phir usko
+          mita kar apna text likhna padta tha. Yaani ek poori call ka paisa aur
+          waqt sirf wizard kholne ke liye.
+
+          ⚠️ Button ka naam bhi badalta hai. Ek hi naam rakh kar do alag kaam
+          karwana wahi cheez hai jisse aadmi ko bharosa nahi rehta ki dabane par
+          paisa lagega ya nahi — aur yahan wahi sabse zaroori baat hai.
+        */}
         <button
           type="button"
-          disabled={busy || story.trim().length === 0}
-          onClick={() => void generate()}
+          /*
+           * ⚠️ Sirf `busy` par band. Ek click ke baad jab tak jawab na aaye,
+           * dobara dabana ek aur poori call hai — aur uska nateeja bhi wahi
+           * hota hai jo pehli ka. Ye hifazat yahan hai, `generate()` ke andar
+           * nahi: dabne se pehle rokna hi asli rokna hai.
+           */
+          disabled={busy}
+          onClick={() => {
+            if (story.trim().length === 0) {
+              setScript(null);
+              setUsage(null);
+              setError(null);
+              setWizardOpen(true);
+              return;
+            }
+            void generate();
+          }}
           className="flex w-full items-center justify-center gap-1.5 rounded bg-terracotta px-2 py-1.5 text-chalk-100 transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-          {busy ? "soch raha hai…" : "Scenes banao"}
+          {busy ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : story.trim().length === 0 ? (
+            <PenLine size={12} />
+          ) : (
+            <Sparkles size={12} />
+          )}
+          {busy
+            ? "soch raha hai…"
+            : story.trim().length === 0
+              ? "Khud scene banao (AI nahi chalega)"
+              : "Scenes banao"}
         </button>
       </section>
 
@@ -197,12 +237,17 @@ export function AiPanel() {
       ) : null}
 
       {/*
-        ⚠️ Wizard tabhi khulta hai jab script sach me aa chuki ho. Use pehle se
-        khula rakhna aur andar "intezaar karo" dikhana aasan tha, par tab aadmi ek
-        khaali dabbe ke saamne baitha rehta hai aur use pata nahi chalta ki kuch
-        ho bhi raha hai ya nahi.
+        ⚠️ Shart `wizardOpen` par hai, `script` par nahi (26.27). Pehle wizard
+        tabhi ban'ta tha jab script aa chuki ho — theek tha, jab tak wizard me
+        jaane ka ek hi raasta AI tha. Ab do hain, aur khaali wala (`script ===
+        null`) is shart me kabhi ghus hi nahi paata tha.
+
+        ⚠️ Jo baat pehle bhi sach thi aur ab bhi hai: AI chalte waqt wizard khula
+        nahi rakha jaata. Ek khaali dabbe ke saamne "intezaar karo" dikhane se
+        aadmi ko ye pata hi nahi chalta ki kuch ho bhi raha hai ya nahi — isliye
+        `generate()` khatam hone par hi `setWizardOpen(true)` hota hai.
       */}
-      {script ? (
+      {wizardOpen ? (
         <WizardModal
           open={wizardOpen}
           script={script}

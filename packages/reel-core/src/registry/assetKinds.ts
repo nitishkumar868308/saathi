@@ -221,6 +221,32 @@ export type AssetLifecycle = (typeof ASSET_LIFECYCLES)[number];
  */
 export const TEMPORARY_ASSET_TTL_DAYS = 7;
 
+/**
+ * Bani hui awaaz ka **padha jaane layak naam** (26.27).
+ *
+ * ⚠️ Pehle naam `male-3f2a91bc.wav` hota tha. Wo galat nahi tha — bas kisi kaam
+ * ka nahi tha. Library me bees aisi file ek saath padi hon to unme se "wahi wali"
+ * dhoondhne ka koi tarika nahi bachta: sunne ke alawa. Naam me bola gaya text
+ * hone se wo sawaal hi khatam ho jaata hai.
+ *
+ * ⚠️ Naam sirf dikhane ke liye hai — storage key isse **nahi** banti (wo
+ * `storageKey.tts(id)` se aati hai, uuid par). Isliye yahan do file ka naam ek
+ * jaisa ho jaana bhi koi khatra nahi hai; aur yehi wajah hai ki naam ko
+ * chhota-saaf karna surakshit hai.
+ */
+export function ttsFilename(categoryLabel: string, text: string, maxChars = 48): string {
+  const clean = text
+    .replace(/\s+/gu, " ")
+    .trim()
+    // Filesystem aur R2 key dono me jo characters dard dete hain, wo hata do.
+    .replace(/[\\/:*?"<>|#]+/gu, "")
+    .trim();
+  const short = clean.length > maxChars ? `${clean.slice(0, maxChars).trimEnd()}…` : clean;
+  // Text khaali ho hi nahi sakta (route uspar pehle hi rok deta hai), par bina
+  // fallback ke ye chup-chaap `Aadmi — .wav` bana deta.
+  return short ? `${categoryLabel} — ${short}.wav` : `${categoryLabel} awaaz.wav`;
+}
+
 export function temporaryExpiryIso(now: number, ttlDays = TEMPORARY_ASSET_TTL_DAYS): string {
   return new Date(now + ttlDays * 24 * 60 * 60 * 1000).toISOString();
 }
@@ -255,6 +281,27 @@ export const LIBRARY_TABS: readonly LibraryTabEntry[] = [
   { id: "images", label: "Images", icon: "Image", kinds: ["image"], tag: null, appliesTagOnUpload: false },
   { id: "videos", label: "Videos", icon: "Video", kinds: ["video"], tag: null, appliesTagOnUpload: false },
   { id: "audio", label: "Audio", icon: "Mic", kinds: ["audio"], tag: null, appliesTagOnUpload: false },
+  /*
+   * Awaaz — **banayi hui** awaaz, `tts` tag par (26.27).
+   *
+   * ⚠️ Ye "Audio" tab ka duplicate nahi hai. Audio me sab kuch aata hai: music,
+   * apni record ki hui awaaz, aur AI se bani hui bhi. Reel banate waqt do-teen
+   * din me 40-50 TTS clip ban jaati hain, aur wo Audio tab me music ko dhakel
+   * kar bahar kar deti thi — yaani jo file aadmi ne khud chadhayi thi wo apni hi
+   * library me dhoondhni padti thi.
+   *
+   * ⚠️ `appliesTagOnUpload: false` jaan-boojhkar hai. Is tab se upload ki hui
+   * file par `tts` tag lagana jhooth hota — wo AI ne nahi banayi. Wo Audio tab me
+   * jaati hai, jahan uska ghar hai.
+   */
+  {
+    id: "voice",
+    label: "Awaaz",
+    icon: "AudioLines",
+    kinds: ["audio"],
+    tag: "tts",
+    appliesTagOnUpload: false,
+  },
   {
     id: "music",
     label: "Music",
@@ -312,7 +359,21 @@ export function libraryTabForKind(kind: string): LibraryTabEntry | undefined {
   );
 }
 
-/** Jo tag kisi tab me use hote hain — detail panel me yahi chips dikhte hain. */
+/**
+ * Jo tag **aadmi khud** laga sakta hai — detail panel me yahi chips dikhte hain.
+ *
+ * ⚠️ Chhaanni `appliesTagOnUpload` par hai, `tag !== null` par nahi (26.27). Ye
+ * farak zaroori hai. `tts` bhi ek tab ka tag hai, par wo tag **system lagata
+ * hai** — uska matlab hi hai "ye awaaz AI ne banayi". Use chip bana dene par koi
+ * bhi apni record ki hui file par `tts` chipka sakta tha, aur uske baad "Awaaz"
+ * tab ka matlab hi khatam: wo phir wahi purana Audio tab ban jaata.
+ */
 export function libraryTags(): readonly string[] {
-  return [...new Set(LIBRARY_TABS.map((tab) => tab.tag).filter((tag): tag is string => !!tag))];
+  return [
+    ...new Set(
+      LIBRARY_TABS.filter((tab) => tab.appliesTagOnUpload)
+        .map((tab) => tab.tag)
+        .filter((tag): tag is string => !!tag),
+    ),
+  ];
 }

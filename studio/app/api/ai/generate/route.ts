@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { readTokenUsage, type GeminiUsageMetadata } from "@/lib/ai/usage";
-import { recordReelUsage } from "@/lib/usage";
+import { overDailyLimit, recordReelUsage } from "@/lib/usage";
 
 /**
  * Gemini ka darwaza — **key sirf server par** (21.3).
@@ -53,6 +53,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const prompt = body.prompt?.trim();
   if (!prompt) return NextResponse.json({ error: "prompt khaali hai" }, { status: 400 });
+
+  /*
+   * Roz ki hadd — call bhejne se pehle (26.27).
+   *
+   * ⚠️ Ye ek din ke ₹407 wale bill ke baad aayi hai. Us din kuch "toota" nahi
+   * tha: har call theek chali, har jawab theek aaya, bas unki ginti par koi
+   * upar wali rok thi hi nahi. Bina hadd ke ek chhoti si galti (ek loop, ek
+   * baar-baar dabta button, ek retry) aur ek mehnga din me koi farak nahi hai.
+   *
+   * ⚠️ Hadd \`prompt\` ki jaanch ke **baad** hai. Khaali prompt wali call
+   * provider tak jaati hi nahi, isliye use ginti me lena hadd ko wahan kharch
+   * kar dena hai jahan kharcha hua hi nahi.
+   */
+  const capped = await overDailyLimit("scenes");
+  if (capped) return NextResponse.json({ error: capped }, { status: 429 });
 
   const model = body.model ?? process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
   const startedAt = Date.now();

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AudioLines,
   Circle,
   Captions,
   FileQuestion,
@@ -28,6 +29,7 @@ import {
  * hain jo sach me use hote hain, aur naya icon jodna ek line hai.
  */
 const ICONS: Record<string, LucideIcon> = {
+  AudioLines,
   Captions,
   Image,
   Layers,

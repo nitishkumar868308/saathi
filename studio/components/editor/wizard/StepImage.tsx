@@ -3,6 +3,7 @@
 import {
   requiredVisualSize,
   fitFor,
+  fitVerdict,
   planFit,
   suggestAnimation,
   suggestTransition,
@@ -12,7 +13,17 @@ import {
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Check, Crop, Film, ImageOff, Info, Loader2, Smartphone } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Crop,
+  Film,
+  ImageOff,
+  Info,
+  Loader2,
+  Smartphone,
+  ThumbsUp,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
@@ -34,6 +45,28 @@ import { useEditorStore } from "@/lib/store";
  * chunav par kaam lagta hai.
  */
 const FIT_DEBOUNCE_MS = 500;
+
+/**
+ * "Is server par video fit ho sakti hai?" — ek hi baar poochha jaata hai (26.27).
+ *
+ * ⚠️ Ye promise module ke scope me hai, kisi component ke andar nahi. Har scene
+ * ki qatar apna hook chalati hai; component ke andar rakhne par ek hi sawaal
+ * saat baar server tak jaata, aur step badalte hi phir se saat baar.
+ *
+ * ⚠️ Jawab na aaye to `true` maana jaata hai — yaani purana bartaav. Ye
+ * jaan-boojhkar hai: is jaanch ka fail hona ek aisi wajah nahi hai jispar fit
+ * karna band kar diya jaaye. Ulta karne par ek network hichki har video ka fit
+ * chup-chaap band kar deti.
+ */
+let fitCapability: Promise<boolean> | null = null;
+
+function canFitVideoHere(): Promise<boolean> {
+  fitCapability ??= fetch("/api/assets/fit-capability")
+    .then((response) => (response.ok ? response.json() : { video: true }))
+    .then((data: { video?: boolean }) => data.video !== false)
+    .catch(() => true);
+  return fitCapability;
+}
 
 /** `/api/assets/[id]/fit` ka jawab — kaamyab aur nakaam, dono ka ek hi shape. */
 interface FitReply {
@@ -251,9 +284,20 @@ function SceneRow({
       ? `${scene.visualAssetId}|${plan.target.width}x${plan.target.height}|${plan.mode}|${trimKey}`
       : null;
 
+  /**
+   * Ek line ka faisla — **sabse pehle, aur fit ki khabar se alag**.
+   *
+   * ⚠️ Ye alag isliye hai ki do bilkul alag sawaalon ke jawab hain. "Ye file
+   * theek hai ya nahi" ek faisla hai jo aadmi ko file chunte hi chahiye. "Fit ho
+   * rahi hai / ho gayi" ek kaam ki khabar hai. Dono ek patti me hone par faisla
+   * kaam ki khabar ke neeche dab jaata tha, aur aadmi aage badh jaata tha — file
+   * ki kharabi reel ban jaane ke baad dikhti thi.
+   */
+  const verdict = plan && source ? fitVerdict(plan, source, picked ?? suggested) : null;
+
   const [fitState, setFitState] = useState<{
     key: string;
-    status: "busy" | "done" | "fail";
+    status: "busy" | "done" | "fail" | "skip";
     reason?: string;
   } | null>(null);
   /** Kis maang par call ja chuki hai — warna effect apne hi state par dobara chalta rehta. */
@@ -317,6 +361,25 @@ function SceneRow({
            * phir bhi ban jaati hai.
            */
           let fittedId: string;
+
+          if (isVideo && !(await canFitVideoHere())) {
+            /*
+             * ⚠️ Ye **nakami nahi hai**, aur usi farak ke liye ye branch hai.
+             * Vercel par ffmpeg kabhi nahi hoga, isliye wahan video ki alag
+             * fit-file ban hi nahi sakti. Par reel phir bhi bilkul theek banti
+             * hai — renderer khud cover/contain aur kinaron ki dhundhli copy
+             * lagata hai, poori quality par, render ke waqt.
+             *
+             * Isse pehle yahan ek laal chetavni aati thi jo do jhooth bolti
+             * thi: ki kuch toot gaya hai (nahi toota), aur ki ffmpeg install
+             * karne se theek ho jaayega (Vercel par kabhi nahi hoga). Ab wo
+             * scene chup-chaap aage badh jaata hai aur `fitState` "skip" par
+             * jaata hai, jise UI ek shaant line me dikhati hai.
+             */
+            if (!alive) return;
+            setFitState({ key: wantFit, status: "skip" });
+            return;
+          }
 
           if (isVideo) {
             const response = await fetch(`/api/assets/${assetId}/fit`, {
@@ -623,6 +686,48 @@ function SceneRow({
           feature aadmi par thopa hua ban jaata hai — aur jis tasveer ka zaroori
           hissa kinare par hai, uske liye koi ilaaj hi na bachta.
         */}
+        {/*
+          Faisla **pehle** — file chunte hi (26.26).
+
+          ⚠️ Ye wo cheez hai jo aadmi ne seedha maangi thi: "pehle bata do ki ye
+          image ya video sahi nahi hai." Pehle ye baat thi to sahi, par fit ki
+          khabar ke saath teesri-chauthi line me — yaani wahan jahan padhi nahi
+          jaati. Ab ek line, upar, aur uske rang se hi faisla dikh jaata hai.
+
+          ⚠️ Theek file par bhi ek line dikhti hai (hari), khaali nahi chhodi
+          jaati. Sirf kharabi par bolne wala nishaan aadmi ko ye kabhi nahi batata
+          ki baaki file jaanchi bhi gayi thi — chuppi ka matlab "theek hai" bhi ho
+          sakta hai aur "dekha hi nahi" bhi.
+        */}
+        {scene.visualAssetId && verdict ? (
+          <p
+            className={clsx(
+              "flex items-start gap-1 rounded border px-1.5 py-1 text-[10px] leading-snug",
+              verdict.level === "bad"
+                ? "border-red-500/40 bg-red-500/10 text-red-300"
+                : verdict.level === "weak"
+                  ? "border-amber/40 bg-amber/10 text-amber"
+                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+            )}
+          >
+            {verdict.level === "good" ? (
+              <ThumbsUp size={10} className="mt-0.5 shrink-0" />
+            ) : (
+              <AlertTriangle size={10} className="mt-0.5 shrink-0" />
+            )}
+            <span>
+              {verdict.headline}
+              {verdict.level === "bad" ? (
+                <>
+                  {" "}
+                  <strong>Fit phir bhi apne aap ho jaayega</strong> — par isse behtar file
+                  daalo to reel saaf banegi.
+                </>
+              ) : null}
+            </span>
+          </p>
+        ) : null}
+
         {scene.visualAssetId ? (
           <FitPanel
             plan={plan}
@@ -738,7 +843,7 @@ function FitPanel({
   onOn,
 }: {
   plan: FitPlan | null;
-  state: { key: string; status: "busy" | "done" | "fail"; reason?: string } | null;
+  state: { key: string; status: "busy" | "done" | "fail" | "skip"; reason?: string } | null;
   off: boolean;
   applied: boolean;
   isVideo: boolean;
@@ -810,6 +915,8 @@ function FitPanel({
             <Loader2 size={9} className="animate-spin" />
           ) : state?.status === "fail" ? (
             <AlertTriangle size={9} />
+          ) : state?.status === "skip" ? (
+            <Check size={9} className="text-emerald-400" />
           ) : applied ? (
             <Check size={9} className="text-emerald-400" />
           ) : (
@@ -821,9 +928,18 @@ function FitPanel({
               : "Tasveer frame me fit ho rahi hai…"
             : state?.status === "fail"
               ? "Fit nahi ho paayi — asli file hi lagegi"
-              : applied
-                ? `Fit ho gayi — ${plan.target.width}x${plan.target.height}, ${plan.mode === "cover" ? "frame bhar kar" : "poori dikhti hui"}`
-                : `Fit hogi — ${plan.target.width}x${plan.target.height}`}
+              : /*
+                 * ⚠️ "skip" par hara nishaan hai, peela nahi — kyunki yahan kuch
+                 * galat hua hi nahi. Video reel me utni hi theek baithegi;
+                 * sirf uski alag copy library me nahi banti. Ise chetavni ki
+                 * tarah dikhana aadmi ko us cheez ko theek karne bhejta hai jo
+                 * toota hi nahi hai.
+                 */
+                state?.status === "skip"
+                ? `Video reel me apne aap fit hogi — ${plan.target.width}x${plan.target.height}, ${plan.mode === "cover" ? "frame bhar kar" : "poori dikhti hui"}`
+                : applied
+                  ? `Fit ho gayi — ${plan.target.width}x${plan.target.height}, ${plan.mode === "cover" ? "frame bhar kar" : "poori dikhti hui"}`
+                  : `Fit hogi — ${plan.target.width}x${plan.target.height}`}
         </span>
 
         <button
