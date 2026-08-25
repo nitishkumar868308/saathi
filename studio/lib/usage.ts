@@ -71,10 +71,26 @@ export async function recordReelUsage(input: RecordUsageInput): Promise<void> {
  * ho to rok do) ek Supabase hichki ko poore studio ka band hona bana deta.
  */
 export async function countReelCallsToday(kind: ReelUsageKind): Promise<number | null> {
-  // Din UTC ka hai, local nahi — `created_at` bhi UTC me hai, aur do alag
-  // timezone milane se hadd aadhi raat ko do baar khulti.
-  const since = new Date();
-  since.setUTCHours(0, 0, 0, 0);
+  /*
+   * ⚠️ Din **Pacific** ka hai, UTC ya local ka nahi — aur ye ek asli farak hai.
+   *
+   * Google ka apna per-day counter (RPD) Pacific ki aadhi raat par reset hota
+   * hai. Pehle yahan UTC ki aadhi raat thi, yaani humari ginti Google se **7
+   * ghante pehle** zero ho jaati thi. Us khidki me humara counter kehta "aaj to
+   * abhi 3 hi call hui" jabki Google ka counter 100 par bhara baitha hota —
+   * yaani brake wahan nahi lagta jahan asli hadd lagni thi, aur aadmi ko wahi
+   * 429 milta jiska matlab uske liye kuch nahi hota.
+   *
+   * ⚠️ -8/-7 ka jhagda jaan-boojhkar nahi paala. PDT (-7) maana gaya hai, jo
+   * saal ke zyada hisse me sahi hai; sardi me ye ginti ek ghante ki khidki par
+   * thodi jaldi khulegi. Us ek ghante ke liye poora timezone package laana is
+   * kaam se bada bojh hai — ye ek brake hai, koi hisaab-kitaab nahi.
+   */
+  const PACIFIC_OFFSET_HOURS = -7;
+  const now = Date.now();
+  const pacific = new Date(now + PACIFIC_OFFSET_HOURS * 60 * 60 * 1000);
+  pacific.setUTCHours(0, 0, 0, 0);
+  const since = new Date(pacific.getTime() - PACIFIC_OFFSET_HOURS * 60 * 60 * 1000);
 
   try {
     /*

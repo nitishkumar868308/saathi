@@ -60,6 +60,21 @@ export interface WizardScene {
   /** AI ke diye baaki slots (role naam ke saath), jaise ke waise. */
   slots: Record<string, string>;
 
+  /**
+   * Peeche chalne wali tasveer — **scene ke visual se alag cheez** (26.27).
+   *
+   * ⚠️ Ise `visualAssetId` me mila dena sabse aasan tha aur sabse galat. Scene ka
+   * visual wo hai jo scene *hai* (ek tasveer, ek video, ek screen recording);
+   * background wo hai jo uske **peeche** chalta hai. Ek hi khaana rakhne par CTA
+   * jaise scene par — jiska apna visual hai hi nahi — dono ek doosre ki jagah le
+   * lete, aur aadmi ko sirf itna dikhta ki uski tasveer "kahin aur" chali gayi.
+   *
+   * ⚠️ Har scene par ho sakti hai, kisi par bhi nahi — dono theek hain. Ye ek
+   * **chunav** hai, koi zaroori khaana nahi: `null` ka matlab hai "peeche kuch
+   * nahi", aur wahi default hai.
+   */
+  backgroundAssetId: string | null;
+
   visualAssetId: string | null;
   /**
    * Jo cheez chuni gayi wo tasveer thi ya video.
@@ -379,19 +394,34 @@ export function textSlotId(typeId: string): string | null {
  * mili" keh kar chhoot jaata tha — aur aadmi ke paas use theek karne ka koi
  * raasta nahi hota tha.
  */
+/**
+ * ⚠️ `background` yahan se **jaan-boojhkar bahar** hai (26.27). Wo bhi
+ * `asset:image` hai, isliye bina is rok ke wo un types me "visual" ban jaata
+ * jinme koi aur tasveer wala slot nahi hai (jaise `text`) — aur tab scene ki
+ * asli tasveer chup-chaap peeche chali jaati, screen ke beech me kuch na hota,
+ * aur aadmi ko sirf itna dikhta ki "tasveer lagi to hai par dikh nahi rahi".
+ *
+ * Slots ki tarteeb (background hamesha aakhir me) bhi yahi rok lagati hai. Do
+ * jagah rokna is liye hai ki naya scene type jodte waqt tarteeb ka dhyan rakhna
+ * yaad rahe ya na rahe, ye check phir bhi sahi jawab dega.
+ */
+const BACKGROUND_SLOT_ID = "background";
+
+function isVisualSlot(slot: { id: string; kind: string }): boolean {
+  if (slot.id === BACKGROUND_SLOT_ID) return false;
+  return slot.kind === "asset:image" || slot.kind === "asset:video";
+}
+
 export function visualSlotId(typeId: string): string | null {
   const type = getSceneType(typeId);
-  return (
-    type?.slots.find((slot) => slot.kind === "asset:image" || slot.kind === "asset:video")?.id ??
-    null
-  );
+  return type?.slots.find(isVisualSlot)?.id ?? null;
 }
 
 /** Wo slot tasveer maangta hai ya video — picker aur label dono isse tay hote hain. */
 export function visualSlotKind(typeId: string): "image" | "video" | null {
   const type = getSceneType(typeId);
-  const slot = type?.slots.find(
-    (entry) => entry.kind === "asset:image" || entry.kind === "asset:video",
+  const slot = type?.slots.find((entry) =>
+    isVisualSlot(entry),
   );
   if (!slot) return null;
   return slot.kind === "asset:video" ? "video" : "image";
@@ -535,6 +565,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         durationOverrideSeconds: null,
         text: (textSlot ? scene.slots[textSlot] : "") ?? "",
         slots: rest,
+        backgroundAssetId: null,
         visualAssetId: null,
         visualAssetKind: null,
         visualFitAssetId: null,
@@ -600,6 +631,7 @@ export function blankScene(index: number): WizardScene {
     durationOverrideSeconds: null,
     text: "",
     slots: {},
+    backgroundAssetId: null,
     visualAssetId: null,
     visualAssetKind: null,
     visualFitAssetId: null,
@@ -1138,6 +1170,22 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       const role = `logo:${scene.index}`;
       slots.logo = role;
       assetByRole[role] = args.doc.brand.logoAssetId;
+    }
+
+    /*
+     * Peeche ki tasveer — apna role, visual se bilkul alag (26.27).
+     *
+     * ⚠️ `background` slot har scene type me hai, isliye yahan type dekhne ki
+     * zaroorat nahi. Ye jaan-boojhkar hai: aadmi ne kaha tha ki background kisi
+     * bhi scene par lag sake, ya kisi par bhi nahi — to use type ki shart ke
+     * peeche baandhna usi baat ko todta.
+     */
+    if (scene.backgroundAssetId) {
+      const role = `background:${scene.index}`;
+      slots.background = role;
+      assetByRole[role] = scene.backgroundAssetId;
+    } else {
+      delete slots.background;
     }
 
     const audioSlot = audioSlotId(type);

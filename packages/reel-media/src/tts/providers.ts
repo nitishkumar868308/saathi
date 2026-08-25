@@ -181,7 +181,8 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
  * poore kharche ko lagbhag dugna kar deti hai. Free quota par wo farak seedha
  * "aaj kitni reel ban sakti hai" me dikhta hai.
  */
-const GEMINI_CONSISTENCY = "Poori reel me wahi ek narrator, wahi raftaar. Natural bolo.";
+const GEMINI_CONSISTENCY =
+  "Wahi ek narrator har line me — wahi umar, wahi pitch, wahi raftaar. Natural bolo.";
 
 interface GeminiPart {
   text?: string;
@@ -366,16 +367,28 @@ export const geminiTtsAdapter: TtsAdapter = {
       generationConfig: {
         responseModalities: ["AUDIO"],
         /*
-         * ⚠️ 0.35 — jaan-boojhkar na 0, na default.
+         * ⚠️ **0**, aur ye 0.35 se wapas neeche laaya gaya hai (26.27).
          *
-         * 0 par har call bilkul ek jaisi aati hai (jo chahiye tha) par bolna
-         * chapta aur machine jaisa ho jaata hai. Default par har call apna andaaz
-         * chun leti hai aur poori reel me bolne wala badalta hua sunai deta hai —
-         * wahi shikayat jisse ye poora daur shuru hua. Neeche wali jagah dono se
-         * bachati hai: awaaz aur raftaar tikti hai, par line apni saans ke saath
-         * boli jaati hai.
+         * 26.26 me 0.35 rakha gaya tha is dalil par ki 0 par bolna "chapta" ho
+         * jaata hai. Wo dalil ek cheez bhool gayi thi: temperature sirf andaaz
+         * nahi badalta, wo **bolne wale ki pehchaan** bhi badal deta hai. 7 scene
+         * ki reel me har call apni pitch aur umar chun leti thi, aur nateeja wo
+         * tha jo aadmi ne saaf shabdon me bataya:
+         *
+         *     "maine sab me Aadmi choose kiya tha, phir har scene me awaaz alag
+         *      kyun lag rahi hai"
+         *
+         * ⚠️ Isse bolna bejaan nahi hota — ye galatfehmi hi 0.35 wali galti ki
+         * jad thi. Line ka andaaz **text se** aata hai (sawaal, hairaani, CTA —
+         * sab alag bolte hain), aur wo aage bhi aata rahega. Temperature sirf
+         * **ek hi text par baar-baar alag** natija dene ka naam hai — aur reel me
+         * uski koi zaroorat nahi hai. Aadmi ne khud kaha: "scene ke hisab se
+         * badalna chahiye" — wo text se hota hai, is number se nahi.
+         *
+         * ⚠️ Iska kharcha shunya hai. Ye na model badalta hai na tokens — yaani
+         * behtar nateeja bina ek paisa badhe.
          */
-        temperature: 0.35,
+        temperature: 0,
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: args.voiceId } },
         },
@@ -400,12 +413,36 @@ export const geminiTtsAdapter: TtsAdapter = {
         const { retryAfterSeconds, perDay } = readGoogleError(raw);
 
         if (response.status === 429) {
+          /*
+           * ⚠️ Yahan pehle "free quota" likha tha, aur wo **jhooth** tha (26.27).
+           *
+           * Account paid hai (Tier 1, prepay credits). 429 ka matlab paisa
+           * khatam hona nahi hai — ye Google ki **rate limit** hai, jo paid tier
+           * par bhi lagti hai aur paise se nahi khulti:
+           *
+           *     TTS model par Tier 1 — 10 request/minute, 100 request/din
+           *
+           * "Free quota khatam" padh kar aadmi billing par jaata tha, credit
+           * dekhta tha (jo pade the), aur use kuch samajh nahi aata tha. Galat
+           * wajah batana koi wajah na batane se bura hai — wo aadmi ko us cheez
+           * ko theek karne bhejti hai jo tooti hi nahi.
+           *
+           * ⚠️ Din **Pacific time** par badalta hai, tumhare aadhi raat par nahi
+           * — ye likhna zaroori hai warna aadmi 12 baje baith kar intezaar karta
+           * hai aur hadd khulti hi nahi.
+           *
+           * ⚠️ Har model ka apna RPD hai. Ye baat sach hai par yahan salah ke
+           * roop me nahi likhi jaati: doosra model chunna sasta lagta hai aur
+           * mehnga nikal sakta hai (3.1 wala ~₹44/call tha). Model badalne ki
+           * salah tabhi jab uska per-call kharcha dekh liya gaya ho.
+           */
           throw new TtsHttpError(
             429,
             perDay
-              ? `Aaj ka free quota khatam ho gaya (${GEMINI_TTS_MODEL}). Kal reset hoga — ` +
-                `tab tak apni awaaz upload kar sakte ho.`
-              : `Ek minute me itni awaazein nahi ban sakti (free quota ki hadd). ` +
+              ? `Aaj ki hadd poori ho gayi — ${GEMINI_TTS_MODEL} par 100 awaaz/din ` +
+                `(ye Google ki rate limit hai, paise ki nahi — tumhare credit bache hue hain). ` +
+                `Ye Pacific time ki aadhi raat par khulti hai. Tab tak apni awaaz upload kar sakte ho.`
+              : `Ek minute me 10 se zyada awaaz nahi ban sakti (Google ki rate limit). ` +
                 `${retryAfterSeconds ?? 30} second baad apne aap dobara koshish hogi.`,
             retryAfterSeconds,
             perDay,

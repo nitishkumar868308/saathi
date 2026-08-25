@@ -20,6 +20,7 @@ import {
   EyeOff,
   Info,
   Loader2,
+  Megaphone,
   Mic,
   Plus,
   RotateCcw,
@@ -637,6 +638,51 @@ export function StepText({
                 {scene.hideText ? <EyeOff size={9} /> : <Eye size={9} />}
                 {scene.hideText ? "Chhupa hua" : "Dikhega"}
               </button>
+            </div>
+
+            {/*
+              CTA ka chunav — **haath se banaye scene ke liye** (26.27).
+
+              ⚠️ Ye button is liye aaya ki bina AI ke wizard kholne par har scene
+              `text` ka banta hai, aur use CTA banane ka koi raasta hi nahi tha.
+              Yaani jo aadmi khud reel banata tha, uski reel ka aakhri frame —
+              wahi jispar "ab karna kya hai" likha hota hai — kabhi ban hi nahi
+              paata tha. Wo hissa AI wali reel me tha aur haath wali me nahi, bina
+              kisi wajah ke.
+
+              ⚠️ Yahan poora scene-type ka picker **nahi** hai, aur ye soch kar
+              hai. Baaki har type apne aap tay ho jaata hai — tasveer lagao to
+              image wala, awaaz lagao to audio wala (`effectiveType`). CTA hi ek
+              aisi cheez hai jise koi anumaan nahi laga sakta: wo aadmi ka iraada
+              hai, uski file ka nateeja nahi. Bees types ki list dikhana un
+              unnees ko bhi haath se chunwana hai jo pehle se sahi bant'te hain.
+            */}
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  onChange(scene.index, { type: scene.type === "cta" ? "text" : "cta" })
+                }
+                title={
+                  scene.type === "cta"
+                    ? "Wapas aam scene bana do"
+                    : "Ise reel ka aakhri call-to-action banao — logo, ek line, aur ek button"
+                }
+                className={clsx(
+                  "flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                  scene.type === "cta"
+                    ? "border-terracotta text-terracotta"
+                    : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                )}
+              >
+                <Megaphone size={9} />
+                {scene.type === "cta" ? "CTA scene hai" : "CTA banao"}
+              </button>
+              {scene.type === "cta" ? (
+                <span className="text-[10px] text-chalk-500">
+                  Logo project ke brand se apne aap lagta hai.
+                </span>
+              ) : null}
             </div>
 
             {/*

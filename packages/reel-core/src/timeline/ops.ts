@@ -29,7 +29,7 @@ import {
   requireTransition,
   trackAccepts,
 } from "../registry/index";
-import { createTrack } from "../schema/factory";
+import { createItem, createTrack } from "../schema/factory";
 import {
   itemEndFrame,
   type Doc,
@@ -2758,6 +2758,45 @@ export const addScene = defineOp<AddSceneArgs>("addScene", (draft, args) => {
     throw new TimelineOpError(
       `"${entry.label}" scene se koi item nahi bana — zaroori slot bhare hain?`,
     );
+  }
+
+  /*
+   * Peeche ki tasveer — **yahan, har scene type ke liye ek saath** (26.27).
+   *
+   * ⚠️ Ye kaam jaan-boojhkar `entry.build()` ke andar nahi hai. Background har
+   * scene type par chal sakta hai (12 types), aur use har `build()` me alag-alag
+   * likhne ka matlab hota 12 jagah wahi hisaab — jisme se ek din ek jagah chhoot
+   * jaati, aur wo galti "sirf CTA par background nahi aata" jaisi shakal me aati,
+   * jise pakadna sabse mushkil hota hai. Ek jagah likhne se wo halat ban hi nahi
+   * sakti.
+   *
+   * ⚠️ Ye `built` ke **shuru me** lagta hai. Ek hi track par baad wala item pehle
+   * wale ke upar aata hai, isliye background sabse pehle jaana chahiye — warna wo
+   * poore scene ko dhak leta hai, aur ye galti editor me nahi, sirf render ke
+   * baad dikhti hai.
+   *
+   * ⚠️ `cover` + `blurred-asset` — frame poora bharta hai aur bache kinare usi
+   * tasveer ki dhundhli copy se bharte hain. Ye CTA ke logo ke ulta hai (wo
+   * `contain` + transparent par hai): logo ko safai chahiye, background ko bharaav.
+   */
+  const backgroundId = typeof args.slots?.background === "string" ? args.slots.background : null;
+  if (backgroundId) {
+    const background = createItem("image", {
+      fps: draft.project.fps,
+      trackId: "",
+      name: "Peeche ki tasveer",
+      assetId: backgroundId,
+      startFrame: 0,
+      durationInFrames: built[0]?.durationInFrames ?? draft.project.fps * 3,
+    });
+    built.unshift({
+      ...background,
+      fit: {
+        mode: "cover" as const,
+        background: { kind: "blurred-asset" as const, value: null },
+      },
+      sceneId,
+    });
   }
 
   // Naya scene sabse aakhir me lagta hai; `relayoutScenes` uski asli jagah tay

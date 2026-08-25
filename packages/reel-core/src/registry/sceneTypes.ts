@@ -103,6 +103,34 @@ const CAPTION_SLOT: SlotDef = {
   hint: "Screen par dikhne wala text (khaali chhod sakte ho)",
 };
 
+/**
+ * Peeche ki tasveer — **har scene type me, aur sabse aakhir me** (26.27).
+ *
+ * ⚠️ Ye CTA ke logo se bilkul alag cheez hai, aur scene ki apni "Tasveer" se
+ * bhi. Scene ka visual wo cheez hai jo scene *hai* (ek tasveer, ek video).
+ * Background wo hai jo uske **peeche** chalti hai — kisi bhi scene par, ya kisi
+ * par bhi nahi. Aadmi ne teenon ko alag maanga tha, aur ye teen alag cheezein
+ * hain bhi.
+ *
+ * ⚠️ Ye har type me is liye likhna padta hai ki `applyProposal` un slots ko
+ * **chup-chaap gira deta hai** jo us type me declare na hon
+ * (`if (!definition) continue`). Ek jagah likh kar sab jagah kaam karwane ka
+ * koi raasta nahi hai — isliye `AUDIO_SLOT` ki tarah ek saanjha const, aur wahi
+ * har type me.
+ *
+ * ⚠️ **Slots ke aakhir me lagta hai, shuru me nahi.** `visualSlotId()` type ka
+ * pehla `asset:image` slot uthata hai; ise pehle likhne par har scene ki asli
+ * tasveer background me chali jaati aur scene khaali dikhta. (Ab
+ * `visualSlotId()` ise chhodta bhi hai — do rok, kyunki ye galti dikhti nahi.)
+ */
+const BACKGROUND_SLOT: SlotDef = {
+  id: "background",
+  label: "Peeche ki tasveer",
+  kind: "asset:image",
+  required: false,
+  hint: "Poore frame me peeche chalti hai. Khaali chhod do to kuch nahi lagta.",
+};
+
 const AUDIO_SLOT: SlotDef = {
   id: "audio",
   label: "Awaaz",
@@ -136,6 +164,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     slots: [
       { id: "image", label: "Tasveer", kind: "asset:image", required: true },
       CAPTION_SLOT,
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 4,
     build: (input) => {
@@ -170,6 +199,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       { id: "image", label: "Tasveer", kind: "asset:image", required: true },
       AUDIO_SLOT,
       CAPTION_SLOT,
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 5,
     build: (input) => {
@@ -234,6 +264,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     slots: [
       { id: "text", label: "Text", kind: "text", required: true, multiline: true },
       AUDIO_SLOT,
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 4,
     build: (input) => {
@@ -290,6 +321,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
       { id: "video", label: "Video", kind: "asset:video", required: true },
       AUDIO_SLOT,
       CAPTION_SLOT,
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 6,
     build: (input) => {
@@ -374,6 +406,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
         required: false,
         hint: '"raw" likho to frame nahi lagega',
       },
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 8,
     build: (input) => {
@@ -464,6 +497,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
         required: true,
         multiline: true,
       },
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 3,
     build: (input) => {
@@ -526,6 +560,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
        * phir `video` ke saath, ab yahan.
        */
       AUDIO_SLOT,
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 3,
     /**
@@ -686,7 +721,9 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     icon: "Mic",
     hint: "Voiceover jo peeche chalti rahe",
     group: "audio",
-    slots: [{ ...AUDIO_SLOT, required: true }],
+    slots: [{ ...AUDIO_SLOT, required: true },
+      BACKGROUND_SLOT,
+    ],
     defaultDurationSeconds: 10,
     build: (input) => {
       const duration = input.durationInFrames ?? durationFromSeconds(10, input.fps);
@@ -715,7 +752,9 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     icon: "Music",
     hint: "Background music — volume apne aap kam",
     group: "audio",
-    slots: [{ id: "audio", label: "Music", kind: "asset:audio", required: true }],
+    slots: [{ id: "audio", label: "Music", kind: "asset:audio", required: true },
+      BACKGROUND_SLOT,
+    ],
     defaultDurationSeconds: 15,
     build: (input) => {
       const duration = input.durationInFrames ?? durationFromSeconds(15, input.fps);
@@ -750,6 +789,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     group: "special",
     slots: [
       { id: "image", label: "Tasveer", kind: "asset:image", required: true },
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 3,
     build: (input) => {
@@ -779,7 +819,9 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     icon: "Square",
     hint: "Rang ka band ya gola — text ke peeche ya divider ki tarah",
     group: "special",
-    slots: [],
+    slots: [
+      BACKGROUND_SLOT,
+    ],
     defaultDurationSeconds: 3,
     build: (input) => {
       const duration = input.durationInFrames ?? durationFromSeconds(3, input.fps);
@@ -806,6 +848,7 @@ export const BUILTIN_SCENE_TYPES: readonly SceneTypeEntry[] = [
     group: "text",
     slots: [
       { id: "text", label: "Subtitle", kind: "text", required: true, multiline: true },
+      BACKGROUND_SLOT,
     ],
     defaultDurationSeconds: 3,
     build: (input) => {

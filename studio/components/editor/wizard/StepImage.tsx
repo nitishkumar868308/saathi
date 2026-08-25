@@ -629,6 +629,48 @@ function SceneRow({
         </div>
 
         {/*
+          Peeche ki tasveer — **scene ki apni tasveer se alag khaana** (26.27).
+        
+          ⚠️ Ye upar wale picker ka duplicate nahi hai, do alag cheezein hain.
+          Upar wali tasveer wo hai jo scene *hai*; ye wo hai jo uske **peeche**
+          chalti hai. Ek hi khaana rakhne par CTA jaise scene par — jiska apna
+          visual hota hi nahi — dono ek doosre ki jagah le lete, aur aadmi ko
+          sirf itna dikhta ki uski tasveer "kahin aur" chali gayi.
+
+          ⚠️ Har scene par dikhta hai, kism koi bhi ho — aur khaali chhodna
+          bilkul theek hai. Ye ek chunav hai, koi bharna zaroori khaana nahi:
+          kisi ek scene par background chahiye, kisi par nahi — dono chalta hai.
+
+          ⚠️ Sirf `image` — video nahi. Peeche chalti hui video har scene ka
+          matlab kha jaati hai (aankh peeche wali harkat par chali jaati hai) aur
+          render ka waqt kai guna badha deti hai. Jise peeche video chahiye wo use
+          scene ki apni cheez banaye, background nahi.
+        */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="shrink-0 text-[10px] text-chalk-500">Peeche:</span>
+          <div className="min-w-0 max-w-[190px] flex-1">
+            <AssetPickerButton
+              kind="image"
+              allowUpload
+              uploadTags={["wizard"]}
+              assetId={scene.backgroundAssetId}
+              onPick={(assetId) => onChange(scene.index, { backgroundAssetId: assetId })}
+            />
+          </div>
+          {scene.backgroundAssetId ? (
+            <button
+              type="button"
+              onClick={() => onChange(scene.index, { backgroundAssetId: null })}
+              className="rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-400 transition-colors hover:border-chalk-500"
+            >
+              Hata do
+            </button>
+          ) : (
+            <span className="text-[10px] text-chalk-500">ya chhod do — peeche kuch nahi lagega</span>
+          )}
+        </div>
+
+        {/*
           ⚠️ Harkat ka chunav ab **hamesha** dikhta hai, tasveer ho ya na ho.
 
           Pehle wo sirf tasveer wale scene par tha, is dalil par ki bina tasveer
