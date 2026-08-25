@@ -138,6 +138,9 @@ const BETWEEN_CALLS_MS = 4_000;
  */
 const LANES = 1;
 
+/** Do awaazon ke beech ki saans — upar wala ⚠️ dekho. */
+const BREATH_MS = 2_000;
+
 /**
  * Ek scene par kitni baar rukein.
  *
@@ -806,9 +809,27 @@ export function StepVoice({
 
         inFlight.delete(at);
         tick();
-        // Gap sirf tab jab provider ek baar mana kar chuka ho. Warna ye har reel
-        // par lagne wala bina wajah ka intezaar hai.
-        if (slow && !stopped) await sleep(BETWEEN_CALLS_MS);
+        /*
+         * Do call ke beech thodi saans — **naap kar rakhi gayi** (26.28).
+         *
+         * ⚠️ Ye "shayad achha hoga" wala gap nahi hai. Ek ke baad ek bina ruke
+         * Gemini ko bulane par uski latency chadhti jaati hai, aur ye seedha
+         * naapa gaya hai:
+         *
+         *     pehli call   3.3s
+         *     doosri       6.7s
+         *     teesri      40.7s
+         *     chauthi     jawab hi nahi
+         *
+         * Google 429 nahi deta — wo bas rok kar baitha rehta hai. Yehi wajah thi
+         * ki reel me "kuch scene par awaaz ban gayi, baaki par nahi" hota tha:
+         * shuru ki do-teen nikal jaati thi aur baaki us khaayi me gir jaati thi.
+         *
+         * ⚠️ `slow` par gap poora 4s ho jaata hai. Do alag number hone ki wajah
+         * saaf hai: neeche wala gap sirf latency ko chadhne se rokta hai, upar
+         * wala tab lagta hai jab provider **saaf mana** kar chuka ho.
+         */
+        if (!stopped) await sleep(slow ? BETWEEN_CALLS_MS : BREATH_MS);
       }
     }
 

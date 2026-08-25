@@ -399,14 +399,81 @@ export const geminiTtsAdapter: TtsAdapter = {
 
     /** Sirf "200 par audio nadaarad" wali halat ke liye — 2 se aage kabhi nahi. */
     const EMPTY_AUDIO_TRIES = 2;
+
+    /**
+     * Ek call ko kitna waqt — dekho neeche wala ⚠️.
+     *
+     * Vercel ka function 60s par marta hai, client 70s par haar maanta hai. 45
+     * dono se pehle hai, taaki rukne ki wajah hum likhen — koi platform apne
+     * HTML error page se nahi.
+     */
+    const GEMINI_TIMEOUT_MS = 45_000;
     let lastEmpty = "";
 
     for (let attempt = 1; attempt <= EMPTY_AUDIO_TRIES; attempt += 1) {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-      });
+      /*
+       * ⚠️ **Timeout — aur iska na hona ek asli, poore feature ko todne wala
+       * bug tha (26.28).**
+       *
+       * Ye naap kar pakda gaya, andaaza nahi hai. Studio ke through ek call
+       * chala kar dekha to route `200 in 114988ms` par lauta — yaani 115 second.
+       * Usi waqt seedha Gemini ko wahi maang bheji to wo 3.3s me jawab de rahi
+       * thi. Timing daal kar dekha to poora waqt yahin, is fetch me tha:
+       *
+       *     findAssetByCacheKey:  787ms
+       *     overDailyLimit:      1401ms
+       *     adapter.available:   1401ms
+       *     synthesize:          ← 113 second
+       *
+       * Google is model par ek ke baad ek call par latency badhata jaata hai
+       * (3.3s → 6.7s → 40s → atak gaya) — 429 dene ki jagah wo bas **rok kar
+       * baitha rehta hai**. Bina timeout ke ye intezaar kabhi khatam hi nahi
+       * hota tha, aur uske do nateeje the:
+       *
+       *   1. Vercel apna function beech me maar deta tha aur client ko JSON ki
+       *      jagah HTML milta tha — wahi "Server ne jawab beech me chhod diya"
+       *      wala message, jisse na wajah pata chalti thi na ilaaj.
+       *   2. Bani hui awaaz (agar ban chuki hoti) kabhi save hi nahi hoti,
+       *      kyunki uske aage ka code chalta hi nahi tha — paisa lag chuka hota
+       *      aur maal kuch nahi.
+       *
+       * ⚠️ 45 second hai, aur ye do haddon ke **beech** me chuna gaya hai:
+       * Vercel ka function 60s par marta hai aur client 70s par haar maanta
+       * hai. Yahan pehle rukne ka matlab hai ki wajah **hum** likhte hain, koi
+       * platform apne HTML page se nahi. Aam call 3-7 second ki hai, isliye ye
+       * hadd sirf usi ko kaat'ti hai jo waise bhi kabhi nahi lautne wala tha.
+       */
+      const controller = new AbortController();
+      const cutoff = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+          signal: controller.signal,
+        });
+      } catch (cause) {
+        if (controller.signal.aborted) {
+          /*
+           * ⚠️ 503 hai, 500 nahi — aur wo farak client ke liye maayne rakhta
+           * hai. Ye "kuch toot gaya" nahi hai; ye "provider abhi jawab nahi de
+           * raha" hai, jispar dobara koshish karna sahi hai. `voiceGen` isi
+           * darje par peek + retry chalata hai.
+           */
+          throw new TtsHttpError(
+            503,
+            `Gemini ne ${Math.round(GEMINI_TIMEOUT_MS / 1000)}s me jawab nahi diya. ` +
+              `Ye is model par ek ke baad ek awaaz banane par hota hai — thodi der ruk kar ` +
+              `dobara koshish karo, ya kuch awaazein baad me banao.`,
+            null,
+            false,
+          );
+        }
+        throw cause;
+      } finally {
+        clearTimeout(cutoff);
+      }
 
       if (!response.ok) {
         const raw = await response.text();
