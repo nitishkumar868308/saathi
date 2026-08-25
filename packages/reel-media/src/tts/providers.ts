@@ -161,7 +161,44 @@ export const edgeTtsAdapter: TtsAdapter = {
  * se pehle billing par uska **per-call kharcha** dekh lo — "naya hai" ya "tez
  * hai" iski wajah nahi hai.
  */
-const GEMINI_TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? "gemini-2.5-flash-preview-tts";
+const GEMINI_TTS_DEFAULT = "gemini-2.5-flash-preview-tts";
+
+/**
+ * Mehnge model — **env var se bhi nahi chalenge** (26.29).
+ *
+ * ⚠️ Upar wala default theek karna kaafi nahi tha, aur wo isi bill se pata
+ * chala. Code me default 2.5 kar dene ke baad bhi kharcha 3.1 par dikhta raha,
+ * kyunki asli chunav code me nahi tha — wo **Vercel ke env var me** baitha tha.
+ * `?? default` us haalat me kuch nahi karta: env set hai, to env jeetta hai.
+ *
+ * Isliye ab default sirf khaali jagah nahi bharta, wo ek **hadd** bhi hai. Jis
+ * model ka per-call kharcha ₹44 naapa gaya ho, wo chup-chaap kisi dashboard ki
+ * setting se wapas nahi aa sakta.
+ *
+ * ⚠️ Ye "3.x hamesha bura hai" nahi keh raha. Ye keh raha hai ki **is kharche
+ * wala faisla likh kar liya jaaye**: jise sach me chahiye wo `GEMINI_TTS_MODEL`
+ * ke saath `GEMINI_TTS_ALLOW_COSTLY=yes` bhi rakhe. Do var set karna bhoola
+ * nahi jaata; ek var chup-chaap reh jaata hai — 24 Aug ko wahi hua tha.
+ */
+const GEMINI_TTS_COSTLY = /^gemini-3(\.\d+)?-(flash|pro)-tts/i;
+
+export function pickTtsModel(): string {
+  const asked = process.env.GEMINI_TTS_MODEL?.trim();
+  if (!asked) return GEMINI_TTS_DEFAULT;
+
+  const allowed = /^(1|yes|true)$/i.test(process.env.GEMINI_TTS_ALLOW_COSTLY?.trim() ?? "");
+  if (GEMINI_TTS_COSTLY.test(asked) && !allowed) {
+    console.warn(
+      `[tts] GEMINI_TTS_MODEL="${asked}" chhod diya gaya — is model ka kharcha ~₹44 per call ` +
+        `naapa gaya hai (2.5 par ~₹0.17). "${GEMINI_TTS_DEFAULT}" chal raha hai. ` +
+        `Sach me yahi chahiye to GEMINI_TTS_ALLOW_COSTLY=yes bhi set karo.`,
+    );
+    return GEMINI_TTS_DEFAULT;
+  }
+  return asked;
+}
+
+const GEMINI_TTS_MODEL = pickTtsModel();
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /**
@@ -183,6 +220,68 @@ const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
  */
 const GEMINI_CONSISTENCY =
   "Wahi ek narrator har line me — wahi umar, wahi pitch, wahi raftaar. Natural bolo.";
+
+/**
+ * Temperature — **0.6, aur 0 ek asli bug tha** (26.29).
+ *
+ * ⚠️ Ye number naapa gaya hai, chuna nahi gaya. 26.27 me ise 0 kar diya gaya
+ * tha is dalil par ki "temperature bolne wale ki pehchaan badal deta hai". Wo
+ * dalil dono taraf se galat nikli. Upar wale prompt ke saath ek hi line par
+ * temperature badal-badal kar chalaya gaya (`gemini-2.5-flash-preview-tts`,
+ * voice `Charon`, wahi text):
+ *
+ *     temperature   nateeja
+ *     0             2/2 call kabhi lauti hi nahi (30s+)
+ *     0.05          2/2 kabhi nahi lauti
+ *     0.1           2/2 kabhi nahi lauti
+ *     0.2           1/2 nahi lauti, doosri 21s
+ *     0.35          1/4 nahi lauti, baaki ~6s
+ *     0.6           9/9 lauti, 5-8s
+ *     1.0 (default) 9/9 lauti, 5-15s
+ *
+ * Yaani neeche jaane par model **atak jaata hai** — audio tokens greedy decode
+ * par apne aap ko dohrata rehta hai aur generation kabhi khatam nahi hoti.
+ * Google 429 nahi deta, error nahi deta; wo bas rok kar baitha rehta hai.
+ *
+ * ⚠️ **Isi ek line se do aur "bug" bane the, jo bug the hi nahi:**
+ *
+ *   1. "Gemini ek ke baad ek call par dheema hota jaata hai (3.3s → 6.7s → 40s
+ *      → atak gaya)" — ye 26.28 me naapa gaya tha, par temperature 0 lage hue.
+ *      Wo ramp nahi thi; wo yahi atakna tha, alag-alag line par alag-alag
+ *      shiddat se. 0.6 par 6 call **bina kisi gap ke** ek ke baad ek chalayi
+ *      gayi: 7.8s, 6.2s, 7.7s, 7.6s, 5.8s, 5.2s. Koi ramp nahi.
+ *   2. "45s me jawab nahi aaya" — wahi atakna, sirf timeout ki taraf se dikhta
+ *      hua. Aadmi ne ek hi scene par "Awaaz banao" dabaya tha aur use ye error
+ *      mila, jo "ek ke baad ek call" ko dosh de raha tha. Wo dosh jhootha tha.
+ *
+ * ⚠️ Aur pehchaan (jiske liye 0 laaya gaya tha) neeche jaane se **bigadti** hai,
+ * sudharti nahi. Ek hi reel ki teen line par bolne wale ki pitch naapi gayi —
+ * jitna kam temperature, utna zyada farak:
+ *
+ *     0.35 → 42.7 Hz ka farak
+ *     0.6  → 11-16 Hz
+ *     1.0  → 13-67 Hz
+ *
+ * ⚠️ `seed` se ye theek nahi hota — 0.6 aur 1.0 dono par seed daal kar dekha
+ * gaya, farak wahi ka wahi raha. Pehchaan `prebuiltVoiceConfig.voiceName` se
+ * bandhti hai (wo har scene par ek hi hai), is number se nahi.
+ *
+ * ⚠️ Ise phir se neeche mat le jaana, aur iske liye **env var bhi nahi hai** —
+ * jaan-boojhkar. Ye wahi galti hai jo `GEMINI_TTS_MODEL` ne ₹393 me karayi:
+ * ek number jo chup-chaap badal jaaye aur kuch "toota" hua na dikhe. Jo badle
+ * wo yahin badle, aur pehle ek hi line par 3 call chala kar dekh le ki wo lauti
+ * bhi hain ya nahi — ye galti browser me "atak gaya" jaisi dikhti hai, error ki
+ * tarah nahi.
+ */
+export const GEMINI_TEMPERATURE = 0.6;
+
+/**
+ * Isse neeche jaana model ko atka deta hai — `check-tts.ts` isi par khada hai.
+ *
+ * ⚠️ 0.35 par 4 me se 1 call nahi lauti thi, isliye hadd usse upar hai. Ye
+ * "safe" nahi, **naapa hua** number hai.
+ */
+export const GEMINI_MIN_TEMPERATURE = 0.5;
 
 interface GeminiPart {
   text?: string;
@@ -366,29 +465,7 @@ export const geminiTtsAdapter: TtsAdapter = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         responseModalities: ["AUDIO"],
-        /*
-         * ⚠️ **0**, aur ye 0.35 se wapas neeche laaya gaya hai (26.27).
-         *
-         * 26.26 me 0.35 rakha gaya tha is dalil par ki 0 par bolna "chapta" ho
-         * jaata hai. Wo dalil ek cheez bhool gayi thi: temperature sirf andaaz
-         * nahi badalta, wo **bolne wale ki pehchaan** bhi badal deta hai. 7 scene
-         * ki reel me har call apni pitch aur umar chun leti thi, aur nateeja wo
-         * tha jo aadmi ne saaf shabdon me bataya:
-         *
-         *     "maine sab me Aadmi choose kiya tha, phir har scene me awaaz alag
-         *      kyun lag rahi hai"
-         *
-         * ⚠️ Isse bolna bejaan nahi hota — ye galatfehmi hi 0.35 wali galti ki
-         * jad thi. Line ka andaaz **text se** aata hai (sawaal, hairaani, CTA —
-         * sab alag bolte hain), aur wo aage bhi aata rahega. Temperature sirf
-         * **ek hi text par baar-baar alag** natija dene ka naam hai — aur reel me
-         * uski koi zaroorat nahi hai. Aadmi ne khud kaha: "scene ke hisab se
-         * badalna chahiye" — wo text se hota hai, is number se nahi.
-         *
-         * ⚠️ Iska kharcha shunya hai. Ye na model badalta hai na tokens — yaani
-         * behtar nateeja bina ek paisa badhe.
-         */
-        temperature: 0,
+        temperature: GEMINI_TEMPERATURE,
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: args.voiceId } },
         },
@@ -425,10 +502,15 @@ export const geminiTtsAdapter: TtsAdapter = {
        *     adapter.available:   1401ms
        *     synthesize:          ← 113 second
        *
-       * Google is model par ek ke baad ek call par latency badhata jaata hai
-       * (3.3s → 6.7s → 40s → atak gaya) — 429 dene ki jagah wo bas **rok kar
-       * baitha rehta hai**. Bina timeout ke ye intezaar kabhi khatam hi nahi
-       * hota tha, aur uske do nateeje the:
+       * ⚠️ Us waqt is atakne ki wajah "ek ke baad ek call par Google ka dheema
+       * hona" samajhi gayi thi (3.3s → 6.7s → 40s → atak gaya). Wo galat thi —
+       * asli wajah `GEMINI_TEMPERATURE` par likhi hai, aur 26.29 me theek ho
+       * chuki hai. Timeout phir bhi rehta hai, kyunki wo ek **jaal** hai kisi
+       * ek wajah ka ilaaj nahi: kal koi doosri wajah se call atke to Vercel ka
+       * HTML error page nahi, hamara likha hua jawab jaana chahiye.
+       *
+       * Bina timeout ke ye intezaar kabhi khatam hi nahi hota tha, aur uske do
+       * nateeje the:
        *
        *   1. Vercel apna function beech me maar deta tha aur client ko JSON ki
        *      jagah HTML milta tha — wahi "Server ne jawab beech me chhod diya"
@@ -460,12 +542,20 @@ export const geminiTtsAdapter: TtsAdapter = {
            * hai. Ye "kuch toot gaya" nahi hai; ye "provider abhi jawab nahi de
            * raha" hai, jispar dobara koshish karna sahi hai. `voiceGen` isi
            * darje par peek + retry chalata hai.
+           *
+           * ⚠️ Message me **wajah ka andaaza nahi lagaya jaata**, aur ye ek
+           * naapi hui galti ka ilaaj hai. Pehle yahan likha tha "ye ek ke baad
+           * ek awaaz banane par hota hai" — aadmi ne sirf **ek** scene par
+           * dabaya tha aur use yahi mila. Galat wajah batana koi wajah na batane
+           * se bura hai: wo aadmi ko us cheez ko badalne bhejti hai jo tooti hi
+           * nahi (usne awaazein ek-ek karke banani shuru kar di thi, jabki
+           * dikkat temperature me thi).
            */
           throw new TtsHttpError(
             503,
-            `Gemini ne ${Math.round(GEMINI_TIMEOUT_MS / 1000)}s me jawab nahi diya. ` +
-              `Ye is model par ek ke baad ek awaaz banane par hota hai — thodi der ruk kar ` +
-              `dobara koshish karo, ya kuch awaazein baad me banao.`,
+            `Gemini ne is line par ${Math.round(GEMINI_TIMEOUT_MS / 1000)}s me jawab nahi diya ` +
+              `(${GEMINI_TTS_MODEL}). Aam call 5-8s ki hoti hai. Dobara dabao — ` +
+              `baar-baar ho to ye line ke shabd badal kar dekho.`,
             null,
             false,
           );

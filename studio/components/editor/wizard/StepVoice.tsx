@@ -133,6 +133,18 @@ const BETWEEN_CALLS_MS = 4_000;
  * jo aksar lagti hi nahi. Jo cheez hatayi gayi wo **bekaar intezaar** tha, na ki
  * wo tarteeb jo kaam ko chalta rakhti hai.
  *
+ * ⚠️ **Upar wali wajah galat thi, par ginti sahi hai (26.29).** "Teen call ek
+ * saath bhejne par Google unhe dheema kar deta hai" — aisa kuch nahi hota. Wo
+ * "jawab beech me chhod diya" `temperature: 0` ka atakna tha (dekho
+ * `GEMINI_TEMPERATURE`), jo ab theek hai; 6 call bina kisi gap ke chalayi gayi
+ * aur har ek 5-8s me lauti.
+ *
+ * Phir bhi 1 hi hai, ab ek naapi hui wajah se: TTS model par Tier 1 ki hadd
+ * **10 call/minute** hai. Ek call ~6s ki hai, yaani ek lane khud-ba-khud us
+ * hadd ke andar rehti hai. Teen lane usse teen guna tez nahi banati — wo bas
+ * 429 ke uss raaste par le jaati hai jahan rukna padta hai, aur kul waqt utna
+ * hi ya zyada ho jaata hai.
+ *
  * ⚠️ Ye ginti badhane se pehle: ek scene ka fail hona ek awaaz ka kharcha aur
  * ek adhoori reel hai. Utni keemat par thodi si tezi kabhi sasti nahi padti.
  */
@@ -810,24 +822,24 @@ export function StepVoice({
         inFlight.delete(at);
         tick();
         /*
-         * Do call ke beech thodi saans — **naap kar rakhi gayi** (26.28).
+         * Do call ke beech thodi saans — **per-minute hadd ke liye** (26.29).
          *
-         * ⚠️ Ye "shayad achha hoga" wala gap nahi hai. Ek ke baad ek bina ruke
-         * Gemini ko bulane par uski latency chadhti jaati hai, aur ye seedha
-         * naapa gaya hai:
+         * ⚠️ Yahan pehle ye likha tha ki "ek ke baad ek bina ruke bulane par
+         * Gemini ki latency chadhti jaati hai (3.3s → 6.7s → 40.7s → jawab hi
+         * nahi)". Wo naap sach tha par uska matlab galat nikala gaya tha: us
+         * waqt `temperature: 0` laga hua tha aur wahi atakne ki asli wajah thi
+         * (dekho `GEMINI_TEMPERATURE`). Theek karne ke baad 6 call **bina kisi
+         * gap ke** chalayi gayi: 7.8s, 6.2s, 7.7s, 7.6s, 5.8s, 5.2s. Koi ramp
+         * nahi hai.
          *
-         *     pehli call   3.3s
-         *     doosri       6.7s
-         *     teesri      40.7s
-         *     chauthi     jawab hi nahi
-         *
-         * Google 429 nahi deta — wo bas rok kar baitha rehta hai. Yehi wajah thi
-         * ki reel me "kuch scene par awaaz ban gayi, baaki par nahi" hota tha:
-         * shuru ki do-teen nikal jaati thi aur baaki us khaayi me gir jaati thi.
+         * ⚠️ Gap phir bhi rehta hai, kyunki uski ek doosri, asli wajah hai:
+         * TTS model par Tier 1 ki hadd **10 call/minute** hai. ~6s ki call ke
+         * saath 2s ka gap yaani ~7.5 call/minute — us hadd se saaf neeche, bina
+         * kisi mehsoos hone wale intezaar ke.
          *
          * ⚠️ `slow` par gap poora 4s ho jaata hai. Do alag number hone ki wajah
-         * saaf hai: neeche wala gap sirf latency ko chadhne se rokta hai, upar
-         * wala tab lagta hai jab provider **saaf mana** kar chuka ho.
+         * saaf hai: neeche wala gap hadd ke paas jaane se rokta hai, upar wala
+         * tab lagta hai jab provider **saaf mana** kar chuka ho.
          */
         if (!stopped) await sleep(slow ? BETWEEN_CALLS_MS : BREATH_MS);
       }
