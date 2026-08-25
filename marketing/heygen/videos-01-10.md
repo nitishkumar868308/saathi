@@ -180,9 +180,7 @@ two people merged, extra fingers, distorted hands, text, watermark, logo
 
 ### SCRIPT — HI (paste into HeyGen)
 ```
-Beta... license expire ho gaya.
-
-Papa ki awaaz thodi dheemi thi.
+Beta license expire ho gaya. Papa ki awaaz thodi dheemi thi.
 
 Jinhone humari har date yaad rakhi... unki ek date main bhool gaya.
 
