@@ -72,6 +72,21 @@ const GenerateSchema = z.object({
   providerId: z.string().min(1).optional(),
   rate: z.number().min(0.5).max(2).optional(),
   pitch: z.number().min(-12).max(12).optional(),
+  /**
+   * Sirf **poochho**, banao mat (26.28).
+   *
+   * ⚠️ Ye ek asli, chup-chaap paisa khaane wali halat ke liye hai. Gemini kabhi
+   * 100s+ le leta hai; tab tak client (ya Vercel ka function) haar maan chuka
+   * hota hai aur aadmi ko dikhta hai "Server ne jawab beech me chhod diya".
+   * Par udhar kaam **poora ho chuka** hota hai — awaaz ban kar R2 aur DB me
+   * baith chuki hoti hai, aur uska paisa lag chuka hota hai.
+   *
+   * Us halat me dobara "Awaaz banao" dabana Gemini ko **dobara** bulata tha,
+   * yaani ek hi line ka paisa do baar. `peek` us call ko bina provider ko chhue
+   * cache se jawab dilata hai: bani hui ho to wahi milegi, na bani ho to saaf
+   * 404 — aur dono me se kisi bhi halat me ek paisa nahi lagta.
+   */
+  peek: z.boolean().optional(),
 });
 
 /** Har provider se poochho ki wo chalne layak hai ya nahi. */
@@ -206,6 +221,21 @@ export async function POST(request: Request): Promise<Response> {
         voiceId,
         categoryId: category.id,
       });
+    }
+
+    /*
+     * ⚠️ `peek` ka jawab **yahin** khatam ho jaata hai — provider ko chhue bina.
+     *
+     * Ye line hi is poore feature ki jaan hai. Isse neeche ka har raasta paisa
+     * kharch karta hai; `peek` ka poora maqsad hi ye jaanna hai ki "jo paisa
+     * shayad pehle lag chuka hai, uska maal kahin pada to nahi hai".
+     */
+    if (body.data.peek) {
+      return fail(
+        "abhi tak nahi bani",
+        404,
+        "Is text ki awaaz cache me nahi hai — pichhli koshish sach me poori nahi hui thi.",
+      );
     }
 
     /* ------------------------------------------------------- ab hi banao */

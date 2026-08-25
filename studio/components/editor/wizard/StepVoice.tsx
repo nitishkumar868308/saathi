@@ -113,17 +113,30 @@ const BETWEEN_CALLS_MS = 4_000;
  * ne ek baar bhi mana na kiya ho — yaani jo hadd kabhi lagi hi nahi, uski keemat
  * har reel chukati thi.
  *
- * ⚠️ 3 hai, 6 nahi. Ye TTS ki hadd ka andaaza nahi hai — ye wo ginti hai jispar
- * fail hone ki keemat kam rehti hai. Hadd lagni hi hai to teen call par lagegi,
- * aur teen ko dobara bhejna sasta hai; chhe par hadd lagne ka matlab hai chhe
- * bekaar call, jo free quota par ginti me bhi aati hain.
+ * ⚠️ **1 hai — 3 se wapas laaya gaya (26.28).** Pehle 3 kiya gaya tha, aur wo
+ * naap kar nahi, ummeed par tha. Asli nateeja ye nikla:
  *
- * ⚠️ Ye sirf **shuruaat** hai. Pehli 429 par hi ye 1 par aa jaati hai aur gap
- * wapas lag jaata hai — dekho `slow`. Yehi is badlaav ki asli baat hai: tez
- * chalna default hai, aur dheema hona provider ke mana karne par hota hai, pehle
- * se dar kar nahi.
+ *     Scene 1 — Server ne jawab beech me chhod diya
+ *     Scene 2 — awaaz lag gayi
+ *     Scene 3 — Server ne jawab beech me chhod diya
+ *
+ * Wajah ye hai ki teen call ek saath bhejne se wo teen guna tez nahi hoti —
+ * Google unhe apne yahan qatar me lagata hai, har ek pehle se dheemi ho jaati
+ * hai, aur ek-do us 60 second ki hadd ko chhoo leti hain jispar Vercel function
+ * ko maar deta hai. Yaani tez chalne ki koshish ne har baar **aadhi reel par
+ * awaaz** bana di — aur wo sabse buri shakal hai kisi bhi kharabi ki, kyunki
+ * aadmi ko na wajah dikhti hai na koi tarteeb.
+ *
+ * ⚠️ Intezaar phir bhi pehle jitna nahi hai, aur wo hissa bacha hua hai: beech
+ * ka 4 second ka gap ab tabhi lagta hai jab provider ek baar mana kar de
+ * (`slow`). Pehle wo har reel par har baar lagta tha, us hadd se bachne ke liye
+ * jo aksar lagti hi nahi. Jo cheez hatayi gayi wo **bekaar intezaar** tha, na ki
+ * wo tarteeb jo kaam ko chalta rakhti hai.
+ *
+ * ⚠️ Ye ginti badhane se pehle: ek scene ka fail hona ek awaaz ka kharcha aur
+ * ek adhoori reel hai. Utni keemat par thodi si tezi kabhi sasti nahi padti.
  */
-const LANES = 3;
+const LANES = 1;
 
 /**
  * Ek scene par kitni baar rukein.

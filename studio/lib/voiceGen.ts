@@ -67,7 +67,104 @@ interface TtsReply {
   quotaExhausted?: boolean;
 }
 
+/**
+ * Server ke haar maan lene ke baad bhi — **awaaz bani to nahi?** (26.28)
+ *
+ * ⚠️ Ye ek asli, chup-chaap paisa khaane wali halat ka ilaaj hai. Gemini kabhi
+ * 100s+ le leta hai. Tab tak ya client ki hadd lag jaati hai ya Vercel apna
+ * function maar deta hai, aur aadmi ko ye dikhta hai:
+ *
+ *     Server ne jawab beech me chhod diya
+ *
+ * — jisse lagta hai ki kuch hua hi nahi. Par aksar udhar kaam **poora ho chuka**
+ * hota hai: awaaz ban kar R2 aur DB me baith chuki hoti hai aur uska paisa lag
+ * chuka hota hai. Dobara "Awaaz banao" dabana Gemini ko dobara bulata tha —
+ * ek hi line ka paisa do baar, aur aadmi ko iska pata bhi nahi chalta tha.
+ *
+ * ⚠️ Do baar poochha jaata hai, ek baar nahi. Server client ke haar maanne ke
+ * thodi der baad bhi kaam khatam kar sakta hai, aur turant ek hi baar poochhne
+ * par wo awaaz miss ho jaati — jo abhi-abhi kharidi gayi thi.
+ *
+ * ⚠️ Ye khud kabhi throw nahi karta. Ye ek **bachaav** ki koshish hai, kaam nahi;
+ * iske fail hone par asli wajah aadmi tak jaani chahiye, na ki is koshish ki
+ * koi nayi wajah.
+ */
+async function peekVoice(args: {
+  text: string;
+  categoryId: string;
+  providerId?: string | null;
+}): Promise<MadeVoice | null> {
+  for (const waitMs of [0, 4_000]) {
+    if (waitMs > 0) await new Promise((done) => setTimeout(done, waitMs));
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: args.text,
+          categoryId: args.categoryId,
+          ...(args.providerId ? { providerId: args.providerId } : {}),
+          peek: true,
+        }),
+      });
+      if (!response.ok) continue;
+      const json = (await response.json()) as TtsReply;
+      if (!json.asset) continue;
+      forgetAssetMeta();
+      return {
+        assetId: json.asset.id,
+        seconds: json.asset.durationMs ? json.asset.durationMs / 1000 : null,
+        // `true` — kyunki ye sach me cache se aayi hai. Ise `false` batana usi
+        // jhooth ka doosra roop hota: kharcha is call me hua hi nahi.
+        cached: true,
+      };
+    } catch {
+      // Chup. Agli koshish, ya `null`.
+    }
+  }
+  return null;
+}
+
+/**
+ * Ek scene ki awaaz — **koshish, muft jaanch, phir ek aur koshish** (26.28).
+ *
+ * ⚠️ Pehle yahan koshish **ek hi** thi, aur yehi wo bug tha jise aadmi ne
+ * "kisi me awaaz ban rahi hai kisi me nahi" kaha. Rate-limit (429) par to dobara
+ * koshish hoti thi, par timeout par nahi — jabki aam din me girne ki asli wajah
+ * wahi hoti hai: Gemini ka ek call achanak 100s le leta hai. Us ek scene ke liye
+ * ye hamesha ke liye fail ho jaata tha, aur baaki scene theek bante rehte —
+ * yaani aadhi reel par awaaz, bina kisi samajh me aane wali wajah ke.
+ *
+ * ⚠️ Beech me `peekVoice` hona **zaroori** hai, aur wo tarteeb hi is function ki
+ * poori baat hai. Seedha dobara koshish karna aasan tha, par timeout ka aksar
+ * matlab hota hai ki kaam ho chuka hai aur sirf jawab kho gaya. Bina poochhe
+ * dobara bhejna us surat me ek hi awaaz ka paisa do baar deta hai.
+ *
+ * ⚠️ 429 aur quota par ye kuch nahi karta — wahan call provider tak pahunchi hi
+ * nahi, isliye na kuch bana hoga aur na hi turant dobara bhejne se kuch banega.
+ * Wo intezaar bulane wala karta hai, jispar koi hadd nahi.
+ */
 export async function generateVoice(args: {
+  text: string;
+  categoryId: string;
+  providerId?: string | null;
+  signal?: AbortSignal;
+}): Promise<MadeVoice> {
+  try {
+    return await attemptVoice(args);
+  } catch (cause) {
+    const error = cause instanceof VoiceError ? cause : new VoiceError(String(cause), "other");
+    if (error.kind !== "timeout" && error.kind !== "server") throw error;
+    if (args.signal?.aborted) throw error;
+
+    const already = await peekVoice(args);
+    if (already) return already;
+
+    return attemptVoice(args);
+  }
+}
+
+async function attemptVoice(args: {
   text: string;
   categoryId: string;
   /**
