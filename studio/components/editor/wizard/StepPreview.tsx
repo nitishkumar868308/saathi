@@ -40,13 +40,17 @@ import {
   Plus,
   RotateCcw,
   RotateCw,
+  Scissors,
   Undo2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AudioPreview } from "@/components/media/AudioPreview";
+
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
+import { VoiceTrimDialog } from "@/components/editor/wizard/VoiceTrimDialog";
 import { useAssetMap } from "@/lib/assetMap";
 import { useFonts } from "@/lib/fonts";
 import { useEditorStore } from "@/lib/store";
@@ -259,6 +263,8 @@ export function StepPreview({
   const [mark, setMark] = useState<{ left: number; top: number; width: number; height: number } | null>(
     null,
   );
+  /** Awaaz kaatne wala dialog — chuni hui cheez ke scene ki awaaz par. */
+  const [trimming, setTrimming] = useState(false);
 
   /*
    * `autoFill` yahan bhi — aadmi seedha is step par aa sakta hai bina kuch chune.
@@ -334,6 +340,13 @@ export function StepPreview({
    * `requestAnimationFrame` se zyada kuch nahi hai.
    */
   useEffect(() => {
+    /*
+     * ⚠️ Chunav badalte hi kaatne wala dialog band. Bina iske wo khula reh jaata
+     * hai par ab kisi aur scene ki awaaz par kaam karta hai — aur "Yahi lo" us
+     * scene par lagti hai jo screen par hai hi nahi.
+     */
+    setTrimming(false);
+
     if (!picked) {
       setMark(null);
       return;
@@ -741,6 +754,38 @@ export function StepPreview({
               <div className="space-y-1.5 border-t border-ink-700 pt-1.5">
                 {scene.voiceAssetId ? (
                   <>
+                    {/*
+                      Sun kar dekho, aur wahin se kaat do (26.28).
+
+                      ⚠️ Ye dono cheezein Awaaz wale step me bhi hain, aur yahan
+                      hona dohraav nahi hai. "Shuru me ek lambi saans hai" aur
+                      "ant ka shabd adhoora hai" sirf **poori reel chalate hue**
+                      pakdi jaati hain — aur us waqt aadmi yahan khada hota hai.
+                      Wapas step 3 par bhej kar wahi scene dhoondhwana matlab wo
+                      teesri baar ye karega hi nahi.
+                    */}
+                    <div className="flex items-center gap-1.5">
+                      <AudioPreview assetId={scene.voiceAssetId} className="min-w-0 flex-1" />
+                      <Tap
+                        title="Awaaz ka sirf ek hissa lo — shuru ki saans ya ant ka adhoora shabd kaat do"
+                        active={scene.voiceTrim !== null}
+                        onClick={() => setTrimming(true)}
+                      >
+                        <Scissors size={9} />
+                        {scene.voiceTrim
+                          ? `${scene.voiceTrim.startSeconds.toFixed(1)}–${scene.voiceTrim.endSeconds.toFixed(1)}s`
+                          : "Kaato"}
+                      </Tap>
+                      {scene.voiceTrim ? (
+                        <Tap
+                          title="Poori awaaz wapas"
+                          onClick={() => onChange(scene.index, { voiceTrim: null })}
+                        >
+                          Poori
+                        </Tap>
+                      ) : null}
+                    </div>
+
                     <LevelRow
                       label="Is scene ki awaaz"
                       levels={VOICE_LEVELS}
@@ -785,6 +830,13 @@ export function StepPreview({
                   )}
                 </div>
 
+                {/*
+                  ⚠️ Jo dhun is scene par sach me bajegi wahi bajti hai — scene ka
+                  apna gaana ho to wo, warna reel wala. Sirf scene wala dikhane par
+                  aam haalat me (jahan reel ki dhun chal rahi hai) kuch bhi na hota.
+                */}
+                {sceneMusicId ? <AudioPreview assetId={sceneMusicId} /> : null}
+
                 {sceneMusicId ? (
                   <LevelRow
                     label="Music yahan"
@@ -809,6 +861,18 @@ export function StepPreview({
                   />
                 ) : null}
               </div>
+
+              <VoiceTrimDialog
+                open={trimming}
+                assetId={scene.voiceAssetId}
+                fallbackSeconds={scene.voiceSeconds}
+                value={scene.voiceTrim}
+                onCancel={() => setTrimming(false)}
+                onSave={(trim) => {
+                  onChange(scene.index, { voiceTrim: trim });
+                  setTrimming(false);
+                }}
+              />
 
               {!tweakIsEmpty(tweak) ? (
                 <button

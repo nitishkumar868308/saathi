@@ -245,6 +245,7 @@ export function WizardModal({
           scene.durationOverrideSeconds !== null ||
           scene.effectPresetId !== null ||
           scene.musicAssetId !== null ||
+          scene.voiceTrim !== null ||
           Object.keys(scene.tweaks ?? {}).length > 0,
       );
     if (touched && !window.confirm("Wizard band kar dein? Yahan kiya hua kaam chala jaayega.")) {

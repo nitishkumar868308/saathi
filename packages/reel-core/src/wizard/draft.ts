@@ -271,6 +271,25 @@ export interface WizardScene {
    */
   voiceSeconds: number | null;
   /**
+   * Awaaz ka kaunsa hissa lena hai — file ke andar ka waqt (26.28).
+   *
+   * ⚠️ `null` matlab poori awaaz, aur wo aam haalat hai. Ye field is liye aayi ki
+   * TTS aur apni recording dono me aksar **kinare** kharab hote hain: shuru me ek
+   * lambi saans ya "umm", ant me ek adhoora shabd jo dobara banane par bhi wahi
+   * rehta. Uska ek hi ilaaj bacha tha — poora editor kholo, clip dhoondho, dono
+   * taraf se kheencho — yaani theek wo kaam jisse bachne ke liye wizard bana hai.
+   *
+   * ⚠️ Ye kaat **file ko nahi badalti**, sirf ye batati hai ki uska kaunsa hissa
+   * bajega (`trimItemToSourceRange`). Isliye kaat hatana ek tap hai, aur wahi
+   * asli file har waqt bachi rehti hai — video ke `visualTrim` wala hi niyam.
+   *
+   * ⚠️ Scene ki lambai bhi isi se banti hai (`voiceSeconds`). Bina uske aadmi
+   * awaaz me se 2 second kaat deta aur scene wahi purani lambai ka reh jaata —
+   * yaani ant me do second ki chuppi, jo sunne me "reel atak gayi" jaisi lagti
+   * hai.
+   */
+  voiceTrim: { startSeconds: number; endSeconds: number } | null;
+  /**
    * Awaaz kitni tez chale — 1 = jaisi bani thi.
    *
    * ⚠️ Ye **dobara banane wali** speed nahi hai. Yahan se `playbackRate` lagta
@@ -698,6 +717,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         textPosition: "center",
         voiceAssetId: null,
         voiceSeconds: null,
+        voiceTrim: null,
         voiceRate: 1,
         voiceVolume: 1,
         musicVolume: null,
@@ -766,6 +786,7 @@ export function blankScene(index: number): WizardScene {
     textPosition: "center",
     voiceAssetId: null,
     voiceSeconds: null,
+    voiceTrim: null,
     voiceRate: 1,
     voiceVolume: 1,
     musicVolume: null,
@@ -990,10 +1011,31 @@ const MIN_SCENE_SECONDS = 1.2;
  *
  * `null` = is scene par awaaz hai hi nahi (ya uski lambai pata nahi).
  */
-export function voiceSeconds(scene: WizardScene): number | null {
+/**
+ * File me se kitni awaaz sach me bajegi — kaat laga kar (26.28).
+ *
+ * `null` = awaaz hai hi nahi (ya uski lambai pata nahi).
+ *
+ * ⚠️ Kaat file ki apni lambai ke andar hi baandhi jaati hai. Ek purana draft
+ * (jisme kaat kisi aur, lambi file ki likhi hai) yahan bina hadd ke nikal jaata
+ * to scene us awaaz se lamba ban jaata jo hai hi nahi — yaani ant me chuppi, aur
+ * uski wajah kahin dikhti nahi.
+ */
+export function voiceSourceSeconds(scene: WizardScene): number | null {
   if (!scene.voiceAssetId || !scene.voiceSeconds || scene.voiceSeconds <= 0) return null;
+  if (!scene.voiceTrim) return scene.voiceSeconds;
+
+  const start = Math.max(0, Math.min(scene.voiceTrim.startSeconds, scene.voiceSeconds));
+  const end = Math.max(start, Math.min(scene.voiceTrim.endSeconds, scene.voiceSeconds));
+  const cut = end - start;
+  return cut > 0 ? cut : scene.voiceSeconds;
+}
+
+export function voiceSeconds(scene: WizardScene): number | null {
+  const source = voiceSourceSeconds(scene);
+  if (source === null) return null;
   const rate = scene.voiceRate > 0 ? scene.voiceRate : 1;
-  return scene.voiceSeconds / rate + VOICE_TAIL_SECONDS;
+  return source / rate + VOICE_TAIL_SECONDS;
 }
 
 /**
@@ -1586,30 +1628,66 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
   created.forEach((scene, at) => {
     const src = madeFrom[at];
     if (!src) return;
-    if (src.voiceRate === 1 && src.voiceVolume === 1) return;
-    doc = {
-      ...doc,
-      items: doc.items.map((item) =>
-        item.sceneId === scene.id && item.type === "audio"
-          ? {
-              ...item,
-              playbackRate: src.voiceRate,
-              /*
-               * ⚠️ Level yahin lagta hai, aur `muted` bhi saath me. Sirf volume 0
-               * kar dena kaafi lagta hai par nahi hai: properties panel me clip
-               * "chal rahi" dikhti hai aur uska volume slider 0 par hota hai, jise
-               * aadmi ek galti samajh kar wapas 1 kar deta hai. `muted: true` wo
-               * baat saaf kehta hai — "ye jaan-boojhkar chup hai".
-               */
-              audio: {
-                ...item.audio,
-                volume: Math.max(0, Math.min(1, src.voiceVolume)),
-                muted: src.voiceVolume <= 0,
-              },
-            }
-          : item,
-      ),
-    };
+
+    /*
+     * ⚠️ Raftaar **kaat se pehle** lagti hai, aur ye kram badla nahi ja sakta.
+     * `trimItemToSourceRange` source ke frames ko timeline ke frames me badalne
+     * ke liye item ka `playbackRate` padhta hai — 1.3x par source ke 3 second
+     * timeline par 2.3 bharte hain. Rate baad me likhne par kaat hamesha 1x ke
+     * hisaab se lagti, aur tez awaaz apne ant se pehle hi kat jaati.
+     */
+    if (src.voiceRate !== 1 || src.voiceVolume !== 1) {
+      doc = {
+        ...doc,
+        items: doc.items.map((item) =>
+          item.sceneId === scene.id && item.type === "audio"
+            ? {
+                ...item,
+                playbackRate: src.voiceRate,
+                /*
+                 * ⚠️ Level yahin lagta hai, aur `muted` bhi saath me. Sirf volume
+                 * 0 kar dena kaafi lagta hai par nahi hai: properties panel me
+                 * clip "chal rahi" dikhti hai aur uska volume slider 0 par hota
+                 * hai, jise aadmi ek galti samajh kar wapas 1 kar deta hai.
+                 * `muted: true` wo baat saaf kehta hai — "ye jaan-boojhkar chup
+                 * hai".
+                 */
+                audio: {
+                  ...item.audio,
+                  volume: Math.max(0, Math.min(1, src.voiceVolume)),
+                  muted: src.voiceVolume <= 0,
+                },
+              }
+            : item,
+        ),
+      };
+    }
+
+    /*
+     * Awaaz ka chuna hua hissa (26.28).
+     *
+     * ⚠️ Item `assetId` se dhoondha jaata hai, sirf `type === "audio"` se nahi.
+     * Aage chal kar isi scene par music ka tukda bhi ek audio item hi banta hai;
+     * bina is shart ke ek din wo kaat gaane par lag jaati — aur wo galti sirf
+     * poori reel sun kar pakdi jaati.
+     *
+     * ⚠️ Kaat item ki apni lambai bhi ghatati hai, poore scene ki nahi. Scene ki
+     * lambai `voiceSeconds()` se aati hai jo yahi kaat pehle se jodta hai —
+     * isliye dono ka jawab ek rehta hai aur ant me chuppi nahi bachti.
+     */
+    if (src.voiceTrim && src.voiceAssetId) {
+      const voice = doc.items.find(
+        (item) =>
+          item.sceneId === scene.id && item.type === "audio" && item.assetId === src.voiceAssetId,
+      );
+      if (voice) {
+        doc = trimItemToSourceRange(doc, {
+          itemId: voice.id,
+          startSeconds: src.voiceTrim.startSeconds,
+          endSeconds: src.voiceTrim.endSeconds,
+        });
+      }
+    }
   });
 
   /*

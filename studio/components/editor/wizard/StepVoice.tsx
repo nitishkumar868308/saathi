@@ -17,12 +17,13 @@ import {
   type WizardScene,
 } from "@reel/core";
 import clsx from "clsx";
-import { AlertTriangle, Info, Loader2, Mic } from "lucide-react";
+import { AlertTriangle, Info, Loader2, Mic, Scissors } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AudioPreview } from "@/components/media/AudioPreview";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
+import { VoiceTrimDialog } from "@/components/editor/wizard/VoiceTrimDialog";
 import { useAssetDurations } from "@/lib/assetMeta";
 import { VoiceError, generateVoice } from "@/lib/voiceGen";
 
@@ -192,6 +193,8 @@ function VoiceRow({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Awaaz kaatne wala dialog khula hai? */
+  const [trimming, setTrimming] = useState(false);
 
   /**
    * Library / upload se chuni hui awaaz lagao — **uski lambai ke saath**.
@@ -229,6 +232,12 @@ function VoiceRow({
        * de — yaani wo file jo usne khud record ki thi.
        */
       voiceCategoryId: null,
+      /*
+       * ⚠️ Purani kaat yahin girti hai. Nayi file ki lambai alag hoti hai, aur
+       * "2.4s se 6.1s" us file ka matlab rakhti thi jo ab hai hi nahi — nayi par
+       * wo aksar aadhi awaaz kaat deti, chup-chaap.
+       */
+      voiceTrim: null,
     });
   }
 
@@ -263,6 +272,8 @@ function VoiceRow({
         voiceCategoryId: categoryId,
         // Lambai wahi jo abhi bani — scene ki lambai isi par bandhi hai.
         voiceSeconds: made.seconds,
+        // Nayi awaaz, nayi lambai — purani kaat uspar bemaani hai.
+        voiceTrim: null,
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -389,7 +400,12 @@ function VoiceRow({
           <button
             type="button"
             onClick={() =>
-              onChange(scene.index, { voiceAssetId: null, voiceForText: null, voiceSeconds: null })
+              onChange(scene.index, {
+                voiceAssetId: null,
+                voiceForText: null,
+                voiceSeconds: null,
+                voiceTrim: null,
+              })
             }
             className="rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-400 transition-colors hover:border-chalk-500"
           >
@@ -413,8 +429,56 @@ function VoiceRow({
         kuch bajta nahi) toote hue button jaisa hi hai.
       */}
       {scene.voiceAssetId ? (
-        <AudioPreview assetId={scene.voiceAssetId} className="mt-1" />
+        <div className="mt-1 flex items-center gap-1.5">
+          <AudioPreview assetId={scene.voiceAssetId} className="min-w-0 flex-1" />
+          {/*
+            Kaat — **player ke bilkul bagal me** (26.28).
+
+            ⚠️ Ye button yahan hai, kisi menu me nahi, kyunki ye wahi pal hai jab
+            zaroorat pata chalti hai: aadmi awaaz sunta hai, shuru me ek lambi
+            saans milti hai, aur agla haath usi jagah jaana chahiye. Do click door
+            rakhne par wo saans reel me chali jaati hai.
+          */}
+          <button
+            type="button"
+            onClick={() => setTrimming(true)}
+            title="Awaaz ka sirf ek hissa lo — shuru ki saans ya ant ka adhoora shabd kaat do"
+            className={clsx(
+              "flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+              scene.voiceTrim
+                ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                : "border-ink-600 text-chalk-400 hover:border-chalk-500 hover:text-chalk-100",
+            )}
+          >
+            <Scissors size={9} />
+            {scene.voiceTrim
+              ? `${scene.voiceTrim.startSeconds.toFixed(1)}–${scene.voiceTrim.endSeconds.toFixed(1)}s`
+              : "Kaato"}
+          </button>
+          {scene.voiceTrim ? (
+            <button
+              type="button"
+              onClick={() => onChange(scene.index, { voiceTrim: null })}
+              title="Poori awaaz wapas"
+              className="shrink-0 rounded border border-ink-600 px-1.5 py-0.5 text-[10px] text-chalk-400 transition-colors hover:border-chalk-500"
+            >
+              Poori
+            </button>
+          ) : null}
+        </div>
       ) : null}
+
+      <VoiceTrimDialog
+        open={trimming}
+        assetId={scene.voiceAssetId}
+        fallbackSeconds={scene.voiceSeconds}
+        value={scene.voiceTrim}
+        onCancel={() => setTrimming(false)}
+        onSave={(trim) => {
+          onChange(scene.index, { voiceTrim: trim });
+          setTrimming(false);
+        }}
+      />
 
       {/*
         Raftaar — sirf tab jab awaaz ho.
@@ -519,6 +583,22 @@ function VoiceRow({
           </span>
         )}
       </div>
+
+      {/*
+        Music bhi sun kar dekho — bilkul awaaz ki tarah (26.28).
+
+        ⚠️ Ye kami chala kar pakdi gayi: awaaz ka player pehle din se tha, music
+        ka nahi. Yaani aadmi gaana chunta tha aur use SUNE BINA aage badh jaata
+        tha — uske paas koi raasta hi nahi tha. Galat ya bahut tez dhun poori reel
+        banne ke baad hi pata chalti thi.
+
+        ⚠️ Jo dhun is scene par sach me bajegi wahi bajti hai — scene ka apna gaana
+        ho to wo, warna reel wala. Sirf `scene.musicAssetId` dikhane par un scenes
+        par kuch bhi na hota jahan reel wali dhun chal rahi hai, jo aam haalat hai.
+      */}
+      {(scene.musicAssetId ?? reelMusicAssetId) ? (
+        <AudioPreview assetId={scene.musicAssetId ?? reelMusicAssetId} className="mt-1" />
+      ) : null}
 
       {/*
         ⚠️ Level ka chunav tabhi dikhta hai jab is scene par music sach me baj
@@ -986,6 +1066,13 @@ export function StepVoice({
             </span>
           )}
         </div>
+
+        {/*
+          ⚠️ Reel ka gaana bhi sunna chahiye, chunne ke turant baad. Bina iske
+          library se ek naam chun lena hi poora "chunav" tha — aur naam se ye kabhi
+          pata nahi chalta ki dhun reel ke saath baithegi ya nahi.
+        */}
+        {draft.musicAssetId ? <AudioPreview assetId={draft.musicAssetId} /> : null}
 
         {draft.musicAssetId ? (
           <div className="flex flex-wrap items-center gap-1.5 border-t border-ink-700 pt-1.5">

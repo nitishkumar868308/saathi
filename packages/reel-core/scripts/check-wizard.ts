@@ -24,6 +24,7 @@ import {
   applyWizard,
   elementKeyMap,
   sceneItemsInOrder,
+  voiceSourceSeconds,
   autoFill,
   blankScene,
   canMoveScene,
@@ -1478,6 +1479,93 @@ check(
   applyWizard({ doc: project, draft: { ...filled, replaceExisting: true } }).doc.items.every(
     (item) => item.assetId !== "as_music",
   ),
+);
+
+console.log("\nawaaz ka chuna hua hissa (kaat)");
+
+/** Ek scene jispar naapi hui 6s ki awaaz hai. */
+const voicedScene = {
+  ...filled.scenes[0]!,
+  voiceAssetId: "as_voice_0",
+  voiceForText: filled.scenes[0]!.text,
+  voiceSeconds: 6,
+};
+
+check(
+  "bina kaat ke poori awaaz ginti hai",
+  voiceSourceSeconds(voicedScene) === 6,
+);
+check(
+  "kaat lagne par sirf chuna hua hissa ginta hai",
+  voiceSourceSeconds({ ...voicedScene, voiceTrim: { startSeconds: 1, endSeconds: 4 } }) === 3,
+);
+check(
+  "kaat file ki apni lambai se bahar nahi ja sakti",
+  voiceSourceSeconds({ ...voicedScene, voiceTrim: { startSeconds: 1, endSeconds: 99 } }) === 5,
+  "purana draft ek lambi file ki kaat rakh sakta hai — bina hadd ke scene us awaaz se lamba banta jo hai hi nahi",
+);
+check(
+  "scene ki lambai kaat ke saath ghatti hai",
+  (() => {
+    const full = sceneSeconds(voicedScene);
+    const cut = sceneSeconds({ ...voicedScene, voiceTrim: { startSeconds: 1, endSeconds: 4 } });
+    return cut < full && Math.abs(cut - (3 + 0.35)) < 0.5;
+  })(),
+  "bina iske awaaz me se 2 second kaat kar bhi scene wahi lamba rehta — ant me chuppi",
+);
+
+const trimmed = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    scenes: filled.scenes.map((s, i) =>
+      i === 0
+        ? { ...voicedScene, voiceTrim: { startSeconds: 1, endSeconds: 4 } }
+        : s,
+    ),
+  },
+});
+
+const trimmedVoice = (() => {
+  const sceneId = Object.keys(trimmed.sceneIndexById).find(
+    (id) => trimmed.sceneIndexById[id] === filled.scenes[0]!.index,
+  );
+  return trimmed.doc.items.find(
+    (item) => item.sceneId === sceneId && item.assetId === "as_voice_0",
+  );
+})();
+
+check(
+  "kaat doc ke audio item par lagti hai",
+  trimmedVoice !== undefined &&
+    trimmedVoice.trimStartFrame === Math.round(1 * trimmed.doc.project.fps),
+);
+check(
+  "kata hua item utna hi lamba hai jitna chuna gaya tha",
+  trimmedVoice !== undefined &&
+    Math.abs(trimmedVoice.durationInFrames - 3 * trimmed.doc.project.fps) <= 1,
+  "poori scene ki lambai rakh dene par kaat ke aage ka hissa bhi baj jaata — yaani kaat lagti hi nahi",
+);
+check(
+  "kaat sirf awaaz par lagti hai, music par nahi",
+  (() => {
+    const withBoth = applyWizard({
+      doc: project,
+      draft: {
+        ...filled,
+        replaceExisting: true,
+        musicAssetId: "as_music",
+        scenes: filled.scenes.map((s, i) =>
+          i === 0 ? { ...voicedScene, voiceTrim: { startSeconds: 1, endSeconds: 4 } } : s,
+        ),
+      },
+    });
+    return withBoth.doc.items
+      .filter((item) => item.assetId === "as_music")
+      .every((item) => item.durationInFrames > 0 && item.trimStartFrame >= 0);
+  })(),
+  "dono audio item hain — sirf type dekhne par kaat gaane par lag jaati",
 );
 
 console.log("\nhar scene ka apna gaana");
