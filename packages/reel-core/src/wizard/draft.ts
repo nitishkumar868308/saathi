@@ -5,6 +5,7 @@ import type { Doc, Item, Scene } from "../schema/project";
 import { createItem } from "../schema/factory";
 import {
   addItem,
+  addKeyframe,
   addTrack,
   applyAnimationPreset,
   applyEffectPreset,
@@ -33,6 +34,203 @@ import { suggestAnimation, suggestTransition, type WizardSceneLike } from "./sug
  */
 
 /**
+ * Scene ke andar awaaz ka ek mod — "yahan se itna tez" (26.29).
+ *
+ * ⚠️ Ye `voiceVolume` / `musicVolume` ki jagah nahi leta, unke **upar** chalta
+ * hai. Wo do ek scene ka *ek* level hain; ye us level ka **safar** hai. Dono ki
+ * zaroorat asli hai: 90% scene par ek hi level theek hota hai (aur wahan teen
+ * point maangna bekaar ka kaam hai), par jahan hook ke baad music uthana ho ya
+ * bolne wale ke aate hi dhun ko peeche karna ho, wahan ek level ka koi jawab
+ * nahi hota.
+ *
+ * ⚠️ `atSeconds` **scene ke shuru se** ginta hai, reel ke shuru se nahi. Reel ke
+ * hisaab se rakhne par scene upar-neeche karte hi har point galat jagah chala
+ * jaata — aur wo galti sirf poori reel sun kar pakdi jaati hai.
+ */
+export interface VolumePoint {
+  /** Scene ke shuru se — second me. */
+  atSeconds: number;
+  /** 0 = chup, 1 = poora. */
+  volume: number;
+  /**
+   * Yahan tak **dhire** pahunche (`true`) ya **turant** badle (`false`).
+   *
+   * ⚠️ Do alag cheezein hain aur dono chahiye. Music ko dhire uthana chahiye
+   * (turant uthne par wo "kisi ne volume ka button daba diya" jaisa lagta hai),
+   * aur bolne wale ke aate hi use turant peeche jaana chahiye (dhire jaane par
+   * pehle do shabd dhun me dab jaate hain). Ek hi tarika rakhne par aadha kaam
+   * hamesha galat lagta.
+   */
+  ramp: boolean;
+}
+
+/**
+ * Point ki list se `audio.volume` ke keyframes — **ek hi jagah ka hisaab** (26.29).
+ *
+ * Lauta ta hai: item-local frame aur us frame par volume. Khaali list ka matlab
+ * "kuch nahi badalna" hai — tab item ka sthir volume hi chalta rehta hai, aur
+ * uspar ek bhi keyframe nahi likha jaata (`itemVolume` tab har frame par function
+ * bulane se bach jaata hai).
+ *
+ * ⚠️ `ramp: false` par ek **extra keyframe theek pichhle frame par** likha jaata
+ * hai, purani value ke saath. Iske bina "turant" jaisa kuch hota hi nahi:
+ * keyframes ke beech hamesha interpolation hoti hai, isliye 0s ka point aur 3s
+ * ka point milkar teen second ki dheemi dhalaan bana dete hain — jabki aadmi ne
+ * teen second tak *sthir* maanga tha aur uske baad ek mod.
+ *
+ * ⚠️ Poora hisaab yahan hai, UI me nahi, aur wo jaan-boojhkar hai: ise ek script
+ * se chala kar dekha ja sakta hai (`check-wizard.ts`). UI me likhne par ise sirf
+ * kaan se jaancha ja sakta tha — yaani har badlav ke baad poori reel sunna.
+ */
+export function volumeCurve(args: {
+  points: readonly VolumePoint[];
+  /** Point na hone par jo level chalta — pehla keyframe isi ka banta hai. */
+  base: number;
+  durationInFrames: number;
+  fps: number;
+}): { frame: number; value: number }[] {
+  const clamp = (value: number): number => Math.max(0, Math.min(1, value));
+  const base = clamp(args.base);
+  const last = Math.max(0, args.durationInFrames - 1);
+
+  const points = args.points
+    .filter((point) => Number.isFinite(point.atSeconds) && Number.isFinite(point.volume))
+    .map((point) => ({
+      frame: Math.max(0, Math.min(last, Math.round(point.atSeconds * args.fps))),
+      value: clamp(point.volume),
+      ramp: point.ramp,
+    }))
+    .sort((a, b) => a.frame - b.frame);
+
+  if (points.length === 0) return [];
+
+  const curve: { frame: number; value: number }[] = [{ frame: 0, value: base }];
+  let previous = base;
+
+  for (const point of points) {
+    if (!point.ramp && point.frame > 0) curve.push({ frame: point.frame - 1, value: previous });
+    curve.push({ frame: point.frame, value: point.value });
+    previous = point.value;
+  }
+
+  return curve;
+}
+
+/** Is safar me kahin awaaz hai bhi? (`muted` ka faisla isi se hota hai.) */
+export function curveIsSilent(curve: readonly { value: number }[]): boolean {
+  return curve.every((entry) => entry.value <= 0);
+}
+
+/**
+ * Ek cheez screen par **kaise aati hai** (26.30).
+ *
+ * ⚠️ Ye scene ke `animationPresetId` ki jagah nahi leta, uske **upar** ek element
+ * par baithta hai. Preset poore scene ka mood hai (aur wo sirf dikhne wale
+ * bade item par lagta hai); ye ek cheez ka apna aana hai. Dono ki zaroorat asli
+ * hai, aur CTA us baat ka sabse saaf misaal hai: wahan logo, ek line, aur ek
+ * button — teeno ek saath hote hain, aur teeno ka ek jaisa aana bilkul bekaar
+ * dikhta hai. Logo beech me se ubharna chahiye, button neeche se uthna chahiye.
+ *
+ * ⚠️ `kind: "inherit"` ka matlab "maine kuch nahi kaha" hai, "kuch nahi" nahi.
+ * Do alag cheezein hain: `inherit` par scene ka apna chunav chalta rehta hai
+ * (aur wo aksar theek hota hai), `none` par us cheez par jaan-boojhkar koi harkat
+ * nahi lagti. Ek hi value rakhne par "harkat hatao" aur "abhi socha nahi" me
+ * farak hi nahi bachta — aur tab har naya element chup-chaap sthir ban jaata.
+ */
+export interface ElementEntry {
+  kind: "inherit" | "none" | "fade" | "slide" | "pop" | "blur" | "spin";
+  /**
+   * `slide` ke liye — **kahan se** aata hai.
+   *
+   * ⚠️ Ye registry ke `direction` se ULTA padh sakta hai, isliye badalna
+   * `SLIDE_FROM` se hota hai. Registry me `direction: "down"` ka matlab "neeche
+   * se upar aata hai" hai (wo neeche se chal kar apni jagah par aata hai), aur
+   * seedha "bottom" ko "up" par bhej dene par button upar se gir'ta hua dikhta —
+   * theek ulta. Wo galti dikhne me chhoti hai aur sirf chala kar pakdi jaati hai.
+   */
+  from: "bottom" | "top" | "left" | "right";
+  /** Kitni door se — frame ke naap ka percent. "kahan tak" ka jawab. */
+  distancePercent: number;
+  /** Aane me kitna waqt — raftaar. Chhota = tez. */
+  seconds: number;
+  /** Saath me halka fade bhi. */
+  withFade: boolean;
+}
+
+/** Kuch nahi kaha — scene ka apna chunav chalta rahe. */
+export const NO_ENTRY: ElementEntry = {
+  kind: "inherit",
+  from: "bottom",
+  distancePercent: 20,
+  seconds: 0.5,
+  withFade: true,
+};
+
+/**
+ * "Kahan se" → registry ka `direction`.
+ *
+ * ⚠️ Upar wala ⚠️ dekho: `bottom` (neeche se aata hai) registry me `down` hai.
+ */
+const SLIDE_FROM: Record<ElementEntry["from"], string> = {
+  bottom: "down",
+  top: "up",
+  left: "left",
+  right: "right",
+};
+
+/** Aane ki raftaar ki hadd — isse tez jhatka lagta hai, isse dheema atka hua. */
+export const MIN_ENTRY_SECONDS = 0.1;
+export const MAX_ENTRY_SECONDS = 3;
+
+/**
+ * Ek `ElementEntry` se asli animations ki list (26.30).
+ *
+ * ⚠️ Yahan koi naya animation nahi banaya gaya — sab `ANIMATIONS` registry ke
+ * wahi entries hain jo panel me bhi hain (`slide`, `fade`, `scalePop`, `blurIn`,
+ * `rotateIn`). Wizard ke liye apna alag raasta banane par ek din wizard se bani
+ * reel aur haath se banayi reel do alag cheezein ban jaati.
+ *
+ * ⚠️ Fade **aakhir me** judta hai, aur wo kram maayne rakhta hai: `composeAnimations`
+ * opacity guna karta hai, isliye khisakne ke saath fade dono ek saath chalte hain
+ * aur cheez "aati hui" lagti hai, "phisalti hui" nahi.
+ */
+export function entryAnimations(entry: ElementEntry, fps: number): Item["animations"] {
+  if (entry.kind === "inherit" || entry.kind === "none") return [];
+
+  const seconds = Math.max(MIN_ENTRY_SECONDS, Math.min(MAX_ENTRY_SECONDS, entry.seconds));
+  const durationInFrames = Math.max(1, Math.round(seconds * fps));
+  const list: Item["animations"] = [];
+
+  if (entry.kind === "slide") {
+    list.push({
+      type: "slide",
+      enabled: true,
+      direction: SLIDE_FROM[entry.from],
+      distancePercent: Math.max(0, Math.min(100, entry.distancePercent)),
+      durationInFrames,
+      easing: "ease-out",
+    });
+  } else if (entry.kind === "pop") {
+    list.push({ type: "scalePop", enabled: true, from: 0.6, durationInFrames, easing: "spring" });
+  } else if (entry.kind === "blur") {
+    list.push({ type: "blurIn", enabled: true, blurPx: 24, durationInFrames, easing: "ease-out" });
+  } else if (entry.kind === "spin") {
+    list.push({ type: "rotateIn", enabled: true, degrees: -12, durationInFrames, easing: "ease-out" });
+  }
+
+  /*
+   * ⚠️ `fade` wale chunav par ye shart hamesha sach honi chahiye, chahe aadmi ne
+   * "saath me fade" band kar rakha ho — warna "Fade" chunne par kuch hota hi
+   * nahi, aur wo ek aisa chunav ban jaata hai jo dabta hai par lagta nahi.
+   */
+  if (entry.withFade || entry.kind === "fade") {
+    list.push({ type: "fade", enabled: true, mode: "in", durationInFrames, easing: "ease-out" });
+  }
+
+  return list;
+}
+
+/**
  * Preview me haath se kiya hua chhota sudhaar — **ek element par** (26.28).
  *
  * ⚠️ Ye scene ke baaki chunav (`animationPresetId`, `textPosition`…) ki jagah
@@ -56,8 +254,8 @@ export interface SceneTweak {
   rotation: number;
   /** Kitna dikhe — 1 = poora. */
   opacity: number;
-  /** Is cheez par harkat mat lagao. */
-  noAnimation: boolean;
+  /** Ye cheez screen par kaise aaye — dekho `ElementEntry`. */
+  entry: ElementEntry;
   /** Is cheez par rang ka effect mat lagao. */
   noEffect: boolean;
   /** Ye cheez reel me dikhni hi nahi chahiye. */
@@ -71,7 +269,7 @@ export const NO_TWEAK: SceneTweak = {
   y: 0,
   rotation: 0,
   opacity: 1,
-  noAnimation: false,
+  entry: NO_ENTRY,
   noEffect: false,
   hidden: false,
 };
@@ -85,7 +283,7 @@ export function tweakIsEmpty(tweak: SceneTweak | undefined | null): boolean {
     tweak.y === 0 &&
     tweak.rotation === 0 &&
     tweak.opacity === 1 &&
-    !tweak.noAnimation &&
+    (tweak.entry?.kind ?? "inherit") === "inherit" &&
     !tweak.noEffect &&
     !tweak.hidden
   );
@@ -314,6 +512,14 @@ export interface WizardScene {
    */
   voiceVolume: number;
   /**
+   * Is scene ke andar bolne wale ka safar — khaali = ek hi level poore scene par.
+   *
+   * ⚠️ Ye music wale se alag field hai, ek nahi. Aksar dono ek doosre ke ulte
+   * chalte hain (bolne wala uthta hai to dhun neeche jaati hai), aur ek hi list
+   * rakhne par wo likha hi nahi ja sakta.
+   */
+  voiceVolumePoints: VolumePoint[];
+  /**
    * Is scene ka apna gaana — `null` = poori reel wala (draft ka).
    *
    * ⚠️ Ye `WizardDraft.musicAssetId` ki jagah nahi leta, uske **upar** baithta
@@ -327,6 +533,15 @@ export interface WizardScene {
    * yahin jam jaata hai — jo tabhi theek hai jab aadmi ne sach me chuna ho.
    */
   musicAssetId: string | null;
+  /**
+   * Is scene ke andar music ka safar — khaali = ek hi level poore scene par.
+   *
+   * ⚠️ Dekho `VolumePoint`. Khaali list aur `[{ atSeconds: 0, ... }]` do alag
+   * cheezein hain: khaali par ek bhi keyframe nahi likha jaata, aur wo sirf
+   * saaf-suthrapan nahi hai — bina keyframe ke Remotion volume ek hi baar naapta
+   * hai, har frame par nahi.
+   */
+  musicVolumePoints: VolumePoint[];
   /**
    * Is scene par music kitna tez — `null` = poori reel wala (draft ka).
    *
@@ -720,7 +935,9 @@ export function draftFromScript(script: AiScript): WizardDraft {
         voiceTrim: null,
         voiceRate: 1,
         voiceVolume: 1,
+        voiceVolumePoints: [],
         musicVolume: null,
+        musicVolumePoints: [],
         voiceForText: null,
         voiceCategoryId: null,
         musicAssetId: null,
@@ -789,7 +1006,9 @@ export function blankScene(index: number): WizardScene {
     voiceTrim: null,
     voiceRate: 1,
     voiceVolume: 1,
+    voiceVolumePoints: [],
     musicVolume: null,
+    musicVolumePoints: [],
     voiceForText: null,
     voiceCategoryId: null,
     musicAssetId: null,
@@ -1464,12 +1683,12 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * (`suggestAnimation`), aur jo aadmi haath se chunta hai wo uska chunav hai.
      */
     /*
-     * ⚠️ `noAnimation` yahan rokta hai, preset ko `null` karke nahi. Preset scene
-     * ka chunav hai; "is cheez par harkat nahi" ek element ka. Preset mita dene
-     * par aadmi ka pehla chunav chup-chaap chala jaata, aur harkat wapas laane
-     * par use dobara chunni padti.
+     * ⚠️ Element ka apna chunav preset se **jeetta** hai, par preset ko mitata
+     * nahi. Preset scene ka chunav hai; "ye cheez neeche se aaye" us ek cheez ka.
+     * Preset `null` kar dene par aadmi ka pehla chunav chup-chaap chala jaata, aur
+     * "jaisa tha waisa" par wapas jaane ka koi raasta nahi bachta.
      */
-    if (source.animationPresetId && !tweakOf(primary.id)?.noAnimation) {
+    if (source.animationPresetId && (tweakOf(primary.id)?.entry.kind ?? "inherit") === "inherit") {
       doc = applyAnimationPreset(doc, {
         itemIds: [primary.id],
         presetId: source.animationPresetId,
@@ -1591,6 +1810,33 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * ki recording frame se bahar nikal jaati — dono galtiyan sirf us ek scene
      * par dikhti hain, aur aadmi ne wahan kuch kiya bhi nahi hota.
      */
+    /*
+     * Har cheez ka apna aana (26.30).
+     *
+     * ⚠️ Ye `applyAnimationPreset` ke **baad** lagta hai aur us item ki purani
+     * animations ko badal deta hai — kyunki aadmi ne is cheez ke liye saaf-saaf
+     * kuch kaha hai. Upar jodne par preset ka zoom aur uska slide dono ek saath
+     * chalte, aur nateeja wo hota jo kisi ne nahi maanga.
+     *
+     * ⚠️ Ye sirf primary par nahi, **har** item par lag sakta hai — aur wahi is
+     * poore feature ki wajah hai. CTA me logo, line aur button teen alag item
+     * hain; preset unme se sirf ek par lagta hai, aur baaki do hamesha ek jaise
+     * aate the.
+     */
+    const entryKeys = Object.keys(tweaks).filter(
+      (key) => tweaks[key]!.entry && tweaks[key]!.entry.kind !== "inherit",
+    );
+    if (entryKeys.length > 0) {
+      doc = {
+        ...doc,
+        items: doc.items.map((item) => {
+          const entry = tweakOf(item.id)?.entry;
+          if (!entry || entry.kind === "inherit") return item;
+          return { ...item, animations: entryAnimations(entry, doc.project.fps) };
+        }),
+      };
+    }
+
     const tweakedKeys = Object.keys(tweaks);
     if (tweakedKeys.length > 0) {
       doc = {
@@ -1685,6 +1931,56 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
           itemId: voice.id,
           startSeconds: src.voiceTrim.startSeconds,
           endSeconds: src.voiceTrim.endSeconds,
+        });
+      }
+    }
+
+    /*
+     * Bolne wale ka safar — scene ke andar level ka badalna (26.29).
+     *
+     * ⚠️ Ye kaat ke **baad** lagta hai, aur ye kram zaroori hai: `volumeCurve`
+     * point ko item ki lambai ke andar baandhta hai, aur kaat lagne ke baad wo
+     * lambai badal chuki hoti hai. Pehle likhne par aakhri point clip se bahar
+     * chala jaata aur chup-chaap gir jaata.
+     */
+    const voiceItem = src.voiceAssetId
+      ? doc.items.find(
+          (item) =>
+            item.sceneId === scene.id && item.type === "audio" && item.assetId === src.voiceAssetId,
+        )
+      : undefined;
+
+    if (voiceItem && src.voiceVolumePoints?.length) {
+      const curve = volumeCurve({
+        points: src.voiceVolumePoints,
+        base: src.voiceVolume,
+        durationInFrames: voiceItem.durationInFrames,
+        fps: doc.project.fps,
+      });
+
+      /*
+       * ⚠️ `muted` yahan hatana padta hai. Base 0 ("Chup") par upar wala hissa
+       * `muted: true` likh chuka hota hai, aur `itemGainAt` uspar seedha 0 lauta
+       * deta hai — yaani beech me level uthane wala har point bekaar. Safar me
+       * kahin awaaz ho to chuppi ka thappa jhootha hai.
+       */
+      if (!curveIsSilent(curve)) {
+        doc = {
+          ...doc,
+          items: doc.items.map((item) =>
+            item.id === voiceItem.id
+              ? { ...item, audio: { ...item.audio, muted: false } }
+              : item,
+          ),
+        };
+      }
+
+      for (const point of curve) {
+        doc = addKeyframe(doc, {
+          itemId: voiceItem.id,
+          path: "audio.volume",
+          frame: point.frame,
+          value: point.value,
         });
       }
     }
@@ -1788,6 +2084,43 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         });
 
         doc = addItem(doc, { item: music });
+
+        /*
+         * Dhun ka safar — isi scene ke tukde par (26.29).
+         *
+         * ⚠️ Ye per-scene hai aur wahi iski poori taakat hai. Ek lambi clip par
+         * ye keyframes reel ke frame par lagte (yaani scene khiskate hi galat
+         * jagah), aur "is scene par teen second baad music uthao" likhne ke liye
+         * aadmi ko poori reel ka waqt ginna padta. Har scene ka apna tukda hone
+         * se point scene ke apne waqt me rehte hain.
+         */
+        if (src.musicVolumePoints?.length) {
+          const curve = volumeCurve({
+            points: src.musicVolumePoints,
+            base: volume,
+            durationInFrames: duration,
+            fps: doc.project.fps,
+          });
+
+          if (!curveIsSilent(curve)) {
+            doc = {
+              ...doc,
+              items: doc.items.map((item) =>
+                item.id === music.id ? { ...item, audio: { ...item.audio, muted: false } } : item,
+              ),
+            };
+          }
+
+          for (const point of curve) {
+            doc = addKeyframe(doc, {
+              itemId: music.id,
+              path: "audio.volume",
+              frame: point.frame,
+              value: point.value,
+            });
+          }
+        }
+
         cursorOf[assetId] = cursor + duration;
       });
     }

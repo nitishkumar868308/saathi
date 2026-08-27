@@ -76,6 +76,40 @@ export const EFFECT_PLAIN_NAMES: readonly PlainName[] = [
 ];
 
 /**
+ * Ek cheez **kaise aati hai** — aam bhasha me (26.30).
+ *
+ * ⚠️ Pehla option `inherit` hai ("Jaisa hai") aur wo list me sabse pehle **hona**
+ * chahiye. Wo default hai, aur default ka dikhna zaroori hai: bina uske aadmi ko
+ * lagta hai ki har cheez ke liye kuch chunna hi padega, aur wo CTA ke teen items
+ * par teen faisle lene lagta hai jahan do ki zaroorat hi nahi thi.
+ *
+ * ⚠️ `inherit` aur `none` do alag cheezein hain. `inherit` = "maine kuch nahi
+ * kaha", `none` = "is cheez par jaan-boojhkar koi harkat nahi". Ek hi rakhne par
+ * "harkat hatao" ka koi raasta nahi bachta.
+ */
+export const ENTRY_PLAIN_NAMES: readonly PlainName[] = [
+  { id: "inherit", label: "Jaisa hai", when: "Scene ka apna chunav chalta rahe" },
+  { id: "none", label: "Kuch nahi", when: "Ye cheez bilkul sthir rahe" },
+  { id: "fade", label: "Ubhar kar", when: "Logo aur nishaan — apni jagah par saaf hote hain" },
+  { id: "slide", label: "Khisak kar", when: "Button aur patti — kinare se apni jagah tak" },
+  { id: "pop", label: "Uchhal kar", when: "Chhoti cheez par dhyan le jaana ho" },
+  { id: "blur", label: "Dhundhle se", when: "Tasveer — halke se saaf hoti hui" },
+  { id: "spin", label: "Ghoom kar", when: "Sticker jaisi cheez par" },
+];
+
+/** Slide kis taraf se — jo aadmi padhta hai. */
+export const ENTRY_FROM_NAMES: readonly PlainName[] = [
+  { id: "bottom", label: "neeche se", when: "Button — neeche se uth kar apni jagah par" },
+  { id: "top", label: "upar se", when: "Patti ya heading — upar se utar kar" },
+  { id: "left", label: "baayen se", when: "Naam ya nishaan — baayen se andar" },
+  { id: "right", label: "daayen se", when: "Naam ya nishaan — daayen se andar" },
+];
+
+export function plainEntry(id: string): PlainName | null {
+  return ENTRY_PLAIN_NAMES.find((entry) => entry.id === id) ?? null;
+}
+
+/**
  * Awaaz aur music ke level — **naam se, number se nahi** (26.28).
  *
  * ⚠️ Ye list yahan hai, kisi ek step ke andar nahi, aur wo ek asli galti ke baad

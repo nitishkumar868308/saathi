@@ -11,6 +11,7 @@ import {
   sceneAdvice,
   sceneSeconds,
   usableVoiceSeconds,
+  voiceSeconds,
   voiceStale,
   voiceStaleReason,
   type WizardDraft,
@@ -24,6 +25,7 @@ import { AudioPreview } from "@/components/media/AudioPreview";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { VoiceTrimDialog } from "@/components/editor/wizard/VoiceTrimDialog";
+import { VolumePoints } from "@/components/editor/wizard/VolumePoints";
 import { useAssetDurations } from "@/lib/assetMeta";
 import { VoiceError, generateVoice } from "@/lib/voiceGen";
 
@@ -546,6 +548,24 @@ function VoiceRow({
       ) : null}
 
       {/*
+        ⚠️ Safar ki hadd **awaaz ki apni lambai** hai, scene ki nahi. Kaat lagne ke
+        baad awaaz scene se chhoti ho sakti hai; scene ki lambai dikhane par uske
+        aage ka mod chup-chaap gir jaata aur uska koi nishaan kahin nahi dikhta.
+      */}
+      {scene.voiceAssetId ? (
+        <div className="mt-1">
+          <VolumePoints
+            label="Bolne wale ka safar"
+            hint="Scene ke beech me awaaz kam ya zyada karni ho to yahan mod jodo."
+            maxSeconds={voiceSeconds(scene) ?? sceneSeconds(scene)}
+            base={scene.voiceVolume}
+            points={scene.voiceVolumePoints}
+            onChange={(next) => onChange(scene.index, { voiceVolumePoints: next })}
+          />
+        </div>
+      ) : null}
+
+      {/*
         Is scene ka apna gaana (26.28).
 
         ⚠️ Ye chunav har scene par dikhta hai, tab bhi jab reel par music na ho —
@@ -625,6 +645,19 @@ function VoiceRow({
               {entry.label}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {(scene.musicAssetId ?? reelMusicAssetId) ? (
+        <div className="mt-1">
+          <VolumePoints
+            label="Dhun ka safar"
+            hint="Jaise: shuru ke 3 second dheemi, phir aakhri me tez — mod jodo."
+            maxSeconds={sceneSeconds(scene)}
+            base={scene.musicVolume ?? draft.musicVolume}
+            points={scene.musicVolumePoints}
+            onChange={(next) => onChange(scene.index, { musicVolumePoints: next })}
+          />
         </div>
       ) : null}
 

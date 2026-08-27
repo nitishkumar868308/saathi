@@ -21,9 +21,13 @@ import {
   EFFECT_PLAIN_NAMES,
   NO_TWEAK,
   TRANSITION_PLAIN_NAMES,
+  NO_ENTRY,
   applyWizard,
+  curveIsSilent,
+  entryAnimations,
   elementKeyMap,
   sceneItemsInOrder,
+  volumeCurve,
   voiceSourceSeconds,
   autoFill,
   blankScene,
@@ -1481,6 +1485,302 @@ check(
   ),
 );
 
+console.log("\nhar cheez ka apna aana (entry)");
+
+check(
+  "'jaisa tha waisa' par koi animation nahi banti",
+  entryAnimations({ ...NO_ENTRY }, 30).length === 0,
+);
+check(
+  "'kuch nahi' par bhi list khaali — yaani us item par koi harkat nahi",
+  entryAnimations({ ...NO_ENTRY, kind: "none" }, 30).length === 0,
+);
+check(
+  "'neeche se' registry ke `down` par jaata hai",
+  (() => {
+    const made = entryAnimations({ ...NO_ENTRY, kind: "slide", from: "bottom" }, 30);
+    const slide = made.find((entry) => entry.type === "slide");
+    return slide?.direction === "down";
+  })(),
+  "seedha 'up' bhej dene par button UPAR SE GIRTA hua dikhta — theek ulta, aur wo sirf chala kar pakda jaata",
+);
+check(
+  "'upar se' registry ke `up` par jaata hai",
+  entryAnimations({ ...NO_ENTRY, kind: "slide", from: "top" }, 30).find(
+    (entry) => entry.type === "slide",
+  )?.direction === "up",
+);
+check(
+  "doori wahi jaati hai jo chuni gayi",
+  entryAnimations({ ...NO_ENTRY, kind: "slide", distancePercent: 45 }, 30).find(
+    (entry) => entry.type === "slide",
+  )?.distancePercent === 45,
+);
+check(
+  "raftaar second se frame me badalti hai",
+  entryAnimations({ ...NO_ENTRY, kind: "slide", seconds: 0.5 }, 30).every(
+    (entry) => entry.durationInFrames === 15,
+  ),
+);
+check(
+  "raftaar hadd me aati hai",
+  entryAnimations({ ...NO_ENTRY, kind: "pop", seconds: 99 }, 30).every(
+    (entry) => (entry.durationInFrames as number) <= 90,
+  ),
+);
+check(
+  "'Fade' chunne par fade banta hi hai, chahe 'saath me fade' band ho",
+  entryAnimations({ ...NO_ENTRY, kind: "fade", withFade: false }, 30).some(
+    (entry) => entry.type === "fade",
+  ),
+  "warna wo ek aisa chunav ban jaata hai jo dabta hai par lagta nahi",
+);
+check(
+  "khisakne ke saath fade band bhi ho sakta hai",
+  entryAnimations({ ...NO_ENTRY, kind: "slide", withFade: false }, 30).every(
+    (entry) => entry.type !== "fade",
+  ),
+);
+
+/*
+ * CTA — teen cheezein ek saath, teeno ka apna aana. Yahi wo scene hai jiske liye
+ * ye poora feature bana: logo beech me se ubharta hai, button neeche se uthta hai.
+ */
+const ctaBuild = applyWizard({
+  doc: { ...project, brand: { ...project.brand, logoAssetId: "as_logo" } },
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    scenes: filled.scenes.map((s, i) =>
+      i === 3
+        ? {
+            ...s,
+            tweaks: {
+              "image:0": { ...NO_TWEAK, entry: { ...NO_ENTRY, kind: "fade" }, scale: 1.4 },
+              "text:1": {
+                ...NO_TWEAK,
+                entry: {
+                  ...NO_ENTRY,
+                  kind: "slide",
+                  from: "bottom",
+                  distancePercent: 30,
+                  seconds: 0.4,
+                },
+              },
+            },
+          }
+        : s,
+    ),
+  },
+});
+
+const entrySceneId = Object.keys(ctaBuild.sceneIndexById).find(
+  (id) => ctaBuild.sceneIndexById[id] === filled.scenes[3]!.index,
+);
+const entryScene = ctaBuild.doc.scenes.find((entry) => entry.id === entrySceneId);
+const entryItems = entryScene ? sceneItemsInOrder(ctaBuild.doc.items, entryScene) : [];
+const entryKeys = elementKeyMap(entryItems);
+const entryLogo = entryItems.find((item) => entryKeys[item.id] === "image:0");
+const entryButton = entryItems.find((item) => entryKeys[item.id] === "text:1");
+
+check(
+  "CTA me logo, line aur button alag-alag pehchaane jaate hain",
+  entryLogo?.name === "Logo" && entryButton?.name === "CTA button",
+  "bina alag pehchaan ke teeno par ek hi chunav lagta — aur wahi purani halat thi",
+);
+check(
+  "logo apne chune hue tarike se aata hai",
+  entryLogo?.animations.length === 1 && entryLogo.animations[0]?.type === "fade",
+);
+check(
+  "button neeche se uthta hai, apni doori aur raftaar ke saath",
+  (() => {
+    const slide = entryButton?.animations.find((entry) => entry.type === "slide");
+    return (
+      slide?.direction === "down" &&
+      slide.distancePercent === 30 &&
+      slide.durationInFrames === Math.round(0.4 * ctaBuild.doc.project.fps)
+    );
+  })(),
+);
+check(
+  "logo ka naap bhi saath me badla ja sakta hai",
+  (() => {
+    const plain = applyWizard({
+      doc: { ...project, brand: { ...project.brand, logoAssetId: "as_logo" } },
+      draft: { ...filled, replaceExisting: true },
+    });
+    const plainSceneId = Object.keys(plain.sceneIndexById).find(
+      (id) => plain.sceneIndexById[id] === filled.scenes[3]!.index,
+    );
+    const plainScene = plain.doc.scenes.find((entry) => entry.id === plainSceneId);
+    const plainItems = plainScene ? sceneItemsInOrder(plain.doc.items, plainScene) : [];
+    const plainKeys = elementKeyMap(plainItems);
+    const plainLogo = plainItems.find((item) => plainKeys[item.id] === "image:0");
+    return (
+      plainLogo !== undefined &&
+      entryLogo !== undefined &&
+      Math.abs(entryLogo.transform.scale - plainLogo.transform.scale * 1.4) < 0.001
+    );
+  })(),
+);
+check(
+  "jis cheez par kuch nahi kaha, uspar scene ka apna preset chalta rehta hai",
+  (() => {
+    /*
+     * Sirf button badla gaya. Scene ka preset `primary` par lagta hai (CTA me wo
+     * logo hai) — aur use waisa ka waisa rehna chahiye.
+     */
+    const onlyButton = applyWizard({
+      doc: { ...project, brand: { ...project.brand, logoAssetId: "as_logo" } },
+      draft: {
+        ...filled,
+        replaceExisting: true,
+        scenes: filled.scenes.map((s, i) =>
+          i === 3
+            ? {
+                ...s,
+                animationPresetId: "pop-in",
+                tweaks: {
+                  "text:1": { ...NO_TWEAK, entry: { ...NO_ENTRY, kind: "slide" } },
+                },
+              }
+            : s,
+        ),
+      },
+    });
+    const sceneId = Object.keys(onlyButton.sceneIndexById).find(
+      (id) => onlyButton.sceneIndexById[id] === filled.scenes[3]!.index,
+    );
+    const scene = onlyButton.doc.scenes.find((entry) => entry.id === sceneId);
+    const items = scene ? sceneItemsInOrder(onlyButton.doc.items, scene) : [];
+    const keys = elementKeyMap(items);
+    const logo = items.find((item) => keys[item.id] === "image:0");
+    const button = items.find((item) => keys[item.id] === "text:1");
+    return (
+      logo?.animations.some((entry) => entry.type === "scalePop") === true &&
+      button?.animations.some((entry) => entry.type === "slide") === true
+    );
+  })(),
+  "har cheez ka chunav maangne par aadmi teesri cheez par chhod deta hai — default ka kaam karna zaroori hai",
+);
+
+console.log("\nscene ke andar awaaz ka safar (volume points)");
+
+check(
+  "point na ho to ek bhi keyframe nahi banta",
+  volumeCurve({ points: [], base: 0.5, durationInFrames: 150, fps: 30 }).length === 0,
+  "bina keyframe ke Remotion volume ek hi baar naapta hai — har frame par function bulana bekaar kharch hai",
+);
+
+const stepCurve = volumeCurve({
+  points: [{ atSeconds: 3, volume: 0.6, ramp: false }],
+  base: 0.1,
+  durationInFrames: 150,
+  fps: 30,
+});
+check(
+  "pehla keyframe hamesha sthir level ka hota hai",
+  stepCurve[0]?.frame === 0 && stepCurve[0]?.value === 0.1,
+);
+check(
+  "'turant' par theek pichhle frame par purani value likhi jaati hai",
+  stepCurve[1]?.frame === 89 && stepCurve[1]?.value === 0.1 &&
+    stepCurve[2]?.frame === 90 && stepCurve[2]?.value === 0.6,
+  "bina uske 0s aur 3s ke beech dheemi dhalaan ban jaati — jabki aadmi ne 3 second tak STHIR maanga tha",
+);
+
+const rampCurve = volumeCurve({
+  points: [{ atSeconds: 3, volume: 0.6, ramp: true }],
+  base: 0.1,
+  durationInFrames: 150,
+  fps: 30,
+});
+check(
+  "'dhire' par sirf do keyframe — beech ka safar apne aap",
+  rampCurve.length === 2 && rampCurve[1]?.frame === 90,
+);
+check(
+  "point clip ke bahar nahi ja sakta",
+  volumeCurve({
+    points: [{ atSeconds: 99, volume: 1, ramp: true }],
+    base: 0.1,
+    durationInFrames: 150,
+    fps: 30,
+  }).at(-1)?.frame === 149,
+  "clip se bahar ka keyframe chup-chaap gir jaata hai — aur uska koi nishaan kahin nahi dikhta",
+);
+check(
+  "level 0-1 ke andar baandha jaata hai",
+  volumeCurve({
+    points: [{ atSeconds: 1, volume: 9, ramp: true }],
+    base: -3,
+    durationInFrames: 150,
+    fps: 30,
+  }).every((entry) => entry.value >= 0 && entry.value <= 1),
+);
+check(
+  "poora safar chup ho to hi use chup maana jaata hai",
+  curveIsSilent([{ value: 0 }, { value: 0 }]) &&
+    !curveIsSilent([{ value: 0 }, { value: 0.4 }]),
+);
+
+const withCurves = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    musicAssetId: "as_music",
+    scenes: filled.scenes.map((s, i) =>
+      i === 0
+        ? {
+            ...s,
+            voiceAssetId: "as_voice_0",
+            voiceForText: s.text,
+            voiceSeconds: 5,
+            // "Chup" par shuru, aur beech se awaaz upar — `muted` yahan jhootha hai.
+            voiceVolume: 0,
+            voiceVolumePoints: [{ atSeconds: 2, volume: 1, ramp: false }],
+            musicVolumePoints: [
+              { atSeconds: 0, volume: 0.08, ramp: true },
+              { atSeconds: 3, volume: 0.5, ramp: false },
+            ],
+          }
+        : s,
+    ),
+  },
+});
+
+const curvedSceneId = Object.keys(withCurves.sceneIndexById).find(
+  (id) => withCurves.sceneIndexById[id] === filled.scenes[0]!.index,
+);
+const curvedVoice = withCurves.doc.items.find(
+  (item) => item.sceneId === curvedSceneId && item.assetId === "as_voice_0",
+);
+const curvedMusic = withCurves.doc.items.find(
+  (item) => item.sceneId === curvedSceneId && item.assetId === "as_music",
+);
+
+check(
+  "awaaz ke safar ke keyframes doc me lagte hain",
+  (curvedVoice?.keyframes["audio.volume"]?.length ?? 0) >= 3,
+);
+check(
+  "safar me awaaz ho to 'chup' ka thappa hat jaata hai",
+  curvedVoice?.audio.muted === false,
+  "muted par itemGainAt seedha 0 lauta deta hai — yaani beech me level uthane wala har point bekaar",
+);
+check(
+  "music ka safar us scene ke apne tukde par lagta hai",
+  (curvedMusic?.keyframes["audio.volume"]?.length ?? 0) >= 3,
+);
+check(
+  "jis scene par safar nahi kaha wahan ek bhi keyframe nahi",
+  withCurves.doc.items
+    .filter((item) => item.assetId === "as_music" && item.sceneId !== curvedSceneId)
+    .every((item) => (item.keyframes["audio.volume"]?.length ?? 0) === 0),
+);
+
 console.log("\nawaaz ka chuna hua hissa (kaat)");
 
 /** Ek scene jispar naapi hui 6s ki awaaz hai. */
@@ -1648,7 +1948,7 @@ const tweaked = applyWizard({
                 y: -20,
                 rotation: 10,
                 opacity: 0.5,
-                noAnimation: true,
+                entry: { ...NO_ENTRY, kind: "none" },
                 noEffect: true,
               },
               "text:0": { ...NO_TWEAK, hidden: true },

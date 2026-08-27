@@ -1,8 +1,13 @@
 "use client";
 
 import {
+  ENTRY_FROM_NAMES,
+  ENTRY_PLAIN_NAMES,
+  MAX_ENTRY_SECONDS,
+  MIN_ENTRY_SECONDS,
   MUSIC_LEVELS,
   MUSIC_LEVEL_DEFAULT,
+  NO_ENTRY,
   NO_TWEAK,
   SCENE_MUSIC_LEVELS,
   VOICE_LEVELS,
@@ -12,13 +17,15 @@ import {
   draftTotalSeconds,
   effectiveType,
   elementKeyMap,
-  plainAnimation,
   plainEffect,
   primaryOfScene,
   sameLevel,
   sceneItemsInOrder,
+  sceneSeconds,
   suggestAnimation,
+  voiceSeconds,
   tweakIsEmpty,
+  type ElementEntry,
   type Item,
   type SceneTweak,
   type WizardDraft,
@@ -51,6 +58,7 @@ import { AudioPreview } from "@/components/media/AudioPreview";
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
 import { VoiceTrimDialog } from "@/components/editor/wizard/VoiceTrimDialog";
+import { VolumePoints } from "@/components/editor/wizard/VolumePoints";
 import { useAssetMap } from "@/lib/assetMap";
 import { useFonts } from "@/lib/fonts";
 import { useEditorStore } from "@/lib/store";
@@ -114,7 +122,17 @@ const ELEMENT_NAMES: Record<string, string> = {
   audio: "Awaaz",
 };
 
+/**
+ * ⚠️ `build()` ka diya hua chhota naam pehle aata hai ("Logo", "CTA button"), type
+ * ka aam naam uske baad. Ye farak CTA par sab kuch badal deta hai: wahan logo aur
+ * button dono ke liye "Tasveer" / "Likha hua" likhna aadmi ko ye batata hi nahi ki
+ * usne kya chuna hai — aur wahi ek scene hai jahan teen cheezein ek saath hoti hain.
+ *
+ * Lamba naam (caption ke pehle 40 akshar) chhod diya jaata hai — wo panel ke sar par
+ * ek poori line kha jaata hai aur sawaal ka jawab phir bhi nahi deta.
+ */
 function elementName(item: Item): string {
+  if (item.name.length <= 16) return item.name;
   return ELEMENT_NAMES[item.type] ?? item.type;
 }
 
@@ -683,8 +701,164 @@ export function StepPreview({
                 `applyWizard` karta hai — `primaryOfScene` — do jagah do niyam
                 rakhne par wizard me chunav dikhta aur reel me lagta hi nahi.
               */}
-              {selection.isPrimary ? (
-                <div className="space-y-1.5 border-t border-ink-700 pt-1.5">
+              {/*
+                Kaise aaye — **har cheez par apna** (26.30).
+
+                ⚠️ Ye khaana chuni hui har cheez ke saath dikhta hai, sirf scene ke
+                sabse bade item ke saath nahi. CTA hi is baat ka sabse saaf misaal
+                hai: wahan logo, ek line aur ek button ek saath hote hain, aur scene
+                ka preset unme se sirf ek par lagta hai — baaki do hamesha ek jaise
+                aate the, aur unhe alag karne ka koi raasta hi nahi tha.
+
+                ⚠️ "Jaisa hai" pehla option hai aur wahi default hai. Bina uske
+                aadmi ko lagta hai ki har cheez ke liye kuch chunna hi padega.
+              */}
+              <div className="space-y-1.5 border-t border-ink-700 pt-1.5">
+                <span className="text-[10px] text-chalk-500">Ye cheez kaise aaye</span>
+                <div className="flex flex-wrap gap-1">
+                  {ENTRY_PLAIN_NAMES.map((choice) => (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      title={choice.when}
+                      onClick={() =>
+                        patchTweak({
+                          entry: { ...tweak.entry, kind: choice.id as ElementEntry["kind"] },
+                        })
+                      }
+                      className={clsx(
+                        "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                        tweak.entry.kind === choice.id
+                          ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                          : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                      )}
+                    >
+                      {choice.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/*
+                  ⚠️ "Kahan se" sirf khisakne wale chunav par dikhta hai. Fade ya
+                  uchhal par wo chaar button dabte to hain par kuch nahi karte — aur
+                  ek button jo kuch na kare wo toote hue button jaisa hi hai.
+                */}
+                {tweak.entry.kind === "slide" ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="w-14 shrink-0 text-[10px] text-chalk-500">Kahan se</span>
+                      {ENTRY_FROM_NAMES.map((choice) => (
+                        <button
+                          key={choice.id}
+                          type="button"
+                          title={choice.when}
+                          onClick={() =>
+                            patchTweak({
+                              entry: { ...tweak.entry, from: choice.id as ElementEntry["from"] },
+                            })
+                          }
+                          className={clsx(
+                            "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                            tweak.entry.from === choice.id
+                              ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                              : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                          )}
+                        >
+                          {choice.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/*
+                      Doori — "kahan tak". Frame ke naap ka percent hai, pixel nahi:
+                      wahi number 9:16 aur 16:9 dono me ek jaisa dikhta hai.
+                    */}
+                    <div className="flex items-center gap-1">
+                      <span className="w-14 shrink-0 text-[10px] text-chalk-500">Doori</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={1}
+                        value={tweak.entry.distancePercent}
+                        onChange={(event) =>
+                          patchTweak({
+                            entry: { ...tweak.entry, distancePercent: Number(event.target.value) },
+                          })
+                        }
+                        className="min-w-0 flex-1 accent-terracotta"
+                      />
+                      <span className="w-8 shrink-0 text-right font-mono text-[10px] text-chalk-300">
+                        {tweak.entry.distancePercent}%
+                      </span>
+                    </div>
+                  </>
+                ) : null}
+
+                {tweak.entry.kind !== "inherit" && tweak.entry.kind !== "none" ? (
+                  <div className="flex items-center gap-1">
+                    <span className="w-14 shrink-0 text-[10px] text-chalk-500">Raftaar</span>
+                    <Tap
+                      title="Tez karo — kam waqt me aaye"
+                      onClick={() =>
+                        patchTweak({
+                          entry: {
+                            ...tweak.entry,
+                            seconds: Math.max(
+                              MIN_ENTRY_SECONDS,
+                              Number((tweak.entry.seconds - 0.1).toFixed(2)),
+                            ),
+                          },
+                        })
+                      }
+                    >
+                      <Minus size={10} />
+                    </Tap>
+                    <span className="w-12 text-center font-mono text-[10px] text-chalk-300">
+                      {tweak.entry.seconds.toFixed(1)}s
+                    </span>
+                    <Tap
+                      title="Dheema karo — zyada waqt le kar aaye"
+                      onClick={() =>
+                        patchTweak({
+                          entry: {
+                            ...tweak.entry,
+                            seconds: Math.min(
+                              MAX_ENTRY_SECONDS,
+                              Number((tweak.entry.seconds + 0.1).toFixed(2)),
+                            ),
+                          },
+                        })
+                      }
+                    >
+                      <Plus size={10} />
+                    </Tap>
+                    {/*
+                      ⚠️ "Saath me fade" `Ubhar kar` wale chunav par nahi dikhta —
+                      wahan fade hamesha lagta hai (warna wo chunav kuch karta hi
+                      nahi), aur ek toggle jo band ho hi na sake sirf dhokha deta hai.
+                    */}
+                    {tweak.entry.kind !== "fade" ? (
+                      <Tap
+                        title="Aate waqt halka fade bhi — aksar isse aana narm lagta hai"
+                        active={tweak.entry.withFade}
+                        onClick={() =>
+                          patchTweak({ entry: { ...tweak.entry, withFade: !tweak.entry.withFade } })
+                        }
+                      >
+                        saath me fade
+                      </Tap>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {/*
+                  ⚠️ Scene ka apna preset yahan tabhi dikhta hai jab is cheez par
+                  koi apna chunav na ho. Dono ek saath dikhane par ye samajhna
+                  namumkin ho jaata hai ki abhi chal kya raha hai — aur aadmi wahi
+                  dropdown teen baar badal kar chhod deta hai.
+                */}
+                {tweak.entry.kind === "inherit" && selection.isPrimary ? (
                   <ChoicePicker
                     kind="animation"
                     value={scene.animationPresetId}
@@ -698,24 +872,18 @@ export function StepPreview({
                     )}
                     onPick={(id) => onChange(scene.index, { animationPresetId: id })}
                   />
-                  <Tap
-                    title={
-                      tweak.noAnimation
-                        ? "Harkat wapas lagao"
-                        : "Is cheez par koi harkat mat lagao — chunav waisa ka waisa rahega"
-                    }
-                    active={tweak.noAnimation}
-                    onClick={() => patchTweak({ noAnimation: !tweak.noAnimation })}
-                  >
-                    {tweak.noAnimation
-                      ? `Harkat hati hui hai${
-                          scene.animationPresetId
-                            ? ` (${plainAnimation(scene.animationPresetId)?.label ?? scene.animationPresetId})`
-                            : ""
-                        } — wapas lao`
-                      : "Harkat hata do"}
-                  </Tap>
+                ) : null}
 
+                {tweak.entry.kind === "inherit" && !selection.isPrimary ? (
+                  <p className="text-[10px] leading-snug text-chalk-500">
+                    Abhi is cheez ka apna kuch nahi hai — scene ki harkat sirf uski sabse badi
+                    cheez par lagti hai. Yahan se ise apna aana de sakte ho.
+                  </p>
+                ) : null}
+              </div>
+
+              {selection.isPrimary ? (
+                <div className="space-y-1.5 border-t border-ink-700 pt-1.5">
                   <ChoicePicker
                     kind="effect"
                     value={scene.effectPresetId ?? "none"}
@@ -798,6 +966,14 @@ export function StepPreview({
                       value={scene.voiceRate}
                       onPick={(next) => onChange(scene.index, { voiceRate: next ?? 1 })}
                     />
+                    <VolumePoints
+                      label="Bolne wale ka safar"
+                      hint="Scene ke beech me awaaz kam ya zyada karni ho to yahan mod jodo."
+                      maxSeconds={voiceSeconds(scene) ?? sceneSeconds(scene)}
+                      base={scene.voiceVolume}
+                      points={scene.voiceVolumePoints}
+                      onChange={(next) => onChange(scene.index, { voiceVolumePoints: next })}
+                    />
                   </>
                 ) : (
                   <p className="text-[10px] text-chalk-500">
@@ -847,6 +1023,24 @@ export function StepPreview({
                 ) : null}
 
                 {/*
+                  ⚠️ Safar ka control yahan hona hi sabse zyada maayne rakhta hai.
+                  "Teen second baad dhun uthni chahiye" ek aisa faisla hai jo reel
+                  DEKHTE HUE aata hai, aur uska nateeja bhi wahin sunai deta hai —
+                  Awaaz wale step par jaakar ise andaaze se set karna, phir wapas
+                  aakar sunna, phir dobara jaana — teesri baar koi nahi karta.
+                */}
+                {sceneMusicId ? (
+                  <VolumePoints
+                    label="Dhun ka safar"
+                    hint="Jaise: shuru ke 3 second dheemi, phir aakhri me tez — mod jodo."
+                    maxSeconds={sceneSeconds(scene)}
+                    base={scene.musicVolume ?? draft.musicVolume}
+                    points={scene.musicVolumePoints}
+                    onChange={(next) => onChange(scene.index, { musicVolumePoints: next })}
+                  />
+                ) : null}
+
+                {/*
                   ⚠️ Poori reel ka level bhi yahin hai. Ek scene par music kam karna
                   aur poori reel par kam karna do alag faisle hain, aur aksar sahi
                   jawab doosra wala hota hai — "yahan tez lag raha hai" ka matlab
@@ -884,7 +1078,7 @@ export function StepPreview({
                       y: 0,
                       rotation: 0,
                       opacity: 1,
-                      noAnimation: false,
+                      entry: NO_ENTRY,
                       noEffect: false,
                       hidden: false,
                     })
