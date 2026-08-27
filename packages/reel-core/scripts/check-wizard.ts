@@ -19,8 +19,11 @@
 import {
   ANIMATION_PLAIN_NAMES,
   EFFECT_PLAIN_NAMES,
+  NO_TWEAK,
   TRANSITION_PLAIN_NAMES,
   applyWizard,
+  elementKeyMap,
+  sceneItemsInOrder,
   autoFill,
   blankScene,
   canMoveScene,
@@ -1475,6 +1478,163 @@ check(
   applyWizard({ doc: project, draft: { ...filled, replaceExisting: true } }).doc.items.every(
     (item) => item.assetId !== "as_music",
   ),
+);
+
+console.log("\nhar scene ka apna gaana");
+
+const mixedMusic = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    musicAssetId: "as_music",
+    scenes: filled.scenes.map((s, i) => (i >= 2 ? { ...s, musicAssetId: "as_music_2" } : s)),
+  },
+});
+const mixedClips = mixedMusic.doc.items
+  .filter((item) => item.assetId === "as_music" || item.assetId === "as_music_2")
+  .sort((a, b) => a.startFrame - b.startFrame);
+
+check("har scene apna gaana chun sakta hai", mixedClips.length === 4);
+check(
+  "jis scene par apna gaana likha hai wahan wahi bajta hai",
+  mixedClips[0]?.assetId === "as_music" &&
+    mixedClips[1]?.assetId === "as_music" &&
+    mixedClips[2]?.assetId === "as_music_2" &&
+    mixedClips[3]?.assetId === "as_music_2",
+);
+check(
+  "naya gaana apni shuruaat se bajta hai",
+  mixedClips[2]?.trimStartFrame === 0,
+  "ek hi cursor rakhne par doosri dhun apne beech se shuru hoti — sunne me 'gaana kat gaya' jaisa",
+);
+check(
+  "gaana badalne wale jod par dono taraf fade lagta hai",
+  (mixedClips[1]?.audio.fadeOutFrames ?? 0) > 0 && (mixedClips[2]?.audio.fadeInFrames ?? 0) > 0,
+  "bina iske ek dhun poore level par achanak katti hai aur doosri achanak shuru hoti hai",
+);
+check(
+  "ek hi gaane ke beech ke jod chipke rehte hain",
+  mixedClips[1]?.audio.fadeInFrames === 0 && mixedClips[2]?.audio.fadeOutFrames === 0,
+);
+check(
+  "reel par music na ho tab bhi ek scene par lag sakta hai",
+  applyWizard({
+    doc: project,
+    draft: {
+      ...filled,
+      replaceExisting: true,
+      musicAssetId: null,
+      scenes: filled.scenes.map((s, i) => (i === 3 ? { ...s, musicAssetId: "as_cta_music" } : s)),
+    },
+  }).doc.items.filter((item) => item.assetId === "as_cta_music").length === 1,
+  "aksar music sirf aakhri CTA par chahiye hota hai — reel wale chunav ki shart lagane par wo raasta hi nahi bachta",
+);
+
+console.log("\npreview me chun kar kiye hue sudhaar");
+
+const plainBuild = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    scenes: filled.scenes.map((s, i) => (i === 0 ? { ...s, effectPresetId: "bw" } : s)),
+  },
+});
+
+const tweaked = applyWizard({
+  doc: project,
+  draft: {
+    ...filled,
+    replaceExisting: true,
+    scenes: filled.scenes.map((s, i) =>
+      i === 0
+        ? {
+            ...s,
+            effectPresetId: "bw",
+            tweaks: {
+              "image:0": {
+                ...NO_TWEAK,
+                scale: 1.5,
+                x: 40,
+                y: -20,
+                rotation: 10,
+                opacity: 0.5,
+                noAnimation: true,
+                noEffect: true,
+              },
+              "text:0": { ...NO_TWEAK, hidden: true },
+            },
+          }
+        : s,
+    ),
+  },
+});
+
+/** Bane hue doc me se pehle draft scene ka wo hissa jispar tweak laga tha. */
+function firstScenePieces(result: typeof tweaked) {
+  const sceneId = Object.keys(result.sceneIndexById).find(
+    (id) => result.sceneIndexById[id] === filled.scenes[0]!.index,
+  );
+  const scene = result.doc.scenes.find((entry) => entry.id === sceneId);
+  const items = scene ? sceneItemsInOrder(result.doc.items, scene) : [];
+  const keys = elementKeyMap(items);
+  return {
+    keys,
+    picture: items.find((item) => keys[item.id] === "image:0") ?? null,
+    caption: items.find((item) => keys[item.id] === "text:0") ?? null,
+  };
+}
+
+const plainPieces = firstScenePieces(plainBuild);
+const tweakedPieces = firstScenePieces(tweaked);
+
+check(
+  "doc ke scene se wapas draft ka scene mil jaata hai",
+  tweakedPieces.picture !== null && plainPieces.picture !== null,
+  "bina `sceneIndexById` ke preview me chuni hui cheez ka koi maalik nahi hota",
+);
+check(
+  "element ki pehchaan type aur ginti se banti hai",
+  tweakedPieces.keys[tweakedPieces.picture!.id] === "image:0" &&
+    tweakedPieces.keys[tweakedPieces.caption!.id] === "text:0",
+  "item ki id har baar nayi banti hai — uspar tweak baandhne par pehla hi sudhaar apni chuni hui cheez gum kar deta",
+);
+check(
+  "naap guna hota hai, likha nahi jaata",
+  Math.abs(
+    tweakedPieces.picture!.transform.scale - plainPieces.picture!.transform.scale * 1.5,
+  ) < 0.001,
+  "seedha likh dene par scene type ka apna layout (CTA ka logo, phone frame) chup-chaap mit jaata",
+);
+check(
+  "jagah aur ghumav jud'te hain",
+  tweakedPieces.picture!.transform.x === plainPieces.picture!.transform.x + 40 &&
+    tweakedPieces.picture!.transform.y === plainPieces.picture!.transform.y - 20 &&
+    tweakedPieces.picture!.transform.rotation === plainPieces.picture!.transform.rotation + 10,
+);
+check(
+  "halkapan guna hota hai",
+  Math.abs(
+    tweakedPieces.picture!.transform.opacity - plainPieces.picture!.transform.opacity * 0.5,
+  ) < 0.001,
+);
+check(
+  "harkat hatane par us item par koi animation nahi bachti",
+  plainPieces.picture!.animations.length > 0 && tweakedPieces.picture!.animations.length === 0,
+);
+check(
+  "rang ka effect hatane par us item par koi effect nahi bachta",
+  plainPieces.picture!.effects.length > 0 && tweakedPieces.picture!.effects.length === 0,
+);
+check(
+  "chhupayi hui cheez doc me hidden hai",
+  tweakedPieces.caption!.hidden === true && plainPieces.caption!.hidden === false,
+);
+check(
+  "jispar kuch nahi kiya wo waisa ka waisa rehta hai",
+  tweakedPieces.caption!.transform.scale === plainPieces.caption!.transform.scale &&
+    tweakedPieces.caption!.transform.x === plainPieces.caption!.transform.x,
 );
 
 console.log("\nlibrary ka tab (kind se)");

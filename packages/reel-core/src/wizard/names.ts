@@ -75,6 +75,87 @@ export const EFFECT_PLAIN_NAMES: readonly PlainName[] = [
   { id: "vintage", label: "Purana", when: "Bhoora, halka pheeka — nostalgia wali baat par" },
 ];
 
+/**
+ * Awaaz aur music ke level — **naam se, number se nahi** (26.28).
+ *
+ * ⚠️ Ye list yahan hai, kisi ek step ke andar nahi, aur wo ek asli galti ke baad
+ * hua. Wahi chunav ab do jagah dikhta hai — Awaaz wale step me har qatar par, aur
+ * Dekho wale step me chuni hui cheez ke saath — aur do jagah do list rakhne par
+ * ek din "Dheemi" ka matlab ek jagah 0.6 hota aur doosri jagah 0.5. Wo farak
+ * screen par kabhi nahi dikhta; sirf sunne me lagta hai ki chunav tikta nahi.
+ *
+ * ⚠️ `value: null` ka apna matlab hai aur wo har list me nahi hai — sirf scene ke
+ * music me, jahan uska matlab "jo poori reel me chal raha hai wahi" hai. `0` se
+ * uska farak zaroori hai: `0` matlab "yahan band", chahe reel me kuch bhi ho.
+ */
+export interface WizardLevel {
+  /** Volume (0-1) ya raftaar (1 = jaisi bani thi). `null` = "reel jaisa". */
+  value: number | null;
+  label: string;
+  /** Ek line: ye kab theek hai. */
+  when: string;
+}
+
+/**
+ * Ek scene par awaaz kitni tez.
+ *
+ * ⚠️ "Chup" ek asli chunav hai, koi galti nahi. Kuch scene sirf dikhne ke liye
+ * hote hain (b-roll, ek tasveer jispar music chalta hai), aur wahan bolne wala
+ * ulta rukavat banta hai. Bina is chunav ke aadmi ko us scene ki awaaz **hatani**
+ * padti thi — aur uske saath uska likha hua text bhi chala jaata tha.
+ */
+export const VOICE_LEVELS: readonly WizardLevel[] = [
+  { value: 1, label: "Normal", when: "Aam line — jaisi bani hai" },
+  { value: 1.3, label: "Tez", when: "Zor dene wali line par (thoda oopar)" },
+  { value: 0.6, label: "Dheemi", when: "Peeche ki baat, ya jab tasveer hi asli baat ho" },
+  { value: 0, label: "Chup", when: "Is scene par kuch bola na jaaye — sirf music/tasveer" },
+];
+
+/**
+ * Awaaz ki raftaar.
+ *
+ * ⚠️ Sabse tez 1.3x par ruk-ta hai. Usse aage shabd aapas me chipak jaate hain;
+ * wo slider par ek number ki tarah dikhta hai par sunne me toota hua lagta hai.
+ * Jo hadd nateeja kharab karti ho, use dena hi nahi chahiye.
+ */
+export const VOICE_RATES: readonly WizardLevel[] = [
+  { value: 0.85, label: "Dheemi", when: "Bhaari baat — sunne wale ko rukna chahiye" },
+  { value: 1, label: "Normal", when: "Jaisi bani thi" },
+  { value: 1.15, label: "Tez", when: "Reel ki aam raftaar — 30s me zyada baat" },
+  { value: 1.3, label: "Bahut tez", when: "Sirf list ya ginti wali line par" },
+];
+
+/** Poori reel me music ka level. 0.15 sifaarish hai — dekho `MUSIC_LEVEL_DEFAULT`. */
+export const MUSIC_LEVELS: readonly WizardLevel[] = [
+  { value: 0.08, label: "Bahut halka", when: "Sirf khaali jagah bharne ke liye" },
+  { value: 0.15, label: "Halka", when: "Bolne wale ke peeche — sabse surakshit" },
+  { value: 0.3, label: "Sunai dene layak", when: "Jab bolne wala kam ho" },
+  { value: 0.6, label: "Tez", when: "Sirf bina awaaz wali reel par" },
+];
+
+/**
+ * Music ka sifaarish wala level.
+ *
+ * ⚠️ Ye number `emptyDraft`/`draftFromScript` me bhi likha hai, aur dono ka ek
+ * hona zaroori hai — warna UI par "Sifaarish" ka nishaan us button par lagta hai
+ * jo chuna hua nahi hai, aur wo ek chhoti si baat lagti hai jo poore chunav par
+ * shak paida karti hai.
+ */
+export const MUSIC_LEVEL_DEFAULT = 0.15;
+
+/** Ek scene par music ka level — `null` = poori reel wala. */
+export const SCENE_MUSIC_LEVELS: readonly WizardLevel[] = [
+  { value: null, label: "Reel jaisa", when: "Jo poori reel me chal raha hai" },
+  { value: 0.05, label: "Bahut kam", when: "Zaroori baat boli ja rahi ho" },
+  { value: 0, label: "Band", when: "Is scene par music bilkul nahi" },
+];
+
+/** Do level ek hi hain? (`null` bhi ek value hai — dekho `SCENE_MUSIC_LEVELS`.) */
+export function sameLevel(a: number | null, b: number | null): boolean {
+  if (a === null || b === null) return a === b;
+  return Math.abs(a - b) < 0.01;
+}
+
 function find(list: readonly PlainName[], id: string): PlainName | null {
   return list.find((entry) => entry.id === id) ?? null;
 }

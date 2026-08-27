@@ -1,7 +1,13 @@
 "use client";
 
 import {
+  MUSIC_LEVELS,
+  MUSIC_LEVEL_DEFAULT,
+  SCENE_MUSIC_LEVELS,
+  VOICE_LEVELS,
+  VOICE_RATES,
   estimateSpeechSeconds,
+  sameLevel,
   sceneAdvice,
   sceneSeconds,
   usableVoiceSeconds,
@@ -47,42 +53,13 @@ import { VoiceError, generateVoice } from "@/lib/voiceGen";
  * hain; wo slider par ek number ki tarah dikhta hai par sunne me toota hua lagta
  * hai. Jo hadd nateeja kharab karti ho, use dena hi nahi chahiye.
  */
-/**
- * Ek scene par awaaz kitni tez — **naam se, number se nahi**.
+/*
+ * Awaaz aur music ke level ki list ab `@reel/core` (`wizard/names.ts`) me hai.
  *
- * ⚠️ "Chup" ek asli chunav hai, koi galti nahi. Kuch scene sirf dikhne ke liye
- * hote hain (b-roll, ek tasveer jispar music chalta hai), aur wahan bolne wala
- * ulta rukavat banta hai. Bina is chunav ke aadmi ko us scene ki awaaz **hatani**
- * padti thi — aur uske saath uska likha hua text bhi chala jaata tha.
+ * ⚠️ Wo yahan se hatayi gayi thi kyunki wahi chunav ab Dekho wale step me bhi
+ * dikhta hai. Do jagah do list rakhne par ek din "Dheemi" ka matlab ek jagah 0.6
+ * hota aur doosri jagah 0.5 — aur wo farak screen par kabhi nahi dikhta.
  */
-const VOICE_LEVELS = [
-  { volume: 1, label: "Normal", when: "Aam line — jaisi bani hai" },
-  { volume: 1.3, label: "Tez", when: "Zor dene wali line par (thoda oopar)" },
-  { volume: 0.6, label: "Dheemi", when: "Peeche ki baat, ya jab tasveer hi asli baat ho" },
-  { volume: 0, label: "Chup", when: "Is scene par kuch bola na jaaye — sirf music/tasveer" },
-] as const;
-
-/** Poori reel me music ka level. */
-const MUSIC_LEVELS = [
-  { volume: 0.08, label: "Bahut halka", when: "Sirf khaali jagah bharne ke liye" },
-  { volume: 0.15, label: "Halka", when: "Bolne wale ke peeche — sabse surakshit" },
-  { volume: 0.3, label: "Sunai dene layak", when: "Jab bolne wala kam ho" },
-  { volume: 0.6, label: "Tez", when: "Sirf bina awaaz wali reel par" },
-] as const;
-
-/** Ek scene par music ka level — `null` = poori reel wala. */
-const SCENE_MUSIC = [
-  { volume: null, label: "Reel jaisa", when: "Jo poori reel me chal raha hai" },
-  { volume: 0.05, label: "Bahut kam", when: "Zaroori baat boli ja rahi ho" },
-  { volume: 0, label: "Band", when: "Is scene par music bilkul nahi" },
-] as const;
-
-const VOICE_RATES = [
-  { rate: 0.85, label: "Dheemi", when: "Bhaari baat — sunne wale ko rukna chahiye" },
-  { rate: 1, label: "Normal", when: "Jaisi bani thi" },
-  { rate: 1.15, label: "Tez", when: "Reel ki aam raftaar — 30s me zyada baat" },
-  { rate: 1.3, label: "Bahut tez", when: "Sirf list ya ginti wali line par" },
-] as const;
 
 interface Category {
   id: string;
@@ -178,7 +155,7 @@ function VoiceRow({
   categoryId,
   providerId,
   ttsUsable,
-  hasMusic,
+  reelMusicAssetId,
   onChange,
 }: {
   scene: WizardScene;
@@ -190,8 +167,14 @@ function VoiceRow({
   providerId: string | null;
   /** Koi provider chalne layak hai? Nahi to "Awaaz banao" dabna hi nahi chahiye. */
   ttsUsable: boolean;
-  /** Reel par music laga hai? Nahi to per-scene music ka chunav dikhta hi nahi. */
-  hasMusic: boolean;
+  /**
+   * Poori reel ka gaana — `null` = reel par koi music nahi.
+   *
+   * ⚠️ Pehle yahan ek `hasMusic: boolean` tha, aur wo kaafi nahi raha. Ab har
+   * scene apna gaana bhi rakh sakta hai, isliye "is scene par music baj raha hai
+   * ya nahi" ka jawab dono se milkar banta hai — sirf reel wale se nahi.
+   */
+  reelMusicAssetId: string | null;
   onChange(index: number, patch: Partial<WizardScene>): void;
 }) {
   /*
@@ -447,13 +430,13 @@ function VoiceRow({
           <span className="text-[10px] text-chalk-500">Raftaar:</span>
           {VOICE_RATES.map((entry) => (
             <button
-              key={entry.rate}
+              key={entry.label}
               type="button"
               title={entry.when}
-              onClick={() => onChange(scene.index, { voiceRate: entry.rate })}
+              onClick={() => onChange(scene.index, { voiceRate: entry.value ?? 1 })}
               className={clsx(
                 "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
-                Math.abs(scene.voiceRate - entry.rate) < 0.01
+                sameLevel(scene.voiceRate, entry.value)
                   ? "border-terracotta bg-terracotta/10 text-chalk-100"
                   : "border-ink-600 text-chalk-400 hover:border-chalk-500",
               )}
@@ -484,10 +467,10 @@ function VoiceRow({
               key={entry.label}
               type="button"
               title={entry.when}
-              onClick={() => onChange(scene.index, { voiceVolume: entry.volume })}
+              onClick={() => onChange(scene.index, { voiceVolume: entry.value ?? 1 })}
               className={clsx(
                 "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
-                Math.abs(scene.voiceVolume - entry.volume) < 0.01
+                sameLevel(scene.voiceVolume, entry.value)
                   ? "border-terracotta bg-terracotta/10 text-chalk-100"
                   : "border-ink-600 text-chalk-400 hover:border-chalk-500",
               )}
@@ -499,25 +482,62 @@ function VoiceRow({
       ) : null}
 
       {/*
-        ⚠️ Music ka per-scene chunav tabhi dikhta hai jab reel par music laga ho.
-        Bina music ke ye teen button dabte to hain par kuch nahi karte — aur ek
-        button jo kuch na kare, toote hue button jaisa hi hai (README rule 5).
+        Is scene ka apna gaana (26.28).
+
+        ⚠️ Ye chunav har scene par dikhta hai, tab bhi jab reel par music na ho —
+        aur wo jaan-boojhkar hai. Aksar aadmi ko music poori reel par nahi, sirf
+        aakhri CTA par chahiye hota hai; reel wale chunav ki shart lagane par uske
+        paas wo karne ka koi raasta hi nahi bachta.
+
+        ⚠️ Khaali hone par yahan "Reel wala" likha hai, "koi nahi" nahi — kyunki
+        khaali ka matlab wahi hai. "Koi nahi" padh kar aadmi har scene par gaana
+        chunne lagta hai, jabki 90% reel me ek hi dhun sahi hoti hai.
       */}
-      {hasMusic ? (
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] text-chalk-500">Is scene ka music:</span>
+        <div className="min-w-0 max-w-[170px] flex-1">
+          <AssetPickerButton
+            kind="audio"
+            allowUpload
+            uploadTags={["music", "wizard"]}
+            assetId={scene.musicAssetId}
+            onPick={(assetId) => onChange(scene.index, { musicAssetId: assetId })}
+          />
+        </div>
+        {scene.musicAssetId ? (
+          <button
+            type="button"
+            title="Is scene par bhi wahi dhun jo poori reel par chal rahi hai"
+            onClick={() => onChange(scene.index, { musicAssetId: null })}
+            className="rounded border border-ink-600 px-1.5 py-0.5 text-[10px] text-chalk-400 transition-colors hover:border-chalk-500"
+          >
+            Reel wala
+          </button>
+        ) : (
+          <span className="text-[10px] text-chalk-500">
+            {reelMusicAssetId ? "reel wali dhun chal rahi hai" : "koi music nahi"}
+          </span>
+        )}
+      </div>
+
+      {/*
+        ⚠️ Level ka chunav tabhi dikhta hai jab is scene par music sach me baj
+        raha ho — reel wala ho ya iska apna. Bina music ke ye teen button dabte to
+        hain par kuch nahi karte, aur ek button jo kuch na kare wo toote hue
+        button jaisa hi hai (README rule 5).
+      */}
+      {(scene.musicAssetId ?? reelMusicAssetId) ? (
         <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-chalk-500">Music yahan:</span>
-          {SCENE_MUSIC.map((entry) => (
+          {SCENE_MUSIC_LEVELS.map((entry) => (
             <button
               key={entry.label}
               type="button"
               title={entry.when}
-              onClick={() => onChange(scene.index, { musicVolume: entry.volume })}
+              onClick={() => onChange(scene.index, { musicVolume: entry.value })}
               className={clsx(
                 "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
-                (entry.volume === null && scene.musicVolume === null) ||
-                  (entry.volume !== null &&
-                    scene.musicVolume !== null &&
-                    Math.abs(scene.musicVolume - entry.volume) < 0.01)
+                sameLevel(scene.musicVolume, entry.value)
                   ? "border-terracotta bg-terracotta/10 text-chalk-100"
                   : "border-ink-600 text-chalk-400 hover:border-chalk-500",
               )}
@@ -975,16 +995,16 @@ export function StepVoice({
                 key={entry.label}
                 type="button"
                 title={entry.when}
-                onClick={() => onMusicVolume(entry.volume)}
+                onClick={() => onMusicVolume(entry.value ?? MUSIC_LEVEL_DEFAULT)}
                 className={clsx(
                   "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
-                  Math.abs(draft.musicVolume - entry.volume) < 0.01
+                  sameLevel(draft.musicVolume, entry.value)
                     ? "border-terracotta bg-terracotta/10 text-chalk-100"
                     : "border-ink-600 text-chalk-400 hover:border-chalk-500",
                 )}
               >
                 {entry.label}
-                {Math.abs(entry.volume - 0.15) < 0.01 ? (
+                {sameLevel(entry.value, MUSIC_LEVEL_DEFAULT) ? (
                   <span className="ml-1 rounded bg-terracotta/20 px-1 text-[9px] text-terracotta">
                     Sifaarish
                   </span>
@@ -992,7 +1012,7 @@ export function StepVoice({
               </button>
             ))}
             <span className="min-w-0 flex-1 text-[10px] text-chalk-500">
-              Har scene par ise alag bhi kar sakte ho — neeche &ldquo;Music yahan&rdquo;.
+              Har scene par level aur dhun dono alag ho sakte hain — neeche har qatar me.
             </span>
           </div>
         ) : null}
@@ -1007,7 +1027,7 @@ export function StepVoice({
           categoryId={categoryId}
           providerId={providerId}
           ttsUsable={ttsUsable}
-          hasMusic={draft.musicAssetId !== null}
+          reelMusicAssetId={draft.musicAssetId}
           onChange={onChange}
         />
       ))}

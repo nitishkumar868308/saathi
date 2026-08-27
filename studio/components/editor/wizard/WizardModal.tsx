@@ -243,7 +243,9 @@ export function WizardModal({
           scene.voiceAssetId ||
           scene.removed ||
           scene.durationOverrideSeconds !== null ||
-          scene.effectPresetId !== null,
+          scene.effectPresetId !== null ||
+          scene.musicAssetId !== null ||
+          Object.keys(scene.tweaks ?? {}).length > 0,
       );
     if (touched && !window.confirm("Wizard band kar dein? Yahan kiya hua kaam chala jaayega.")) {
       return;
@@ -393,7 +395,16 @@ export function WizardModal({
               onVoiceCategory={setVoiceCategory}
             />
           ) : null}
-          {step === 3 ? <StepPreview draft={draft} /> : null}
+          {/*
+            ⚠️ Dekho wale step ko bhi `update` milta hai, sirf `draft` nahi. Wo
+            step ab dikhane ke saath **badalne** ka bhi hai — reel me kisi cheez
+            par click karke uska naap, jagah, harkat aur us scene ki awaaz/music
+            wahin se theek hoti hai. Sab kuch usi draft me jaata hai jisme baaki
+            step likhte hain, isliye doc yahan bhi nahi chhua jaata.
+          */}
+          {step === 3 ? (
+            <StepPreview draft={draft} onChange={update} onMusicVolume={setMusicVolume} />
+          ) : null}
         </div>
       </div>
     </Modal>

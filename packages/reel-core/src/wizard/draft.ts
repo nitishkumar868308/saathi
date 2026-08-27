@@ -1,7 +1,7 @@
 import type { AiScene, AiScript } from "../ai/types";
 import { applyProposal, buildProposal } from "../ai/proposal";
 import { getSceneType, requireSceneType } from "../registry/sceneTypes";
-import type { Doc } from "../schema/project";
+import type { Doc, Item, Scene } from "../schema/project";
 import { createItem } from "../schema/factory";
 import {
   addItem,
@@ -31,6 +31,100 @@ import { suggestAnimation, suggestTransition, type WizardSceneLike } from "./sug
  * dekha ja sakta hai (`scripts/check-wizard.ts`), bina browser khole. UI ka kaam
  * sirf ye draft bharna hai.
  */
+
+/**
+ * Preview me haath se kiya hua chhota sudhaar — **ek element par** (26.28).
+ *
+ * ⚠️ Ye scene ke baaki chunav (`animationPresetId`, `textPosition`…) ki jagah
+ * nahi hai, unke **upar** hai. Wo chunav poore scene ke hain; ye ek cheez ke —
+ * "wo tasveer thodi badi", "ye line thodi baayen". Dono ko ek hi khaane me
+ * daalne par "scene ka text neeche" aur "is line ko 40px baayen" ek doosre ko
+ * mita dete, aur aadmi ko sirf itna dikhta ki uska pehla chunav gayab ho gaya.
+ *
+ * ⚠️ Naap aur jagah **judte** hain, likhte nahi (`scale` guna, `x`/`y` jama).
+ * Seedha likh dene par scene type ka apna layout — CTA ka logo, phone frame ki
+ * screen — chup-chaap mit jaata, aur wo galti sirf us ek scene par dikhti.
+ */
+export interface SceneTweak {
+  /** Guna hone wala naap — 1 = jaisa tha. */
+  scale: number;
+  /** Daayen-baayen khisakna, project pixels me. Rina (-) = baayen. */
+  x: number;
+  /** Upar-neeche khisakna, project pixels me. Rina (-) = upar. */
+  y: number;
+  /** Ghumav, degree me. */
+  rotation: number;
+  /** Kitna dikhe — 1 = poora. */
+  opacity: number;
+  /** Is cheez par harkat mat lagao. */
+  noAnimation: boolean;
+  /** Is cheez par rang ka effect mat lagao. */
+  noEffect: boolean;
+  /** Ye cheez reel me dikhni hi nahi chahiye. */
+  hidden: boolean;
+}
+
+/** Kuch nahi badla — har naye tweak ki shuruaat yahin se hoti hai. */
+export const NO_TWEAK: SceneTweak = {
+  scale: 1,
+  x: 0,
+  y: 0,
+  rotation: 0,
+  opacity: 1,
+  noAnimation: false,
+  noEffect: false,
+  hidden: false,
+};
+
+/** Is tweak me kuch hai bhi ya wo `NO_TWEAK` ke barabar hai? */
+export function tweakIsEmpty(tweak: SceneTweak | undefined | null): boolean {
+  if (!tweak) return true;
+  return (
+    tweak.scale === 1 &&
+    tweak.x === 0 &&
+    tweak.y === 0 &&
+    tweak.rotation === 0 &&
+    tweak.opacity === 1 &&
+    !tweak.noAnimation &&
+    !tweak.noEffect &&
+    !tweak.hidden
+  );
+}
+
+/**
+ * Scene ke andar ek cheez ki **pehchaan** — `"image:0"`, `"text:1"`.
+ *
+ * ⚠️ Item ki apni `id` yahan kaam nahi aati, aur wahi is function ki poori
+ * wajah hai. Har baar `applyWizard` chalne par scene naye sire se banta hai aur
+ * har item ko nayi id milti hai — yaani preview me chuni hui cheez ka tweak
+ * agle hi render me kisi ka nahi rehta. Kram `build()` ka hai aur wo har baar
+ * wahi hota hai, isliye "is scene ka pehla text" ek tikaau naam hai.
+ *
+ * ⚠️ Ginti **type ke hisaab se** hai, list ki position se nahi. Position lene par
+ * scene me ek caption jud'te hi tasveer ka naam `0` se `1` ho jaata aur uska
+ * naap chup-chaap kisi aur cheez par chala jaata.
+ *
+ * `items` wahi kram me hone chahiye jo `scene.itemIds` me hai — dekho
+ * `sceneItemsInOrder`.
+ */
+export function elementKeyMap(items: readonly Item[]): Record<string, string> {
+  const seen: Record<string, number> = {};
+  const keys: Record<string, string> = {};
+  for (const item of items) {
+    const nth = seen[item.type] ?? 0;
+    seen[item.type] = nth + 1;
+    keys[item.id] = `${item.type}:${nth}`;
+  }
+  return keys;
+}
+
+/** Scene ke items, usi kram me jisme `build()` ne unhe banaya tha. */
+export function sceneItemsInOrder(items: readonly Item[], scene: Scene): Item[] {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  return scene.itemIds
+    .map((id) => byId.get(id))
+    .filter((item): item is Item => item !== undefined);
+}
 
 export interface WizardScene {
   /** AI ke script me is scene ka number (0 se). Kabhi nahi badalta. */
@@ -201,6 +295,20 @@ export interface WizardScene {
    */
   voiceVolume: number;
   /**
+   * Is scene ka apna gaana — `null` = poori reel wala (draft ka).
+   *
+   * ⚠️ Ye `WizardDraft.musicAssetId` ki jagah nahi leta, uske **upar** baithta
+   * hai. 90% reel me ek hi dhun poore video par chalti hai, aur wo chunav ek hi
+   * baar hona chahiye — har scene par gaana poochhne par aadmi teesre scene par
+   * chhod deta hai. Par kuch reel do hisson ki hoti hain (samasya, phir hal), aur
+   * wahan dhun ka badalna hi wo mod dikhata hai.
+   *
+   * ⚠️ `null` aur "wahi gaana jo reel ka hai" do alag cheezein hain. `null` par
+   * reel ka music badalne se ye scene bhi saath badalta hai; id likh dene par wo
+   * yahin jam jaata hai — jo tabhi theek hai jab aadmi ne sach me chuna ho.
+   */
+  musicAssetId: string | null;
+  /**
    * Is scene par music kitna tez — `null` = poori reel wala (draft ka).
    *
    * ⚠️ `null` aur `0` do alag cheezein hain, aur ye farak zaroori hai. `null`
@@ -268,6 +376,17 @@ export interface WizardScene {
    */
   hideText: boolean;
 
+  /**
+   * Preview me chun kar kiye hue sudhaar — key `elementKeyMap` se (26.28).
+   *
+   * ⚠️ Khaali record ka matlab "kuch haath se nahi badla", aur wo aam haalat
+   * hai. Har element ka khaana pehle se bana dena aasan tha aur do cheezein
+   * todta: draft teen guna bada ho jaata (jiska poora fayda sifar hai), aur
+   * "kuch badla hai ya nahi" ka jawab har jagah ek-ek field ginn kar nikalna
+   * padta — jabki abhi wo sirf ek `Object.keys().length` hai.
+   */
+  tweaks: Record<string, SceneTweak>;
+
   /** Aadmi ne "hata do" dabaya. */
   removed: boolean;
 }
@@ -333,9 +452,11 @@ export interface WizardDraft {
   /**
    * Poori reel ke peeche chalne wala music — `null` = koi nahi.
    *
-   * ⚠️ Music **ek** hai, per-scene nahi. Har scene par alag gaana lagana reel ko
-   * jode hue tukdon ka dher bana deta hai; jo cheez per-scene honi chahiye wo
-   * uski **awaaz ka level** hai (`WizardScene.musicVolume`), gaana nahi.
+   * ⚠️ Ye poori reel ka **default** hai, aur aam haalat me akela chunav bhi. Har
+   * scene par gaana poochhna reel ko jode hue tukdon ka dher bana deta hai, aur
+   * aadmi teesre scene par wo chunav chhod deta hai. Isliye chunav yahan ek baar
+   * hota hai; jise sach me alag chahiye wo `WizardScene.musicAssetId` se apne
+   * scene par usse upar likh sakta hai.
    *
    * ⚠️ Ye wizard me isliye hai ki bina iske reel ka aadha asar hi nahi banta —
    * chup reel dekhne wale ko adhoori lagti hai — aur uske liye aadmi ko poora
@@ -582,10 +703,12 @@ export function draftFromScript(script: AiScript): WizardDraft {
         musicVolume: null,
         voiceForText: null,
         voiceCategoryId: null,
+        musicAssetId: null,
         hideText: false,
         animationPresetId: null,
         transitionId: null,
         effectPresetId: null,
+        tweaks: {},
         removed: false,
       };
     }),
@@ -648,10 +771,12 @@ export function blankScene(index: number): WizardScene {
     musicVolume: null,
     voiceForText: null,
     voiceCategoryId: null,
+    musicAssetId: null,
     hideText: false,
     animationPresetId: null,
     transitionId: null,
     effectPresetId: null,
+    tweaks: {},
     removed: false,
   };
 }
@@ -1087,6 +1212,15 @@ export interface ApplyWizardResult {
   applied: number;
   /** Jo chhoot gaye, wajah ke saath. */
   skipped: { index: number; reason: string }[];
+  /**
+   * Bane hue doc scene ki id se wapas draft ke scene ka `index`.
+   *
+   * ⚠️ Iske bina preview me chuni hui cheez ka koi maalik nahi hota. Doc me item
+   * ke paas sirf `sceneId` hai, aur wo id har baar naye sire se banti hai —
+   * yaani "ye tasveer kis scene ki thi" ka jawab UI ke paas hai hi nahi. Wo
+   * jawab yahan banta hai, jahan dono list ek saath haath me hain.
+   */
+  sceneIndexById: Record<string, number>;
 }
 
 /**
@@ -1246,6 +1380,13 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
     .filter((scene) => !before.has(scene.id))
     .sort((a, b) => a.order - b.order);
 
+  /** Bane hue scene se wapas draft ke scene tak — preview ki selection ke liye. */
+  const sceneIndexById: Record<string, number> = {};
+  created.forEach((scene, at) => {
+    const source = madeFrom[at];
+    if (source) sceneIndexById[scene.id] = source.index;
+  });
+
   let doc = result.doc;
 
   created.forEach((scene, at) => {
@@ -1258,6 +1399,18 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
     if (!primary) return;
 
     /*
+     * Preview me haath se kiye hue sudhaar (26.28).
+     *
+     * ⚠️ Pehchaan `elementKeyMap` se banti hai, item ki id se nahi — id har baar
+     * nayi hoti hai. Aur wo `doc` ke abhi wale roop se banti hai, sabse pehle:
+     * neeche fit, trim aur effect items ko badalte hain par unki id kabhi nahi
+     * badalte, isliye ek hi baar ginna kaafi hai.
+     */
+    const tweaks = source.tweaks ?? {};
+    const keyById = elementKeyMap(sceneItemsInOrder(doc.items, scene));
+    const tweakOf = (itemId: string): SceneTweak | null => tweaks[keyById[itemId] ?? ""] ?? null;
+
+    /*
      * ⚠️ Harkat ab **text par bhi** lagti hai, aur ye guard jaan-boojhkar hataya
      * gaya hai. Pehle yahan `&& source.visualAssetId` tha, is dar se ki zoom wala
      * preset text par lag jaayega. Us dar ki keemat ye thi ki bina tasveer wali
@@ -1268,7 +1421,13 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * Ab sifaarish khud text ke liye text wala preset chunti hai
      * (`suggestAnimation`), aur jo aadmi haath se chunta hai wo uska chunav hai.
      */
-    if (source.animationPresetId) {
+    /*
+     * ⚠️ `noAnimation` yahan rokta hai, preset ko `null` karke nahi. Preset scene
+     * ka chunav hai; "is cheez par harkat nahi" ek element ka. Preset mita dene
+     * par aadmi ka pehla chunav chup-chaap chala jaata, aur harkat wapas laane
+     * par use dobara chunni padti.
+     */
+    if (source.animationPresetId && !tweakOf(primary.id)?.noAnimation) {
       doc = applyAnimationPreset(doc, {
         itemIds: [primary.id],
         presetId: source.animationPresetId,
@@ -1363,7 +1522,7 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * preset likha hai) poore wizard ko gira deta, aur wo galti "Editor me daalo"
      * dabane par hi dikhti.
      */
-    if (source.effectPresetId) {
+    if (source.effectPresetId && !tweakOf(primary.id)?.noEffect) {
       try {
         doc = applyEffectPreset(doc, {
           itemIds: [primary.id],
@@ -1380,6 +1539,39 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         side: "in",
         type: source.transitionId,
       });
+    }
+
+    /*
+     * Naap / jagah / ghumav — sabse aakhir me, aur **jodkar**.
+     *
+     * ⚠️ Ye scene ke apne layout ke upar lagta hai, uski jagah nahi leta. Seedha
+     * likh dene par CTA ka logo apni jagah se hat jaata aur phone frame ke andar
+     * ki recording frame se bahar nikal jaati — dono galtiyan sirf us ek scene
+     * par dikhti hain, aur aadmi ne wahan kuch kiya bhi nahi hota.
+     */
+    const tweakedKeys = Object.keys(tweaks);
+    if (tweakedKeys.length > 0) {
+      doc = {
+        ...doc,
+        items: doc.items.map((item) => {
+          const tweak = tweakOf(item.id);
+          if (!tweak) return item;
+          return {
+            ...item,
+            hidden: item.hidden || tweak.hidden,
+            transform: {
+              ...item.transform,
+              // 0 ya rina scale par item gayab ho jaata hai aur schema bhi use
+              // nahi maanta (`positive`) — isliye ek chhoti si farsh.
+              scale: Math.max(0.05, item.transform.scale * tweak.scale),
+              x: item.transform.x + tweak.x,
+              y: item.transform.y + tweak.y,
+              rotation: item.transform.rotation + tweak.rotation,
+              opacity: Math.max(0, Math.min(1, item.transform.opacity * tweak.opacity)),
+            },
+          };
+        }),
+      };
     }
   });
 
@@ -1439,7 +1631,11 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
    * "purane scene hata do" par purana music bhi mit'ta hai. Bina `sceneId` ke wo
    * doosri baar wizard chalane par jama hote rehte — do gaane ek saath.
    */
-  if (args.draft.musicAssetId && created.length > 0) {
+  /** Is scene par kaunsa gaana bajega — scene ka apna, warna reel ka. */
+  const musicOf = (src: WizardScene | undefined): string | null =>
+    src ? (src.musicAssetId ?? args.draft.musicAssetId) : null;
+
+  if (created.length > 0 && madeFrom.some((src) => musicOf(src) !== null)) {
     const musicTrack =
       doc.tracks.find((track) => track.type === "music") ??
       (() => {
@@ -1448,12 +1644,23 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
       })();
 
     if (musicTrack) {
-      /** Source ke andar kahan tak baj chuka — agla tukda yahin se uthta hai. */
-      let sourceCursor = 0;
+      /**
+       * Har gaane ka apna cursor — wo kahan tak baj chuka.
+       *
+       * ⚠️ Ek hi cursor rakhna tab tak theek tha jab tak poori reel par ek hi
+       * gaana tha. Alag-alag gaane hone par wo cursor doosre gaane ke andar bhi
+       * aage badh jaata, aur teesre scene par pehla gaana apne beech se shuru
+       * hota — sunne me wo "gaana kat gaya" jaisa lagta hai, aur uski wajah
+       * kahin dikhti nahi.
+       */
+      const cursorOf: Record<string, number> = {};
 
       created.forEach((scene, at) => {
         const src = madeFrom[at];
         if (!src) return;
+
+        const assetId = musicOf(src);
+        if (!assetId) return;
 
         const items = doc.items.filter((item) => item.sceneId === scene.id);
         if (items.length === 0) return;
@@ -1466,33 +1673,44 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         const volume = src.musicVolume ?? args.draft.musicVolume;
         const fade = Math.round(doc.project.fps * 0.5);
 
+        /*
+         * Fade **wahan** jahan gaana sach me shuru ya khatam hota hai.
+         *
+         * ⚠️ Pehle ye sirf pehle aur aakhri scene par tha, is dalil par ki beech
+         * ke jode chipke rehne chahiye — aur wo dalil tab tak sahi thi jab poori
+         * reel par ek hi gaana tha. Alag gaana lagate hi wo galat ho jaati hai:
+         * beech me ek dhun poore level par achanak katti hai aur doosri poore
+         * level par achanak shuru hoti hai. Wo jhatka reel ki sabse buri awaaz
+         * hai, aur wo sirf sun kar pakda jaata hai.
+         *
+         * Isliye shart gaane ki hai, scene ki position ki nahi: pichhle/agle
+         * scene par yahi gaana ho to jod chipka rehta hai, warna dono taraf
+         * aadha second ka fade lagta hai.
+         */
+        const samePrevious = at > 0 && musicOf(madeFrom[at - 1]) === assetId;
+        const sameNext = at < created.length - 1 && musicOf(madeFrom[at + 1]) === assetId;
+
+        const cursor = cursorOf[assetId] ?? 0;
+
         const music = createItem("audio", {
           fps: doc.project.fps,
           trackId: musicTrack.id,
           sceneId: scene.id,
           name: "Music",
-          assetId: args.draft.musicAssetId,
+          assetId,
           startFrame: start,
           durationInFrames: duration,
-          trimStartFrame: sourceCursor,
+          trimStartFrame: cursor,
           audio: {
             volume: Math.max(0, Math.min(1, volume)),
             muted: volume <= 0,
-            /*
-             * Reel ke shuru me music aata hua, ant me jaata hua.
-             *
-             * ⚠️ Fade sirf pehle aur aakhri tukde par hai, har tukde par nahi —
-             * warna beech ke har scene par music dab kar wapas uthta, aur wo
-             * "ghar ghar" ki tarah sunai deta hai. Beech ke jode bilkul chipke
-             * hue hone chahiye.
-             */
-            fadeInFrames: at === 0 ? fade : 0,
-            fadeOutFrames: at === created.length - 1 ? fade : 0,
+            fadeInFrames: samePrevious ? 0 : fade,
+            fadeOutFrames: sameNext ? 0 : fade,
           },
         });
 
         doc = addItem(doc, { item: music });
-        sourceCursor += duration;
+        cursorOf[assetId] = cursor + duration;
       });
     }
   }
@@ -1627,6 +1845,7 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
   return {
     doc,
     applied: result.applied,
+    sceneIndexById,
     skipped: result.skipped.map((entry) => {
       const at = Number(entry.id.replace("proposal_", ""));
       return { index: live[at]?.index ?? at, reason: entry.reason };

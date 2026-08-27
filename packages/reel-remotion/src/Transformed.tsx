@@ -110,6 +110,14 @@ export const Transformed: React.FC<{
 
   return (
     <AbsoluteFill
+      /*
+       * ⚠️ Ye attribute sajawat nahi hai — iske bina preview par click karke kisi
+       * cheez ko chunna mumkin hi nahi. Har item ek poore frame ki `AbsoluteFill`
+       * hai, isliye click sirf "kaunsa item" bata sakta hai tabhi jab DOM par
+       * uski pehchaan likhi ho. Render me iska koi asar nahi hai (data attribute
+       * na dikhta hai, na style leta hai).
+       */
+      data-reel-item={item.id}
       style={{
         // CSS transform daayen se baayen lagta hai: pehle scale, phir rotate,
         // phir translate. Isliye position rotation se prabhavit nahi hoti —
