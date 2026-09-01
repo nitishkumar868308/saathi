@@ -83,7 +83,8 @@
         {
           "photosPermission": "Saathi ko photos ki access chahiye taaki aapke documents gallery me save ho sakein.",
           "savePhotosPermission": "Saathi aapke documents ko phone ki gallery me save karega.",
-          "isAccessMediaLocationEnabled": false
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
         }
       ],
       "./plugins/with-fullscreen-notifications",
