@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Chehre ka wo hissa jo bolti tasveer ko chahiye.
  *
@@ -12,84 +14,58 @@
  * bahar chala jaata.
  */
 
-export interface FacePoint {
+export const FacePointSchema = z.object({
   /** 0-1 — tasveer ki chaudai ka anupaat. */
-  x: number;
+  x: z.number().finite(),
   /** 0-1 — tasveer ki oonchai ka anupaat. */
-  y: number;
-}
-
-export interface FaceData {
-  version: 1;
-  /** Honth ka bahari kinara. */
-  lipsOuter: FacePoint[];
-  /** Honth ka andaruni kinara — muh ka khulna yahin dikhta hai. */
-  lipsInner: FacePoint[];
-  /** Jabde ki lakeer — thodi kahan tak hai, ye isse pata chalta hai. */
-  jaw: FacePoint[];
-  leftEye: FacePoint[];
-  rightEye: FacePoint[];
-  leftBrow: FacePoint[];
-  rightBrow: FacePoint[];
-}
+  y: z.number().finite(),
+});
 
 export const FACE_DATA_VERSION = 1;
 
-/** Har khaana jo `FaceData` me hota hai — padhne aur jaanchne, dono ke liye. */
-const POINT_LISTS = [
-  "lipsOuter",
-  "lipsInner",
-  "jaw",
-  "leftEye",
-  "rightEye",
-  "leftBrow",
-  "rightBrow",
-] as const;
+/**
+ * ⚠️ Schema **yahan** hai, `schema/project.ts` me nahi, aur wo jaan-boojhkar hai.
+ * Ye data do jagah chahiye — item ke andar (render ke liye) aur asset ke `meta`
+ * me (dobara na naapna pade). Do jagah alag-alag likhne par wo ek din alag ho
+ * jaate hain, aur tab ek jagah ka bana hua data doosri jagah parse hona band kar
+ * deta hai — bina kisi saaf wajah ke.
+ *
+ * ⚠️ `lipsOuter` par kam se kam teen point ki shart schema me hai. Honth ke bina
+ * ye data kisi kaam ka nahi, aur use aage jaane dena matlab render me ek khaali
+ * mesh — yaani ek bilkul sthir chehra, bina kisi error ke.
+ */
+export const FaceDataSchema = z.object({
+  version: z.literal(FACE_DATA_VERSION),
+  /** Honth ka bahari kinara. */
+  lipsOuter: z.array(FacePointSchema).min(3),
+  /** Honth ka andaruni kinara — muh ka khulna yahin dikhta hai. */
+  lipsInner: z.array(FacePointSchema),
+  /** Jabde ki lakeer — thodi kahan tak hai, ye isse pata chalta hai. */
+  jaw: z.array(FacePointSchema),
+  /*
+   * ⚠️ Ye chaaron khaali ho sakte hain. Inke bina chehra kam zinda lagta hai
+   * (palak nahi jhapakti, bhaunh nahi hilti) par bolta phir bhi hai — aur "kam
+   * zinda" ko "bilkul nahi" bana dena galat sauda hai.
+   */
+  leftEye: z.array(FacePointSchema),
+  rightEye: z.array(FacePointSchema),
+  leftBrow: z.array(FacePointSchema),
+  rightBrow: z.array(FacePointSchema),
+});
 
-function readPoints(value: unknown): FacePoint[] | null {
-  if (!Array.isArray(value)) return null;
-  const points: FacePoint[] = [];
-  for (const entry of value) {
-    if (!entry || typeof entry !== "object") return null;
-    const { x, y } = entry as { x?: unknown; y?: unknown };
-    if (typeof x !== "number" || typeof y !== "number") return null;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-    points.push({ x, y });
-  }
-  return points;
-}
+export type FacePoint = z.infer<typeof FacePointSchema>;
+export type FaceData = z.infer<typeof FaceDataSchema>;
 
 /**
  * Asset ke `meta` me se chehra padho — **samajh na aaye to `null`**.
  *
- * ⚠️ Ye `readWizardMemory` wali hi soch hai aur usi wajah se: ye data asset ki
- * row me pada rehta hai, aur uska shape aage badal sakta hai. Sakht parse karke
- * phat jaane par ek purani tasveer poori library ko kholna band kar deti.
- *
- * ⚠️ Par yahan ek farak hai: `null` lautne ka matlab "ye tasveer bol nahi sakti"
- * hai, aur wo UI me **saaf dikhna** chahiye — chup-chaap aadha chehra maan kar
- * aage badhna wo galti hai jo render me ek hilte hue dhabbe ki tarah nikalti hai.
+ * ⚠️ `null` ka matlab "ye tasveer bol nahi sakti" hai, aur wo UI me **saaf
+ * dikhna** chahiye — chup-chaap aadha chehra maan kar aage badhna wo galti hai
+ * jo render me ek hilte hue dhabbe ki tarah nikalti hai.
  */
 export function readFaceData(value: unknown): FaceData | null {
-  if (!value || typeof value !== "object") return null;
-  const raw = value as Record<string, unknown>;
-  if (raw.version !== FACE_DATA_VERSION) return null;
-
-  const out = { version: FACE_DATA_VERSION } as FaceData;
-  for (const key of POINT_LISTS) {
-    const points = readPoints(raw[key]);
-    if (!points) return null;
-    out[key] = points;
-  }
-
-  /*
-   * Honth ke bina ye data kisi kaam ka nahi — aur wahi is poore feature ka
-   * aadhaar hai. Baaki hisse (aankh, bhaunh) khaali ho sakte hain: unke bina
-   * chehra thoda kam zinda lagta hai, par bolta phir bhi hai.
-   */
-  if (out.lipsOuter.length < 3) return null;
-
-  return out;
+  const parsed = FaceDataSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 /** Ek list ka ghera — mesh ka region isi se banta hai. */

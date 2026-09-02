@@ -157,6 +157,8 @@ export function createItem(typeId: string, partial: CreateItemInput = {}): Item 
     text: null,
     shape: null,
     subtitle: null,
+    /* Bolti tasveer ka data — aam item par hamesha null. */
+    talkingPhoto: null,
 
     hidden: false,
     locked: false,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { EASING_IDS, DEFAULT_EASING } from "../config/easing";
 import { DIMENSION_STEP, MAX_DIMENSION, MIN_DIMENSION } from "../config/presets";
 import { MAX_FPS, MIN_FPS } from "../time";
+import { FaceDataSchema } from "../face/landmarks";
 
 /**
  * Project JSON — poore product ka **ekmatra** sach.
@@ -584,6 +585,41 @@ export const MockupSchema = z
   })
   .nullable();
 
+export const VisemeFrameSchema = z.object({
+  atSeconds: z.number().min(0),
+  viseme: z.string().min(1),
+  intensity: z.number().min(0).max(1),
+});
+
+/**
+ * Bolti tasveer ka data — ek tasveer, ek awaaz, aur muh ka poora track.
+ *
+ * ⚠️ Chehra **yahan** rakha jaata hai, asset me nahi (jabki wahan bhi jama hota
+ * hai). Wajah render ke raaste me hai: renderer ko `assets` sirf **URL** ka map
+ * deta hai (`AssetMap = Record<string, string>`), uske paas asset ki row hoti hi
+ * nahi. Yahan rakhne se render doc se hi poora ho jaata hai — wahi asool jo
+ * render job ke frozen snapshot ka hai.
+ *
+ * ⚠️ Iska ek aur faayda hai: tasveer ka chehra baad me dobara naapa jaaye (behtar
+ * model se) to purani reel apne hi purane naap par chalti rehti hai, badalti
+ * nahi.
+ *
+ * ⚠️ Yahan schema **sakht** hai — `doc.meta.wizard` ki tarah dheela nahi. Farak
+ * asli hai: wizard ki yaadgaar sirf UI ki suvidha hai, na padhi jaaye to ek
+ * button chhup jaata hai. Ye data **render ko chahiye**; aadha-adhoora yahan
+ * pahunchna chup-chaap ek murda chehra deta hai, aur wo galti sirf bane hue MP4
+ * me dikhti hai.
+ */
+export const TalkingPhotoSchema = z.object({
+  /** Bolne wali awaaz — `null` = abhi bani nahi. */
+  voiceAssetId: IdSchema.nullable(),
+  /** `EMOTIONS` registry ka id. */
+  emotionId: z.string().min(1),
+  face: FaceDataSchema,
+  /** Kis waqt kaunsa shape — studio me banta hai, render sirf padhta hai. */
+  track: z.array(VisemeFrameSchema),
+});
+
 export const ItemSchema = z.object({
   id: IdSchema,
   trackId: IdSchema,
@@ -634,6 +670,15 @@ export const ItemSchema = z.object({
   text: TextSpecSchema.nullable(),
   shape: ShapeSpecSchema.nullable(),
   subtitle: SubtitleSchema.default(null),
+
+  /**
+   * Bolti tasveer ka data — `null` = ye ek aam tasveer hai.
+   *
+   * ⚠️ `default(null)` zaroori hai: iske bina har purana doc parse hona band kar
+   * deta, aur doc parse na hona matlab **render fail**. Wahi tarika jo `subtitle`
+   * aur `mockup` ka tha jab wo jude the.
+   */
+  talkingPhoto: TalkingPhotoSchema.nullable().default(null),
 
   hidden: z.boolean(),
   locked: z.boolean(),
@@ -851,6 +896,8 @@ export type Transition = z.infer<typeof TransitionSchema>;
 export type TextSpec = z.infer<typeof TextSpecSchema>;
 export type ShapeSpec = z.infer<typeof ShapeSpecSchema>;
 export type Item = z.infer<typeof ItemSchema>;
+export type TalkingPhoto = z.infer<typeof TalkingPhotoSchema>;
+export type VisemeTrackFrame = z.infer<typeof VisemeFrameSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type Brand = z.infer<typeof BrandSchema>;
 export type Meta = z.infer<typeof MetaSchema>;

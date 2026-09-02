@@ -22,12 +22,18 @@ import { Composition } from "remotion";
 
 export const WARP_COMPOSITION_ID = "Warp";
 
-export interface WarpProps {
+/**
+ * ⚠️ `type` hai, `interface` nahi — aur ye farak yahan maayne rakhta hai.
+ * Remotion ke `<Composition>` ko props `Record<string, unknown>` ke layak
+ * chahiye; TypeScript type-alias ko wo maan leta hai par interface ko nahi. Asli
+ * `ReelCompositionProps` bhi isi wajah se type hai.
+ */
+export type WarpProps = {
   /** Test tasveer — data URI. Aadha kaala (baayan), aadha safed (daayan). */
   imageUrl: string;
-  /** `false` = jaisi hai. `true` = kaala hissa aadha simat jaata hai. */
+  /** `false` = jaisi hai. `true` = seema tirchi ho jaati hai. */
   warp: boolean;
-}
+};
 
 /** Frame ka naap — script bhi yahi maanta hai, isliye ek hi jagah likha hai. */
 export const WARP_SIZE = 200;

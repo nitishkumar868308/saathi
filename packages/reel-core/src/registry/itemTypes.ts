@@ -302,6 +302,39 @@ export const BUILTIN_ITEM_TYPES: readonly ItemTypeEntry[] = [
     controls: [...FIT_CONTROLS, ...TRANSFORM_CONTROLS],
     keyframable: [...TRANSFORM_KEYFRAMABLE],
   },
+  /**
+   * Bolti tasveer — ek tasveer jiska muh bola ja rahe text ke saath chalta hai.
+   *
+   * ⚠️ Ye `image` se alag type hai, uspar ek flag nahi. Do wajah:
+   * `componentKey` alag hai (mesh wala renderer), aur iska data (`talkingPhoto`)
+   * har aam tasveer par bekaar pada rehta. Flag rakhne par har `ImageItem` ko
+   * dono raaste sambhalne padte, aur aam tasveer ka raasta — jo hazaar guna zyada
+   * chalta hai — bina wajah bhaari ho jaata.
+   *
+   * ⚠️ Iske saath koi **scene type nahi** jodha gaya, aur wo jaan-boojhkar hai:
+   * `sceneTypesForPrompt()` saare scene types AI ke HAR prompt me bhejta hai.
+   * Ek naya type jodne se har purani reel ka prompt badal jaata, har call mehngi
+   * hoti, aur AI aam scene ke liye bhi ise chun sakta tha. Ye panel apna scene
+   * khud banata hai, isliye us registry me jaane ki zaroorat hi nahi.
+   */
+  {
+    id: "talking_photo",
+    label: "Bolti tasveer",
+    icon: "MessageCircle",
+    kind: "media",
+    componentKey: "TalkingPhotoItem",
+    needsAsset: true,
+    hasVisual: true,
+    /* Awaaz apne alag audio item me chalti hai — wahi jo baaki reel me chalti hai. */
+    hasAudio: false,
+    supportsTrim: false,
+    defaultTrackType: "image",
+    defaultDurationSeconds: 5,
+    schema: z.object({ assetId: z.string().min(1) }),
+    defaults: {},
+    controls: [...FIT_CONTROLS, ...TRANSFORM_CONTROLS],
+    keyframable: [...TRANSFORM_KEYFRAMABLE],
+  },
   {
     id: "video",
     label: "Video",

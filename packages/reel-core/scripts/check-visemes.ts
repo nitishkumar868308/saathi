@@ -36,6 +36,13 @@ import {
   mouthRegion,
   readFaceData,
   sampleFace,
+  createEmptyProject,
+  createItem,
+  getItemType,
+  getSceneType,
+  listSceneTypes,
+  parseDoc,
+  TalkingPhotoSchema,
   type Point,
 } from "../src/index";
 
@@ -538,6 +545,66 @@ check(
   "har triangle se matrix ban jaati hai",
   open.every((t) => affineFromTriangles(t.from, t.to) !== null),
   "jis triangle ki matrix na bane wo tukda render me gayab ho jaata hai",
+);
+
+/* -------------------------------------------------- schema aur registry */
+
+console.log("\nschema — sirf juda hai, badla kuch nahi");
+
+check(
+  "aam item par bolti tasveer ka data null hota hai",
+  createItem("image").talkingPhoto === null,
+);
+check(
+  "purana doc bina is khaane ke bhi khulta hai",
+  parseDoc(createEmptyProject({ name: "purana" })) !== null,
+  "doc parse na hona matlab render fail — isliye default null zaroori hai",
+);
+
+const goodTalking = {
+  voiceAssetId: "as_1",
+  emotionId: DEFAULT_EMOTION,
+  face,
+  track: buildVisemeTrack({ steps: visemesFromText("namaste"), envelope: loud, durationSeconds: 1 }),
+};
+check("poora data schema se guzar jaata hai", TalkingPhotoSchema.safeParse(goodTalking).success);
+check(
+  "bina chehre ke mana",
+  !TalkingPhotoSchema.safeParse({ ...goodTalking, face: undefined }).success,
+  "chehre ke bina render me ek bilkul sthir chehra nikalta hai, bina kisi error ke",
+);
+check(
+  "aadhe chehre par mana",
+  !TalkingPhotoSchema.safeParse({ ...goodTalking, face: { ...face, lipsOuter: [] } }).success,
+);
+check(
+  "hadd se bahar zor par mana",
+  !TalkingPhotoSchema.safeParse({
+    ...goodTalking,
+    track: [{ atSeconds: 0, viseme: "AA", intensity: 5 }],
+  }).success,
+);
+check("bina awaaz ke bhi jaayaz hai", TalkingPhotoSchema.safeParse({ ...goodTalking, voiceAssetId: null }).success);
+
+console.log("\nregistry — naya item type, par koi naya scene type nahi");
+
+check("naya item type registry me hai", getItemType("talking_photo") !== undefined);
+check(
+  "uska apna renderer hai",
+  getItemType("talking_photo")?.componentKey === "TalkingPhotoItem",
+);
+check("wo tasveer maangta hai", getItemType("talking_photo")?.needsAsset === true);
+check("purana image type waisa ka waisa hai", getItemType("image")?.componentKey === "ImageItem");
+
+check(
+  "koi naya SCENE type nahi jodha gaya",
+  getSceneType("talking_photo") === undefined,
+  "sceneTypesForPrompt() saare scene type AI ke HAR prompt me bhejta hai — naya jodne se har purani reel ka prompt badal jaata",
+);
+check(
+  "AI ko dikhne wale scene type utne hi hain jitne pehle the",
+  listSceneTypes().length === 12,
+  "ye ginti badal jaaye to AI ka prompt badal chuka hai — aur wo maujooda reel ka vyavhaar badalna hai",
 );
 
 /* ------------------------------------------------------------------ summary */

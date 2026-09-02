@@ -560,9 +560,14 @@ section("registries (1.7-1.10)");
 test("saare item types registered hain", () => {
   // Phase 19 me `subtitle` juda — wo text item se alag type hai (text ki zindagi
   // ek content par tiki hai, subtitle ki waqt ke saath badalte cues par).
+  //
+  // Baad me `talking_photo` juda — wo `image` se alag type hai, uspar ek flag
+  // nahi: uska renderer alag hai (mesh wala), aur uska data har aam tasveer par
+  // bekaar pada rehta. Flag rakhne par aam tasveer ka raasta — jo hazaar guna
+  // zyada chalta hai — bina wajah bhaari ho jaata.
   assert.deepEqual(
     [...ITEM_TYPES.ids()].sort(),
-    ["audio", "image", "shape", "subtitle", "text", "video"],
+    ["audio", "image", "shape", "subtitle", "talking_photo", "text", "video"],
   );
 });
 

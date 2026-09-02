@@ -2,7 +2,15 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     // Plain Node process hai — fs/path/process ke types chahiye.
-    "types": ["node"]
+    "types": ["node"],
+
+    // Worker khud JSX nahi likhta. Ye sirf ek jagah ke liye hai:
+    // `scripts/warp-spike/` — bolti tasveer ka spike, jise apna chhota Remotion
+    // bundle chahiye (dekho scripts/render-warp.ts). Bina iske wo files
+    // typecheck se bahar reh jaati, aur bina typecheck ke code me kaisi galti
+    // chhup jaati hai wo isi kaam me dekh liya gaya (VisemeStep galat file se
+    // import ho gaya tha aur sirf tsc ne pakda).
+    "jsx": "react-jsx"
   },
   "include": ["src", "scripts"]
 }
