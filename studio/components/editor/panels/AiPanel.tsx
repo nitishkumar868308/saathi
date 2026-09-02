@@ -13,7 +13,6 @@ import {
 import { Loader2, PenLine, Sparkles } from "lucide-react";
 import { useState } from "react";
 
-import { WizardModal } from "@/components/editor/wizard/WizardModal";
 import { useAiProvider } from "@/lib/ai/provider";
 import { useEditorStore } from "@/lib/store";
 
@@ -44,14 +43,20 @@ export function AiPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; raw: string | null } | null>(null);
   const [script, setScript] = useState<AiScript | null>(null);
-  const [wizardOpen, setWizardOpen] = useState(false);
   const [usage, setUsage] = useState<AiUsage | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+
+  /*
+   * ⚠️ Wizard ka khulna ab store me hai, yahan ke `useState` me nahi. Wajah ye
+   * hai ki wizard me aane ka doosra raasta ban gaya — Renders panel se bani hui
+   * reel — aur wo ek alag panel hai. Yahan rakhne par wo raasta is state tak
+   * pahunch hi nahi sakta tha.
+   */
+  const openWizard = useEditorStore((state) => state.openWizard);
+  const wizardOpen = useEditorStore((state) => state.wizardRequest !== null);
 
   async function generate(): Promise<void> {
     setBusy(true);
     setError(null);
-    setDone(null);
     try {
       const result = await ai.provider.generateScript({
         story,
@@ -72,7 +77,12 @@ export function AiPanel() {
        */
       setScript(result.data);
       setUsage(result.usage);
-      setWizardOpen(true);
+      /*
+       * ⚠️ `result.data` seedha jaata hai, upar wala `script` state nahi — wo is
+       * render me abhi laga hi nahi hota, aur uspar bharosa karne par wizard
+       * PICHHLI script le kar khulta hai.
+       */
+      openWizard({ script: result.data, draft: null, note: null });
     } catch (cause) {
       const aiError = cause instanceof AiError ? cause : null;
       setError({
@@ -181,7 +191,7 @@ export function AiPanel() {
               setScript(null);
               setUsage(null);
               setError(null);
-              setWizardOpen(true);
+              openWizard({ script: null, draft: null, note: null });
               return;
             }
             void generate();
@@ -230,35 +240,6 @@ export function AiPanel() {
         </p>
       ) : null}
 
-      {done ? (
-        <p className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-[11px] text-emerald-300">
-          {done} Ctrl+Z se poora wapas ho sakta hai.
-        </p>
-      ) : null}
-
-      {/*
-        ⚠️ Shart `wizardOpen` par hai, `script` par nahi (26.27). Pehle wizard
-        tabhi ban'ta tha jab script aa chuki ho — theek tha, jab tak wizard me
-        jaane ka ek hi raasta AI tha. Ab do hain, aur khaali wala (`script ===
-        null`) is shart me kabhi ghus hi nahi paata tha.
-
-        ⚠️ Jo baat pehle bhi sach thi aur ab bhi hai: AI chalte waqt wizard khula
-        nahi rakha jaata. Ek khaali dabbe ke saamne "intezaar karo" dikhane se
-        aadmi ko ye pata hi nahi chalta ki kuch ho bhi raha hai ya nahi — isliye
-        `generate()` khatam hone par hi `setWizardOpen(true)` hota hai.
-      */}
-      {wizardOpen ? (
-        <WizardModal
-          open={wizardOpen}
-          script={script}
-          onClose={() => setWizardOpen(false)}
-          onDone={(applied) => {
-            setWizardOpen(false);
-            setScript(null);
-            setDone(`${applied} scene ban gaye.`);
-          }}
-        />
-      ) : null}
 
       {/*
         Script bani hui hai par wizard band kar diya — dobara kholne ka raasta
@@ -267,7 +248,7 @@ export function AiPanel() {
       {script && !wizardOpen ? (
         <button
           type="button"
-          onClick={() => setWizardOpen(true)}
+          onClick={() => openWizard({ script, draft: null, note: null })}
           className="w-full rounded border border-ink-600 px-2 py-1.5 text-chalk-300 transition-colors hover:border-terracotta hover:text-chalk-100"
         >
           Wizard dobara kholo

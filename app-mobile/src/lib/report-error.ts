@@ -53,8 +53,27 @@ function objectMessage(o: Record<string, unknown>): string {
       if (nested !== "Unknown error") return nested;
     }
   }
+  /*
+   * Anjaan shakal — poora object hi likh do, kam se kam kuch to dikhe.
+   *
+   * ⚠️ Khaali value pehle **girayi** jaati hain, aur ye ek asli galti se aaya
+   * hai: admin > Logs me `{"message":""}` chhap raha tha. Wo padha ja sakta tha
+   * par usse kuch kiya nahi ja sakta tha — na status, na code, kuch nahi. Khaali
+   * khaanon ko likhna jaankari nahi hai, sirf jaankari jaisa dikhta hai; aur wo
+   * us "Unknown error" se bura hai jo saaf-saaf maan leta hai ki pata nahi
+   * chala.
+   *
+   * (Asli ilaaj `http-error-body.ts` me hai — wo aisi error ko banne hi nahi
+   * deta. Ye uske neeche wali jaal hai, un jagahon ke liye jo Supabase se aati
+   * hi nahi.)
+   */
   try {
-    const json = JSON.stringify(o);
+    const kept: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(o)) {
+      if (v === undefined || v === null || v === "") continue;
+      kept[k] = v;
+    }
+    const json = JSON.stringify(kept);
     if (json && json !== "{}") return json.slice(0, 300);
   } catch {
     /* circular object */

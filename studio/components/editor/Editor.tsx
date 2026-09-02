@@ -11,6 +11,7 @@ import { RightSidebar } from "@/components/editor/RightSidebar";
 import { TimelineView } from "@/components/editor/timeline/TimelineView";
 import { DraftRecovery } from "@/components/editor/DraftRecovery";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
+import { WizardModal } from "@/components/editor/wizard/WizardModal";
 import { TopBar } from "@/components/editor/TopBar";
 import { MobileShell } from "@/components/editor/MobileShell";
 import { useScreen } from "@/lib/breakpoint";
@@ -103,6 +104,9 @@ function EditorShell() {
         <ConflictBanner />
         <DraftRecovery />
         <ShortcutsDialog />
+        {/* Wizard do jagah se khulta hai (AI panel, Renders panel) — isliye
+            modal yahan hai, kisi ek panel ke andar nahi. */}
+        <WizardModal />
         {opError ? <OpError message={opError} onClear={clearOpError} /> : null}
         <div className="min-h-0 flex-1">
           <MobileShell screen={screen} />
@@ -119,6 +123,9 @@ function EditorShell() {
       <DraftRecovery />
       {/* `?` se khulta hai — list registry se banti hai, haath se nahi (16.6). */}
       <ShortcutsDialog />
+      {/* Wizard do jagah se khulta hai (AI panel, Renders panel) — isliye
+          modal yahan hai, kisi ek panel ke andar nahi. */}
+      <WizardModal />
 
       {opError ? <OpError message={opError} onClear={clearOpError} /> : null}
 

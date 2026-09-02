@@ -193,6 +193,55 @@ eq("apni adhoori download", belongsToDoc(`${ID}-v2.jpg.part`, ID), true);
 eq("kisi aur ki file", belongsToDoc("9999abcd.jpg", ID), false);
 eq("aisi id jo humari se shuru hoti hai", belongsToDoc(`${ID}extra.jpg`, ID), false);
 
+/* ══════════════════ 4. Galat status wale jawab ka body ══════════════════ */
+
+/*
+ * ⚠️ Ye jaanch ek asli error se aayi hai: admin > Logs me `{"message":""}`
+ * chhapta tha, jisse kabhi pata nahi chalta tha ki 500 tha, 403 tha, ya beech
+ * me network kat gaya. Poori wajah src/lib/http-error-body.ts ke upar likhi hai.
+ */
+
+const { errorBodyFor } = await load("src/lib/http-error-body.ts");
+
+const parse = (out) => (out === null ? null : JSON.parse(out));
+
+// ── Wahi haalat jisse asli error aayi thi: galat status + bilkul khaali body.
+eq("khaali body par status milta hai", parse(errorBodyFor(502, "Bad Gateway", "")), {
+  message: "HTTP 502 Bad Gateway — server ne khaali jawab bheja",
+  code: "HTTP_502",
+});
+
+// ── statusText na ho tab bhi status to dikhna hi chahiye.
+eq("bina statusText ke bhi", parse(errorBodyFor(500, "", "   ")), {
+  message: "HTTP 500 — server ne khaali jawab bheja",
+  code: "HTTP_500",
+});
+
+// ── Captive portal / proxy ka HTML — ye "khaali" se alag haalat hai.
+eq(
+  "JSON na hone par jo aaya wo bhi likha jaata hai",
+  parse(errorBodyFor(403, "Forbidden", "<html>login karo</html>")),
+  {
+    message: "HTTP 403 Forbidden — jawab JSON nahi tha: <html>login karo</html>",
+    code: "HTTP_403",
+  },
+);
+
+// ── ⚠️ Asli error body ke UPAR kabhi nahi likha jaata — usme sach pehle se hai.
+eq(
+  "PostgREST ka apna error waisa ka waisa",
+  errorBodyFor(400, "Bad Request", '{"message":"column x nahi hai","code":"42703"}'),
+  null,
+);
+
+// ── ⚠️ 404 + khaali body ko chhedna "koi row nahi mili" ko error bana deta hai.
+eq("404 + khaali body chhoda jaata hai", errorBodyFor(404, "Not Found", ""), null);
+eq(
+  "par 404 ke saath kuch aaya ho to wo likha jaata hai",
+  parse(errorBodyFor(404, "Not Found", "nope")),
+  { message: "HTTP 404 Not Found — jawab JSON nahi tha: nope", code: "HTTP_404" },
+);
+
 /* ══════════════════ nateeja ══════════════════ */
 
 if (fails.length) {

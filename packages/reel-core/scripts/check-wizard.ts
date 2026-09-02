@@ -66,6 +66,11 @@ import {
   draftAdvice,
   textHidden,
   requireSceneType,
+  parseDoc,
+  readWizardMemory,
+  writeWizardMemory,
+  rehydrateDraft,
+  checkUploadSize,
   type AiScript,
   type WizardSceneLike,
 } from "../src/index";
@@ -2035,6 +2040,158 @@ check(
   "yahi wo galti thi jiski wajah se Awaaz wala picker hamesha 400 deta tha",
 );
 check("bina tag wala tab chunta hai", libraryTabForKind("audio")?.tag === null, "warna 'music' mil jaata aur bina tag wali awaazein dikhti hi nahi");
+
+/* ------------------------------------------------------ wizard ki yaadgaar */
+
+console.log("\nwizard ki yaadgaar");
+
+const memoryDraft = draftFromScript(script);
+const memory = writeWizardMemory({ draft: memoryDraft, appliedSceneIds: ["sc_1", "sc_2"] });
+
+check("bani hui yaadgaar wapas padhi jaati hai", readWizardMemory(memory) !== null);
+check(
+  "draft jaisa ka waisa aata hai",
+  readWizardMemory(memory)?.draft.scenes.length === memoryDraft.scenes.length,
+);
+check("null par null", readWizardMemory(null) === null);
+check("kachra par null", readWizardMemory({ hello: 1 }) === null);
+check(
+  "purane version par null",
+  readWizardMemory({ ...memory, version: 0 }) === null,
+  "yahi wo rok hai jo shape badalne par render ko marne se bachati hai",
+);
+check("bina scenes ke draft par null", readWizardMemory({ ...memory, draft: {} }) === null);
+
+check(
+  "bina wizard khaane wala purana doc bhi khulta hai",
+  parseDoc({
+    ...createEmptyProject({ name: "purana" }),
+    meta: { createdBy: "manual", sourceStory: null },
+  }).meta.wizard === undefined,
+  "warna har purana project khulna band ho jaata",
+);
+
+console.log("\nyaadgaar apply ke saath jama hoti hai");
+
+const memoryApplied = applyWizard({
+  doc: createEmptyProject({ name: "yaadgaar" }),
+  draft: autoFill(draftFromScript(script)),
+});
+const savedMemory = readWizardMemory(memoryApplied.doc.meta.wizard);
+
+check("apply ke baad doc me yaadgaar hai", savedMemory !== null);
+check(
+  "usme utne hi scene hain jitne draft me the",
+  savedMemory?.draft.scenes.length === draftFromScript(script).scenes.length,
+);
+check(
+  "bane hue scene ki id yaad hain",
+  savedMemory?.appliedSceneIds.length === Object.keys(memoryApplied.sceneIndexById).length,
+  "inke bina 'haath se badlav hue the' ka koi jawab nahi hota",
+);
+check(
+  "yaadgaar wala doc schema se guzar jaata hai",
+  parseDoc(memoryApplied.doc).meta.wizard !== undefined,
+  "yahi wo raasta hai jispar render job ka snapshot chalta hai",
+);
+
+console.log("\npurana draft seedha karna");
+
+const oldMemory = writeWizardMemory({
+  draft: autoFill(draftFromScript(script)),
+  appliedSceneIds: ["sc_1", "sc_2"],
+});
+oldMemory.draft.scenes[0]!.voiceAssetId = "gayab_awaaz";
+oldMemory.draft.scenes[0]!.voiceSeconds = 4;
+oldMemory.draft.scenes[0]!.visualAssetId = "gayab_tasveer";
+oldMemory.draft.musicAssetId = "gayab_music";
+const firstIndex = oldMemory.draft.scenes[0]!.index;
+
+const fresh = rehydrateDraft({
+  memory: oldMemory,
+  assetExists: () => false,
+  docSceneIds: ["sc_1", "sc_2"],
+});
+
+check("gayab awaaz hata di jaati hai", fresh.draft.scenes[0]!.voiceAssetId === null);
+check("uski lambai bhi", fresh.draft.scenes[0]!.voiceSeconds === null);
+check("gayab tasveer hata di jaati hai", fresh.draft.scenes[0]!.visualAssetId === null);
+check("gayab music hata diya jaata hai", fresh.draft.musicAssetId === null);
+check("kaunse scene ki awaaz gayi wo bataya jaata hai", fresh.lostVoice.includes(firstIndex));
+check("kaunse scene ki tasveer gayi wo bhi", fresh.lostVisual.includes(firstIndex));
+check("wahi scene id hon to haath ka badlav nahi", fresh.handEdited === false);
+check(
+  "scene id badle hon to haath ka badlav pakda jaata hai",
+  rehydrateDraft({ memory: oldMemory, assetExists: () => true, docSceneIds: ["sc_1"] })
+    .handEdited === true,
+);
+check(
+  "dobara kholne par hamesha 'purane hata kar'",
+  fresh.draft.replaceExisting === true,
+  "warna dobara lagne par reel do guni lambi ho jaati",
+);
+check(
+  "maujood asset chhue nahi jaate",
+  rehydrateDraft({ memory: oldMemory, assetExists: () => true, docSceneIds: ["sc_1", "sc_2"] })
+    .draft.scenes[0]!.voiceAssetId === "gayab_awaaz",
+);
+
+console.log("\nupload par naap ki rok");
+
+const reelFrame = { width: 1080, height: 1920 };
+
+const tooSmall = checkUploadSize({
+  filename: "chhoti.jpg",
+  hasPixels: true,
+  source: { width: 540, height: 960 },
+  frame: reelFrame,
+});
+check("aadhi naap ki tasveer rukti hai", tooSmall.ok === false);
+check(
+  "exact naap bataya jaata hai",
+  tooSmall.required?.width === 1080 && tooSmall.required?.height === 1920,
+);
+check("message me dono naap hain", (tooSmall.message ?? "").includes("1080x1920"));
+
+check(
+  "landscape footage rukta NAHI",
+  checkUploadSize({
+    filename: "wide.mp4",
+    hasPixels: true,
+    source: { width: 1920, height: 1080 },
+    frame: reelFrame,
+  }).ok === true,
+  "wo contain + dhundhle kinare se baithta hai - rok pixel ki kami par hai, aspect par nahi",
+);
+
+check(
+  "poore naap ki tasveer nikal jaati hai",
+  checkUploadSize({ filename: "theek.jpg", hasPixels: true, source: reelFrame, frame: reelFrame })
+    .ok === true,
+);
+
+check(
+  "audio par rok lagti hi nahi",
+  checkUploadSize({ filename: "gaana.mp3", hasPixels: false, source: null, frame: reelFrame })
+    .ok === true,
+);
+
+check(
+  "naap pata na ho to rok nahi",
+  checkUploadSize({ filename: "ajeeb.mkv", hasPixels: true, source: null, frame: reelFrame })
+    .ok === true,
+  "bina naap ke mana karna andaaza hoga, aur wo sahi file ko rok deta",
+);
+
+check(
+  "frame na ho to rok nahi",
+  checkUploadSize({
+    filename: "koi.jpg",
+    hasPixels: true,
+    source: { width: 100, height: 100 },
+    frame: null,
+  }).ok === true,
+);
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.

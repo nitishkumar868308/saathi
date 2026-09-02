@@ -24,7 +24,7 @@ import { StepImage } from "@/components/editor/wizard/StepImage";
 import { StepPreview } from "@/components/editor/wizard/StepPreview";
 import { StepText } from "@/components/editor/wizard/StepText";
 import { StepVoice } from "@/components/editor/wizard/StepVoice";
-import { useEditorStore } from "@/lib/store";
+import { useEditorStore, type WizardRequest } from "@/lib/store";
 
 /**
  * Reel Wizard — kahani se chalti hui reel, ek raaste me (Phase 26).
@@ -57,58 +57,50 @@ const STEPS = [
   { id: 3, label: "Dekho", hint: "Poori reel yahin chala kar dekh lo, phir editor me daalo." },
 ] as const;
 
-export function WizardModal({
-  open,
-  script,
+export function WizardModal() {
+  const request = useEditorStore((state) => state.wizardRequest);
+  const closeWizard = useEditorStore((state) => state.closeWizard);
+
+  if (!request) return null;
+  return <WizardBody key={request.key} request={request} onClose={closeWizard} />;
+}
+
+/**
+ * Asli wizard — `key` par **remount** hota hai.
+ *
+ * ⚠️ Remount jaan-boojhkar hai. Pehle draft ko nayi script par `useState` ke
+ * andar hi badla jaata tha ("pehle kaunsi script dekhi thi" wala tarika), aur ab
+ * wizard me aane ke do alag raaste hain: nayi script se, aur bani hui reel ke
+ * jama kiye hue draft se. Un dono ke liye alag-alag "pehle kya dekha tha" rakhne
+ * par ek raasta doosre ka aadha bhara draft le kar khulta hai — aur aadmi ko
+ * sirf itna dikhta hai ki uska chunav maana hi nahi gaya.
+ *
+ * ⚠️ `useEffect` yahan bhi nahi hai, aur wajah wahi purani hai: effect se
+ * karne par ek render ke liye purana draft nayi farmaaish ke saath dikhta hai,
+ * aur us ek frame me scene ki ginti alag hoti hai — jo aankh ko jhatka lagta hai.
+ */
+function WizardBody({
+  request,
   onClose,
-  onDone,
 }: {
-  open: boolean;
-  script: AiScript | null;
+  request: WizardRequest;
   onClose(): void;
-  onDone(applied: number): void;
 }) {
   const doc = useEditorStore((state) => state.doc);
   const applyOp = useEditorStore((state) => state.applyOp);
 
-  const [draft, setDraft] = useState<WizardDraft | null>(null);
+  /*
+   * ⚠️ Draft kabhi `null` nahi hota — remount ne us halat ko khatam kar diya.
+   * Isi wajah se neeche har `setDraft` seedha naya draft banata hai, "pehle kuch
+   * tha bhi ya nahi" ki jaanch ke bina.
+   */
+  const [draft, setDraft] = useState<WizardDraft>(() =>
+    request.draft ??
+    (request.script ? autoFill(draftFromScript(request.script)) : emptyDraft()),
+  );
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  /*
-   * Script badalne par draft naye sire se. `useEffect` ki jagah ye tarika
-   * jaan-boojhkar hai: effect se karne par ek render ke liye purana draft nayi
-   * script ke saath dikhta hai, aur us ek frame me scene ki ginti alag hoti
-   * hai — jo aankh ko jhatka lagta hai.
-   */
-  const [seenScript, setSeenScript] = useState<AiScript | null>(null);
-  if (script && script !== seenScript) {
-    setSeenScript(script);
-    setDraft(autoFill(draftFromScript(script)));
-    setStep(0);
-    setError(null);
-  }
-
-  /*
-   * Bina script ke bhi wizard khulta hai — ek khaali scene ke saath (26.27).
-   *
-   * ⚠️ Ye us halat ka ilaaj hai jahan aadmi ko sirf ek scene khud banana tha aur
-   * uske liye bhi ek AI call chalti thi. Wo call paise leti thi, waqt leti thi,
-   * aur uska nateeja wo turant mita deta tha — kyunki use apna text likhna tha,
-   * AI ka nahi.
-   *
-   * ⚠️ Shart me `open` bhi hai. Iske bina ye component mount hote hi (bina khule)
-   * draft bana leta, aur "wizard dobara kholo" wala raasta us khaali draft par
-   * ja girta — yaani AI ki bani hui script chup-chaap gayab.
-   */
-  if (open && !script && !draft) {
-    setDraft(emptyDraft());
-    setStep(0);
-    setError(null);
-  }
-
-  if (!open || !draft) return null;
 
   const progress = draftProgress(draft);
   const current = STEPS[step] ?? STEPS[0];
@@ -122,16 +114,12 @@ export function WizardModal({
   const advice = draftAdvice(draft);
 
   function update(index: number, patch: Partial<WizardScene>): void {
-    setDraft((previous) =>
-      previous
-        ? {
-            ...previous,
-            scenes: previous.scenes.map((scene) =>
-              scene.index === index ? { ...scene, ...patch } : scene,
-            ),
-          }
-        : previous,
-    );
+    setDraft((previous) => ({
+      ...previous,
+      scenes: previous.scenes.map((scene) =>
+        scene.index === index ? { ...scene, ...patch } : scene,
+      ),
+    }));
   }
 
   /**
@@ -144,23 +132,23 @@ export function WizardModal({
    * badlav par aath scene ka wizard dobara bharna, jo koi nahi karta.
    */
   function move(index: number, delta: -1 | 1): void {
-    setDraft((previous) => (previous ? moveScene(previous, index, delta) : previous));
+    setDraft((previous) => moveScene(previous, index, delta));
   }
 
   function addScene(afterIndex: number | null): void {
-    setDraft((previous) => (previous ? insertSceneAfter(previous, afterIndex) : previous));
+    setDraft((previous) => insertSceneAfter(previous, afterIndex));
   }
 
   function setGap(seconds: number): void {
-    setDraft((previous) => (previous ? { ...previous, gapSeconds: seconds } : previous));
+    setDraft((previous) => ({ ...previous, gapSeconds: seconds }));
   }
 
   function setMusic(assetId: string | null): void {
-    setDraft((previous) => (previous ? { ...previous, musicAssetId: assetId } : previous));
+    setDraft((previous) => ({ ...previous, musicAssetId: assetId }));
   }
 
   function setMusicVolume(volume: number): void {
-    setDraft((previous) => (previous ? { ...previous, musicVolume: volume } : previous));
+    setDraft((previous) => ({ ...previous, musicVolume: volume }));
   }
 
   /**
@@ -171,27 +159,26 @@ export function WizardModal({
    * category par gir jaata tha, aur aadhi reel doosri awaaz me ban jaati thi.
    */
   function setVoiceCategory(categoryId: string): void {
-    setDraft((previous) => (previous ? { ...previous, voiceCategoryId: categoryId } : previous));
+    setDraft((previous) => ({ ...previous, voiceCategoryId: categoryId }));
   }
 
   function setTextScale(scale: number): void {
-    setDraft((previous) => (previous ? { ...previous, textScale: scale } : previous));
+    setDraft((previous) => ({ ...previous, textScale: scale }));
   }
 
   function setTextColor(color: string | null): void {
-    setDraft((previous) => (previous ? { ...previous, textColor: color } : previous));
+    setDraft((previous) => ({ ...previous, textColor: color }));
   }
 
   function setReplaceExisting(value: boolean): void {
-    setDraft((previous) => (previous ? { ...previous, replaceExisting: value } : previous));
+    setDraft((previous) => ({ ...previous, replaceExisting: value }));
   }
 
   function fillEverything(): void {
-    setDraft((previous) => (previous ? autoFill(previous) : previous));
+    setDraft((previous) => autoFill(previous));
   }
 
   function apply(): void {
-    if (!draft) return;
     setBusy(true);
     setError(null);
     try {
@@ -211,7 +198,7 @@ export function WizardModal({
       }
 
       applyOp("replaceDoc", { doc: result.doc }, { label: `Wizard: ${result.applied} scene` });
-      onDone(result.applied);
+      onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -235,7 +222,7 @@ export function WizardModal({
      * jaanch unhe dekhti hi nahi thi.
      */
     const touched =
-      draft?.musicAssetId !== null ||
+      draft.musicAssetId !== null ||
       draft.scenes.some(
         (scene) =>
           scene.visualAssetId ||
@@ -258,7 +245,7 @@ export function WizardModal({
 
   return (
     <Modal
-      open={open}
+      open
       title="Reel banao"
       onClose={requestClose}
       width="max-w-3xl"
@@ -340,6 +327,21 @@ export function WizardModal({
             </button>
           ) : null}
         </div>
+
+        {/*
+          Bani hui reel dobara kholte waqt jo batana zaroori hai — kya gaya, aur
+          ye lagega kahan.
+
+          ⚠️ Ye error se ALAG hai aur uske upar hai. Ye galti nahi batata; ye
+          wo shart batata hai jispar aage ka poora kaam khada hai (purana render
+          badla nahi jaayega, gayi hui awaaz dobara banegi). Use error ke rang me
+          dikhane par aadmi use "kuch toot gaya" padh kar band kar deta hai.
+        */}
+        {request.note ? (
+          <p className="rounded border border-amber/30 bg-amber/10 px-2 py-1.5 text-[11px] leading-snug text-amber">
+            {request.note}
+          </p>
+        ) : null}
 
         {error ? (
           <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">

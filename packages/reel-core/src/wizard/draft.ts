@@ -13,6 +13,7 @@ import {
   trimItemToSourceRange,
 } from "../timeline/ops";
 import { primarySceneItem } from "../scenes/primary";
+import { writeWizardMemory } from "./memory";
 import { suggestAnimation, suggestTransition, type WizardSceneLike } from "./suggest";
 
 /**
@@ -2252,6 +2253,29 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
   if (lastFrame > 0) {
     doc = { ...doc, project: { ...doc.project, durationInFrames: lastFrame } };
   }
+
+  /*
+   * Wizard ka apna draft doc ke saath jama — "Wizard me kholo" ka poora aadhaar.
+   *
+   * ⚠️ Ye yahan hai, UI me nahi, aur wo jaan-boojhkar hai. Doc yahi function
+   * banata hai; yaad bhi yahi rakhega. Dono jagah alag rakhne par ek din wo alag
+   * ho jaate hain — doc me kuch aur hota aur yaadgaar kuch aur kehti — aur wo
+   * farak sirf wizard dobara khol kar pakda jaata.
+   *
+   * ⚠️ Har render job doc ka frozen snapshot rakhta hai, isliye ye yaadgaar us
+   * video ke saath apne aap jam jaati hai. Alag column banane ki zaroorat isi
+   * wajah se nahi padi.
+   */
+  doc = {
+    ...doc,
+    meta: {
+      ...doc.meta,
+      wizard: writeWizardMemory({
+        draft: args.draft,
+        appliedSceneIds: Object.keys(sceneIndexById),
+      }),
+    },
+  };
 
   return {
     doc,

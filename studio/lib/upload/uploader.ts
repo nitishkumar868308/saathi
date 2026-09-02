@@ -1,6 +1,11 @@
 "use client";
 
-import { checkUploadable, sha256HexFromStream, type AssetKindEntry } from "@reel/core";
+import {
+  checkUploadSize,
+  checkUploadable,
+  sha256HexFromStream,
+  type AssetKindEntry,
+} from "@reel/core";
 import { useCallback, useRef, useState } from "react";
 
 import { probeFileInBrowser, type BrowserProbe } from "@/lib/upload/probeInBrowser";
@@ -57,6 +62,15 @@ export interface UseUploaderOptions {
   tags?: readonly string[];
   /** Ek file poori hone par — library refresh karne ke liye. */
   onFinished?: (result: { assetId: string; duplicate: boolean }) => void;
+  /**
+   * Project ka frame — naap ki rok isi par tikti hai. Na do (ya `null`) matlab
+   * naap pata nahi, aur tab rok lagti hi nahi.
+   *
+   * ⚠️ Ye option se aata hai, store se seedha nahi. `uploader` ek upload ka hook
+   * hai; use editor ke store se baandh dene par wo har us jagah tootta jahan koi
+   * project khula hi na ho.
+   */
+  frame?: { width: number; height: number } | null;
 }
 
 export interface Uploader {
@@ -227,6 +241,28 @@ async function runTask(
     patch(taskId, { probe });
     if (entry.cancelled) return;
 
+    /*
+     * 2b. Naap ki rok — PUT se **PEHLE**.
+     *
+     * ⚠️ Jagah maayne rakhti hai. Ye jaanch pehle baad me hoti thi (wizard me
+     * tasveer chunte waqt, ya export ke validator me) — sach wahan bhi batati
+     * thi, par tab tak bytes storage par ja chuke hote the. Ek 480p tasveer jo
+     * reel me kabhi kaam aa hi nahi sakti, wo bhi hamesha ke liye jagah ghere
+     * baithi reh jaati thi.
+     *
+     * Yahan rukne par ek bhi byte nahi jaata.
+     */
+    const size = checkUploadSize({
+      filename: task.file.name,
+      hasPixels: task.kind.hasPixels,
+      source: probe.width && probe.height ? { width: probe.width, height: probe.height } : null,
+      frame: options.frame ?? null,
+    });
+    if (!size.ok) {
+      patch(taskId, { phase: "error", error: size.message });
+      return;
+    }
+
     // 3. Presign — server duplicate bhi yahin pakad leta hai.
     const presign = await postJson("/api/assets/presign", {
       filename: task.file.name,
@@ -263,6 +299,13 @@ async function runTask(
       ...(probe.durationMs ? { durationMs: probe.durationMs } : {}),
       ...(probe.fps ? { fps: probe.fps } : {}),
       ...(options.tags && options.tags.length > 0 ? { tags: [...options.tags] } : {}),
+      /*
+       * ⚠️ Frame server ko bhi jaata hai — wahan wahi rok probe ke **naape hue**
+       * naap par dobara lagti hai. Browser ka bataya naap ghum sakta hai
+       * (rotation apne aap lag jaata hai), aur client par lagi rok soojh-boojh
+       * hai, deewar nahi.
+       */
+      ...(options.frame ? { frame: options.frame } : {}),
     });
 
     const asset = completed.asset as { id: string };
