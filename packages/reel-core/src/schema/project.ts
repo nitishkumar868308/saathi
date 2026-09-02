@@ -731,6 +731,18 @@ export const BrandSchema = z.object({
 export const MetaSchema = z.object({
   createdBy: z.enum(["manual", "ai", "template"]),
   sourceStory: z.string().nullable(),
+  /**
+   * Wizard ki yaadgaar — samajhne ka kaam `wizard/memory.ts` karta hai.
+   *
+   * ⚠️ `z.unknown()` jaan-boojhkar hai. Yahan sakht schema rakhne par draft ka
+   * shape badalte hi har purana doc parse hona band kar deta — aur doc parse na
+   * hone ka matlab **render fail** hai (worker `parseDoc` se guzarta hai). Ek UI
+   * ki suvidha kabhi video banne ke beech me nahi aani chahiye.
+   *
+   * ⚠️ `optional` hai, isliye purane doc bina badle khulte hain aur
+   * `SCHEMA_VERSION` badalne ki koi zaroorat nahi.
+   */
+  wizard: z.unknown().optional(),
 });
 
 const DocShape = z.object({
