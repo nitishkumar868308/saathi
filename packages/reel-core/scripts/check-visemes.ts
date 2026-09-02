@@ -31,6 +31,11 @@ import {
   EMOTIONS,
   emotionOrDefault,
   getEmotion,
+  buildMouthMesh,
+  displacePoint,
+  mouthRegion,
+  readFaceData,
+  sampleFace,
   type Point,
 } from "../src/index";
 
@@ -396,6 +401,143 @@ check("maujood id apni hi lautti hai", emotionOrDefault("sad").id === "sad");
 check(
   "saada emotion sach me saada hai",
   getEmotion(DEFAULT_EMOTION)!.brow === 0 && getEmotion(DEFAULT_EMOTION)!.mouthCorner === 0,
+);
+
+/* ------------------------------------------------------------- chehre ka data */
+
+console.log("\nchehre ka data padhna");
+
+const face = sampleFace();
+
+check("banaya hua chehra khud padha jaata hai", readFaceData(face) !== null);
+check("null par null", readFaceData(null) === null);
+check("kachra par null", readFaceData({ hello: 1 }) === null);
+check(
+  "purane version par null",
+  readFaceData({ ...face, version: 99 }) === null,
+  "shape badalne par purana data chup-chaap aadha chehra maan liya jaata",
+);
+check(
+  "bina honth ke null",
+  readFaceData({ ...face, lipsOuter: [] }) === null,
+  "honth ke bina ye data kisi kaam ka nahi — aur wahi is feature ka aadhaar hai",
+);
+check(
+  "galat point par null",
+  readFaceData({ ...face, lipsOuter: [{ x: "a", y: 1 }] }) === null,
+);
+check(
+  "aankh khaali ho to bhi chalta hai",
+  readFaceData({ ...face, leftEye: [] }) !== null,
+  "unke bina chehra kam zinda lagta hai, par bolta phir bhi hai",
+);
+
+/* ------------------------------------------------------------------ mesh */
+
+console.log("\nmuh ka mesh");
+
+const size = { width: 1080, height: 1920 };
+const rest = getVisemeShape(REST_VISEME)!;
+const aa = getVisemeShape("AA")!;
+const oo = getVisemeShape("OO")!;
+const ee = getVisemeShape("EE")!;
+const neutral = getEmotion("neutral")!;
+const happy = getEmotion("happy")!;
+const sad = getEmotion("sad")!;
+
+const region = mouthRegion(face, size)!;
+check("muh ka ilaaka mil jaata hai", region !== null);
+check(
+  "ilaaka muh se chaura hai",
+  region.right - region.left > region.mouthWidth,
+  "kinare tak kheenchav 0 hone ke liye jagah chahiye",
+);
+check("ilaake me thodi bhi aati hai", region.bottom > region.lipBottom);
+check("ilaaka tasveer ke andar hi rehta hai", region.left >= 0 && region.right <= size.width);
+
+const still = buildMouthMesh({ face, size, shape: aa, intensity: 0, emotion: neutral });
+check(
+  "bina zor ke mesh kuch nahi kheenchta",
+  still.every((t) => t.from.every((p, at) => near(p.x, t.to[at]!.x) && near(p.y, t.to[at]!.y))),
+  "chup lamhe par muh apni jagah rehna chahiye",
+);
+
+const open = buildMouthMesh({ face, size, shape: aa, intensity: 1, emotion: neutral });
+check("khulne par honth sach me hilte hain", open.some((t) => t.from.some((p, at) => Math.abs(p.y - t.to[at]!.y) > 1)));
+check("har triangle ke teen point hain", open.every((t) => t.from.length === 3 && t.to.length === 3));
+check("mesh ki ginti tay hai", open.length === still.length && open.length > 0);
+
+/*
+ * ⚠️ Ye is poori file ka sabse zaroori niyam hai — kinara hila to muh ke chaaron
+ * taraf ek chaukor ka nishaan dikhne lagta hai.
+ */
+const onEdge = (p: { x: number; y: number }): boolean =>
+  near(p.x, region.left, 1e-6) ||
+  near(p.x, region.right, 1e-6) ||
+  near(p.y, region.top, 1e-6) ||
+  near(p.y, region.bottom, 1e-6);
+
+check(
+  "ilaake ka kinara kabhi nahi hilta",
+  open.every((t) =>
+    t.from.every((p, at) => !onEdge(p) || (near(p.x, t.to[at]!.x, 1e-6) && near(p.y, t.to[at]!.y, 1e-6))),
+  ),
+  "kinara hilne par kheenche hue hisse aur baaki tasveer ke beech ek saaf lakeer ban jaati hai",
+);
+
+const half = buildMouthMesh({ face, size, shape: aa, intensity: 0.5, emotion: neutral });
+const travel = (mesh: typeof open): number =>
+  Math.max(...mesh.map((t) => Math.max(...t.from.map((p, at) => Math.abs(t.to[at]!.y - p.y)))));
+check(
+  "aadhe zor par aadha khulta hai",
+  Math.abs(travel(half) * 2 - travel(open)) < 1,
+  "bina iske dheeme bole gaye hisse par bhi muh poora khulta hai — cheekh jaisa",
+);
+
+check(
+  "khule muh me band muh se zyada harkat hai",
+  travel(open) > travel(buildMouthMesh({ face, size, shape: rest, intensity: 1, emotion: neutral })),
+);
+
+check(
+  "upar wala honth jabde ke saath neeche nahi jaata",
+  displacePoint({ x: region.centerX, y: region.lipTop }, { region, shape: aa, intensity: 1, emotion: neutral }).y <=
+    region.lipTop + 1e-6,
+);
+check(
+  "neeche wala honth neeche jaata hai",
+  displacePoint({ x: region.centerX, y: region.lipBottom }, { region, shape: aa, intensity: 1, emotion: neutral }).y >
+    region.lipBottom + 1,
+);
+
+const wideAt = (shape: typeof ee): number => {
+  const p = { x: region.centerX + region.mouthWidth / 3, y: (region.lipTop + region.lipBottom) / 2 };
+  return displacePoint(p, { region, shape, intensity: 1, emotion: neutral }).x - p.x;
+};
+check("chaura shape honth ko bahar le jaata hai", wideAt(ee) > 0);
+check("gol shape honth ko andar lata hai", wideAt(oo) < 0);
+
+const cornerY = (emotion: typeof happy): number => {
+  const p = { x: region.centerX + region.mouthWidth / 2, y: (region.lipTop + region.lipBottom) / 2 };
+  return displacePoint(p, { region, shape: rest, intensity: 0, emotion }).y;
+};
+check(
+  "khush par kone upar jaate hain, dukhi par neeche",
+  cornerY(happy) < cornerY(neutral) && cornerY(sad) > cornerY(neutral),
+  "iske bina dono bilkul ek jaise dikhte hain",
+);
+check(
+  "emotion chup rehne par bhi dikhta hai",
+  Math.abs(cornerY(happy) - cornerY(neutral)) > 0.5,
+  "zor se baandh dene par aadmi sannate me saada dikhta aur bolte hi khush ho jaata",
+);
+
+check("bina honth wale chehre par mesh khaali", buildMouthMesh({ face: { ...face, lipsOuter: [] }, size, shape: aa, intensity: 1, emotion: neutral }).length === 0);
+check("naap 0 par mesh khaali", buildMouthMesh({ face, size: { width: 0, height: 0 }, shape: aa, intensity: 1, emotion: neutral }).length === 0);
+check(
+  "har triangle se matrix ban jaati hai",
+  open.every((t) => affineFromTriangles(t.from, t.to) !== null),
+  "jis triangle ki matrix na bane wo tukda render me gayab ho jaata hai",
 );
 
 /* ------------------------------------------------------------------ summary */
