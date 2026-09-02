@@ -1,4 +1,5 @@
-import { REST_VISEME, type VisemeStep } from "./shapes";
+import type { VisemeStep } from "./fromText";
+import { REST_VISEME } from "./shapes";
 
 /**
  * Muh ka poora track — kis waqt kaunsa shape, aur kitna khula.
