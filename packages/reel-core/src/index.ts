@@ -53,6 +53,7 @@ export * from "./media/uploadSize";
 export * from "./face/affine";
 export * from "./visemes/shapes";
 export * from "./visemes/fromText";
+export * from "./visemes/track";
 
 // Quality — Section 3A ka naapne wala hissa (poora validator Phase 20 me)
 export * from "./quality/assetQuality";

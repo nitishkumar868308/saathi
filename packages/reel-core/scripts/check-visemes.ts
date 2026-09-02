@@ -24,6 +24,9 @@ import {
   knownViseme,
   trianglePoints,
   visemesFromText,
+  buildVisemeTrack,
+  speechSegments,
+  visemeAt,
   type Point,
 } from "../src/index";
 
@@ -235,6 +238,125 @@ check(
 check(
   "sirf viraam par bhi nahi phatta",
   visemesFromText("... !!! ???").every((s) => s.viseme === REST_VISEME),
+);
+
+/* --------------------------------------------------- awaaz aur text ka jod */
+
+console.log("\nbolne wale hisse dhoondhna");
+
+const loud = new Array(50).fill(0.7) as number[];
+const quiet = new Array(50).fill(0) as number[];
+
+check("poori awaaz par ek hi hissa", speechSegments(loud, 2).length === 1);
+check("poori chuppi par koi hissa nahi", speechSegments(quiet, 2).length === 0);
+check(
+  "khaali envelope par poori lambai ko bolna maana jaata hai",
+  speechSegments([], 2).length === 1,
+  "awaaz ki koi jaankari hi na ho to sannata dhoondhna mumkin hi nahi",
+);
+check(
+  "beech ki chuppi do hisse banati hai",
+  speechSegments([...new Array(20).fill(0.7), ...new Array(20).fill(0), ...new Array(20).fill(0.7)], 3)
+    .length === 2,
+);
+check(
+  "bahut chhoti chuppi jodi jaati hai",
+  speechSegments([...new Array(30).fill(0.7), 0, ...new Array(30).fill(0.7)], 3).length === 1,
+  "shabdon ke beech ka jhol bolne ka hi hissa hai — wahan muh band karne se chehra hakla'ne lagta hai",
+);
+check(
+  "ek khatka bolna nahi maana jaata",
+  speechSegments([...new Array(60).fill(0), 0.9, ...new Array(60).fill(0)], 6).length === 0,
+  "saans ya khatka threshold paar kar leti hai, par uspar shabd baithana galat hai",
+);
+
+console.log("\nmuh ka track");
+
+const trackSteps = visemesFromText("namaste");
+const allLoud = buildVisemeTrack({ steps: trackSteps, envelope: loud, durationSeconds: 2 });
+
+check("bolte waqt shape aate hain", allLoud.length > 1);
+check("pehla frame 0 se shuru hota hai", allLoud[0]?.atSeconds === 0);
+check(
+  "frame waqt ke kram me hain",
+  allLoud.every((f, at) => at === 0 || f.atSeconds >= (allLoud[at - 1] as { atSeconds: number }).atSeconds),
+  "beh tarteeb frame par visemeAt galat shape lauta deta hai",
+);
+check(
+  "koi frame lambai se bahar nahi jaata",
+  allLoud.every((f) => f.atSeconds <= 2 + 1e-9),
+);
+check(
+  "ant me muh band hota hai",
+  allLoud[allLoud.length - 1]?.viseme === REST_VISEME,
+  "warna awaaz khatam hone ke baad bhi muh khula reh jaata hai — aur wo reel ka aakhri frame hota hai",
+);
+check(
+  "har shape registry me hai",
+  allLoud.every((f) => knownViseme(f.viseme)),
+);
+
+const halfSilent = buildVisemeTrack({
+  steps: trackSteps,
+  envelope: [...loud, ...quiet],
+  durationSeconds: 2,
+});
+check(
+  "chuppi wale hisse me muh band rehta hai",
+  halfSilent.filter((f) => f.atSeconds > 1.05).every((f) => f.viseme === REST_VISEME),
+  "yahi wo galti hai jo sirf text se karne par aati hai — saans me bhi muh chalta rehta",
+);
+check(
+  "saare shape pehle aadhe me hi baithte hain",
+  halfSilent.filter((f) => f.viseme !== REST_VISEME).every((f) => f.atSeconds < 1.05),
+  "kadam sirf bolne wale hisson me baithte hain, poori lambai par nahi",
+);
+
+check(
+  "poori chuppi par sirf aaram",
+  buildVisemeTrack({ steps: trackSteps, envelope: quiet, durationSeconds: 1 }).every(
+    (f) => f.viseme === REST_VISEME,
+  ),
+);
+check(
+  "bina text ke bhi ek shape milta hai",
+  buildVisemeTrack({ steps: [], envelope: loud, durationSeconds: 1 }).length === 1,
+  "khaali track par render ke paas koi shape hota hi nahi aur muh apni pichhli jagah jama reh jaata hai",
+);
+
+check(
+  "zor envelope se aata hai, sab par ek jaisa nahi",
+  new Set(
+    buildVisemeTrack({
+      steps: visemesFromText("namaste dosto kaise ho"),
+      envelope: [0.2, 0.95, 0.3, 0.9, 0.25, 0.85, 0.35, 0.95, 0.3, 0.9],
+      durationSeconds: 2,
+    })
+      .filter((f) => f.viseme !== REST_VISEME)
+      .map((f) => Math.round(f.intensity * 10)),
+  ).size > 1,
+  "har frame par ek hi zor matlab 'chabaana' — sabse aam nakli lip sync",
+);
+
+check(
+  "do hisson me bant kar bhi shabd chhoot'te nahi",
+  buildVisemeTrack({
+    steps: visemesFromText("namaste dosto"),
+    envelope: [...new Array(20).fill(0.8), ...new Array(20).fill(0), ...new Array(20).fill(0.8)],
+    durationSeconds: 3,
+  }).filter((f) => f.viseme !== REST_VISEME).length >= visemesFromText("namaste dosto").filter((s) => s.viseme !== REST_VISEME).length - 1,
+  "har hisse par naya kadam shuru karne se chhote hisse par shabd chhoot jaate hain",
+);
+
+console.log("\nlamhe se shape");
+
+check("shuruaat par pehla shape", visemeAt(allLoud, 0).viseme === allLoud[0]?.viseme);
+check("bahut aage ka lamha aakhri shape deta hai", visemeAt(allLoud, 99).viseme === REST_VISEME);
+check("khaali track par aaram", visemeAt([], 1).viseme === REST_VISEME);
+check(
+  "shuruaat se pehle ka lamha bhi kuch deta hai",
+  knownViseme(visemeAt(allLoud, -5).viseme),
+  "render har frame par yahi poochhta hai — yahan undefined lautna matlab poora frame khaali",
 );
 
 /* ------------------------------------------------------------------ summary */
