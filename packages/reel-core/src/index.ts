@@ -50,6 +50,7 @@ export * from "./keyframes/interpolate";
 // Media — fit ka hisaab (ffmpeg @reel/media me, faisla yahan)
 export * from "./media/fitPlan";
 export * from "./media/uploadSize";
+export * from "./face/affine";
 
 // Quality — Section 3A ka naapne wala hissa (poora validator Phase 20 me)
 export * from "./quality/assetQuality";

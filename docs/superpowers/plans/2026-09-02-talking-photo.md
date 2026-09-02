@@ -947,11 +947,51 @@ threshold se neeche reh jaata hai aur muh kabhi khulta hi nahi.
 - Create: `studio/components/editor/panels/TalkingPhotoPanel.tsx`
 - Modify: `studio/components/editor/panels/index.tsx` (ek entry)
 
+### UI ki shart (user ne saaf kaha)
+
+**1. Dekhte hi samajh aaye ki karna kya hai.** Panel ek **ginne hue kadam** ki
+tarah dikhega, ek dher ki tarah nahi:
+
+```
+1. Tasveer chuno          [ chuno ]  ✓ chehra mil gaya
+2. Kya bolna hai          [ text ]
+3. Kaise bolna hai        [ awaaz ▾ ] [ emotion ▾ ]
+4. Kaisa dikhna hai       [ harkat ▾ ] [ effect ▾ ] [ text dikhe? ]
+                                                    [ Bana do ]
+```
+
+Har kadam ke saath ek line jo batati hai ki wo hai kya. Har kadam poora hone par
+✓. Jo kadam abhi nahi ho sakta (tasveer bina text ka koi matlab nahi) wo halka
+(disabled) rahega — chhupega nahi, kyunki chhupi hui cheez ko dhoondha nahi ja
+sakta.
+
+**2. Har cheez chunne ko mile.** Kuch bhi chupke se tay nahi hoga:
+
+| Kya | Kahan se |
+|---|---|
+| Tasveer | `AssetPicker` (library + naya upload, dono) |
+| Text | likho |
+| Awaaz (aadmi/aurat/…) | `VOICE_CATEGORIES` |
+| Bolne ki raftaar | TTS ka rate |
+| Emotion | `EMOTIONS` registry |
+| Harkat (Ken Burns waghairah) | `ANIMATION_PRESETS` |
+| Effect (rang) | `EFFECT_PRESETS` |
+| Text screen par dikhe ya nahi | toggle |
+| Text ka naap aur rang | wahi controls jo wizard me hain |
+| Aane ka andaaz | `ElementEntry` |
+| Clip ki lambai | awaaz se apne aap, ya haath se |
+
+⚠️ Har chunav ke saath **default pehle se bhara hua** rahega, taaki koi kuch na
+chune to bhi "Bana do" chale. Khaali dabbe dikha kar aadmi ko har cheez chunne
+par majboor karna wahi galti hai jisse wizard bachta hai (`autoFill`).
+
+⚠️ Registry par `map` karna hai, haath se list mat likhna — nayi emotion ya nayi
+harkat jodne par wo apne aap yahan dikhni chahiye.
+
 - [ ] **Step 1: Panel**
 
-Andar: tasveer chuno (`AssetPicker`), text likho, emotion chuno (`EMOTIONS` par
-map), awaaz banao (wahi TTS raasta jo `VoiceGenerate` istemal karta hai), aur
-"Bana do".
+Upar wali shart ke hisaab se: chaar ginne hue kadam, har chunav registry se, har
+chunav ka default pehle se bhara hua.
 
 ⚠️ Chehra na mile to **saaf mana**, wahi tarika jo `checkUploadSize` ka hai.
 
