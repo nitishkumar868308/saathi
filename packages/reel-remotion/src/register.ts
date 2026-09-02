@@ -3,6 +3,7 @@ import { AudioItem } from "./items/AudioItem";
 import { ImageItem } from "./items/ImageItem";
 import { ShapeItem } from "./items/ShapeItem";
 import { SubtitleItem } from "./items/SubtitleItem";
+import { TalkingPhotoItem } from "./items/TalkingPhotoItem";
 import { TextItem } from "./items/TextItem";
 import { VideoItem } from "./items/VideoItem";
 
@@ -29,4 +30,5 @@ export function registerBuiltinItemComponents(): void {
   registerItemComponent("TextItem", TextItem);
   registerItemComponent("ShapeItem", ShapeItem);
   registerItemComponent("SubtitleItem", SubtitleItem);
+  registerItemComponent("TalkingPhotoItem", TalkingPhotoItem);
 }

@@ -20,6 +20,7 @@ import {
   VISEME_SHAPES,
   affineFromTriangles,
   applyAffine,
+  inflateTriangle,
   getVisemeShape,
   knownViseme,
   trianglePoints,
@@ -157,6 +158,31 @@ check(
   trianglePoints(unit) === "0,0 10,0 0,10",
 );
 /* ------------------------------------------------------------ muh ke shape */
+
+console.log("\njod ki lakeer — triangle phulana");
+
+const fat = inflateTriangle(unit, 1);
+const centroid = { x: 10 / 3, y: 10 / 3 };
+const away = (p: { x: number; y: number }): number => Math.hypot(p.x - centroid.x, p.y - centroid.y);
+
+check(
+  "har point beech se door hota hai",
+  fat.every((p, at) => away(p) > away(unit[at]!)),
+  "bilkul kinare par katne se Chromium beech me aadhe pixel ki lakeer chhod deta hai, aur usme peeche wali tasveer jhaankti hai",
+);
+check("theek utna hi door jitna kaha gaya", near(away(fat[0]!) - away(unit[0]!), 1, 1e-9));
+check("0 par kuch nahi badalta", inflateTriangle(unit, 0).every((p, at) => near(p.x, unit[at]!.x)));
+check(
+  "beech par hi pade teeno point par nahi phatta",
+  inflateTriangle(
+    [
+      { x: 5, y: 5 },
+      { x: 5, y: 5 },
+      { x: 5, y: 5 },
+    ],
+    1,
+  ).every((p) => Number.isFinite(p.x)),
+);
 
 console.log("\nmuh ke aath shape");
 
@@ -565,6 +591,7 @@ const goodTalking = {
   voiceAssetId: "as_1",
   emotionId: DEFAULT_EMOTION,
   face,
+  sourceSize: { width: 1080, height: 1350 },
   track: buildVisemeTrack({ steps: visemesFromText("namaste"), envelope: loud, durationSeconds: 1 }),
 };
 check("poora data schema se guzar jaata hai", TalkingPhotoSchema.safeParse(goodTalking).success);
@@ -585,6 +612,11 @@ check(
   }).success,
 );
 check("bina awaaz ke bhi jaayaz hai", TalkingPhotoSchema.safeParse({ ...goodTalking, voiceAssetId: null }).success);
+check(
+  "bina naap ke mana",
+  !TalkingPhotoSchema.safeParse({ ...goodTalking, sourceSize: undefined }).success,
+  "naap ke bina chaudi tasveer par muh khisak kar chehre se bahar chala jaata hai",
+);
 
 console.log("\nregistry — naya item type, par koi naya scene type nahi");
 

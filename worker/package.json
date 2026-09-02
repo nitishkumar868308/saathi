@@ -25,6 +25,7 @@
     "beats:smoke": "tsx scripts/beats-smoke.ts",
     "render:mask": "tsx scripts/render-mask.ts",
     "render:warp": "tsx scripts/render-warp.ts",
+    "render:talking": "tsx scripts/render-talking.ts",
     "check": "tsx scripts/check-fonts.ts && tsx scripts/check-bundle-cache.ts && tsx scripts/check-wav.ts"
   },
   "devDependencies": {

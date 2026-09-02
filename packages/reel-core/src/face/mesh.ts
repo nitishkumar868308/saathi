@@ -32,9 +32,21 @@ export interface MeshTriangle {
   to: [Point, Point, Point];
 }
 
-/** Mesh kitna baareek — jitna zyada, utna narm, par utne hi zyada triangle. */
-const COLS = 6;
-const ROWS = 5;
+/**
+ * Mesh kitna baareek.
+ *
+ * ⚠️ Pehle 6x5 tha aur wo kam nikla — render me muh ka neeche wala kinara ek
+ * "V" jaisa polygon dikhta tha, kyunki beech sabse zyada kheenchta hai aur
+ * kinare kam, aur itne kam khaanon me wo dhalaan seedhi lakeeron me toot jaati
+ * thi. Aankh us tootne ko turant pakad leti hai.
+ *
+ * ⚠️ Isse aur badhana sasta lagta hai par muft nahi: har khaane par do triangle
+ * bante hain, aur har triangle ka apna `<image>` DOM me jaata hai. 10x8 par 160
+ * triangle hote hain — Chromium ke liye kuch bhi nahi, par 40x40 par wo 3200 ho
+ * jaate aur har frame ka screenshot dheema pad jaata.
+ */
+const COLS = 10;
+const ROWS = 8;
 
 /** Muh poora khulne par neeche wala honth kitna neeche jaata hai (muh ki oonchai ke guna me). */
 const JAW_TRAVEL = 1.1;

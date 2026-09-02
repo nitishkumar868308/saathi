@@ -60,7 +60,17 @@ export const BUILTIN_TRACK_TYPES: readonly TrackTypeEntry[] = [
     label: "Image",
     icon: "Image",
     kind: "visual",
-    accepts: ["image", "video"],
+    /*
+     * ⚠️ `talking_photo` yahan isliye hai ki wo hai bhi ek tasveer hi — bas uska
+     * muh chalta hai. Uske liye ek alag track type banana galat hota: track ki
+     * list UI me dikhti hai, aur ek aur "Image" jaisi qatar jodne se aadmi ko har
+     * baar chunna padta ki uski tasveer kis qatar me jaaye — jabki dono ek hi
+     * cheez hain.
+     *
+     * Ye sirf JODNA hai: pehle jo kuch is track par ja sakta tha, wo aaj bhi
+     * bilkul waise hi jaata hai.
+     */
+    accepts: ["image", "video", "talking_photo"],
     defaultHeight: 56,
     color: "#4a7a5b",
     defaultOrder: 1,

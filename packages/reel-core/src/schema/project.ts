@@ -616,6 +616,19 @@ export const TalkingPhotoSchema = z.object({
   /** `EMOTIONS` registry ka id. */
   emotionId: z.string().min(1),
   face: FaceDataSchema,
+  /**
+   * Tasveer ka apna naap (pixel) — mesh isi jagah me banta hai.
+   *
+   * ⚠️ Iske bina renderer normalized landmarks ko tasveer par bitha hi nahi
+   * sakta: use ye pata hona chahiye ki tasveer ka anupaat kya hai, warna chaukor
+   * frame me ek chaudi tasveer par muh khisak kar chehre se bahar chala jaata
+   * hai. Asset se ye naap milta nahi — renderer ko `assets` sirf URL ka map
+   * deta hai.
+   */
+  sourceSize: z.object({
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  }),
   /** Kis waqt kaunsa shape — studio me banta hai, render sirf padhta hai. */
   track: z.array(VisemeFrameSchema),
 });
