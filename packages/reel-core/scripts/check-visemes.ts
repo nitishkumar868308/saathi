@@ -27,6 +27,10 @@ import {
   buildVisemeTrack,
   speechSegments,
   visemeAt,
+  DEFAULT_EMOTION,
+  EMOTIONS,
+  emotionOrDefault,
+  getEmotion,
   type Point,
 } from "../src/index";
 
@@ -357,6 +361,41 @@ check(
   "shuruaat se pehle ka lamha bhi kuch deta hai",
   knownViseme(visemeAt(allLoud, -5).viseme),
   "render har frame par yahi poochhta hai — yahan undefined lautna matlab poora frame khaali",
+);
+
+/* ---------------------------------------------------------------- emotion */
+
+console.log("\nemotion");
+
+check("default emotion registry me hai", getEmotion(DEFAULT_EMOTION) !== undefined);
+check("har emotion ka apna naam hai", EMOTIONS.every((e) => e.label.trim().length > 0));
+check("koi id do baar nahi", new Set(EMOTIONS.map((e) => e.id)).size === EMOTIONS.length);
+check(
+  "khush aur dukhi ke honth ulti taraf jaate hain",
+  (getEmotion("happy")?.mouthCorner ?? 0) > 0 && (getEmotion("sad")?.mouthCorner ?? 0) < 0,
+  "iske bina dono bilkul ek jaise dikhte hain",
+);
+check(
+  "hairaan par bhaunh sabse upar",
+  EMOTIONS.every((e) => e.brow <= (getEmotion("surprised")?.brow ?? 0)),
+);
+check(
+  "kisi bhi emotion par sir rukta nahi",
+  EMOTIONS.every((e) => e.swaySpeed > 0),
+  "bilkul sthir sir ek tasveer jaisa lagta hai, bolta hua insaan nahi",
+);
+check("anjaan id par undefined", getEmotion("nahi-hai") === undefined);
+check(
+  "render ko hamesha kuch milta hai",
+  emotionOrDefault("nahi-hai").id === DEFAULT_EMOTION &&
+    emotionOrDefault(null).id === DEFAULT_EMOTION &&
+    emotionOrDefault(undefined).id === DEFAULT_EMOTION,
+  "purani doc me hataayi hui emotion par poora chehra sthir ho jaata — bina error ke",
+);
+check("maujood id apni hi lautti hai", emotionOrDefault("sad").id === "sad");
+check(
+  "saada emotion sach me saada hai",
+  getEmotion(DEFAULT_EMOTION)!.brow === 0 && getEmotion(DEFAULT_EMOTION)!.mouthCorner === 0,
 );
 
 /* ------------------------------------------------------------------ summary */
