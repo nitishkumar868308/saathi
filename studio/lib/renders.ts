@@ -1,4 +1,4 @@
-import { parseDoc, type Doc } from "@reel/core";
+import { parseDoc, readWizardMemory, type Doc } from "@reel/core";
 
 import { rest, restJson, restOne } from "@/lib/supabase";
 
@@ -96,6 +96,16 @@ export async function createRenderJob(input: CreateRenderJobInput): Promise<Rend
       // Schema se guzaar kar — aadha-adhoora doc job me jama ho jaaye to render
       // ke waqt phat'ta hai, aur tab tak user ja chuka hota hai.
       doc: parseDoc(input.doc),
+      /*
+       * ⚠️ Ek sasta nishaan, taaki "Wizard me kholo" dikhane ke liye poora doc na
+       * padhna pade. Job ki list me `doc` jaan-boojhkar nahi aata (upar dekho),
+       * aur har row par ek doc padhna matlab renders panel kholte hi kai sau KB.
+       *
+       * ⚠️ Worker apna `meta` likhte waqt `...job.meta` phailata hai, isliye ye
+       * render poora hone ke baad bhi bacha rehta hai — aur zaroorat theek usi
+       * waqt padti hai.
+       */
+      meta: { hasWizard: readWizardMemory(input.doc.meta.wizard) !== null },
     },
     prefer: "return=representation",
   });

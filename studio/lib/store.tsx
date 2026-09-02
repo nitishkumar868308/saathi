@@ -14,7 +14,9 @@ import {
   type Op,
   type OpName,
   type OverlapPolicy,
+  type AiScript,
   type Selection,
+  type WizardDraft,
 } from "@reel/core";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { createStore, useStore, type StoreApi } from "zustand";
@@ -78,6 +80,25 @@ export interface ConflictInfo {
   serverUpdatedAt: string;
 }
 
+/**
+ * Wizard kholne ki ek farmaaish.
+ *
+ * ⚠️ Ye store me hai, kisi panel ke `useState` me nahi, aur wo zaroori hai:
+ * wizard ab **do** jagah se khulta hai — AI panel se nayi script par, aur
+ * Renders panel se bani hui reel ke draft par. Ek panel ke andar rehne par
+ * doosra panel use kholna to door, uske hone ka pata bhi nahi laga sakta.
+ */
+export interface WizardRequest {
+  /** Har farmaaish par naya — `WizardModal` isi par remount hota hai. */
+  key: number;
+  /** AI se aayi script — `null` jab draft se khul raha ho. */
+  script: AiScript | null;
+  /** Bani hui reel ka draft — `null` jab script se khul raha ho. */
+  draft: WizardDraft | null;
+  /** Modal me sabse upar dikhne wali baat (kya gaya, kya badlega). */
+  note: string | null;
+}
+
 export interface EditorState {
   /* ---------------- doc slice ---------------- */
   projectId: string;
@@ -138,6 +159,8 @@ export interface EditorState {
   snapOptions: SnapOptions;
   /** Cheat-sheet khula hai? (16.6) */
   shortcutsOpen: boolean;
+  /** Wizard kholne ki farmaaish — `null` = band. Dekho `WizardRequest`. */
+  wizardRequest: WizardRequest | null;
   /**
    * "Poori timeline dikhao" ki farmaaish — ek ginti (16.5).
    *
@@ -188,6 +211,8 @@ export interface EditorState {
   setAutoKeyframe(value: boolean): void;
   setSnapOptions(patch: Partial<SnapOptions>): void;
   setShortcutsOpen(open: boolean): void;
+  openWizard(request: Omit<WizardRequest, "key">): void;
+  closeWizard(): void;
   requestFitZoom(): void;
   setZoomToolOn(on: boolean): void;
   setMode(mode: "beginner" | "advanced"): void;
@@ -400,6 +425,7 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       autoKeyframe: false,
       snapOptions: DEFAULT_SNAP_OPTIONS,
       shortcutsOpen: false,
+      wizardRequest: null,
       fitZoomRequest: 0,
       zoomToolOn: false,
       mode: readMode(project.id),
@@ -554,6 +580,17 @@ export function createEditorStore(project: LoadedProjectInput): EditorStore {
       },
       setShortcutsOpen(shortcutsOpen) {
         set({ shortcutsOpen });
+      },
+      openWizard(request) {
+        /*
+         * ⚠️ `key` har baar naya — `WizardModal` isi par remount hota hai. Iske
+         * bina purani farmaaish ka aadha bhara hua draft nayi par bacha reh
+         * jaata, aur aadmi ko sirf itna dikhta ki uska chunav maana hi nahi gaya.
+         */
+        set({ wizardRequest: { ...request, key: Date.now() } });
+      },
+      closeWizard() {
+        set({ wizardRequest: null });
       },
       requestFitZoom() {
         set({ fitZoomRequest: get().fitZoomRequest + 1 });

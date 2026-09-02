@@ -86,6 +86,9 @@ export function MediaPanel() {
     // Tab se upload karne par uska tag apne aap lag jaata hai — "Music" tab me
     // daali hui file agli baar wahin milni chahiye.
     ...(tab?.tag && tab.appliesTagOnUpload ? { tags: [tab.tag] } : {}),
+    // Naap ki rok isi par tikti hai — jo file is frame me kabhi saaf nahi
+    // dikhegi, wo chadhne se pehle hi ruk jaati hai.
+    frame: { width: project.width, height: project.height },
     onFinished: () => void load(),
   });
   const { addFiles } = uploader;

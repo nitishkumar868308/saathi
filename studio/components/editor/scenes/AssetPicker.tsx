@@ -10,6 +10,7 @@ import type { Asset } from "@/lib/assets";
 import { useAssetUrl } from "@/lib/assetUrls";
 import { forgetAssetMeta } from "@/lib/assetMeta";
 import { useUploader } from "@/lib/upload/uploader";
+import { useEditorStore } from "@/lib/store";
 
 /**
  * Asset chunne ka button + dialog.
@@ -162,8 +163,17 @@ function AssetPickerDialog({
    */
   const pendingKind = useRef<string | undefined>(undefined);
 
+  /*
+   * ⚠️ Frame store se, kisi prop se nahi. Ye dialog wizard ke andar se bhi
+   * khulta hai aur properties panel se bhi; prop banane par har bulane wale ko
+   * wo aage bhejna padta, aur ek jagah chhoot jaane par rok chup-chaap lagni
+   * band ho jaati — bina kisi error ke.
+   */
+  const project = useEditorStore((state) => state.doc.project);
+
   const uploader = useUploader({
     ...(uploadTags ? { tags: uploadTags } : {}),
+    frame: { width: project.width, height: project.height },
     /*
      * File chadhne par do kaam: naya asset seedha chun lo, aur list taaza karo.
      *

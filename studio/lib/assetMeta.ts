@@ -106,6 +106,16 @@ export interface AssetMeta {
   sourceFrames(assetId: string | null): number | null;
   /** Source ke asli pixels — `null` = pata nahi (ya audio hai). */
   sourceSize(assetId: string | null): AssetSize | null;
+  /**
+   * Ye asset ab bhi maujood hai?
+   *
+   * ⚠️ List aane se pehle ye hamesha `false` deta hai, aur wo jaan-boojhkar hai:
+   * "abhi pata nahi" ko "hai" maan lena us purane draft me gayab awaaz ko
+   * maujood dikha deta, aur reel me us jagah chuppi aati. Isse bachne ka tarika
+   * yahan jhooth na bolna hai — call karne wala `loaded` dekh kar intezaar
+   * karta hai.
+   */
+  has(assetId: string | null): boolean;
   loaded: boolean;
 }
 
@@ -140,6 +150,10 @@ export function useAssetDurations(fps: number): AssetMeta {
       const entry = map.get(assetId);
       if (!entry?.width || !entry.height) return null;
       return { width: entry.width, height: entry.height };
+    },
+    has(assetId) {
+      if (!assetId || !map) return false;
+      return map.has(assetId);
     },
   };
 }

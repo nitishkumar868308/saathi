@@ -1,11 +1,12 @@
 "use client";
 
-import { formatBytes } from "@reel/core";
+import { formatBytes, readWizardMemory, rehydrateDraft } from "@reel/core";
 import clsx from "clsx";
-import { Download, RefreshCw, X } from "lucide-react";
+import { Download, RefreshCw, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button, IconButton } from "@/components/ui/Button";
+import { useAssetDurations } from "@/lib/assetMeta";
 import type { RenderJob } from "@/lib/renders";
 import { useEditorStore } from "@/lib/store";
 
@@ -38,6 +39,14 @@ function workerLabel(online: boolean, mode: "cloud" | "local"): string {
 
 export function RendersPanel() {
   const projectId = useEditorStore((state) => state.projectId);
+  const doc = useEditorStore((state) => state.doc);
+  const openWizard = useEditorStore((state) => state.openWizard);
+  /*
+   * ⚠️ Media ki list yahan isliye chahiye ki purane draft me padi hui asset id
+   * ab maujood hai ya nahi, ye sirf isi se pata chalta hai. TTS ki awaaz
+   * `temporary` hoti hai aur cleanup use utha leta hai.
+   */
+  const assets = useAssetDurations(doc.project.fps);
 
   const [jobs, setJobs] = useState<RenderJob[]>([]);
   const [worker, setWorker] = useState<{ online: boolean; secondsAgo: number | null } | null>(null);
@@ -99,6 +108,64 @@ export function RendersPanel() {
       return;
     }
     window.open(data.url, "_blank", "noopener");
+  }
+
+  /**
+   * Bani hui reel ko wizard me wapas kholo (26.30).
+   *
+   * ⚠️ Draft us job ke **frozen doc** se aata hai, maujooda project se nahi —
+   * wahi us video ka apna sach hai. Par apply hamesha **maujooda** doc par lagta
+   * hai: purana render itihaas hai, use badla nahi ja sakta. Ye baat wizard ke
+   * andar likhi jaati hai, chhupayi nahi.
+   */
+  async function openInWizard(jobId: string): Promise<void> {
+    const response = await fetch(`/api/render/${jobId}/wizard`);
+    const data = (await response.json()) as {
+      memory?: unknown;
+      docSceneIds?: string[];
+      reason?: string;
+    };
+    if (!response.ok) {
+      setError(data.reason ?? "wizard ka draft nahi mila");
+      return;
+    }
+
+    const memory = readWizardMemory(data.memory);
+    if (!memory) {
+      setError("is reel ka wizard draft padha nahi ja saka");
+      return;
+    }
+
+    const fresh = rehydrateDraft({
+      memory,
+      assetExists: (assetId) => assets.has(assetId),
+      docSceneIds: data.docSceneIds ?? [],
+    });
+
+    /*
+     * ⚠️ Pehli line hamesha rehti hai, chahe kuch bhi gaya na ho. Wo galti nahi
+     * batati — wo shart batati hai jispar aage ka poora kaam khada hai: ye
+     * maujooda project par lagega, aur purana render waise ka waisa rahega.
+     * Bina uske aadmi ko lagta hai ki wo apni purani reel ko hi sudhaar raha
+     * hai, aur wo galti "Editor me daalo" dabane ke baad hi dikhti hai.
+     */
+    const lines = ["Ye maujooda project par lagega — purana render waise ka waisa rahega."];
+    if (fresh.handEdited) {
+      lines.push(
+        "Is reel me wizard ke baad haath se badlav hue the — dobara lagane par wo nahi aayenge.",
+      );
+    }
+    if (fresh.lostVoice.length > 0) {
+      lines.push(
+        `${fresh.lostVoice.length} scene ki banayi hui awaaz ab nahi hai (wo apne aap mit jaati hai) — dobara banani padegi.`,
+      );
+    }
+    if (fresh.lostVisual.length > 0) {
+      lines.push(`${fresh.lostVisual.length} scene ki file ab nahi hai — dobara chunni padegi.`);
+    }
+
+    setError(null);
+    openWizard({ script: null, draft: fresh.draft, note: lines.join(" ") });
   }
 
   return (
@@ -174,7 +241,14 @@ export function RendersPanel() {
         ) : (
           <ul className="divide-y divide-ink-800">
             {jobs.map((job) => (
-              <JobRow key={job.id} job={job} onCancel={cancel} onDownload={download} />
+              <JobRow
+                key={job.id}
+                job={job}
+                onCancel={cancel}
+                onDownload={download}
+                onOpenWizard={openInWizard}
+                wizardReady={assets.loaded}
+              />
             ))}
           </ul>
         )}
@@ -195,10 +269,15 @@ function JobRow({
   job,
   onCancel,
   onDownload,
+  onOpenWizard,
+  wizardReady,
 }: {
   job: RenderJob;
   onCancel(jobId: string): Promise<void>;
   onDownload(jobId: string): Promise<void>;
+  onOpenWizard(jobId: string): Promise<void>;
+  /** Media ki list aa chuki hai? — uske bina gayab file pehchani nahi ja sakti. */
+  wizardReady: boolean;
 }) {
   const running = job.status === "queued" || job.status === "processing";
   const meta = job.meta as {
@@ -206,6 +285,8 @@ function JobRow({
     audio?: { codec?: string; sampleRate?: number; channels?: number };
     loudness?: { integratedLufs?: number | null; truePeakDb?: number | null; normalized?: boolean };
     stage?: string;
+    /** Export ke waqt doc me wizard ka draft tha? — `createRenderJob` likhta hai. */
+    hasWizard?: boolean;
   };
 
   return (
@@ -231,6 +312,23 @@ function JobRow({
           <IconButton className="h-6 w-6" variant="danger" title="Cancel" aria-label="Cancel" onClick={() => void onCancel(job.id)}>
             <X size={11} />
           </IconButton>
+        ) : null}
+        {/*
+          ⚠️ Shart `meta.hasWizard` par hai, sirf `completed` par nahi. Jo render
+          is badlav se PEHLE bane, unke doc me wizard ka draft likha hi nahi gaya
+          tha — un par button dikhana matlab ek aisa button jo dabane par hamesha
+          "nahi mila" kehta hai, aur wo button na hone se bura hai.
+        */}
+        {job.status === "completed" && meta.hasWizard ? (
+          <Button
+            className="px-1.5 py-0.5 text-[11px]"
+            icon={<Wand2 size={11} />}
+            disabled={!wizardReady}
+            title={wizardReady ? "Is reel ko wizard me kholo" : "media ki list aa rahi hai…"}
+            onClick={() => void onOpenWizard(job.id)}
+          >
+            Wizard
+          </Button>
         ) : null}
         {job.status === "completed" ? (
           <Button

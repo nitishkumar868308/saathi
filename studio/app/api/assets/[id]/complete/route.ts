@@ -1,4 +1,4 @@
-import { assetKindForFile } from "@reel/core";
+import { assetKindForFile, checkUploadSize } from "@reel/core";
 import { z } from "zod";
 
 import { fail, handle, ok, readBody } from "@/lib/api";
@@ -9,7 +9,7 @@ import { storage } from "@/lib/storage";
 /**
  * `POST /api/assets/[id]/complete` — upload ho gaya, ab row banao.
  *
- * Teen cheezein yahan hoti hain, isi kram me:
+ * Chaar cheezein yahan hoti hain, isi kram me:
  *
  *  1. **Storage se poochho ki file sach me hai** — aur uska asli naap lo.
  *     Client ka bataya hua size sirf ek daawa hai: presigned PUT me size par
@@ -17,6 +17,12 @@ import { storage } from "@/lib/storage";
  *  2. Row banao (browser ke naape hue numbers ke saath — turant kuch to dikhe).
  *  3. Asli probe + thumbnail. Ye fail ho jaaye to bhi asset bacha rehta hai;
  *     wajah `meta.probeError` me likhi jaati hai.
+ *  4. **Naap ki rok** — probe ke naape hue naap par. Jo file is frame me kabhi
+ *     saaf nahi dikhegi, uski row aur file dono yahin hat jaati hain.
+ *
+ * ⚠️ Kram maayne rakhta hai: naap ki rok probe ke **baad** hai, pehle nahi. Rok
+ * ka poora bharosa asli naap par hai, aur asli naap probe ke bina pata nahi
+ * chalta — browser ka bataya naap rotation par ghum jaata hai.
  */
 
 export const runtime = "nodejs";
@@ -39,6 +45,19 @@ const CompleteSchema = z.object({
   durationMs: z.number().int().nonnegative().optional(),
   fps: z.number().positive().max(1000).optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+  /**
+   * Project ka frame — naap ki rok ke liye.
+   *
+   * ⚠️ Ye client se aata hai, aur wo theek hai: ye deewar nahi, dohri jaanch
+   * hai. Iska asli faayda ye hai ki yahan **probe ka naapa hua** naap lagta hai,
+   * browser ka andaaza nahi.
+   */
+  frame: z
+    .object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request, context: RouteContext): Promise<Response> {
@@ -122,6 +141,31 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
       // Yahan tak aana matlab probe ki apni safai bhi fail hui — asset phir bhi
       // theek hai, isliye upload ko fail nahi karte.
       probeError = error instanceof Error ? error.message : String(error);
+    }
+
+    /*
+     * Naap ki rok — ab **probe ke naape hue** naap par.
+     *
+     * ⚠️ Yahan tak aane ka matlab hai ki client ki rok chook gayi: purana tab
+     * khula tha, ya browser ne galat naap bataya tha (rotation par aisa hota
+     * hai). Us halat me file ko rehne dena wahi nuksaan hai jisse ye poora kaam
+     * bachne ke liye bana hai — ek aisi file jo reel me kabhi kaam nahi aayegi,
+     * hamesha ke liye jagah ghere baithi rehti hai.
+     *
+     * ⚠️ Row aur file **dono** hatti hain. Sirf ek hataane par doosri anaath reh
+     * jaati hai — aur is route par dono taraf ki safai ka raasta upar pehle se
+     * maujood hai.
+     */
+    const size = checkUploadSize({
+      filename,
+      hasPixels: kind.hasPixels,
+      source: asset.width && asset.height ? { width: asset.width, height: asset.height } : null,
+      frame: body.data.frame ?? null,
+    });
+    if (!size.ok) {
+      await deleteAssetRow(asset.id);
+      await storage().delete(key);
+      return fail("naap kaafi nahi", 422, size.message ?? "ye file is reel ke liye chhoti hai");
     }
 
     return ok({ duplicate: false as const, asset, probeError }, 201);
