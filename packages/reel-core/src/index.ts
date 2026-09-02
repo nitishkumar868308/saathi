@@ -51,6 +51,8 @@ export * from "./keyframes/interpolate";
 export * from "./media/fitPlan";
 export * from "./media/uploadSize";
 export * from "./face/affine";
+export * from "./visemes/shapes";
+export * from "./visemes/fromText";
 
 // Quality — Section 3A ka naapne wala hissa (poora validator Phase 20 me)
 export * from "./quality/assetQuality";
