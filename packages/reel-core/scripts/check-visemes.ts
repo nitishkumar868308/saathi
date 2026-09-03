@@ -27,6 +27,8 @@ import {
   visemesFromText,
   buildVisemeTrack,
   speechSegments,
+  rmsEnvelope,
+  toMono,
   visemeAt,
   DEFAULT_EMOTION,
   EMOTIONS,
@@ -689,6 +691,56 @@ check(
   "sab points ek list me mil jaate hain",
   pointsFromConnections([...circle, ...line]).length === 7,
 );
+
+/* ------------------------------------------------------- awaaz ka envelope */
+
+console.log("\nawaaz ki takat naapna");
+
+const sine = (count: number, amplitude: number): number[] =>
+  Array.from({ length: count }, (_, at) => Math.sin((at / 8) * Math.PI * 2) * amplitude);
+
+const loudPcm = rmsEnvelope({ samples: sine(4800, 0.5), sampleRate: 4800, perSecond: 10 });
+check("poori awaaz par har naap bharpoor hai", loudPcm.every((v) => v > 0.9), `${loudPcm.length} naap`);
+check("naap ki ginti lambai se milti hai", loudPcm.length === 10);
+
+check(
+  "chuppi par sab 0",
+  rmsEnvelope({ samples: new Array(4800).fill(0), sampleRate: 4800, perSecond: 10 }).every((v) => v === 0),
+);
+
+const halfHalf = rmsEnvelope({
+  samples: [...sine(2400, 0.5), ...new Array(2400).fill(0)],
+  sampleRate: 4800,
+  perSecond: 10,
+});
+check("aadhi awaaz aadhi chuppi saaf dikhti hai", halfHalf[0]! > 0.9 && halfHalf[9]! === 0);
+
+/*
+ * ⚠️ Ye jaanch sabse zaroori hai. TTS ki awaaz aksar dheemi hoti hai; bina
+ * normalize kiye uska kaccha RMS `SILENCE_THRESHOLD` se neeche reh jaata hai,
+ * poori reel "chup" ginn'ti hai, aur muh kabhi khulta hi nahi.
+ */
+const quietPcm = rmsEnvelope({ samples: sine(4800, 0.01), sampleRate: 4800, perSecond: 10 });
+check(
+  "bahut dheemi awaaz bhi poori takat par aati hai",
+  quietPcm.every((v) => v > 0.9),
+  "bina normalize kiye dheemi TTS par muh kabhi khulta hi nahi — aur wo bilkul chup reel jaisi dikhti hai",
+);
+
+check("khaali awaaz par khaali", rmsEnvelope({ samples: [], sampleRate: 48000 }).length === 0);
+check("galat sampleRate par khaali", rmsEnvelope({ samples: [1, 2], sampleRate: 0 }).length === 0);
+check(
+  "har naap 0 aur 1 ke beech hai",
+  rmsEnvelope({ samples: sine(4800, 0.9), sampleRate: 4800, perSecond: 10 }).every((v) => v >= 0 && v <= 1),
+);
+
+check("ek hi channel jaisa ka waisa aata hai", toMono([[1, 2, 3]]).length === 3);
+check(
+  "do channel mil kar ek ban'te hain",
+  toMono([[1, 0], [0, 1]])[0] === 0.5,
+  "sirf baayan channel lene par wo recording chup ginn'ti hai jiska ek channel khaali ho",
+);
+check("bina channel ke khaali", toMono([]).length === 0);
 
 /* ------------------------------------------------------------------ summary */
 

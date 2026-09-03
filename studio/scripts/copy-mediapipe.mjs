@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { cp, mkdir, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,7 @@ import { fileURLToPath } from "node:url";
  * ```
  * npm run copy:mediapipe --workspace @reel/studio
  * ```
- * (`dev` aur `build` dono se apne aap chalta hai.)
+ * (`dev` aur `build` dono se apne aap chalta hai — yaani Vercel par bhi.)
  *
  * ⚠️ **CDN se kabhi nahi.** MediaPipe ka aam tarika ye hai ki
  * `FilesetResolver.forVisionTasks()` ko jsdelivr ka URL de do. Wo yahan do wajah
@@ -16,10 +17,10 @@ import { fileURLToPath } from "node:url";
  * hone par feature chup-chaap mar jaata hai — screen par sirf "kuch nahi hua"
  * dikhta hai, koi error nahi.
  *
- * ⚠️ Ye files **repo me nahi** rakhi jaatin (34MB), aur wo jaan-boojhkar hai.
- * Wo npm package ke andar pehle se hain, yaani `npm ci` ke baad har machine par
- * maujood. Repo me daalne se har clone 34MB bhaari hota — bina kisi faayde ke,
- * kyunki wahi bytes `node_modules` me bhi utar rahe hote hain.
+ * ⚠️ Ye files **repo me nahi** rakhi jaatin (34MB), aur wo jaan-boojhkar hai. Wo
+ * npm package ke andar pehle se hain, yaani `npm ci` ke baad har machine par —
+ * tumhare PC par bhi aur Vercel ke build par bhi. Repo me daalne se har clone
+ * 34MB bhaari hota, bina kisi faayde ke.
  *
  * ⚠️ Model file (`face_landmarker.task`) is script se **nahi** aati — wo repo me
  * committed hai. Wajah alag hai: wo npm par hai hi nahi, aur use build ke waqt
@@ -28,8 +29,26 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const studio = resolve(here, "..");
-const from = resolve(studio, "..", "node_modules", "@mediapipe", "tasks-vision", "wasm");
 const to = resolve(studio, "public", "models", "wasm");
+
+/**
+ * Package kahan pada hai — **`require.resolve` se, haath ke raaste se nahi**.
+ *
+ * ⚠️ Pehle yahan seedha `../node_modules/@mediapipe/...` likha tha, aur wo ek
+ * chhupi hui gadbad thi: npm workspaces package ko kabhi root ke `node_modules`
+ * me rakhta hai aur kabhi `studio/node_modules` me (nirbhar karta hai ki kaunsi
+ * doosri dependency kya maangti hai). Ek raasta maan lene par wo is machine par
+ * chalta aur Vercel ke build par "nahi mila" bolta — aur wo galti sirf deploy ke
+ * baad dikhti.
+ */
+const require = createRequire(import.meta.url);
+/*
+ * ⚠️ `package.json` se nahi — wo package apne `exports` me use kholta hi nahi
+ * (`ERR_PACKAGE_PATH_NOT_EXPORTED`). Par WASM ki file wo khud kholta hai, aur
+ * uske folder se poora raasta mil jaata hai. Yaani hum package ke apne bataye
+ * hue raaste par chal rahe hain, apne andaaze par nahi.
+ */
+const from = dirname(require.resolve("@mediapipe/tasks-vision/vision_wasm_internal.js"));
 
 const exists = async (path) => {
   try {
@@ -52,4 +71,18 @@ if (!(await exists(from))) {
 
 await mkdir(to, { recursive: true });
 await cp(from, to, { recursive: true });
-console.log(`[copy-mediapipe] WASM copy ho gaya -> ${to}`);
+
+/*
+ * ⚠️ Copy ke baad jaanch, sirf "cp chal gaya" par bharosa nahi. `cp` khaali
+ * folder par bhi khushi se poora ho jaata hai, aur tab galti browser me hi
+ * dikhti hai — jahan se wajah tak pahunchna sabse mushkil hai.
+ */
+const needed = ["vision_wasm_internal.js", "vision_wasm_internal.wasm"];
+for (const file of needed) {
+  if (!(await exists(resolve(to, file)))) {
+    console.error(`[copy-mediapipe] copy ke baad bhi ${file} nahi mila — kuch galat hai.`);
+    process.exit(1);
+  }
+}
+
+console.log(`[copy-mediapipe] WASM taiyaar -> ${to}`);
