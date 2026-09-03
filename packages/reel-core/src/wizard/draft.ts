@@ -1398,6 +1398,62 @@ export function voiceSourceSeconds(scene: WizardScene): number | null {
   return cut > 0 ? cut : scene.voiceSeconds;
 }
 
+/**
+ * Awaaz ki raftaar ki hadd — isse bahar wo insaan ki nahi lagti.
+ *
+ * ⚠️ Schema 0.5-2 tak deta hai, par wo hadd file ki hai, kaan ki nahi. 0.7 se
+ * neeche awaaz nashe me boli hui lagti hai aur 1.6 se upar chipmunk jaisi — dono
+ * halat me baat sunai to deti hai par sunne wala reel chhod deta hai.
+ */
+export const MIN_VOICE_RATE = 0.7;
+export const MAX_VOICE_RATE = 1.6;
+
+export interface VoicePace {
+  /** Jo raftaar lagegi — hadd me baandhi hui. */
+  rate: number;
+  /** Us raftaar par awaaz sach me kitni der chalegi. */
+  seconds: number;
+  /** Maangi hui lambai hadd se bahar thi? */
+  clamped: boolean;
+}
+
+/**
+ * "Is awaaz ko itne second me bulwao" — uske liye kaunsi raftaar chahiye.
+ *
+ * `null` = abhi awaaz hai hi nahi (ya uski lambai pata nahi), isliye koi hisaab
+ * ho hi nahi sakta — aur us halat me andaaza laga kar ek raftaar likh dena galat
+ * hoga.
+ *
+ * ⚠️ Maangi hui lambai hadd se bahar ho to raftaar hadd par ruk jaati hai aur
+ * `clamped` sach ho jaata hai — chup-chaap us hadd tak le jaana galat hota:
+ * aadmi 3 second maangta, use 4.2 milta, aur use kabhi pata na chalta ki uski
+ * maang poori hui hi nahi.
+ */
+export function rateForSeconds(scene: WizardScene, targetSeconds: number): VoicePace | null {
+  const source = voiceSourceSeconds(scene);
+  if (source === null || source <= 0) return null;
+
+  /*
+   * ⚠️ `VOICE_TAIL_SECONDS` ghata kar, kyunki wo saans awaaz ke BAAD lagti hai
+   * aur raftaar se uska koi lena-dena nahi. Ise bhool jaane par har awaaz maangi
+   * hui lambai se thodi lambi nikalti hai — chhota farak, par wo har scene par
+   * jud'ta jaata hai.
+   */
+  const want = targetSeconds - VOICE_TAIL_SECONDS;
+  if (want <= 0) {
+    return { rate: MAX_VOICE_RATE, seconds: source / MAX_VOICE_RATE + VOICE_TAIL_SECONDS, clamped: true };
+  }
+
+  const wanted = source / want;
+  const rate = Math.min(MAX_VOICE_RATE, Math.max(MIN_VOICE_RATE, wanted));
+
+  return {
+    rate: Math.round(rate * 100) / 100,
+    seconds: source / rate + VOICE_TAIL_SECONDS,
+    clamped: Math.abs(rate - wanted) > 0.005,
+  };
+}
+
 export function voiceSeconds(scene: WizardScene): number | null {
   const source = voiceSourceSeconds(scene);
   if (source === null) return null;

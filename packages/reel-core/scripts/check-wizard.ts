@@ -66,6 +66,9 @@ import {
   draftAdvice,
   textHidden,
   requireSceneType,
+  rateForSeconds,
+  MAX_VOICE_RATE,
+  MIN_VOICE_RATE,
   SCENE_MUSIC_LEVELS,
   fitCoversTrim,
   MAX_ANIMATION_ZOOM,
@@ -2884,6 +2887,55 @@ check(
   })(),
   "video ka apna raasta hai (visualMoreTrims) — dono milane par khaana kism dekhe bina samajh na aaye",
 );
+
+/* ------------------------------ "itne second me bulwao" — raftaar ka hisaab */
+
+console.log("\nitne second me bulwao");
+
+const paced = (seconds: number, target: number) =>
+  rateForSeconds(
+    {
+      ...blankScene(0),
+      voiceAssetId: "as_voice",
+      voiceSeconds: seconds,
+      voiceRate: 1,
+    },
+    target,
+  );
+
+check("bina awaaz ke koi hisaab nahi", rateForSeconds(blankScene(0), 4) === null);
+
+const half = paced(8, 4.25);
+check("aadhe waqt me bulwane par raftaar do guni", half !== null && Math.abs(half.rate - 2) < 2);
+check(
+  "hadd ke bahar ki maang hadd par rukti hai",
+  paced(20, 2)?.rate === MAX_VOICE_RATE,
+  "isse aage awaaz chipmunk jaisi ho jaati hai",
+);
+check(
+  "aur wo saaf bataya jaata hai",
+  paced(20, 2)?.clamped === true,
+  "chup-chaap hadd tak le jaane par aadmi ko kabhi pata nahi chalta ki maang poori hui hi nahi",
+);
+check(
+  "poori ho sakne wali maang par clamped nahi hota",
+  paced(5, 5.25)?.clamped === false,
+);
+
+/*
+ * ⚠️ Ye jaanch saans wali ginti par hai. `VOICE_TAIL_SECONDS` awaaz ke BAAD
+ * lagti hai; use bhool jaane par har awaaz maangi hui lambai se thodi lambi
+ * nikalti hai — chhota farak, par har scene par jud'ta jaata hai.
+ */
+const exact = paced(6, 4);
+check(
+  "lauti hui lambai maangi hui lambai se milti hai",
+  exact !== null && Math.abs(exact.seconds - 4) < 0.05,
+  `${exact?.seconds.toFixed(2)}s`,
+);
+
+check("bahut dheemi maang par bhi hadd lagti hai", paced(2, 60)?.rate === MIN_VOICE_RATE);
+check("shunya ya negative maang par nahi phatta", paced(5, 0) !== null && paced(5, -3) !== null);
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.

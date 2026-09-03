@@ -12,6 +12,7 @@ import {
   sceneSeconds,
   draftTotalSeconds,
   usableVoiceSeconds,
+  rateForSeconds,
   voiceSeconds,
   voiceStale,
   voiceStaleReason,
@@ -185,6 +186,9 @@ function VoiceRow({
   /** Is scene par gaane ka hissa chunne ka dialog kholo. */
   onSceneMusicTrim(index: number): void;
 }) {
+  /** "Itne second me bulwao" wala khaana — string, taaki aadha likha hua na mit jaaye. */
+  const [wantSeconds, setWantSeconds] = useState("4");
+
   /*
    * WARNING: Yahan se awaaz ki LAMBAI bhi aati hai, sirf id nahi. Scene ki lambai
    * usi se banti hai; bina uske scene AI ke andaaze par chalta hai aur awaaz ya
@@ -252,6 +256,17 @@ function VoiceRow({
   const stale = staleReason !== null;
   /** Bani hui awaaz ki asli lambai — `null` = hai hi nahi, ya wo purane shabdon ki hai. */
   const measured = usableVoiceSeconds(scene);
+
+  /*
+   * ⚠️ Hisaab `@reel/core` ka — yahan dobara nahi likha gaya. Raftaar ka ganit
+   * (saans ki ginti, hadd, aur "maang poori hui ya nahi") wahan jaancha hua hai;
+   * yahan likhne par screen ek number dikhati aur lagne par doosra nikalta.
+   */
+  const pace = (() => {
+    const want = Number.parseFloat(wantSeconds);
+    if (!Number.isFinite(want) || want <= 0) return null;
+    return rateForSeconds(scene, want);
+  })();
   /*
    * `voiceStale` wali baat upar apni jagah alag se likhi hai (wo is step ki sabse
    * zaroori line hai), isliye yahan usse hata diya jaata hai — ek hi baat do
@@ -520,6 +535,56 @@ function VoiceRow({
               ? `${scene.voiceRate.toFixed(2)}x · scene ${sceneSeconds(scene).toFixed(1)}s`
               : "lambai pata nahi"}
           </span>
+        </div>
+      ) : null}
+
+      {/*
+        "Itne second me bulwao" — raftaar peeche se apne aap tay hoti hai.
+
+        ⚠️ Ye chaar bane hue chunavon ke SAATH hai, unki jagah nahi. Zyadatar
+        waqt aadmi ko "tez" ya "dheemi" hi chahiye hota hai aur wo ek tap hai;
+        par jab scene ki lambai pehle se tay ho (jaise doosre scene ke saath
+        milani ho) tab wahi chaar chunav ek paheli ban jaate hain — "1.15x se
+        kitne second banenge?" ka jawab kisi ke paas nahi hota.
+
+        ⚠️ Maang hadd se bahar ho to wo SAAF bataya jaata hai. Chup-chaap hadd
+        tak le jaane par aadmi 3 second maangta, use 4.2 milta, aur use kabhi
+        pata na chalta ki uski maang poori hui hi nahi.
+      */}
+      {scene.voiceAssetId && measured !== null ? (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-chalk-500">Ya itne second me bulwao:</span>
+          <input
+            type="number"
+            min={0.5}
+            max={60}
+            step={0.5}
+            value={wantSeconds}
+            onChange={(event) => setWantSeconds(event.target.value)}
+            className="w-16 rounded border border-ink-600 bg-ink-800 px-1.5 py-0.5 text-[10px] text-chalk-100"
+          />
+          <button
+            type="button"
+            disabled={!pace}
+            onClick={() => {
+              if (pace) onChange(scene.index, { voiceRate: pace.rate });
+            }}
+            className="rounded border border-ink-600 px-1.5 py-0.5 text-[10px] text-chalk-400 transition-colors hover:border-terracotta hover:text-chalk-100 disabled:opacity-40"
+          >
+            Laga do
+          </button>
+          {pace ? (
+            <span
+              className={clsx(
+                "min-w-0 flex-1 text-right font-mono text-[10px]",
+                pace.clamped ? "text-amber" : "text-chalk-500",
+              )}
+            >
+              {pace.clamped
+                ? `itni tez nahi ho sakti — ${pace.rate.toFixed(2)}x par ${pace.seconds.toFixed(1)}s`
+                : `${pace.rate.toFixed(2)}x`}
+            </span>
+          ) : null}
         </div>
       ) : null}
 
