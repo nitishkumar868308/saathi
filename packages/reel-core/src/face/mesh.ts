@@ -228,7 +228,18 @@ export function buildMouthMesh(args: {
   if (!region) return [];
   if (region.right - region.left <= 0 || region.bottom - region.top <= 0) return [];
 
-  /* Jaali ke saare kone — pehle asli jagah, phir kheenchi hui. */
+  return meshOver(region, (point) => displacePoint(point, { ...args, region }));
+}
+
+/**
+ * Ek ilaake par jaali, aur har kone ko kheench do.
+ *
+ * ⚠️ Ye alag isliye hai ki muh, aankh aur bhaunh — teeno ko wahi jaali chahiye,
+ * bas kheenchne ka tarika alag. Teen jagah teen jaali likhne par ek jagah `ROWS`
+ * badalna doosri jagah bhool jaana hota hai, aur wo farak sirf render me dikhta
+ * hai: ek hissa narm, doosra polygon jaisa.
+ */
+function meshOver(region: MouthRegion, displace: (point: Point) => Point): MeshTriangle[] {
   const grid: { from: Point; to: Point }[][] = [];
   for (let row = 0; row <= ROWS; row += 1) {
     const line: { from: Point; to: Point }[] = [];
@@ -236,7 +247,7 @@ export function buildMouthMesh(args: {
     for (let col = 0; col <= COLS; col += 1) {
       const x = region.left + ((region.right - region.left) * col) / COLS;
       const from: Point = { x, y };
-      line.push({ from, to: displacePoint(from, { ...args, region }) });
+      line.push({ from, to: displace(from) });
     }
     grid.push(line);
   }
@@ -273,4 +284,132 @@ export function sampleFace(): FaceData {
     leftBrow: ellipse(0.38, 0.4, 0.055, 0.012, 6),
     rightBrow: ellipse(0.62, 0.4, 0.055, 0.012, 6),
   };
+}
+
+/* ------------------------------------------- aankh, bhaunh, aur muh ka andhera */
+
+/** Aankh poori band hone par palak kitni neeche aati hai (aankh ki oonchai ke guna me). */
+const LID_TRAVEL = 1;
+/** Bhaunh kitna uth sakti hai (aankh ki oonchai ke guna me). */
+const BROW_TRAVEL = 0.55;
+
+/**
+ * Ek aankh + uski bhaunh ka mesh — palak jhapakne aur bhaunh uthne ke liye.
+ *
+ * ⚠️ Dono **ek hi mesh** me hain, alag-alag nahi. Wajah ye hai ki unke ilaake ek
+ * doosre ko chhoote hain: bhaunh aankh ke theek upar hoti hai. Do alag mesh
+ * banane par unke kinare ek hi jagah milte hain jahan dono apna-apna kheenchav
+ * lagate hain — aur wahan tasveer ek dabi hui lakeer bana deti hai.
+ *
+ * ⚠️ Yahan bhi wahi ek niyam sabse upar hai: **kinara kabhi nahi hilta**.
+ */
+export function buildEyeMesh(args: {
+  /** Ek aankh ke points. */
+  eye: readonly FacePoint[];
+  /** Usi taraf ki bhaunh — khaali ho to sirf palak chalti hai. */
+  brow: readonly FacePoint[];
+  size: { width: number; height: number };
+  /** 0 = poori khuli, 1 = poori band. */
+  closed: number;
+  /** Bhaunh kitni upar — 0 se 1. */
+  browLift: number;
+  /** Emotion ka apna aankh ka naap (1 = normal, <1 = simti). */
+  eyeOpen: number;
+}): MeshTriangle[] {
+  if (args.size.width <= 0 || args.size.height <= 0) return [];
+  const eyeBounds = boundsOf(args.eye);
+  if (!eyeBounds) return [];
+
+  const eyeTop = eyeBounds.minY * args.size.height;
+  const eyeBottom = eyeBounds.maxY * args.size.height;
+  const eyeHeight = Math.max(1, eyeBottom - eyeTop);
+  const eyeWidth = Math.max(1, (eyeBounds.maxX - eyeBounds.minX) * args.size.width);
+  const centerX = ((eyeBounds.minX + eyeBounds.maxX) / 2) * args.size.width;
+  const eyeMid = (eyeTop + eyeBottom) / 2;
+
+  const browBounds = boundsOf(args.brow);
+  const browY = browBounds ? ((browBounds.minY + browBounds.maxY) / 2) * args.size.height : null;
+
+  const region: MouthRegion = {
+    left: Math.max(0, centerX - eyeWidth * 1.1),
+    right: Math.min(args.size.width, centerX + eyeWidth * 1.1),
+    top: Math.max(0, (browY ?? eyeTop) - eyeHeight * 2.4),
+    bottom: Math.min(args.size.height, eyeBottom + eyeHeight * 2.4),
+    centerX,
+    lipTop: eyeTop,
+    lipBottom: eyeBottom,
+    mouthWidth: eyeWidth,
+    mouthHeight: eyeHeight,
+  };
+  if (region.right - region.left <= 0 || region.bottom - region.top <= 0) return [];
+
+  const closed = clamp01(args.closed);
+  /* Emotion ki simti aankh palak ke saath jud jaati hai. */
+  const squint = clamp01(1 - args.eyeOpen);
+  const shut = clamp01(closed + squint * (1 - closed));
+  const lift = clamp01(args.browLift) * BROW_TRAVEL * eyeHeight;
+
+  const displace = (point: Point): Point => {
+    const side = sideFalloff(point.x, region);
+    if (side <= 0) return point;
+
+    /*
+     * Palak upar se girti hai. Aankh ke upar wala hissa neeche aata hai, neeche
+     * wala lagbhag apni jagah — asli palak bhi yahi karti hai. Dono taraf barabar
+     * simatne par aankh "band" nahi, "chhoti" dikhne lagti hai.
+     */
+    let dy = 0;
+    if (point.y <= eyeMid) {
+      const reach = smoothstep((point.y - region.top) / Math.max(1e-6, eyeMid - region.top));
+      dy += shut * LID_TRAVEL * eyeHeight * reach;
+    } else {
+      const fade = smoothstep((region.bottom - point.y) / Math.max(1e-6, region.bottom - eyeMid));
+      dy += shut * LID_TRAVEL * eyeHeight * 0.15 * fade;
+    }
+
+    if (browY !== null) {
+      const near = 1 - smoothstep(Math.abs(point.y - browY) / Math.max(1e-6, eyeHeight * 2));
+      dy -= lift * near;
+    }
+
+    return { x: point.x, y: point.y + dy * side };
+  };
+
+  return meshOver(region, displace);
+}
+
+/**
+ * Muh ke andar ka andhera — khule muh me jo dikhna hi chahiye.
+ *
+ * ⚠️ Iske bina khula muh sirf **khinchi hui khaal** hota hai, aur wahi ek cheez
+ * chehre ko rabar jaisa dikhati hai. Asli khule muh me ek gehra khaali hissa
+ * hota hai, aur wahi andhera aankh ko batata hai ki muh **khula** hai — sirf
+ * lamba nahi hua.
+ *
+ * `null` = andaruni honth ka data hai hi nahi, ya muh khula hi nahi.
+ */
+export function mouthOpening(args: {
+  face: FaceData;
+  size: { width: number; height: number };
+  shape: VisemeShape;
+  intensity: number;
+  emotion: EmotionDef;
+}): { points: Point[]; openness: number } | null {
+  if (args.face.lipsInner.length < 3) return null;
+
+  const region = mouthRegion(args.face, args.size);
+  if (!region) return null;
+
+  const openness = clamp01(args.shape.open * clamp01(args.intensity));
+  /* Halke se khule muh me andhera dikhta hi nahi — wahan use daalna ek dhabba banata hai. */
+  if (openness <= 0.06) return null;
+
+  const points = args.face.lipsInner.map((point) =>
+    displacePoint(
+      { x: point.x * args.size.width, y: point.y * args.size.height },
+      { region, shape: args.shape, intensity: args.intensity, emotion: args.emotion },
+    ),
+  );
+
+  return { points, openness };
 }

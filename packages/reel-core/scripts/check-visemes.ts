@@ -39,6 +39,11 @@ import {
   mouthRegion,
   readFaceData,
   sampleFace,
+  blinkAt,
+  browLiftAt,
+  buildEyeMesh,
+  mouthOpening,
+  visemeStateAt,
   ringsFromConnections,
   pointsFromConnections,
   createEmptyProject,
@@ -741,6 +746,149 @@ check(
   "sirf baayan channel lene par wo recording chup ginn'ti hai jiska ek channel khaali ho",
 );
 check("bina channel ke khaali", toMono([]).length === 0);
+
+/* --------------------------------------------------- zinda dikhne wali cheezein */
+
+console.log("\npalak jhapakna");
+
+const blinkSamples = Array.from({ length: 1200 }, (_, at) => blinkAt(at / 60));
+
+check(
+  "kabhi na kabhi aankh poori band hoti hai",
+  blinkSamples.some((v) => v > 0.9),
+  "jo chehra kabhi nahi jhapakta wo turant murda lagta hai, chahe lip sync theek ho",
+);
+check("zyadatar waqt aankh khuli rehti hai", blinkSamples.filter((v) => v < 0.05).length > 1000);
+check("har naap apni hadd me hai", blinkSamples.every((v) => v >= 0 && v <= 1));
+check(
+  "wahi lamha hamesha wahi jawab deta hai",
+  blinkAt(3.21) === blinkAt(3.21) && blinkAt(7.5) === blinkAt(7.5),
+  "Math.random() yahan chal hi nahi sakta — har frame alag render hota hai aur palak paagalon ki tarah jhapakti",
+);
+check("shuruaat se pehle kuch nahi", blinkAt(-1) === 0);
+
+/*
+ * ⚠️ Antaraal bekayda hona chahiye. Theek har 4 second par jhapakna machine
+ * jaisa lagta hai — dekhne wale ko wajah samajh nahi aati, bas chehra ajeeb
+ * lagta hai.
+ */
+const blinkStarts: number[] = [];
+for (let at = 1; at < blinkSamples.length; at += 1) {
+  if (blinkSamples[at - 1]! === 0 && blinkSamples[at]! > 0) blinkStarts.push(at / 60);
+}
+const gaps = blinkStarts.slice(1).map((v, at) => v - blinkStarts[at]!);
+check("ek se zyada baar jhapakti hai", blinkStarts.length >= 3, `${blinkStarts.length} baar`);
+check(
+  "do jhapak ke beech ka antaraal barabar nahi hota",
+  new Set(gaps.map((g) => Math.round(g * 10))).size > 1,
+  "barabar antaraal machine jaisa lagta hai",
+);
+
+console.log("\nbhaunh");
+
+check("chup rehne par bhaunh nahi uthti", browLiftAt(0) === 0);
+check("halki awaaz par bhi nahi", browLiftAt(0.3) === 0, "halki awaaz par uthna bechaini dikhata hai");
+check("zor par uthti hai", browLiftAt(1) > 0.9);
+check("hadd me rehti hai", [0, 0.5, 0.8, 1].every((v) => browLiftAt(v) >= 0 && browLiftAt(v) <= 1));
+
+console.log("\naankh ka mesh");
+
+const openEye = buildEyeMesh({
+  eye: face.leftEye,
+  brow: face.leftBrow,
+  size,
+  closed: 0,
+  browLift: 0,
+  eyeOpen: 1,
+});
+check("khuli aankh par kuch nahi hilta", openEye.every((t) => t.from.every((p, at) => near(p.y, t.to[at]!.y))));
+
+const shutEye = buildEyeMesh({
+  eye: face.leftEye,
+  brow: face.leftBrow,
+  size,
+  closed: 1,
+  browLift: 0,
+  eyeOpen: 1,
+});
+check("band aankh par palak sach me girti hai", shutEye.some((t) => t.from.some((p, at) => t.to[at]!.y - p.y > 1)));
+check(
+  "palak UPAR se girti hai, neeche se nahi uthti",
+  (() => {
+    const eyeTop = Math.min(...face.leftEye.map((p) => p.y)) * size.height;
+    const eyeBottom = Math.max(...face.leftEye.map((p) => p.y)) * size.height;
+    let upper = 0;
+    let lower = 0;
+    for (const t of shutEye) {
+      for (let at = 0; at < 3; at += 1) {
+        const move = t.to[at]!.y - t.from[at]!.y;
+        if (t.from[at]!.y <= eyeTop) upper = Math.max(upper, move);
+        if (t.from[at]!.y >= eyeBottom) lower = Math.max(lower, move);
+      }
+    }
+    return upper > lower;
+  })(),
+  "dono taraf barabar simatne par aankh band nahi, chhoti dikhne lagti hai",
+);
+
+const liftedBrow = buildEyeMesh({
+  eye: face.leftEye,
+  brow: face.leftBrow,
+  size,
+  closed: 0,
+  browLift: 1,
+  eyeOpen: 1,
+});
+check("bhaunh uthne par wo sach me upar jaati hai", liftedBrow.some((t) => t.from.some((p, at) => p.y - t.to[at]!.y > 1)));
+
+check(
+  "bina aankh wale chehre par mesh khaali",
+  buildEyeMesh({ eye: [], brow: [], size, closed: 1, browLift: 1, eyeOpen: 1 }).length === 0,
+);
+
+console.log("\nmuh ke andar ka andhera");
+
+check(
+  "band muh par andhera nahi",
+  mouthOpening({ face, size, shape: rest, intensity: 0, emotion: neutral }) === null,
+  "halke khule muh me andhera ek dhabbe jaisa dikhta hai",
+);
+
+const dark = mouthOpening({ face, size, shape: aa, intensity: 1, emotion: neutral });
+check("khule muh par andhera aata hai", dark !== null);
+check("uske teen se zyada point hain", (dark?.points.length ?? 0) >= 3);
+check(
+  "zyada khulne par andhera zyada gehra",
+  (dark?.openness ?? 0) > (mouthOpening({ face, size, shape: aa, intensity: 0.4, emotion: neutral })?.openness ?? 0),
+);
+check(
+  "bina andaruni honth ke andhera nahi banta",
+  mouthOpening({ face: { ...face, lipsInner: [] }, size, shape: aa, intensity: 1, emotion: neutral }) === null,
+);
+
+console.log("\nshape ka narm safar");
+
+const blendTrack = [
+  { atSeconds: 0, viseme: "rest", intensity: 0 },
+  { atSeconds: 1, viseme: "AA", intensity: 1 },
+];
+
+const before = visemeStateAt(blendTrack, 0.99);
+const middle = visemeStateAt(blendTrack, 1.035);
+const after = visemeStateAt(blendTrack, 1.5);
+
+check("badlav se pehle purana shape", before.shape.open < 0.1);
+check("badlav ke baad naya shape", near(after.shape.open, aa.open, 1e-9));
+check(
+  "beech me dono ke BEECH ka shape hota hai",
+  middle.shape.open > before.shape.open && middle.shape.open < after.shape.open,
+  "jhatke se koodne par muh bolta hua nahi, flipbook jaisa lagta hai",
+);
+check(
+  "zor bhi saath me badalta hai",
+  middle.intensity > before.intensity && middle.intensity < after.intensity,
+);
+check("khaali track par aaram", visemeStateAt([], 1).shape.id === REST_VISEME);
 
 /* ------------------------------------------------------------------ summary */
 

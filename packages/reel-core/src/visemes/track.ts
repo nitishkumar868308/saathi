@@ -1,5 +1,5 @@
 import type { VisemeStep } from "./fromText";
-import { REST_VISEME } from "./shapes";
+import { REST_VISEME, getVisemeShape, type VisemeShape } from "./shapes";
 
 /**
  * Muh ka poora track — kis waqt kaunsa shape, aur kitna khula.
@@ -231,4 +231,81 @@ export function visemeAt(track: readonly VisemeFrame[], atSeconds: number): Vise
     if (frame.atSeconds <= atSeconds + 1e-9) return frame;
   }
   return track[0] as VisemeFrame;
+}
+
+/* ------------------------------------------------------- shape ka safar */
+
+/**
+ * Ek shape se doosre par pahunchne me itna waqt lagta hai.
+ *
+ * ⚠️ Bina iske muh ek shape se doosre par **jhatke se** koodta hai, aur wo
+ * bolne jaisa nahi — flipbook jaisa lagta hai. Asli honth kabhi turant apni
+ * jagah nahi badalte; unhe pahunchne me kuch lamha lagta hai, aur wahi lamha
+ * "bolna" dikhata hai.
+ *
+ * ⚠️ 70ms jaan-boojhkar hai. Isse chhota rakhne par jhatka wapas aa jaata hai;
+ * isse bada rakhne par honth kabhi apne poore shape tak pahunchte hi nahi aur
+ * har awaaz ek jaisi dikhne lagti hai — yaani wahi "chabaana" jisse hum bach
+ * rahe the.
+ */
+export const VISEME_BLEND_SECONDS = 0.07;
+
+/** Do shape ke beech ka shape. */
+function mix(from: VisemeShape, to: VisemeShape, t: number): VisemeShape {
+  const at = t < 0 ? 0 : t > 1 ? 1 : t;
+  /* Narm dhalaan — seedhi lakeer par shuruaat aur ant dono par jhatka lagta hai. */
+  const eased = at * at * (3 - 2 * at);
+  const blend = (a: number, b: number): number => a + (b - a) * eased;
+  return {
+    id: to.id,
+    label: to.label,
+    open: blend(from.open, to.open),
+    wide: blend(from.wide, to.wide),
+    round: blend(from.round, to.round),
+  };
+}
+
+export interface VisemeState {
+  shape: VisemeShape;
+  intensity: number;
+}
+
+/**
+ * Us lamhe par muh sach me kaisa hai — **do shape ke beech ka**.
+ *
+ * ⚠️ `visemeAt` sirf ye batata hai ki kaunsa shape "chal raha hai". Render ko
+ * usse zyada chahiye: do shape ke beech ka safar. Sirf `visemeAt` par render
+ * karne par har frame ek poora shape hota hai aur beech ka kuch nahi — muh
+ * chalta hua nahi, badalta hua dikhta hai.
+ */
+export function visemeStateAt(
+  track: readonly VisemeFrame[],
+  atSeconds: number,
+  blendSeconds: number = VISEME_BLEND_SECONDS,
+): VisemeState {
+  const rest = getVisemeShape(REST_VISEME) as VisemeShape;
+  if (track.length === 0) return { shape: rest, intensity: 0 };
+
+  let index = 0;
+  for (let at = track.length - 1; at >= 0; at -= 1) {
+    if ((track[at] as VisemeFrame).atSeconds <= atSeconds + 1e-9) {
+      index = at;
+      break;
+    }
+  }
+
+  const current = track[index] as VisemeFrame;
+  const shape = getVisemeShape(current.viseme) ?? rest;
+  const previous = index > 0 ? track[index - 1] : undefined;
+  if (!previous || blendSeconds <= 0) return { shape, intensity: current.intensity };
+
+  const since = atSeconds - current.atSeconds;
+  if (since >= blendSeconds) return { shape, intensity: current.intensity };
+
+  const from = getVisemeShape(previous.viseme) ?? rest;
+  const t = since / blendSeconds;
+  return {
+    shape: mix(from, shape, t),
+    intensity: previous.intensity + (current.intensity - previous.intensity) * t,
+  };
 }
