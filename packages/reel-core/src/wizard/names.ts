@@ -193,11 +193,16 @@ export const MUSIC_LEVEL_DEFAULT = 0.15;
  * nahi tha**, chahe scene par koi bol hi na raha ho. Reel ka default 0.15 hai,
  * aur bina bol wale hook ya aakhri CTA par wo bahut dheema lagta hai.
  *
- * ⚠️ Sabse tez 0.7 par rukta hai, 1 par nahi. 1 ka matlab hai music poore level
- * par — aur uspar bolne wala haar jaata hai, chahe uski awaaz kitni bhi saaf ho.
- * Dekhne wale ko lagta hai "awaaz saaf nahi hai", jabki music tez hota hai. Wo
- * galti banane wale ko kabhi sunai nahi deti, kyunki use pata hota hai ki kya
- * bola ja raha hai.
+ * ⚠️ Pehle ye 0.7 par rok diya gaya tha, is dalil par ki "1 par music bolne wale
+ * ko jeet leta hai". Wo dalil **aadhi sach thi**: wo sirf tab lagti hai jab koi
+ * bol raha ho. Jis scene par sirf music hai — hook, aakhri CTA, ya bina awaaz ka
+ * koi tukda — wahan poora level hi sahi hai, aur use rok dena ek asli zaroorat ko
+ * mana karna tha.
+ *
+ * Ab poora level maujood hai, aur bolne wale ki hifazat rok se nahi hoti — wizard
+ * **ducking** chalu karta hai (`applyWizard`), jisse awaaz aate hi music apne aap
+ * neeche chala jaata hai aur baad me wapas upar. Wo ilaaj sahi jagah par hai: wo
+ * us halat me lagta hai jab wo halat sach me ho.
  */
 export const SCENE_MUSIC_LEVELS: readonly WizardLevel[] = [
   { value: null, label: "Reel jaisa", when: "Jo poori reel me chal raha hai" },
@@ -205,6 +210,7 @@ export const SCENE_MUSIC_LEVELS: readonly WizardLevel[] = [
   { value: 0.05, label: "Bahut kam", when: "Zaroori baat boli ja rahi ho" },
   { value: 0.35, label: "Saaf sunai de", when: "Halki baat, ya sirf tasveer" },
   { value: 0.7, label: "Tez", when: "Koi bol hi nahi raha — hook ya aakhri CTA" },
+  { value: 1, label: "Poora", when: "Sirf music wala scene — koi awaaz nahi" },
 ];
 
 /** Do level ek hi hain? (`null` bhi ek value hai — dekho `SCENE_MUSIC_LEVELS`.) */

@@ -615,6 +615,19 @@ export interface WizardScene {
    */
   musicVolume: number | null;
   /**
+   * Is scene par gaane ka kaunsa hissa bajega — `null` = reel wala hissa.
+   *
+   * ⚠️ Ye `WizardDraft.musicTrim` ke **upar** chalta hai, uski jagah nahi leta —
+   * wahi tarika jo `musicAssetId` aur `musicVolume` ka hai.
+   *
+   * ⚠️ Ek chetavni jo likhi jaani chahiye: har scene par apna hissa chunne par
+   * jodon par dhun **kood** sakti hai, kyunki dono taraf gaane ki alag jagah baj
+   * rahi hoti hai. Jahan scene ka apna gaana ho wahan ye bilkul theek hai (gaana
+   * waise bhi badal raha hai); ek hi gaane ke beech me ye soch kar hi karna
+   * chahiye. Isliye ye chunav hai, default nahi.
+   */
+  musicTrim: { startSeconds: number; endSeconds: number } | null;
+  /**
    * Kis text se awaaz bani thi.
    *
    * ⚠️ Iske bina 26.9 ka nishaan lagana namumkin hai: text badalne ke baad bani
@@ -1019,6 +1032,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         voiceVolume: 1,
         voiceVolumePoints: [],
         musicVolume: null,
+        musicTrim: null,
         musicVolumePoints: [],
         voiceForText: null,
         voiceCategoryId: null,
@@ -1062,6 +1076,7 @@ export function blankScene(index: number): WizardScene {
   return {
     index,
     containBackground: null,
+    musicTrim: null,
     visualFitTrim: null,
     hideRegions: [],
     visualMoreTrims: [],
@@ -2276,6 +2291,20 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
     src ? (src.musicAssetId ?? args.draft.musicAssetId) : null;
 
   if (created.length > 0 && madeFrom.some((src) => musicOf(src) !== null)) {
+    /*
+     * Ducking chalu — **awaaz aate hi music apne aap neeche**.
+     *
+     * ⚠️ Ye feature poore project me pehle se bana hua tha (`MasterAudioSchema`
+     * ka `ducking`), par wizard use kabhi chalu hi nahi karta tha — `enabled`
+     * default `false` hai. Uski keemat seedhi thi: music ko tez rakhna khatarnak
+     * tha, kyunki bolte waqt wo awaaz ko dabaa deta. Isliye music ke level ki
+     * hadd hi kam rakhni padti thi, aur jis scene par sirf music hota wahan bhi
+     * wo dheema rehta.
+     *
+     * Ab ilaaj sahi jagah par hai: music jitna tez chahiye utna rakho, aur bolne
+     * wale ke aate hi wo khud neeche chala jaaye. Ye render aur preview dono me
+     * ek hi function se lagta hai, isliye jo sunai deta hai wahi MP4 me jaata hai.
+     */
     const musicTrack =
       doc.tracks.find((track) => track.type === "music") ??
       (() => {
@@ -2339,13 +2368,24 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
          * hi khatam ho jaata.
          */
         const fps = doc.project.fps;
-        const trim = args.draft.musicTrim;
+        /*
+         * ⚠️ Scene ka apna hissa reel wale par bhaari — wahi tarika jo
+         * `musicAssetId` aur `musicVolume` ka hai.
+         */
+        const trim = src.musicTrim ?? args.draft.musicTrim;
         const from = trim ? Math.max(0, Math.round(trim.startSeconds * fps)) : 0;
         const span = trim
           ? Math.max(1, Math.round((trim.endSeconds - trim.startSeconds) * fps))
           : 0;
 
-        const raw = cursorOf[assetId] ?? 0;
+        /*
+         * ⚠️ Cursor ab gaane **aur uske chune hue hisse** dono se bandha hai.
+         * Sirf gaane se bandhne par ek scene ka apna hissa reel wale hisse ka
+         * cursor le udta tha, aur dono ek doosre ka waqt kha jaate the — dhun
+         * dono jagah galat lamhe se bajti.
+         */
+        const cursorKey = `${assetId}|${from}-${span}`;
+        const raw = cursorOf[cursorKey] ?? 0;
         const cursor = span > 0 ? from + (raw % span) : raw;
 
         const music = createItem("audio", {
@@ -2409,8 +2449,41 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
          * `% span` galat nikalta hai aur dhun apne hi hisse se bahar chali jaati
          * hai.
          */
-        cursorOf[assetId] = raw + duration;
+        cursorOf[cursorKey] = raw + duration;
       });
+
+      /*
+       * ⚠️ Ducking **saare** music tukdon ke baad lagta hai, kyunki tab tak ye
+       * pata hota hai ki music track sach me bana bhi ya nahi. Pehle lagane par
+       * ek aisa doc banta jo ek na-maujood track ko "duck karo" kehta — aur wo
+       * chup-chaap kuch nahi karta.
+       *
+       * ⚠️ Voice wahi track hai jispar scene ki awaaz jaati hai (`audio`), aur
+       * neeche jaane wala music ka track. Dono ko id se joda jaata hai, type se
+       * nahi — track dobara ban sakti hai aur tab type wali list purani id par
+       * atki reh jaati.
+       */
+      const voiceTracks = doc.tracks
+        .filter((track) => track.type === "audio")
+        .map((track) => track.id);
+
+      if (voiceTracks.length > 0) {
+        doc = {
+          ...doc,
+          project: {
+            ...doc.project,
+            audio: {
+              ...doc.project.audio,
+              ducking: {
+                ...doc.project.audio.ducking,
+                enabled: true,
+                voiceTrackIds: voiceTracks,
+                duckedTrackIds: [musicTrack.id],
+              },
+            },
+          },
+        };
+      }
     }
   }
 

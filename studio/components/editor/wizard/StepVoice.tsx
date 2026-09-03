@@ -162,6 +162,7 @@ function VoiceRow({
   ttsUsable,
   reelMusicAssetId,
   onChange,
+  onSceneMusicTrim,
 }: {
   scene: WizardScene;
   at: number;
@@ -181,6 +182,8 @@ function VoiceRow({
    */
   reelMusicAssetId: string | null;
   onChange(index: number, patch: Partial<WizardScene>): void;
+  /** Is scene par gaane ka hissa chunne ka dialog kholo. */
+  onSceneMusicTrim(index: number): void;
 }) {
   /*
    * WARNING: Yahan se awaaz ki LAMBAI bhi aati hai, sirf id nahi. Scene ki lambai
@@ -650,6 +653,40 @@ function VoiceRow({
         </div>
       ) : null}
 
+      {/*
+        Is scene par gaane ka kaunsa hissa.
+
+        ⚠️ Ye reel wale hisse ke UPAR chalta hai, uski jagah nahi leta — wahi
+        tarika jo music ke chunav aur level ka hai. Jahan scene ka apna gaana ho
+        wahan ye bilkul theek hai; ek hi gaane ke beech me ye soch kar hi karna
+        chahiye, kyunki jodon par dhun kood sakti hai.
+      */}
+      {(scene.musicAssetId ?? reelMusicAssetId) ? (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-chalk-500">Is scene par gaane ka hissa:</span>
+          <button
+            type="button"
+            onClick={() => onSceneMusicTrim(scene.index)}
+            className="flex items-center gap-1 text-[10px] text-chalk-400 transition-colors hover:text-chalk-100"
+          >
+            <Scissors size={9} />
+            {scene.musicTrim
+              ? `${scene.musicTrim.startSeconds.toFixed(1)}s se ${scene.musicTrim.endSeconds.toFixed(1)}s`
+              : "reel jaisa"}
+            <span className="underline">badlo</span>
+          </button>
+          {scene.musicTrim ? (
+            <button
+              type="button"
+              onClick={() => onChange(scene.index, { musicTrim: null })}
+              className="rounded border border-ink-600 px-1 py-0.5 text-[9px] text-chalk-500 transition-colors hover:border-chalk-500"
+            >
+              reel jaisa karo
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {(scene.musicAssetId ?? reelMusicAssetId) ? (
         <div className="mt-1">
           <VolumePoints
@@ -711,6 +748,8 @@ export function StepVoice({
   onVoiceCategory(categoryId: string): void;
 }) {
   const [musicTrimOpen, setMusicTrimOpen] = useState(false);
+  /** Kis scene ka gaane wala hissa chuna ja raha hai — `null` = koi nahi. */
+  const [sceneTrimFor, setSceneTrimFor] = useState<number | null>(null);
   const live = draft.scenes.filter((scene) => !scene.removed);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -1138,6 +1177,34 @@ export function StepVoice({
           </div>
         ) : null}
 
+        {/*
+          Is scene ka apna gaane wala hissa.
+
+          ⚠️ `assetId` scene ka apna gaana hai agar ho, warna reel wala — warna
+          dialog us gaane ki jhalak dikhata jo is scene par baj hi nahi raha.
+        */}
+        <VideoTrimDialog
+          open={sceneTrimFor !== null}
+          assetId={
+            sceneTrimFor === null
+              ? null
+              : (draft.scenes.find((entry) => entry.index === sceneTrimFor)?.musicAssetId ??
+                draft.musicAssetId)
+          }
+          sceneSeconds={Math.max(4, draftTotalSeconds(draft))}
+          fallbackSeconds={null}
+          value={
+            sceneTrimFor === null
+              ? null
+              : (draft.scenes.find((entry) => entry.index === sceneTrimFor)?.musicTrim ?? null)
+          }
+          onCancel={() => setSceneTrimFor(null)}
+          onSave={(trim) => {
+            if (sceneTrimFor !== null) onChange(sceneTrimFor, { musicTrim: trim });
+            setSceneTrimFor(null);
+          }}
+        />
+
         <VideoTrimDialog
           open={musicTrimOpen}
           assetId={draft.musicAssetId}
@@ -1193,6 +1260,7 @@ export function StepVoice({
           ttsUsable={ttsUsable}
           reelMusicAssetId={draft.musicAssetId}
           onChange={onChange}
+          onSceneMusicTrim={(index) => setSceneTrimFor(index)}
         />
       ))}
     </>

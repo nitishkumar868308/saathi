@@ -2701,12 +2701,84 @@ check(
   SCENE_MUSIC_LEVELS.some((entry) => (entry.value ?? 0) > 0.3),
   "pehle sirf 'bahut kam' aur 'band' the — tez karne ka koi raasta hi nahi tha",
 );
+/*
+ * ⚠️ Pehle yahan likha tha ki "poore level par nahi" — aur wo niyam jaan-boojhkar
+ * badla gaya. Us dalil ("music bolne wale ko jeet leta hai") ka aadha hissa hi
+ * sach tha: wo sirf tab lagti hai jab koi bol raha ho. Jis scene par sirf music
+ * hai, wahan poora level hi sahi hai.
+ *
+ * Bolne wale ki hifazat ab rok se nahi, DUCKING se hoti hai — neeche uspar jaanch
+ * hai.
+ */
 check(
-  "par poore level par nahi",
-  SCENE_MUSIC_LEVELS.every((entry) => (entry.value ?? 0) <= 0.7),
-  "1 par music bolne wale ko jeet leta hai, aur wo galti banane wale ko sunai nahi deti",
+  "sirf music wale scene ke liye poora level bhi hai",
+  SCENE_MUSIC_LEVELS.some((entry) => entry.value === 1),
+  "use rok dena ek asli zaroorat ko mana karna tha",
 );
 check("har level ka apna naam hai", SCENE_MUSIC_LEVELS.every((entry) => entry.label.trim().length > 0));
+
+check(
+  "music lagane par ducking chalu ho jaati hai",
+  (() => {
+    const out = applyWizard({
+      doc: createEmptyProject({ name: "Duck", fps: 30 }),
+      draft: { ...musicBase(), musicTrim: null },
+    }).doc;
+    return out.project.audio.ducking.enabled === true;
+  })(),
+  "ye feature pehle se bana tha par wizard use kabhi chalu hi nahi karta tha",
+);
+
+check(
+  "music ka track hi neeche jaata hai, aur voice ka track upar rehta hai",
+  (() => {
+    const out = applyWizard({
+      doc: createEmptyProject({ name: "Duck", fps: 30 }),
+      draft: { ...musicBase(), musicTrim: null },
+    }).doc;
+    const duck = out.project.audio.ducking;
+    const musicTrack = out.tracks.find((track) => track.type === "music");
+    const voiceTracks = out.tracks.filter((track) => track.type === "audio").map((t) => t.id);
+    return (
+      duck.duckedTrackIds.length === 1 &&
+      duck.duckedTrackIds[0] === musicTrack?.id &&
+      voiceTracks.every((id) => duck.voiceTrackIds.includes(id))
+    );
+  })(),
+  "galat track jodne par ya to music neeche jaata hi nahi, ya awaaz khud neeche chali jaati hai",
+);
+
+check(
+  "bina music ke ducking chalu nahi hoti",
+  applyWizard({
+    doc: createEmptyProject({ name: "Bina music", fps: 30 }),
+    draft: autoFill(draftFromScript(script)),
+  }).doc.project.audio.ducking.enabled === false,
+  "bina music ke ducking ka koi matlab nahi — wo sirf ek chalu switch hota jo kuch na kare",
+);
+
+check(
+  "scene ka apna hissa reel wale par bhaari padta hai",
+  (() => {
+    const base = musicBase();
+    const out = applyWizard({
+      doc: createEmptyProject({ name: "Scene ka hissa", fps: 30 }),
+      draft: {
+        ...base,
+        musicTrim: { startSeconds: 0, endSeconds: 60 },
+        scenes: base.scenes.map((scene, at) =>
+          at === 0 ? { ...scene, musicTrim: { startSeconds: 40, endSeconds: 50 } } : scene,
+        ),
+      },
+    }).doc;
+    const first = out.items
+      .filter((item) => item.assetId === "as_song")
+      .sort((a, b) => a.startFrame - b.startFrame)[0];
+    return first?.trimStartFrame === 40 * 30;
+  })(),
+  "wahi tarika jo musicAssetId aur musicVolume ka hai",
+);
+
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
