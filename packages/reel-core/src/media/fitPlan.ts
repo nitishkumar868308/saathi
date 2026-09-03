@@ -83,6 +83,37 @@ export const MAX_CLEAN_UPSCALE = 1.6;
  */
 const CROP_WARN = 0.3;
 
+/**
+ * Kisi bhi harkat ka sabse bada zoom — **poori registry me se**.
+ *
+ * ⚠️ Ye ek number poore fit ke tarike ko badal deta hai, aur uski wajah ek asli
+ * shikayat thi: gallery me wahi tasveer baar-baar jama ho rahi thi.
+ *
+ * Pehle fit ka target `frame x us preset ka zoom` tha. Registry me chaar alag
+ * zoom hain (1, 1.12, 1.15, 1.35), yaani ek hi tasveer ke **chaar** alag target
+ * ban sakte the — aur har target ki apni cache key, apni file, apni library
+ * entry. Aadmi ne sirf harkat badli thi; use ek nayi copy dikhi.
+ *
+ * Ab target hamesha sabse bade zoom par banta hai. Ek tasveer + ek frame = **ek
+ * hi** fit copy, chahe harkat kuch bhi ho. File thodi badi banti hai (1.35x), par
+ * chaar ki jagah ek — aur badalne par nayi nahi banti.
+ *
+ * ⚠️ Ye registry se nikalta hai, likha hua number nahi. Nayi harkat jodne par ye
+ * apne aap badal jaayega.
+ */
+export const MAX_ANIMATION_ZOOM: number = (() => {
+  let most = 1;
+  for (const preset of ANIMATION_PRESETS) {
+    for (const animation of preset.animations ?? []) {
+      for (const key of ["from", "to"] as const) {
+        const value = (animation as Record<string, unknown>)[key];
+        if (typeof value === "number" && value > most) most = value;
+      }
+    }
+  }
+  return most;
+})();
+
 /** Harkat ka sabse bada zoom — `from`/`to` dono, kyunki dono me se koi bhi bada ho sakta hai. */
 export function animationZoom(presetId: string | null): number {
   const preset = presetId ? ANIMATION_PRESETS.find((entry) => entry.id === presetId) : null;
@@ -110,13 +141,37 @@ export function planFit(args: {
   /** Asli file ka naap — `null` = pata nahi, tab fit ka koi bharosemand faisla nahi. */
   source: FitSize | null;
   frame: FitSize;
-  animationPresetId: string | null;
 }): FitPlan | null {
   const { source, frame } = args;
   if (!source || source.width <= 0 || source.height <= 0) return null;
   if (frame.width <= 0 || frame.height <= 0) return null;
 
-  const zoom = animationZoom(args.animationPresetId);
+  /*
+   * ⚠️ Yahan **kisi ek harkat ka** zoom nahi, poori registry ka sabse bada zoom
+   * lagta hai. Pehle yahan chuni hui harkat ka zoom aata tha, aur uska nateeja
+   * gallery me dikhta tha: harkat badalte hi ek nayi fit copy ban jaati thi, aur
+   * ek hi tasveer chaar baar jama ho jaati thi.
+   *
+   * Ek hi target rakhne se ek tasveer + ek frame = ek hi copy. File 1.35x banti
+   * hai — thodi badi, par chaar ki jagah ek, aur harkat badalne par nayi nahi
+   * banti. `MAX_ANIMATION_ZOOM` par poori wajah likhi hai.
+   */
+  /*
+   * ⚠️ Zoom source ki apni naap se bandha hua hai, aur ye hissa sabse zaroori
+   * hai. Seedha `MAX_ANIMATION_ZOOM` lagane par ek **bilkul theek naap wali**
+   * tasveer (1080x1920 frame me 1080x1920) bhi 1.35x phail jaati thi — yaani jo
+   * tasveer pixel-perfect ho sakti thi, wo bina wajah dhundhli hoti.
+   *
+   * Isliye target utna hi bada banta hai jitna source bina phaile bhar sakta
+   * hai — par frame se chhota kabhi nahi. Badi tasveer par poora 1.35x milta hai
+   * (Ken Burns ke liye pixel bache rehte hain), aur theek naap wali tasveer apne
+   * hi naap par rehti hai.
+   *
+   * ⚠️ Ye harkat par nirbhar nahi karta, aur wahi is poore badlav ki jaan hai:
+   * harkat badalne par target wahi rehta hai, isliye nayi fit copy nahi banti.
+   */
+  const roomy = Math.min(source.width / frame.width, source.height / frame.height);
+  const zoom = Math.min(MAX_ANIMATION_ZOOM, Math.max(1, roomy));
   const target: FitSize = {
     // Even numbers — H.264 vishm (odd) chaudai/oonchai par encode hi nahi hota.
     width: evenUp(frame.width * zoom),

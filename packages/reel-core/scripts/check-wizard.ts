@@ -399,21 +399,45 @@ check(
 
 const frame1080 = { width: 1080, height: 1920 };
 
+/*
+ * ⚠️ Pehle yahan likha tha ki "harkat ka zoom target naap me judta hai" — aur wo
+ * niyam **jaan-boojhkar badla gaya**. Uski keemat gallery me dikhti thi: chaar
+ * alag zoom (1, 1.12, 1.15, 1.35) ka matlab tha ek hi tasveer ke chaar alag
+ * target, chaar cache key, aur chaar library entry. Aadmi ne sirf harkat badli
+ * thi; use ek nayi copy dikhti thi.
+ *
+ * Ab target harkat par nirbhar nahi karta — sirf source aur frame par.
+ */
+const bigSource = { width: 4000, height: 6000 };
 check(
-  "harkat ka zoom target naap me judta hai",
-  planFit({ source: { width: 2160, height: 3840 }, frame: frame1080, animationPresetId: null })!
-    .target.height === 1920,
+  "badi tasveer par target me zoom ki jagah bachti hai",
+  planFit({ source: bigSource, frame: frame1080 })!.target.height > 1920,
+  "Ken Burns render ke waqt zoom karta hai — uske liye pixel pehle se chahiye",
+);
+check(
+  "theek naap wali tasveer apne hi naap par rehti hai",
+  planFit({ source: frame1080, frame: frame1080 })!.target.height === 1920,
+  "warna jo tasveer pixel-perfect ho sakti thi wo bina wajah dhundhli hoti",
+);
+check(
+  "target harkat par nirbhar nahi karta",
+  planFit({ source: bigSource, frame: frame1080 })!.target.height ===
+    planFit({ source: bigSource, frame: frame1080 })!.target.height,
+  "harkat badalne par naya target matlab nayi fit copy — wahi gallery me jama hoti thi",
+);
+check(
+  "chhoti tasveer par target frame se chhota nahi hota",
+  planFit({ source: { width: 600, height: 1067 }, frame: frame1080 })!.target.height === 1920,
 );
 check(
   "bina naap ke fit ka koi faisla nahi",
-  planFit({ source: null, frame: frame1080, animationPresetId: null }) === null,
+  planFit({ source: null, frame: frame1080 }) === null,
   "andaaza laga kar kaat dena wahi upscale wala jhooth hai",
 );
 
 const wide = planFit({
   source: { width: 1698, height: 926 },
   frame: frame1080,
-  animationPresetId: null,
 })!;
 check("bahut chaudi tasveer contain par jaati hai", wide.mode === "contain");
 check("contain par kinare dhundhle bharte hain", wide.blurredEdges);
@@ -422,7 +446,6 @@ check("contain par kuch kat'ta nahi", wide.cropped.width === 0 && wide.cropped.h
 const tall = planFit({
   source: { width: 1080, height: 1920 },
   frame: frame1080,
-  animationPresetId: null,
 })!;
 check("theek naap wali tasveer bilkul nahi phailti", Math.abs(tall.upscale - 1) < 0.001);
 check(
@@ -434,7 +457,6 @@ check(
 const small = planFit({
   source: { width: 540, height: 960 },
   frame: frame1080,
-  animationPresetId: null,
 })!;
 check(
   "chhoti tasveer par saaf chetavni",
@@ -1645,7 +1667,6 @@ check(
           i === 3
             ? {
                 ...s,
-                animationPresetId: "pop-in",
                 tweaks: {
                   "text:1": { ...NO_TWEAK, entry: { ...NO_ENTRY, kind: "slide" } },
                 },

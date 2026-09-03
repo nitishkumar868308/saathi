@@ -15,10 +15,14 @@ import { MAX_CLEAN_UPSCALE, planFit, type FitSize } from "./fitPlan";
  * `blurred-asset`). Use rok dena aadmi ki sahi footage ko mana karna hota. Rukti
  * sirf wo file hai jo *kisi bhi* tarah bithane par phail kar dhundhli hogi.
  *
- * ⚠️ Zoom ka hisaab yahan **nahi** lagta. Upload ke waqt ye pata hi nahi hota ki
- * us file par kaunsi harkat lagegi, aur sabse bade zoom ko maan kar rok lagana
- * un tasveeron ko bhi mana kar deta jo bina harkat ke bilkul theek hain. Zoom
- * wali chetavni scene par pehle se hai (`requiredVisualSize`).
+ * ⚠️ Zoom ka hisaab **lagta hai**, aur wo `planFit` wala hi zoom hai
+ * (`MAX_ANIMATION_ZOOM`). Ye pehle nahi lagta tha, aur uski keemat seedhi thi:
+ * ek tasveer upload me nikal jaati thi par scene par uska cover ho hi nahi paata
+ * tha, isliye wo chup-chaap `contain` par gir jaati — yaani kinaron par dhundhli
+ * pattiyan, theek wo cheez jo nahi chahiye thi.
+ *
+ * Dono jagah ek hi zoom hone ka matlab ek saaf vaada hai: **jo file upload me
+ * nikal gayi, wo scene me poora frame bharegi** — chahe koi bhi harkat lage.
  */
 
 export interface UploadSizeVerdict {
@@ -45,7 +49,7 @@ export function checkUploadSize(args: {
   if (!args.frame || args.frame.width <= 0 || args.frame.height <= 0) return pass;
   if (!args.source || args.source.width <= 0 || args.source.height <= 0) return pass;
 
-  const plan = planFit({ source: args.source, frame: args.frame, animationPresetId: null });
+  const plan = planFit({ source: args.source, frame: args.frame });
   if (!plan) return pass;
   if (plan.upscale <= MAX_CLEAN_UPSCALE) return { ...pass, upscale: plan.upscale };
 

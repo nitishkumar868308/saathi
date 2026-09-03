@@ -44,7 +44,6 @@ const FitSchema = z.object({
   width: z.number().int().min(16).max(8192),
   height: z.number().int().min(16).max(8192),
   /** `ANIMATION_PRESETS` ka id — iska zoom target naap me judta hai. */
-  animationPresetId: z.string().min(1).nullable().optional(),
   /** Video ka chuna hua hissa — na do to poori file. */
   trim: z
     .object({ startSeconds: z.number().min(0), endSeconds: z.number().min(0) })
@@ -90,7 +89,6 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const plan = planFit({
       source: { width: source.width, height: source.height },
       frame: { width: body.data.width, height: body.data.height },
-      animationPresetId: body.data.animationPresetId ?? null,
     });
     if (!plan) return fail("fit ka hisaab nahi ban paaya", 409, "naap galat hai");
 

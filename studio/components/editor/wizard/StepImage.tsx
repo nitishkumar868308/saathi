@@ -263,9 +263,11 @@ function SceneRow({
       planFit({
         source,
         frame: { width: project.width, height: project.height },
-        animationPresetId: scene.animationPresetId,
       }),
-    [source?.width, source?.height, project.width, project.height, scene.animationPresetId],
+    /* ⚠️ Harkat yahan nahi hai — target ab sabse bade zoom par banta hai, isliye
+       harkat badalne se plan badalta hi nahi (dekho MAX_ANIMATION_ZOOM). Pehle wo
+       yahan tha, aur usi se har harkat par ek nayi fit copy ban jaati thi. */
+    [source?.width, source?.height, project.width, project.height],
   );
 
   const trimKey = scene.visualTrim
@@ -388,7 +390,6 @@ function SceneRow({
               body: JSON.stringify({
                 width: project.width,
                 height: project.height,
-                animationPresetId: scene.animationPresetId,
                 trim: scene.visualTrim,
               }),
             });
