@@ -2780,6 +2780,111 @@ check(
 );
 
 
+/* -------------------------------------- ek scene me kai tasveerein, baari-baari */
+
+console.log("\nek scene me kai tasveerein, baari-baari");
+
+function seqDoc(more: string[]) {
+  const base = autoFill(draftFromScript(script));
+  return applyWizard({
+    doc: createEmptyProject({ name: "Baari-baari", fps: 30 }),
+    draft: {
+      ...base,
+      scenes: base.scenes.map((scene, at) =>
+        at === 0
+          ? {
+              ...scene,
+              type: "image_audio",
+              visualAssetId: "as_one",
+              visualAssetKind: "image" as const,
+              visualFitOff: true,
+              animationPresetId: "kenburns-slow",
+              effectPresetId: "bw",
+              durationOverrideSeconds: 6,
+              visualMoreAssets: more,
+            }
+          : scene,
+      ),
+    },
+  }).doc;
+}
+
+const alone = seqDoc([]);
+const aloneItem = alone.items.find((item) => item.assetId === "as_one");
+check("ek hi tasveer par kuch nahi badalta", aloneItem?.durationInFrames === 6 * 30);
+
+const seqThree = seqDoc(["as_two", "as_three"]);
+const shots = ["as_one", "as_two", "as_three"].map((id) =>
+  seqThree.items.find((item) => item.assetId === id),
+);
+check("teeno tasveerein aati hain", shots.every((item) => item !== undefined));
+
+check(
+  "scene ki lambai NAHI badalti — wahi lambai baant di jaati hai",
+  shots.reduce((sum, item) => sum + (item?.durationInFrames ?? 0), 0) === 6 * 30,
+  "badhane par teesri tasveer jodte hi scene awaaz ke baad tak chalta rehta hai",
+);
+check(
+  "har tasveer pichhli ke theek baad aati hai",
+  shots.every(
+    (item, at) =>
+      at === 0 || item!.startFrame === shots[at - 1]!.startFrame + shots[at - 1]!.durationInFrames,
+  ),
+  "beech me jagah chhodne par wahan kaala frame aata hai",
+);
+check(
+  "beech me koi khaali frame nahi bachta",
+  shots[2]!.startFrame + shots[2]!.durationInFrames ===
+    shots[0]!.startFrame + 6 * 30,
+  "barabar baantne ka round karne ka jhol ant me ek-do frame chhod deta hai",
+);
+
+check(
+  "har tasveer par wahi harkat lagti hai",
+  shots.every((item) => (item?.animations.length ?? 0) > 0),
+  "sirf pehli par lagane se teen tasveerein teen alag scene jaisi lagti hain",
+);
+check(
+  "har tasveer par wahi rang lagta hai",
+  shots.every((item) => (item?.effects.length ?? 0) > 0),
+);
+check(
+  "baad wali har tasveer par ek chhota fade bhi hai",
+  shots.slice(1).every((item) => item!.animations.some((a) => a.type === "fade")),
+  "tez kat par bina fade ke jhatka lagta hai",
+);
+check(
+  "teeno usi scene ke hain",
+  seqThree.scenes.some((scene) => shots.every((item) => scene.itemIds.includes(item!.id))),
+);
+
+check(
+  "video par ye raasta nahi chalta",
+  (() => {
+    const base = autoFill(draftFromScript(script));
+    const out = applyWizard({
+      doc: createEmptyProject({ name: "Video", fps: 30 }),
+      draft: {
+        ...base,
+        scenes: base.scenes.map((scene, at) =>
+          at === 0
+            ? {
+                ...scene,
+                type: "video",
+                visualAssetId: "as_clip",
+                visualAssetKind: "video" as const,
+                visualFitOff: true,
+                visualMoreAssets: ["as_two"],
+              }
+            : scene,
+        ),
+      },
+    }).doc;
+    return !out.items.some((item) => item.assetId === "as_two");
+  })(),
+  "video ka apna raasta hai (visualMoreTrims) — dono milane par khaana kism dekhe bina samajh na aaye",
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *

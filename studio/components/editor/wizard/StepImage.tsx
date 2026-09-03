@@ -811,6 +811,68 @@ function SceneRow({
         ) : null}
 
         {/*
+          Ek hi scene me kai tasveerein — ek ke baad ek.
+
+          ⚠️ Ye "Jodo" se alag hai aur dono ki zaroorat asli hai: "Jodo" teeno ko
+          EK tasveer bana deta hai (teeno ek saath dikhti hain), ye teeno ko
+          BAARI-BAARI dikhata hai. "Papa ko meri har zaroori date yaad thi… meri
+          padhai se lekar… mere documents tak" — is line par teeno ek saath
+          dikhana galat hoga.
+
+          ⚠️ Sirf tasveer par. Video ka apna raasta hai (uske hisse), aur wahan
+          har hisse ki kaat bhi chahiye hoti hai.
+        */}
+        {scene.visualAssetId && scene.visualAssetKind !== "video" ? (
+          <div className="space-y-1 rounded border border-ink-700 px-2 py-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-chalk-400">Baari-baari aur tasveerein</span>
+              {scene.visualMoreAssets.length > 0 ? (
+                <span className="text-[10px] text-terracotta">
+                  ({scene.visualMoreAssets.length + 1} tasveerein)
+                </span>
+              ) : null}
+            </div>
+            <p className="text-[10px] leading-snug text-chalk-500">
+              Scene ki lambai inme baant di jaayegi — scene lamba nahi hoga. Harkat aur rang har
+              tasveer par wahi lagega.
+            </p>
+
+            {scene.visualMoreAssets.map((assetId, order) => (
+              <div key={`${assetId}-${order}`} className="flex items-center gap-1.5">
+                <span className="w-4 shrink-0 text-[10px] text-chalk-500">{order + 2}.</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-chalk-500">
+                  {assetId}
+                </span>
+                <button
+                  type="button"
+                  title="Hata do"
+                  onClick={() =>
+                    onChange(scene.index, {
+                      visualMoreAssets: scene.visualMoreAssets.filter((_, o) => o !== order),
+                    })
+                  }
+                  className="rounded border border-ink-600 px-1 py-0.5 text-[9px] text-chalk-500 transition-colors hover:border-red-400 hover:text-red-300"
+                >
+                  hatao
+                </button>
+              </div>
+            ))}
+
+            <AssetPickerButton
+              kind="image"
+              assetId={null}
+              allowUpload
+              uploadTags={["wizard"]}
+              onPick={(assetId) =>
+                onChange(scene.index, {
+                  visualMoreAssets: [...scene.visualMoreAssets, assetId],
+                })
+              }
+            />
+          </div>
+        ) : null}
+
+        {/*
           Frame ka jo hissa chhupana hai.
 
           ⚠️ Sirf tab dikhta hai jab koi tasveer/video lagi ho — bina kisi cheez

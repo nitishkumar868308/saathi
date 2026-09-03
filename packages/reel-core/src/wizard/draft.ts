@@ -501,6 +501,27 @@ export interface WizardScene {
    */
   visualMoreTrims: { startSeconds: number; endSeconds: number }[];
   /**
+   * Isi scene me **aur** tasveerein — ek ke baad ek, dialogue ke saath.
+   *
+   * ⚠️ Ye collage se bilkul alag cheez hai, aur dono ki zaroorat asli hai.
+   * Collage teen tasveeron ko **ek** tasveer bana deta hai (teeno ek saath
+   * dikhti hain); ye teeno ko **baari-baari** dikhata hai. "Papa ko meri har
+   * zaroori date yaad thi… meri padhai se lekar… mere documents tak" — is ek
+   * line par teen tasveerein ek saath dikhana galat hoga; wo baari-baari aani
+   * chahiye, us line ke tukdon ke saath.
+   *
+   * ⚠️ Scene ki lambai **nahi badalti**. Wahi lambai in sab me baant di jaati
+   * hai. Lambai badhane par awaaz aur tasveer ka rishta toot jaata: aadmi ne
+   * scene ki lambai awaaz ke hisaab se chuni hoti hai, aur teesri tasveer jodte
+   * hi wo lamba ho kar awaaz ke baad tak chalta rehta.
+   *
+   * ⚠️ Sirf tasveerein. Video ka apna raasta hai (`visualMoreTrims`) — wahan har
+   * hissa usi file ka ek alag tukda hai, aur uski kaat bhi chahiye hoti hai.
+   * Dono ko ek field me milana matlab ek aisa khaana jiska matlab kism dekhe
+   * bina samajh hi na aaye.
+   */
+  visualMoreAssets: string[];
+  /**
    * Video ko phone ke frame me dikhao — app ki recording ke liye.
    *
    * ⚠️ Ye sirf sajawat nahi hai, **saaf dikhne ka sawaal** hai. Ek 386x850 ki
@@ -1023,6 +1044,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         visualSize: null,
         visualTrim: null,
         visualMoreTrims: [],
+        visualMoreAssets: [],
         phoneFrame: false,
         textPosition: "center",
         voiceAssetId: null,
@@ -1076,6 +1098,7 @@ export function blankScene(index: number): WizardScene {
   return {
     index,
     containBackground: null,
+    visualMoreAssets: [],
     musicTrim: null,
     visualFitTrim: null,
     hideRegions: [],
@@ -1863,6 +1886,106 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * dobara chhoti ho kar baith jaati hai, kinare par dhundhli patti ke saath.
      */
     const fitVisual = visualAssetOf(source);
+    /*
+     * Isi scene ki baaki tasveerein — ek ke baad ek.
+     *
+     * ⚠️ Scene ki lambai **sab me baant di jaati hai**, badhai nahi jaati. Aadmi
+     * ne wo lambai awaaz ke hisaab se chuni hoti hai; badhane par teesri tasveer
+     * jodte hi scene awaaz ke baad tak chalta rehta hai aur wahan chuppi aati hai.
+     *
+     * ⚠️ Har tasveer par wahi harkat aur wahi rang lagta hai jo scene par chuna
+     * hai. Sirf pehli par lagane se teen tasveerein teen alag scene jaisi lagti
+     * hain — aur poora maqsad ulta ho jaata hai, kyunki ye ek hi baat ke teen
+     * tukde hain.
+     *
+     * ⚠️ Baad wali har tasveer par ek chhota fade bhi lagta hai, chahe preset me
+     * ho ya na ho. Tez kat par bina fade ke jhatka lagta hai — aur yahi wo jagah
+     * hai jahan kat sabse tez hoti hai.
+     */
+    if (source.visualMoreAssets.length > 0 && source.visualAssetKind !== "video") {
+      const fps = doc.project.fps;
+      const shown = doc.items.find((item) => item.id === primary.id) ?? primary;
+      const parts = source.visualMoreAssets.length + 1;
+      const each = Math.max(1, Math.floor(shown.durationInFrames / parts));
+
+      /* Pehli tasveer apna hissa le kar chhoti ho jaati hai. */
+      doc = {
+        ...doc,
+        items: doc.items.map((item) =>
+          item.id === shown.id ? { ...item, durationInFrames: each } : item,
+        ),
+      };
+
+      const extras: Item[] = [];
+      let at = shown.startFrame + each;
+
+      for (const [order, assetId] of source.visualMoreAssets.entries()) {
+        const last = order === source.visualMoreAssets.length - 1;
+        /*
+         * Aakhri tasveer bacha hua poora waqt le leti hai. Barabar baantne par
+         * round karne ka jhol ant me ek-do frame ka khaali tukda chhod deta hai,
+         * aur wahan ek kaala frame aata hai.
+         */
+        const span = last
+          ? Math.max(1, shown.startFrame + shown.durationInFrames - at)
+          : each;
+
+        const piece = createItem("image", {
+          fps,
+          trackId: shown.trackId,
+          name: `${shown.name} — ${order + 2}`,
+          assetId,
+          startFrame: at,
+          durationInFrames: span,
+        });
+        extras.push({ ...piece, sceneId: scene.id, fit: shown.fit, transform: shown.transform });
+        at += span;
+      }
+
+      const items = [...doc.items];
+      const after = items.findIndex((item) => item.id === shown.id);
+      items.splice(after + 1, 0, ...extras);
+      doc = {
+        ...doc,
+        items,
+        scenes: doc.scenes.map((entry) =>
+          entry.id === scene.id
+            ? { ...entry, itemIds: [...entry.itemIds, ...extras.map((piece) => piece.id)] }
+            : entry,
+        ),
+      };
+
+      const extraIds = extras.map((piece) => piece.id);
+      if (source.animationPresetId) {
+        doc = applyAnimationPreset(doc, { itemIds: extraIds, presetId: source.animationPresetId });
+      }
+      if (source.effectPresetId) {
+        doc = applyEffectPreset(doc, { itemIds: extraIds, presetId: source.effectPresetId });
+      }
+
+      /* Chhota fade — tez kat par jhatke se bachne ke liye. */
+      doc = {
+        ...doc,
+        items: doc.items.map((item) =>
+          extraIds.includes(item.id)
+            ? {
+                ...item,
+                animations: [
+                  ...item.animations,
+                  {
+                    type: "fade",
+                    enabled: true,
+                    mode: "in",
+                    durationInFrames: Math.min(8, Math.max(2, Math.round(item.durationInFrames / 6))),
+                    easing: "ease-out",
+                  } as (typeof item.animations)[number],
+                ],
+              }
+            : item,
+        ),
+      };
+    }
+
     /*
      * Chhupaya hua hissa — har chune hue chaukor par ek kaala dabba.
      *
