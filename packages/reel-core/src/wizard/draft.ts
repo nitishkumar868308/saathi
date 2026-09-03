@@ -450,6 +450,23 @@ export interface WizardScene {
    */
   visualFitKey: string | null;
   /**
+   * Lagi hui fit copy **kis kaat par** bani thi — `null` = poori file par.
+   *
+   * ⚠️ Ye field ek asli bug ke baad aayi. `applyWizard` ka niyam hai: fit copy
+   * lagi ho to item par trim mat lagao, kyunki fit file me wo pehle se kata hua
+   * hai. Wo niyam sahi hai — par sirf tab jab fit **usi kaat par** bani ho.
+   *
+   * Hota ye tha: aadmi video chunta, fit poori file par ban jaati, phir wo kaat
+   * chunta. Nayi fit banne tak (ya wo skip/fail ho jaane par hamesha) purani
+   * copy lagi rehti thi, aur item par trim lagta hi nahi tha. Nateeja — video
+   * shuru se chalti thi aur chuna hua hissa kahin nahi jaata. Screen par sab
+   * theek dikhta tha.
+   *
+   * Ab dono ki tulna hoti hai (`fitCoversTrim`), aur mel na khaane par item par
+   * trim laga diya jaata hai.
+   */
+  visualFitTrim: { startSeconds: number; endSeconds: number } | null;
+  /**
    * Chuni hui file ka apna naap — `null` = pata nahi.
    *
    * WARNING: Ye "kitni badi tasveer chahiye" wali chetavni ke liye nahi hai
@@ -973,6 +990,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         containBackground: null,
         hideRegions: [],
         visualFitKey: null,
+        visualFitTrim: null,
         visualSize: null,
         visualTrim: null,
         visualMoreTrims: [],
@@ -1028,6 +1046,7 @@ export function blankScene(index: number): WizardScene {
   return {
     index,
     containBackground: null,
+    visualFitTrim: null,
     hideRegions: [],
     visualMoreTrims: [],
     type: "text",
@@ -1219,6 +1238,30 @@ export function textHidden(scene: WizardScene): boolean {
  * chetavni dikhata aur reel me asli chali jaati — aur wo farak sirf bani hui reel
  * dekh kar pakda jaata.
  */
+/**
+ * Lagi hui fit copy me maujooda kaat pehle se hai?
+ *
+ * ⚠️ `true` ka matlab hai "item par trim mat lagao" — aur ye jawab galat hone ki
+ * keemat seedhi hai: `true` galat hone par chuna hua hissa kahin nahi jaata
+ * (video shuru se chalti hai), aur `false` galat hone par wo hissa apne hi andar
+ * se dobara kat jaata hai. Isliye jawab tabhi `true` hai jab dono kaat sach me
+ * ek jaisi hon.
+ */
+export function fitCoversTrim(scene: WizardScene): boolean {
+  if (!scene.visualFitAssetId) return false;
+
+  const want = scene.visualTrim;
+  const made = scene.visualFitTrim;
+  if (!want && !made) return true;
+  if (!want || !made) return false;
+
+  /* Aadhe frame se chhota farak koi farak nahi — wo sirf ginti ka jhol hai. */
+  return (
+    Math.abs(want.startSeconds - made.startSeconds) < 0.02 &&
+    Math.abs(want.endSeconds - made.endSeconds) < 0.02
+  );
+}
+
 export function visualAssetOf(scene: WizardScene): string | null {
   return scene.visualFitAssetId ?? scene.visualAssetId;
 }
@@ -1894,7 +1937,14 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * kaat kar banti hai), isliye uspar dobara trim nahi lagta — warna chuna hua
      * hissa apne hi andar se dobara kat jaata hai.
      */
-    if (source.visualTrim && source.visualFitAssetId === null && primary.assetId === fitVisual) {
+    /*
+     * ⚠️ Shart `visualFitAssetId === null` se badal kar `!fitCoversTrim(...)` ki
+     * gayi. Purani shart maan leti thi ki koi bhi lagi hui fit copy me kaat
+     * pehle se hai — par wo copy poori file par bhi bani ho sakti hai (aadmi ne
+     * pehle video chuni, phir kaat). Us halat me trim kahin nahi lagta tha aur
+     * video shuru se chalti thi.
+     */
+    if (source.visualTrim && !fitCoversTrim(source) && primary.assetId === fitVisual) {
       doc = trimItemToSourceRange(doc, {
         itemId: primary.id,
         startSeconds: source.visualTrim.startSeconds,
@@ -1917,7 +1967,7 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      */
     if (
       source.visualMoreTrims.length > 0 &&
-      source.visualFitAssetId === null &&
+      !fitCoversTrim(source) &&
       primary.assetId === fitVisual
     ) {
       const fps = doc.project.fps;

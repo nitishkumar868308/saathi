@@ -441,7 +441,17 @@ function SceneRow({
 
           if (!alive) return;
           setFitState({ key: wantFit, status: "done" });
-          onChange(scene.index, { visualFitAssetId: fittedId, visualFitKey: wantFit });
+          onChange(scene.index, {
+                  visualFitAssetId: fittedId,
+                  visualFitKey: wantFit,
+                  /*
+                   * ⚠️ Kaunsi kaat par ye copy bani — ye likhna zaroori hai.
+                   * Bina iske `applyWizard` ko ye pata hi nahi chalta ki lagi hui
+                   * copy me kaat hai bhi ya nahi, aur wo item par trim lagana
+                   * chhod deta tha — yaani chuni hui kaat kahin nahi jaati thi.
+                   */
+                  visualFitTrim: scene.visualTrim,
+                });
         } catch (cause) {
           if (!alive) return;
           /*
@@ -940,7 +950,19 @@ function SceneRow({
           onSave={(trim) => {
             const part = trimFor?.part;
             if (part === 0) {
-              onChange(scene.index, { visualTrim: trim });
+              /*
+               * ⚠️ Purani fit copy yahin hata di jaati hai. Wo poori file par
+               * bani ho sakti hai, aur nayi banne tak (ya wo skip/fail ho jaane
+               * par hamesha) lagi rehti — us dauraan chuni hui kaat kahin nahi
+               * jaati. Hata dene se item par trim turant lag jaata hai, aur nayi
+               * fit aate hi wo apne aap wapas jud jaati hai.
+               */
+              onChange(scene.index, {
+                visualTrim: trim,
+                visualFitAssetId: null,
+                visualFitKey: null,
+                visualFitTrim: null,
+              });
             } else if (part === "new" && trim) {
               onChange(scene.index, {
                 visualMoreTrims: [...scene.visualMoreTrims, trim],

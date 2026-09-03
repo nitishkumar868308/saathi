@@ -66,6 +66,7 @@ import {
   draftAdvice,
   textHidden,
   requireSceneType,
+  fitCoversTrim,
   MAX_ANIMATION_ZOOM,
   ANIMATION_PRESETS,
   EFFECT_PRESETS,
@@ -2566,6 +2567,71 @@ check(
   three.length === 3 && three[1]!.trimStartFrame === 20 * 30 && three[2]!.trimStartFrame === 30 * 30,
   "waqt ke hisaab se apne aap tarteeb dena galat hoga — kabhi baad ka hissa pehle dikhana hi maqsad hota hai",
 );
+
+/* ------------------------------------ purani fit copy kaat nigal leti thi */
+
+console.log("\npurani fit copy aur chuni hui kaat");
+
+/*
+ * ⚠️ Ye ek asli bug ki jaanch hai. Aadmi video chunta tha, fit poori file par
+ * ban jaati thi, phir wo kaat chunta tha — aur nayi fit banne tak (ya wo skip
+ * ho jaane par HAMESHA) purani copy lagi rehti thi. `applyWizard` use dekh kar
+ * item par trim lagana chhod deta tha ("fit me kaat pehle se hai"), aur video
+ * shuru se chalti thi. Screen par sab theek dikhta tha.
+ */
+function trimWithStaleFit(fitTrim: { startSeconds: number; endSeconds: number } | null) {
+  const base = autoFill(draftFromScript(script));
+  return {
+    ...base,
+    scenes: base.scenes.map((scene, at) =>
+      at === 0
+        ? {
+            ...scene,
+            type: "video",
+            visualAssetId: "as_clip",
+            visualAssetKind: "video" as const,
+            visualTrim: { startSeconds: 6, endSeconds: 9 },
+            /* Fit copy lagi hui hai — par kis kaat par, wo `fitTrim` batata hai. */
+            visualFitAssetId: "as_fitted",
+            visualFitTrim: fitTrim,
+          }
+        : scene,
+    ),
+  };
+}
+
+function fittedClip(fitTrim: { startSeconds: number; endSeconds: number } | null) {
+  const out = applyWizard({
+    doc: createEmptyProject({ name: "Purani fit", fps: 30 }),
+    draft: trimWithStaleFit(fitTrim),
+  }).doc;
+  return out.items.find((item) => item.assetId === "as_fitted") ?? null;
+}
+
+check(
+  "poori file par bani fit ho to item par kaat lagti hai",
+  fittedClip(null)?.trimStartFrame === 6 * 30,
+  "yahi wo bug tha — kaat kahin nahi jaati thi aur video shuru se chalti thi",
+);
+check(
+  "aur uski lambai bhi chuni hui kaat jitni hoti hai",
+  fittedClip(null)?.durationInFrames === 3 * 30,
+);
+check(
+  "kisi AUR kaat par bani fit ho to bhi item par kaat lagti hai",
+  fittedClip({ startSeconds: 0, endSeconds: 4 })?.trimStartFrame === 6 * 30,
+);
+check(
+  "usi kaat par bani fit ho to item par dobara kaat NAHI lagti",
+  fittedClip({ startSeconds: 6, endSeconds: 9 })?.trimStartFrame === 0,
+  "dobara lagane par chuna hua hissa apne hi andar se kat jaata hai",
+);
+check(
+  "aadhe frame ka jhol farak nahi maana jaata",
+  fittedClip({ startSeconds: 6.005, endSeconds: 9.005 })?.trimStartFrame === 0,
+);
+
+check("fitCoversTrim: bina fit ke hamesha false", fitCoversTrim(trimWithStaleFit(null).scenes[1]!) === false);
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
