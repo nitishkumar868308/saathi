@@ -66,6 +66,8 @@ import {
   draftAdvice,
   textHidden,
   requireSceneType,
+  listSceneTypes,
+  addScene,
   parseDoc,
   readWizardMemory,
   writeWizardMemory,
@@ -2213,6 +2215,68 @@ check(
     frame: null,
   }).ok === true,
 );
+
+/* ------------------------------------------- peeche ki tasveer (background) */
+
+console.log("\npeeche ki tasveer sach me lagti hai?");
+
+/*
+ * ⚠️ Ye jaanch **`addScene` se** chalti hai, `type.build()` se nahi — aur wo
+ * farak is jaanch ki poori jaan hai.
+ *
+ * Background jaan-boojhkar `build()` ke andar nahi banta; wo `addScene` me ek
+ * hi jagah banta hai (dekho `timeline/ops.ts`, "Peeche ki tasveer" wala hissa),
+ * kyunki 12 scene type me wahi hisaab 12 baar likhne se ek din ek jagah chhoot
+ * jaati hai. Isliye `build()` ko seedha bula kar jaanchna jhooth bolta hai: wo
+ * har type par "background nahi bana" kehta hai, jabki asli raaste par wo banta
+ * hai. (Ye galti yahan ek baar ho chuki hai — jaanch `build()` par likhi gayi
+ * thi aur usne saara logic 12 jagah dobara likhwa diya tha.)
+ */
+{
+  const bgDoc = createEmptyProject({ name: "Background test", fps: 30 });
+  for (const type of listSceneTypes()) {
+    if (!type.slots.some((slot) => slot.id === "background")) continue;
+
+    /*
+     * Zaroori slot bhi bharna padta hai — `addScene` unke bina saaf mana kar
+     * deta hai (aur wo theek hai). Yahan sawaal sirf background ka hai, isliye
+     * baaki slots me koi bhi chalne layak value.
+     */
+    const slots: Record<string, string> = { background: "as_bg" };
+    for (const slot of type.slots) {
+      if (!slot.required) continue;
+      if (slot.kind === "text") slots[slot.id] = "jaanch ka text";
+      else if (slot.kind === "asset:video") slots[slot.id] = "as_video";
+      else if (slot.kind === "asset:audio") slots[slot.id] = "as_audio";
+      else slots[slot.id] = "as_front";
+    }
+
+    const withBg = addScene(bgDoc, { typeId: type.id, slots, durationSeconds: 3 });
+
+    const items = withBg.items.filter((item) => item.assetId === "as_bg");
+    check(
+      `${type.id}: peeche ki tasveer sach me lagti hai`,
+      items.length === 1,
+      items.length === 0
+        ? "slot dikhana par kuch na banana wahi toota hua button hai"
+        : `${items.length} baar lagi — do jagah bana rahe ho`,
+    );
+    if (items.length !== 1) continue;
+
+    check(
+      `${type.id}: wo poora frame bharti hai`,
+      items[0]!.fit.mode === "cover",
+      "contain par peeche ki tasveer ke bhi kinare khaali rehte — tab wo background hai hi nahi",
+    );
+
+    const scene = withBg.scenes.find((entry) => entry.itemIds.includes(items[0]!.id));
+    check(
+      `${type.id}: wo scene me sabse pehli hai`,
+      scene?.itemIds[0] === items[0]!.id,
+      "baad me aane par background asli tasveer aur text dono ko dhak leta hai",
+    );
+  }
+}
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
