@@ -187,10 +187,24 @@ export const MUSIC_LEVELS: readonly WizardLevel[] = [
 export const MUSIC_LEVEL_DEFAULT = 0.15;
 
 /** Ek scene par music ka level — `null` = poori reel wala. */
+/*
+ * ⚠️ Pehle yahan sirf teen chunav the — "Reel jaisa", "Bahut kam", "Band" — aur
+ * teenon niche ki taraf jaate the. Yaani music ko **tez karne ka koi raasta hi
+ * nahi tha**, chahe scene par koi bol hi na raha ho. Reel ka default 0.15 hai,
+ * aur bina bol wale hook ya aakhri CTA par wo bahut dheema lagta hai.
+ *
+ * ⚠️ Sabse tez 0.7 par rukta hai, 1 par nahi. 1 ka matlab hai music poore level
+ * par — aur uspar bolne wala haar jaata hai, chahe uski awaaz kitni bhi saaf ho.
+ * Dekhne wale ko lagta hai "awaaz saaf nahi hai", jabki music tez hota hai. Wo
+ * galti banane wale ko kabhi sunai nahi deti, kyunki use pata hota hai ki kya
+ * bola ja raha hai.
+ */
 export const SCENE_MUSIC_LEVELS: readonly WizardLevel[] = [
   { value: null, label: "Reel jaisa", when: "Jo poori reel me chal raha hai" },
-  { value: 0.05, label: "Bahut kam", when: "Zaroori baat boli ja rahi ho" },
   { value: 0, label: "Band", when: "Is scene par music bilkul nahi" },
+  { value: 0.05, label: "Bahut kam", when: "Zaroori baat boli ja rahi ho" },
+  { value: 0.35, label: "Saaf sunai de", when: "Halki baat, ya sirf tasveer" },
+  { value: 0.7, label: "Tez", when: "Koi bol hi nahi raha — hook ya aakhri CTA" },
 ];
 
 /** Do level ek hi hain? (`null` bhi ek value hai — dekho `SCENE_MUSIC_LEVELS`.) */

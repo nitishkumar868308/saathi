@@ -66,6 +66,7 @@ import {
   draftAdvice,
   textHidden,
   requireSceneType,
+  SCENE_MUSIC_LEVELS,
   fitCoversTrim,
   MAX_ANIMATION_ZOOM,
   ANIMATION_PRESETS,
@@ -2632,6 +2633,80 @@ check(
 );
 
 check("fitCoversTrim: bina fit ke hamesha false", fitCoversTrim(trimWithStaleFit(null).scenes[1]!) === false);
+
+/* ------------------------------------------------------ gaane ka hissa */
+
+console.log("\ngaane ka chuna hua hissa");
+
+const musicBase = () => {
+  const base = autoFill(draftFromScript(script));
+  return { ...base, musicAssetId: "as_song", musicVolume: 0.2 };
+};
+
+function musicClips(trim: { startSeconds: number; endSeconds: number } | null) {
+  const out = applyWizard({
+    doc: createEmptyProject({ name: "Gaana", fps: 30 }),
+    draft: { ...musicBase(), musicTrim: trim },
+  }).doc;
+  return out.items.filter((item) => item.assetId === "as_song");
+}
+
+const wholeSong = musicClips(null);
+check("music ke tukde bante hain", wholeSong.length > 1, `${wholeSong.length} tukde`);
+check("bina kaat ke gaana shuru se bajta hai", wholeSong[0]?.trimStartFrame === 0);
+check(
+  "har agla tukda wahin se uthata hai jahan pichhla chhoda tha",
+  wholeSong.length > 1 &&
+    wholeSong[1]!.trimStartFrame === wholeSong[0]!.trimStartFrame + wholeSong[0]!.durationInFrames,
+  "dobara shuru se lagane par har jod par gaana kat kar dobara chalta sunai deta hai",
+);
+
+const cut = musicClips({ startSeconds: 30, endSeconds: 90 });
+check("kaat ke saath gaana chune hue lamhe se shuru hota hai", cut[0]?.trimStartFrame === 30 * 30);
+check(
+  "har tukda chune hue hisse ke andar hi rehta hai",
+  cut.every((item) => item.trimStartFrame >= 30 * 30 && item.trimStartFrame < 90 * 30),
+  "hisse ke bahar nikalne par 'sirf ye hissa bajao' ka matlab hi khatam ho jaata hai",
+);
+
+/*
+ * Chhota hissa — cursor use wapas hisse ki SHURUAAT par laata hai, gaane ki
+ * shuruaat par nahi.
+ */
+const tiny = musicClips({ startSeconds: 10, endSeconds: 12 });
+check(
+  "chhota hissa khatam hone par wo hisse ki shuruaat par lautta hai",
+  tiny.every((item) => item.trimStartFrame >= 10 * 30 && item.trimStartFrame < 12 * 30),
+  "gaane ki shuruaat par lautne se chuna hua hissa bekaar ho jaata",
+);
+
+check(
+  "chhote hisse par saaf chetavni milti hai",
+  draftAdvice({ ...musicBase(), musicTrim: { startSeconds: 10, endSeconds: 12 } }).some((entry) =>
+    entry.text.includes("hisse ke aage nikal jaayegi"),
+  ),
+  "chup rehne par aadmi ko sirf 'gaana theek nahi baj raha' sunai deta, bina wajah jaane",
+);
+check(
+  "poore hisse par koi chetavni nahi",
+  !draftAdvice({ ...musicBase(), musicTrim: { startSeconds: 0, endSeconds: 300 } }).some((entry) =>
+    entry.text.includes("hisse ke aage nikal jaayegi"),
+  ),
+);
+
+console.log("\nmusic ka level");
+
+check(
+  "music ko tez karne ka raasta hai",
+  SCENE_MUSIC_LEVELS.some((entry) => (entry.value ?? 0) > 0.3),
+  "pehle sirf 'bahut kam' aur 'band' the — tez karne ka koi raasta hi nahi tha",
+);
+check(
+  "par poore level par nahi",
+  SCENE_MUSIC_LEVELS.every((entry) => (entry.value ?? 0) <= 0.7),
+  "1 par music bolne wale ko jeet leta hai, aur wo galti banane wale ko sunai nahi deti",
+);
+check("har level ka apna naam hai", SCENE_MUSIC_LEVELS.every((entry) => entry.label.trim().length > 0));
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.

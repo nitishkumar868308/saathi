@@ -147,6 +147,10 @@ function WizardBody({
     setDraft((previous) => ({ ...previous, musicAssetId: assetId }));
   }
 
+  function setMusicTrim(trim: { startSeconds: number; endSeconds: number } | null): void {
+    setDraft((previous) => (previous ? { ...previous, musicTrim: trim } : previous));
+  }
+
   function setMusicVolume(volume: number): void {
     setDraft((previous) => ({ ...previous, musicVolume: volume }));
   }
@@ -397,6 +401,7 @@ function WizardBody({
               onChange={update}
               onMusic={setMusic}
               onMusicVolume={setMusicVolume}
+              onMusicTrim={setMusicTrim}
               onVoiceCategory={setVoiceCategory}
             />
           ) : null}

@@ -771,6 +771,20 @@ export interface WizardDraft {
    */
   musicVolume: number;
   /**
+   * Gaane ka kaunsa hissa bajega — `null` = poora gaana, shuru se.
+   *
+   * ⚠️ Ye **poori reel ka** chunav hai, per-scene nahi, aur wo jaan-boojhkar hai.
+   * Music scene-dar-scene aage badhta hai (ek hi dhun katti nahi, chalti rehti
+   * hai — `cursorOf` dekho). Har scene par apna hissa chunne ka matlab hota har
+   * jod par dhun ka achanak kood jaana, aur wo reel ki sabse buri awaaz hai.
+   *
+   * ⚠️ Chuna hua hissa khatam hone par wo **wapas apni shuruaat par** aata hai,
+   * gaane ki shuruaat par nahi. Warna "sirf ye hissa bajao" ka matlab hi khatam
+   * ho jaata: pehle scene me chuna hua hissa bajta aur agle me poora gaana shuru
+   * ho jaata.
+   */
+  musicTrim: { startSeconds: number; endSeconds: number } | null;
+  /**
    * Poori reel ki awaaz ka chunav — `VOICE_CATEGORIES` ka id, `null` = abhi nahi chuna.
    *
    * ⚠️ Ye draft me hai, kisi step ke `useState` me nahi — aur wo ek asli bug ka
@@ -944,6 +958,7 @@ export function emptyDraft(): WizardDraft {
     gapSeconds: 0,
     musicAssetId: null,
     musicVolume: 0.15,
+    musicTrim: null,
     // `draftFromScript` ki tarah yahan bhi `null` — awaaz ka chunav Awaaz wala
     // step khulte hi hota hai, pehle se koi default thopna nahi.
     voiceCategoryId: null,
@@ -961,6 +976,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
     gapSeconds: 0,
     musicAssetId: null,
     musicVolume: 0.15,
+    musicTrim: null,
     /*
      * ⚠️ Yahan `null` hai, koi default category nahi — aur wo farak asli hai.
      * Koi ek awaaz pehle se chun dene par UI ke paas ye batane ka tarika nahi
@@ -2314,7 +2330,23 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         const samePrevious = at > 0 && musicOf(madeFrom[at - 1]) === assetId;
         const sameNext = at < created.length - 1 && musicOf(madeFrom[at + 1]) === assetId;
 
-        const cursor = cursorOf[assetId] ?? 0;
+        /*
+         * Gaane ka chuna hua hissa — cursor usi ke andar ghoomta hai.
+         *
+         * ⚠️ `cursorOf` scene-dar-scene aage badhta hai taaki dhun katti na
+         * rahe. Chuna hua hissa khatam hone par wo hisse ki SHURUAAT par lautta
+         * hai, gaane ki shuruaat par nahi — warna "sirf ye hissa bajao" ka matlab
+         * hi khatam ho jaata.
+         */
+        const fps = doc.project.fps;
+        const trim = args.draft.musicTrim;
+        const from = trim ? Math.max(0, Math.round(trim.startSeconds * fps)) : 0;
+        const span = trim
+          ? Math.max(1, Math.round((trim.endSeconds - trim.startSeconds) * fps))
+          : 0;
+
+        const raw = cursorOf[assetId] ?? 0;
+        const cursor = span > 0 ? from + (raw % span) : raw;
 
         const music = createItem("audio", {
           fps: doc.project.fps,
@@ -2371,7 +2403,13 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
           }
         }
 
-        cursorOf[assetId] = cursor + duration;
+        /*
+         * ⚠️ `raw` badhta hai, `cursor` nahi. `cursor` chune hue hisse ke andar ki
+         * asli jagah hai (`from + raw % span`); use aage badhane par agli baar ka
+         * `% span` galat nikalta hai aur dhun apne hi hisse se bahar chali jaati
+         * hai.
+         */
+        cursorOf[assetId] = raw + duration;
       });
     }
   }
@@ -2688,6 +2726,43 @@ export function sceneAdvice(
 }
 
 /** Poori reel par ek nazar — scene-dar-scene wali baatein `sceneAdvice` me hain. */
+/**
+ * Chuna hua gaane ka hissa kisi scene se chhota to nahi?
+ *
+ * ⚠️ Ye ek asli hadd hai jise chhupaya nahi ja sakta. Music har scene ke liye ek
+ * hi tukda banta hai; hissa us tukde se chhota hua to dhun uske ant ke aage
+ * nikal jaati hai. Ise theek karne ke liye ek scene ke beech me music ko todna
+ * padta, aur wo wizard ke bahar ka kaam hai (editor me ho sakta hai).
+ *
+ * Isliye yahan chup rehne ki jagah saaf bataya jaata hai — chup rehne par aadmi
+ * ko sirf itna sunai deta ki "gaana theek nahi baj raha", bina wajah jaane.
+ */
+function musicTrimAdvice(draft: WizardDraft): WizardAdvice[] {
+  const trim = draft.musicTrim;
+  if (!trim) return [];
+
+  const span = trim.endSeconds - trim.startSeconds;
+  if (span <= 0) {
+    return [{ level: "warn", text: "Gaane ka chuna hua hissa khaali hai — shuru aur ant ek hi jagah hain." }];
+  }
+
+  const longest = draft.scenes
+    .filter((scene) => !scene.removed)
+    .reduce((most, scene) => Math.max(most, sceneSeconds(scene)), 0);
+
+  if (span < longest) {
+    return [
+      {
+        level: "warn",
+        text:
+          `Gaane ka chuna hua hissa ${span.toFixed(1)}s ka hai, par sabse lamba scene ` +
+          `${longest.toFixed(1)}s ka. Us scene par dhun hisse ke aage nikal jaayegi.`,
+      },
+    ];
+  }
+  return [];
+}
+
 export function draftAdvice(draft: WizardDraft): WizardAdvice[] {
   const live = draft.scenes.filter((scene) => !scene.removed);
   const total = draftTotalSeconds(draft);
@@ -2708,6 +2783,8 @@ export function draftAdvice(draft: WizardDraft): WizardAdvice[] {
       text: `Scene ke beech ${gap.toFixed(2)}s ki saans hai — poori reel me ${added.toFixed(1)}s isi ke hain, jisme tasveer thehri rehti hai. Reels ki chaal tez hoti hai; 0.2-0.4s se zyada aksar sust lagta hai.`,
     });
   }
+
+  out.push(...musicTrimAdvice(draft));
 
   if (total > 90) {
     out.push({

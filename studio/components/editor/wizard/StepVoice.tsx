@@ -10,6 +10,7 @@ import {
   sameLevel,
   sceneAdvice,
   sceneSeconds,
+  draftTotalSeconds,
   usableVoiceSeconds,
   voiceSeconds,
   voiceStale,
@@ -22,6 +23,7 @@ import { AlertTriangle, Info, Loader2, Mic, Scissors } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AudioPreview } from "@/components/media/AudioPreview";
+import { VideoTrimDialog } from "@/components/editor/wizard/VideoTrimDialog";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { VoiceTrimDialog } from "@/components/editor/wizard/VoiceTrimDialog";
@@ -695,6 +697,7 @@ export function StepVoice({
   onChange,
   onMusic,
   onMusicVolume,
+  onMusicTrim,
   onVoiceCategory,
 }: {
   draft: WizardDraft;
@@ -702,9 +705,12 @@ export function StepVoice({
   /** `null` = music hata do. */
   onMusic(assetId: string | null): void;
   onMusicVolume(volume: number): void;
+  /** Gaane ka chuna hua hissa — `null` = poora gaana. */
+  onMusicTrim(trim: { startSeconds: number; endSeconds: number } | null): void;
   /** Poori reel ki awaaz — draft me jaati hai, yahan ke state me nahi. */
   onVoiceCategory(categoryId: string): void;
 }) {
+  const [musicTrimOpen, setMusicTrimOpen] = useState(false);
   const live = draft.scenes.filter((scene) => !scene.removed);
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -1106,6 +1112,44 @@ export function StepVoice({
           pata nahi chalta ki dhun reel ke saath baithegi ya nahi.
         */}
         {draft.musicAssetId ? <AudioPreview assetId={draft.musicAssetId} /> : null}
+
+        {/*
+          Gaane ka kaunsa hissa bajega.
+
+          ⚠️ Ye poori reel ka chunav hai, per-scene nahi — aur wo jaan-boojhkar
+          hai. Music scene-dar-scene aage badhta hai (ek hi dhun katti nahi,
+          chalti rehti hai). Har scene par apna hissa chunne ka matlab hota har
+          jod par dhun ka achanak kood jaana, aur wo reel ki sabse buri awaaz hai.
+        */}
+        {draft.musicAssetId ? (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-ink-700 pt-1.5">
+            <span className="text-[10px] text-chalk-500">Gaane ka hissa:</span>
+            <button
+              type="button"
+              onClick={() => setMusicTrimOpen(true)}
+              className="flex items-center gap-1 text-[10px] text-chalk-400 transition-colors hover:text-chalk-100"
+            >
+              <Scissors size={9} />
+              {draft.musicTrim
+                ? `${draft.musicTrim.startSeconds.toFixed(1)}s se ${draft.musicTrim.endSeconds.toFixed(1)}s`
+                : "poora gaana"}
+              <span className="underline">badlo</span>
+            </button>
+          </div>
+        ) : null}
+
+        <VideoTrimDialog
+          open={musicTrimOpen}
+          assetId={draft.musicAssetId}
+          sceneSeconds={Math.max(4, draftTotalSeconds(draft))}
+          fallbackSeconds={null}
+          value={draft.musicTrim}
+          onCancel={() => setMusicTrimOpen(false)}
+          onSave={(trim) => {
+            onMusicTrim(trim);
+            setMusicTrimOpen(false);
+          }}
+        />
 
         {draft.musicAssetId ? (
           <div className="flex flex-wrap items-center gap-1.5 border-t border-ink-700 pt-1.5">
