@@ -66,6 +66,11 @@ import {
   draftAdvice,
   textHidden,
   requireSceneType,
+  MAX_ANIMATION_ZOOM,
+  ANIMATION_PRESETS,
+  EFFECT_PRESETS,
+  listAnimations,
+  listEffects,
   listSceneTypes,
   addScene,
   parseDoc,
@@ -2435,6 +2440,41 @@ check(
   box?.durationInFrames === hiddenVisual?.durationInFrames && box?.startFrame === hiddenVisual?.startFrame,
   "chhota rehne par beech me se chhupaya hua hissa dikhne lagta hai",
 );
+
+/* ------------------------------------------------- naye preset chalte hain? */
+
+console.log("\nharkat aur rang ke preset");
+
+check(
+  "sabse bada zoom 1.35 par hi hai",
+  MAX_ANIMATION_ZOOM === 1.35,
+  "ye badalte hi HAR purani fit copy bekaar ho jaati hai — naya target, nayi cache key, nayi file",
+);
+
+/*
+ * ⚠️ Ye jaanch sabse zaroori hai. Preset sirf data hain; usme koi bhi `type`
+ * likha ja sakta hai aur TypeScript kuch nahi kehta. Anjaan type par renderer
+ * chup-chaap kuch nahi karta — yaani preset chunne par kuch hota hi nahi, bina
+ * kisi error ke. Wahi "toota hua button" hai, aur wo sirf reel dekh kar pakda
+ * jaata.
+ */
+const knownAnimations = new Set(listAnimations().map((entry) => entry.id));
+for (const preset of ANIMATION_PRESETS) {
+  check(
+    `${preset.id}: har animation ka type sach me maujood hai`,
+    preset.animations.every((animation) => knownAnimations.has(String(animation.type))),
+    preset.animations.map((a) => String(a.type)).join(", "),
+  );
+}
+
+const knownEffects = new Set(listEffects().map((entry) => entry.id));
+for (const preset of EFFECT_PRESETS) {
+  check(
+    `${preset.id}: har effect ka type sach me maujood hai`,
+    preset.effects.every((effect) => knownEffects.has(String(effect.type))),
+    preset.effects.map((e) => String(e.type)).join(", "),
+  );
+}
 
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.

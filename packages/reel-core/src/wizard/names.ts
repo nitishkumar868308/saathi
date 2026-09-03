@@ -38,6 +38,11 @@ export const ANIMATION_PLAIN_NAMES: readonly PlainName[] = [
   { id: "cinematic-drift", label: "Bahaav", when: "Mahaul wale scene par" },
   { id: "slide-up-soft", label: "Neeche se upar", when: "Nayi baat shuru hone par" },
   { id: "focus-pull", label: "Focus", when: "Kisi ek cheez par dhyan le jaana ho" },
+  { id: "push-in", label: "Paas aana", when: "Kisi baat par zor dena ho" },
+  { id: "pull-back", label: "Door jaana", when: "Pehle ek hissa, phir poori baat" },
+  { id: "pan-across", label: "Aar-paar", when: "Chaudi tasveer khadi reel me daalni ho" },
+  { id: "tilt-in", label: "Tirchha aana", when: "Sticker, logo ya chhote card par" },
+  { id: "slide-in-side", label: "Bagal se aana", when: "Do cheezein baari-baari dikhani ho" },
 ];
 
 export const TRANSITION_PLAIN_NAMES: readonly PlainName[] = [
@@ -73,6 +78,10 @@ export const EFFECT_PLAIN_NAMES: readonly PlainName[] = [
   },
   { id: "bw", label: "Safed-kaala", when: "Purani yaad, ya jab rang bikhre hue hon" },
   { id: "vintage", label: "Purana", when: "Bhoora, halka pheeka — nostalgia wali baat par" },
+  { id: "warm-film", label: "Garam rang", when: "Chehre wale scene par" },
+  { id: "cool-clean", label: "Saaf aur thanda", when: "App ya product dikhana ho" },
+  { id: "pop-colour", label: "Rang chamka do", when: "Kuch bechna ho — khaana, kapda" },
+  { id: "dreamy", label: "Dhundhla sapna", when: "Yaad ya kahani wale scene par" },
 ];
 
 /**

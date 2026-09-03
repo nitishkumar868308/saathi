@@ -56,6 +56,49 @@ export const EFFECT_PRESETS: readonly EffectPreset[] = [
       { type: "vignette", enabled: true, amount: 0.5, spread: 0.5, color: "#2b1a0e" },
     ],
   },
+  {
+    id: "warm-film",
+    label: "Warm film",
+    hint: "Halka garam rang — chehre par sabse achha lagta hai",
+    effects: [
+      { type: "brightness", enabled: true, amount: 1.04 },
+      { type: "sepia", enabled: true, amount: 0.14 },
+      { type: "saturation", enabled: true, amount: 1.08 },
+      { type: "vignette", enabled: true, amount: 0.26, spread: 0.66, color: "#000000" },
+    ],
+  },
+  {
+    id: "cool-clean",
+    label: "Cool clean",
+    hint: "Saaf aur thanda — app, product ya screen recording par",
+    effects: [
+      { type: "brightness", enabled: true, amount: 1.03 },
+      { type: "contrast", enabled: true, amount: 1.1 },
+      { type: "saturation", enabled: true, amount: 1.04 },
+      { type: "sharpen", enabled: true, amount: 0.35 },
+    ],
+  },
+  {
+    id: "pop-colour",
+    label: "Rang chamka do",
+    hint: "Tez rang — khaana, kapda, koi bhi cheez bechni ho",
+    effects: [
+      { type: "saturation", enabled: true, amount: 1.34 },
+      { type: "contrast", enabled: true, amount: 1.12 },
+      { type: "sharpen", enabled: true, amount: 0.4 },
+    ],
+  },
+  {
+    id: "dreamy",
+    label: "Dhundhla sapna",
+    hint: "Narm aur halka — yaad, kahani ya shuruaat wale scene par",
+    effects: [
+      { type: "brightness", enabled: true, amount: 1.08 },
+      { type: "saturation", enabled: true, amount: 0.94 },
+      { type: "blur", enabled: true, radius: 1 },
+      { type: "vignette", enabled: true, amount: 0.3, spread: 0.75, color: "#000000" },
+    ],
+  },
 ];
 
 export function findEffectPreset(id: string): EffectPreset | undefined {

@@ -73,6 +73,59 @@ export const ANIMATION_PRESETS: readonly AnimationPreset[] = [
       { type: "kenburns", enabled: true, from: 1.12, to: 1, focalX: 0.5, focalY: 0.5, easing: "ease-out" },
     ],
   },
+
+  /*
+   * ⚠️ Neeche ke preset baad me jode gaye, aur unme se **kisi ka zoom 1.35 se
+   * upar nahi** hai. Wo hadd `kenburns-punch` ki hai, aur `MAX_ANIMATION_ZOOM`
+   * usi se banta hai — jispar fit ka poora target tika hua hai. Usse upar jaane
+   * wala ek bhi preset har purani fit copy ko bekaar kar deta (naya target =
+   * nayi cache key = nayi file), aur wo kharcha ek animation ke laayak nahi hai.
+   */
+  {
+    id: "push-in",
+    label: "Push in",
+    hint: "Zoom jo aakhir me thehar jaata hai — kisi baat par zor dene ke liye",
+    animations: [
+      { type: "kenburns", enabled: true, from: 1, to: 1.18, focalX: 0.5, focalY: 0.45, easing: "ease-out" },
+    ],
+  },
+  {
+    id: "pull-back",
+    label: "Pull back",
+    hint: "Paas se door — pehle ek hissa, phir poori tasveer",
+    animations: [
+      { type: "kenburns", enabled: true, from: 1.28, to: 1, focalX: 0.5, focalY: 0.5, easing: "ease-out" },
+      { type: "fade", enabled: true, mode: "in", durationInFrames: 10, easing: "ease-out" },
+    ],
+  },
+  {
+    id: "pan-across",
+    label: "Aar-paar",
+    hint: "Chaudi tasveer par baayen se daayen — landscape photo khadi reel me",
+    animations: [
+      { type: "pan", enabled: true, direction: "left", amountPercent: 14, easing: "linear" },
+      { type: "kenburns", enabled: true, from: 1.12, to: 1.12, focalX: 0.5, focalY: 0.5, easing: "linear" },
+    ],
+  },
+  {
+    id: "tilt-in",
+    label: "Tirchha aana",
+    hint: "Halka ghoom kar aana — sticker, logo ya chhote card par",
+    animations: [
+      { type: "rotateIn", enabled: true, degrees: -7, durationInFrames: 14, easing: "spring" },
+      { type: "scalePop", enabled: true, from: 0.86, durationInFrames: 14, easing: "spring" },
+      { type: "fade", enabled: true, mode: "in", durationInFrames: 8, easing: "ease-out" },
+    ],
+  },
+  {
+    id: "slide-in-side",
+    label: "Bagal se aana",
+    hint: "Daayin taraf se sarak kar — do cheezein baari-baari dikhani ho",
+    animations: [
+      { type: "slide", enabled: true, direction: "right", distancePercent: 12, durationInFrames: 16, easing: "ease-out" },
+      { type: "fade", enabled: true, mode: "in", durationInFrames: 10, easing: "ease-out" },
+    ],
+  },
 ];
 
 export function getAnimationPreset(id: string): AnimationPreset | undefined {
