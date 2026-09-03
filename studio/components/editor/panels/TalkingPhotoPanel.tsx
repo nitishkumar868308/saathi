@@ -144,6 +144,7 @@ export function TalkingPhotoPanel() {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   /*
@@ -165,14 +166,7 @@ export function TalkingPhotoPanel() {
 
     void (async () => {
       try {
-        const url = await getAssetUrl(assetId);
-        const image = new Image();
-        image.crossOrigin = "anonymous";
-        image.src = url;
-        await image.decode();
-        if (!alive) return;
-
-        const detected = await detectFace(image);
+        const detected = await detectFace(assetId);
         if (!alive) return;
         setFace(detected ? { kind: "found", detected } : { kind: "none" });
       } catch (cause) {
@@ -191,6 +185,7 @@ export function TalkingPhotoPanel() {
 
     setBusy("Awaaz ban rahi hai…");
     setError(null);
+    setWarning(null);
     setDone(null);
 
     try {
@@ -203,11 +198,18 @@ export function TalkingPhotoPanel() {
       const envelope = await audioEnvelope(voiceUrl);
 
       /*
-       * ⚠️ Envelope na mile to bhi kaam rukta nahi — track poori lambai ko bolna
-       * maan kar ban jaata hai. Wo thoda kam theek hota hai (saans wale sannate
-       * me bhi muh chalta hai), par ek adhoore raaste par poora kaam rok dena
-       * usse zyada bura hai.
+       * ⚠️ Envelope na mile to kaam rukta nahi — track poori lambai ko bolna maan
+       * kar ban jaata hai. Par ye baat **dikhti hai**, chup-chaap nahi hoti: us
+       * halat me muh saans wale sannate me bhi chalta rehta hai, aur agar wo
+       * chup-chaap ho to aadmi ko sirf itna dikhta hai ki "lip sync kharab hai"
+       * — bina ye jaane ki wajah kya thi aur wo theek ho bhi sakti hai.
        */
+      if (!envelope) {
+        setWarning(
+          "Awaaz naapi nahi ja saki, isliye muh poori lambai me chalta rahega — " +
+            "saans wale hisson me bhi. Dobara 'Bana do' dabane par aksar theek ho jaata hai.",
+        );
+      }
       const durationSeconds = Math.max(
         MIN_SECONDS,
         envelope?.durationSeconds ?? voice.seconds ?? MIN_SECONDS,
@@ -395,6 +397,11 @@ export function TalkingPhotoPanel() {
         {error ? (
           <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[10px] leading-snug text-red-300">
             {error}
+          </p>
+        ) : null}
+        {warning ? (
+          <p className="rounded border border-amber/40 bg-amber/10 px-2 py-1.5 text-[10px] leading-snug text-amber">
+            {warning}
           </p>
         ) : null}
         {done ? (

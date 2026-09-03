@@ -90,7 +90,47 @@ function ringArea(points: readonly FacePoint[]): number {
  * jo render me ek hilte hue dhabbe ki tarah nikalti hai — aur tab tak aadmi poori
  * reel bana chuka hota hai.
  */
-export async function detectFace(image: HTMLImageElement): Promise<DetectedFace | null> {
+/**
+ * Asset ki tasveer **apne hi origin se** laao.
+ *
+ * ⚠️ `/raw` se, `/url` se nahi — aur ye ek asli bug ka ilaaj hai. `/url` ek
+ * signed URL deta hai jo R2 ka (ya `http://localhost:3000` ka) hota hai, yaani
+ * aksar **doosra origin**. Uspar `crossOrigin="anonymous"` lagane par browser
+ * CORS maangta hai; na mile to tasveer load hi nahi hoti aur `decode()` seedha
+ * "The source image cannot be decoded" par mar jaata hai — jabki wahi tasveer
+ * screen par bilkul theek dikh rahi hoti hai (`<img>` ko CORS nahi chahiye).
+ *
+ * ⚠️ Aur CORS lag bhi jaaye to doosra sawaal bacha rehta: MediaPipe tasveer ke
+ * **pixel padhta** hai, aur doosre origin ki tasveer canvas ko "taint" kar deti
+ * hai. Blob se banaya hua URL apna hi origin hota hai, isliye dono sawaal uthte
+ * hi nahi. Yahi tarika `lib/fitInBrowser.ts` pehle se istemal karta hai — wahan
+ * bhi wajah likhi hui hai.
+ */
+async function loadFromAsset(assetId: string): Promise<HTMLImageElement> {
+  const response = await fetch(`/api/assets/${assetId}/raw`);
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { reason?: string };
+    throw new Error(data.reason ?? `tasveer nahi mili (${response.status})`);
+  }
+
+  const url = URL.createObjectURL(await response.blob());
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return image;
+  } finally {
+    /*
+     * ⚠️ Revoke `decode()` ke BAAD. Pehle karne par kuch browser tasveer aadhi
+     * padhi chhod dete hain, aur wo galti kabhi-kabhi hi dikhti hai — yaani sabse
+     * bura kism ki galti.
+     */
+    URL.revokeObjectURL(url);
+  }
+}
+
+export async function detectFace(assetId: string): Promise<DetectedFace | null> {
+  const image = await loadFromAsset(assetId);
   const width = image.naturalWidth;
   const height = image.naturalHeight;
   if (!width || !height) return null;
