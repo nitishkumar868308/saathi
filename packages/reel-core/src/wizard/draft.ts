@@ -421,6 +421,20 @@ export interface WizardScene {
    */
   containBackground: { kind: string; value: string | null } | null;
   /**
+   * Frame ke wo hisse jo **dikhne nahi chahiye** — har ek 0-1 me (frame ka anupaat).
+   *
+   * ⚠️ `x`/`y` upar-baayen kone ke hain, beech ke nahi. Beech se naapna item ke
+   * `transform` ka tarika hai (wo frame ke center se offset leta hai), par chunte
+   * waqt aadmi ek chaukor kheenchta hai — aur uska sach upar-baayan kona hota
+   * hai. Do alag tarike ek hi field me milane par ek din koi ek jagah convert
+   * karna bhool jaata hai, aur dabba chehre ki jagah kandhe par baith jaata hai.
+   *
+   * ⚠️ Ye reel ke **poore frame** ke hisaab se hai, us video ke andar ke naap se
+   * nahi. Video ka apna naap fit ke baad badal jaata hai; uspar baandhne par
+   * dabba fit badalte hi khisak jaata.
+   */
+  hideRegions: { x: number; y: number; width: number; height: number }[];
+  /**
    * Jo fit abhi lagi hai, wo **kis maang par** bani thi.
    *
    * ⚠️ Ye sirf hisaab bachane ke liye nahi hai. Iske bina UI ko ye pata hi nahi
@@ -942,6 +956,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         visualFitAssetId: null,
         visualFitOff: false,
         containBackground: null,
+        hideRegions: [],
         visualFitKey: null,
         visualSize: null,
         visualTrim: null,
@@ -997,6 +1012,7 @@ export function blankScene(index: number): WizardScene {
   return {
     index,
     containBackground: null,
+    hideRegions: [],
     type: "text",
     name: `Scene ${index + 1}`,
     /*
@@ -1744,6 +1760,64 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
      * dobara chhoti ho kar baith jaati hai, kinare par dhundhli patti ke saath.
      */
     const fitVisual = visualAssetOf(source);
+    /*
+     * Chhupaya hua hissa — har chune hue chaukor par ek kaala dabba.
+     *
+     * ⚠️ Ye scene ke items ke **beech** me lagta hai: asli tasveer/video ke upar,
+     * par text ke neeche. Sabse upar rakhne par dabba caption ko bhi dhak leta
+     * hai — aur aadmi ne dabba video ka ek hissa chhupane ke liye kheencha tha,
+     * apna hi likha hua text mitane ke liye nahi.
+     *
+     * ⚠️ Naap `shape` ke percent me jaata hai aur jagah `transform` ke pixel me,
+     * kyunki dono ka tarika alag hai. Yahi ek jagah hai jahan upar-baayen kone se
+     * beech wale offset me badla jaata hai — do jagah karne par ek din ek jagah
+     * chhoot jaati hai.
+     */
+    if (source.hideRegions.length > 0) {
+      const frameWidth = doc.project.width;
+      const frameHeight = doc.project.height;
+      const after = doc.items.findIndex((item) => item.id === primary.id);
+
+      const boxes: Item[] = source.hideRegions.map((region, boxAt) => {
+        const box = createItem("shape", {
+          fps: doc.project.fps,
+          trackId: primary.trackId,
+          name: `Chhupaya ${boxAt + 1}`,
+          startFrame: primary.startFrame,
+          durationInFrames: primary.durationInFrames,
+        });
+        return {
+          ...box,
+          sceneId: scene.id,
+          shape: {
+            ...(box.shape as NonNullable<Item["shape"]>),
+            kind: "rect" as const,
+            fill: "#000000",
+            radius: 0,
+            widthPercent: Math.max(0.1, region.width * 100),
+            heightPercent: Math.max(0.1, region.height * 100),
+          },
+          transform: {
+            ...box.transform,
+            x: (region.x + region.width / 2 - 0.5) * frameWidth,
+            y: (region.y + region.height / 2 - 0.5) * frameHeight,
+          },
+        };
+      });
+
+      const items = [...doc.items];
+      items.splice(after + 1, 0, ...boxes);
+      doc = {
+        ...doc,
+        items,
+        scenes: doc.scenes.map((entry) =>
+          entry.id === scene.id
+            ? { ...entry, itemIds: [...entry.itemIds, ...boxes.map((box) => box.id)] }
+            : entry,
+        ),
+      };
+    }
+
     if (
       fitVisual &&
       source.visualFitAssetId === null &&

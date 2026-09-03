@@ -29,6 +29,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
+import { HidePicker } from "@/components/editor/wizard/HidePicker";
 import { VideoTrimDialog } from "@/components/editor/wizard/VideoTrimDialog";
 import { useAssetUrl } from "@/lib/assetUrls";
 import { forgetAssetMeta, useAssetDurations } from "@/lib/assetMeta";
@@ -770,6 +771,32 @@ function SceneRow({
               ) : null}
             </span>
           </p>
+        ) : null}
+
+        {/*
+          Frame ka jo hissa chhupana hai.
+
+          ⚠️ Sirf tab dikhta hai jab koi tasveer/video lagi ho — bina kisi cheez
+          ke "kya chhupana hai" poochhna bekaar hai, aur wo panel ko sirf lamba
+          karta hai.
+        */}
+        {scene.visualAssetId ? (
+          <details className="rounded border border-ink-700 px-2 py-1.5">
+            <summary className="cursor-pointer text-[10px] text-chalk-400">
+              Kuch chhupana hai?
+              {scene.hideRegions.length > 0 ? (
+                <span className="ml-1 text-terracotta">({scene.hideRegions.length})</span>
+              ) : null}
+            </summary>
+            <div className="pt-1.5">
+              <HidePicker
+                preview={scene.visualAssetKind === "video" ? (videoUrl ?? null) : (url ?? null)}
+                aspect={project.width / project.height}
+                regions={scene.hideRegions}
+                onChange={(next) => onChange(scene.index, { hideRegions: next })}
+              />
+            </div>
+          </details>
         ) : null}
 
         {scene.visualAssetId ? (

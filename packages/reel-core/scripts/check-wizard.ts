@@ -2345,6 +2345,97 @@ check(
   "kinare bharne ka tarika alag sawaal hai, aur tasveer kaise baithe wo alag",
 );
 
+/* --------------------------------------------- frame ka hissa chhupana */
+
+console.log("\nchhupaya hua hissa");
+
+function draftWithHidden(regions: { x: number; y: number; width: number; height: number }[]) {
+  const base = autoFill(draftFromScript(script));
+  return {
+    ...base,
+    scenes: base.scenes.map((scene, at) =>
+      at === 0
+        ? {
+            ...scene,
+            type: "image_audio",
+            text: "kuch likha hua",
+            visualAssetId: "as_pic",
+            visualAssetKind: "image" as const,
+            visualFitOff: true,
+            hideRegions: regions,
+          }
+        : scene,
+    ),
+  };
+}
+
+function hiddenDoc(regions: { x: number; y: number; width: number; height: number }[]) {
+  return applyWizard({
+    doc: createEmptyProject({ name: "Chhupao", fps: 30 }),
+    draft: draftWithHidden(regions),
+  }).doc;
+}
+
+const noBox = hiddenDoc([]);
+check(
+  "bina chune koi dabba nahi banta",
+  !noBox.items.some((item) => item.name.startsWith("Chhupaya")),
+);
+
+const oneBox = hiddenDoc([{ x: 0.1, y: 0.2, width: 0.3, height: 0.25 }]);
+const box = oneBox.items.find((item) => item.name.startsWith("Chhupaya"));
+check("chune hue hisse par dabba banta hai", box !== undefined);
+check("wo kaala hai", box?.shape?.fill === "#000000");
+check(
+  "uska naap frame ke percent me jaata hai",
+  box?.shape?.widthPercent === 30 && box?.shape?.heightPercent === 25,
+);
+
+/*
+ * ⚠️ Jagah ka hisaab: chunte waqt aadmi upar-baayan kona deta hai, par item
+ * `transform` me frame ke BEECH se offset leta hai. Yahi ek jagah hai jahan wo
+ * badla jaata hai, aur yahi galat hone par dabba chehre ki jagah kandhe par
+ * baithta hai.
+ */
+check(
+  "jagah beech se naapi jaati hai",
+  box?.transform.x === (0.1 + 0.15 - 0.5) * 1080 && box?.transform.y === (0.2 + 0.125 - 0.5) * 1920,
+  `x ${box?.transform.x}, y ${box?.transform.y}`,
+);
+
+check(
+  "dabba usi scene ka hissa hai",
+  oneBox.scenes.some((scene) => scene.itemIds.includes(box?.id ?? "")),
+  "scene se bahar rehne par wo scene hataane par bhi pada reh jaata",
+);
+
+const hiddenVisual = oneBox.items.find((item) => item.assetId === "as_pic");
+const hiddenCaption = oneBox.items.find((item) => item.type === "text");
+check(
+  "dabba tasveer ke UPAR hai",
+  oneBox.items.indexOf(box!) > oneBox.items.indexOf(hiddenVisual!),
+  "neeche rehne par wo chhupata hi nahi",
+);
+check(
+  "par text ke NEECHE hai",
+  hiddenCaption === undefined || oneBox.items.indexOf(box!) < oneBox.items.indexOf(hiddenCaption),
+  "sabse upar rakhne par dabba apna hi likha hua text bhi mita deta hai",
+);
+
+check(
+  "do hisse chune to do dabbe",
+  hiddenDoc([
+    { x: 0, y: 0, width: 0.2, height: 0.2 },
+    { x: 0.5, y: 0.5, width: 0.2, height: 0.2 },
+  ]).items.filter((item) => item.name.startsWith("Chhupaya")).length === 2,
+);
+
+check(
+  "dabba utni hi der rehta hai jitni tasveer",
+  box?.durationInFrames === hiddenVisual?.durationInFrames && box?.startFrame === hiddenVisual?.startFrame,
+  "chhota rehne par beech me se chhupaya hua hissa dikhne lagta hai",
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *
