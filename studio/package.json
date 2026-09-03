@@ -14,9 +14,10 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts && tsx scripts/check-preview.ts && tsx scripts/check-timeline.ts && tsx scripts/check-properties.ts && tsx scripts/check-shortcuts.ts && tsx scripts/check-ai.ts && tsx scripts/check-responsive.ts && tsx scripts/check-tts.ts && tsx scripts/check-face.ts",
+    "check": "tsx scripts/check-autosave.ts && tsx scripts/check-store.ts && tsx scripts/check-preview.ts && tsx scripts/check-timeline.ts && tsx scripts/check-properties.ts && tsx scripts/check-shortcuts.ts && tsx scripts/check-ai.ts && tsx scripts/check-responsive.ts && tsx scripts/check-tts.ts && tsx scripts/check-face.ts && tsx scripts/check-talking-scene.ts",
     "check:tts": "tsx scripts/check-tts.ts",
-    "check:face": "tsx scripts/check-face.ts"
+    "check:face": "tsx scripts/check-face.ts",
+    "check:talking": "tsx scripts/check-talking-scene.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",

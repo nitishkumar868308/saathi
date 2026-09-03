@@ -11,6 +11,7 @@ import {
   LayoutTemplate,
   Palette,
   Volume2,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -25,6 +26,7 @@ import { ProjectPanel } from "@/components/editor/panels/ProjectPanel";
 import { RendersPanel } from "@/components/editor/panels/RendersPanel";
 import { VersionsPanel } from "@/components/editor/panels/VersionsPanel";
 import { MediaPanel } from "@/components/media/MediaPanel";
+import { TalkingPhotoPanel } from "@/components/editor/panels/TalkingPhotoPanel";
 
 /**
  * Left sidebar ke tabs — **registry se** (checklist 4.11).
@@ -66,6 +68,12 @@ export const LEFT_PANELS: readonly PanelEntry[] = [
     label: "AI",
     icon: Sparkles,
     component: AiPanel,
+  },
+  {
+    id: "talking-photo",
+    label: "Bolti Tasveer",
+    icon: Mic,
+    component: TalkingPhotoPanel,
   },
   {
     id: "templates",
