@@ -3,6 +3,7 @@
 import {
   requiredVisualSize,
   fitFor,
+  CONTAIN_BACKGROUNDS,
   fitVerdict,
   planFit,
   suggestAnimation,
@@ -781,6 +782,10 @@ function SceneRow({
             phoneFrame={scene.phoneFrame}
             onOff={turnFitOff}
             onOn={turnFitOn}
+            containBackground={scene.containBackground}
+            onContainBackground={(next) =>
+              onChange(scene.index, { containBackground: next })
+            }
           />
         ) : null}
 
@@ -884,6 +889,8 @@ function FitPanel({
   phoneFrame,
   onOff,
   onOn,
+  containBackground,
+  onContainBackground,
 }: {
   plan: FitPlan | null;
   state: { key: string; status: "busy" | "done" | "fail" | "skip"; reason?: string } | null;
@@ -893,6 +900,9 @@ function FitPanel({
   phoneFrame: boolean;
   onOff(): void;
   onOn(): void;
+  /** Kinare kaise bharein — `null` = dhundhli copy (default). */
+  containBackground: { kind: string; value: string | null } | null;
+  onContainBackground(next: { kind: string; value: string | null } | null): void;
 }) {
   /*
    * ⚠️ Phone frame wale scene par fit nahi lagta, aur ye baat likhi jaani chahiye.
@@ -994,6 +1004,49 @@ function FitPanel({
           Asli file hi lagao
         </button>
       </div>
+
+      {/*
+        Kinare kaise bharein — **sirf jab kinare sach me bachte hon**.
+
+        ⚠️ Ye shart zaroori hai. `cover` par kinare bachte hi nahi, aur wahan ye
+        chunav dikhana ek aisa control hai jo dabane par kuch nahi karta — aur wo
+        control na hone se bura hota hai, kyunki aadmi use dabata hai aur phir
+        dhoondhta hai ki hua kya.
+
+        ⚠️ Registry par map hai, haath se likhi list nahi — `CONTAIN_BACKGROUNDS`
+        me nayi entry jodne par wo apne aap yahan aa jaayegi.
+      */}
+      {plan?.mode === "contain" && !off ? (
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[10px] text-chalk-500">Kinare:</span>
+          {CONTAIN_BACKGROUNDS.map((entry) => {
+            const chosen =
+              entry.id === (containBackground?.kind ?? "blurred-asset");
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                title={entry.hint}
+                onClick={() =>
+                  onContainBackground(
+                    entry.id === "blurred-asset"
+                      ? null
+                      : { kind: entry.id, value: entry.id === "brand" ? "brand.primary" : "#000000" },
+                  )
+                }
+                className={clsx(
+                  "rounded border px-1.5 py-0.5 text-[10px] transition-colors",
+                  chosen
+                    ? "border-terracotta bg-terracotta/10 text-chalk-100"
+                    : "border-ink-600 text-chalk-400 hover:border-chalk-500",
+                )}
+              >
+                {entry.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/*
         ⚠️ Nateeja **pehle** likha jaata hai, ban jaane ke baad nahi. Yahi wo baat

@@ -406,6 +406,21 @@ export interface WizardScene {
    */
   visualFitOff: boolean;
   /**
+   * Jab tasveer/video frame me poori nahi bharti, to bache hue kinare kaise
+   * bharein — `null` = uski hi dhundhli copy (default).
+   *
+   * ⚠️ Ye chunav **sirf tab maayne rakhta hai jab kinare sach me bachte hon**
+   * (`contain`). Poora bharne wali tasveer par ye kuch nahi karta, aur usi wajah
+   * se UI use wahan dikhata bhi nahi — ek dikhta hua control jo kuch na kare, wo
+   * toota hua control hai.
+   *
+   * ⚠️ Default dhundhli copy hi rehta hai, aur wo soch kar hai: 16:9 footage ko
+   * 9:16 reel me daalne par wahi sabse kam khatakta hai. Rang chunna behtar tab
+   * hota hai jab reel ka apna ek pakka rang ho — aur wo aadmi jaanta hai, hum
+   * nahi.
+   */
+  containBackground: { kind: string; value: string | null } | null;
+  /**
    * Jo fit abhi lagi hai, wo **kis maang par** bani thi.
    *
    * ⚠️ Ye sirf hisaab bachane ke liye nahi hai. Iske bina UI ko ye pata hi nahi
@@ -926,6 +941,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         visualAssetKind: null,
         visualFitAssetId: null,
         visualFitOff: false,
+        containBackground: null,
         visualFitKey: null,
         visualSize: null,
         visualTrim: null,
@@ -980,6 +996,7 @@ export function nextSceneIndex(draft: WizardDraft): number {
 export function blankScene(index: number): WizardScene {
   return {
     index,
+    containBackground: null,
     type: "text",
     name: `Scene ${index + 1}`,
     /*
@@ -1743,9 +1760,20 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
                   ...item,
                   fit: {
                     mode: "contain" as const,
-                    background: fit.blurred
-                      ? { kind: "blurred-asset" as const, value: null }
-                      : item.fit.background,
+                    /*
+                     * ⚠️ Aadmi ka chunav pehle, default baad me. Pehle yahan
+                     * hamesha dhundhli copy lagti thi, aur `CONTAIN_BACKGROUNDS`
+                     * ki poori registry kahin istemal hi nahi hoti thi — yaani
+                     * chaar chunav likhe hue the aur ek bhi pahunchta nahi tha.
+                     */
+                    background: source.containBackground
+                      ? {
+                          kind: source.containBackground.kind as "color",
+                          value: source.containBackground.value,
+                        }
+                      : fit.blurred
+                        ? { kind: "blurred-asset" as const, value: null }
+                        : item.fit.background,
                   },
                 }
               : item,

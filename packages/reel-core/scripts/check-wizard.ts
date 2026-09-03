@@ -2278,6 +2278,73 @@ console.log("\npeeche ki tasveer sach me lagti hai?");
   }
 }
 
+/* ------------------------------------------------ kinaron ka background */
+
+console.log("\nkinare kaise bharein");
+
+/*
+ * ⚠️ Ye chunav pehle registry me likha hua tha par kahin pahunchta nahi tha —
+ * `CONTAIN_BACKGROUNDS` ki chaaron entry maujood thi aur wizard hamesha dhundhli
+ * copy hi lagata tha. Yaani chaar chunav likhe the aur ek bhi kaam nahi karta
+ * tha.
+ */
+function draftWithWideImage(background: { kind: string; value: string | null } | null) {
+  const base = autoFill(draftFromScript(script));
+  return {
+    ...base,
+    scenes: base.scenes.map((scene, at) =>
+      at === 0
+        ? {
+            ...scene,
+            type: "image_audio",
+            visualAssetId: "as_wide",
+            visualAssetKind: "image" as const,
+            visualFitAssetId: null,
+            visualFitOff: true,
+            phoneFrame: false,
+            /* Chaudi tasveer, khadi reel — isi par kinare bachte hain. */
+            visualSize: { width: 3840, height: 1080 },
+            containBackground: background,
+          }
+        : scene,
+    ),
+  };
+}
+
+function firstSceneFit(background: { kind: string; value: string | null } | null) {
+  const out = applyWizard({
+    doc: createEmptyProject({ name: "Kinare", fps: 30 }),
+    draft: draftWithWideImage(background),
+  });
+  const item = out.doc.items.find((entry) => entry.assetId === "as_wide");
+  return item?.fit ?? null;
+}
+
+const autoEdges = firstSceneFit(null);
+check("chaudi tasveer par kinare bachte hain", autoEdges?.mode === "contain");
+check(
+  "bina chune, kinare uski hi dhundhli copy se bharte hain",
+  autoEdges?.background.kind === "blurred-asset",
+  "16:9 footage ko 9:16 me daalne par yahi sabse kam khatakta hai",
+);
+
+const edgeColored = firstSceneFit({ kind: "color", value: "#101014" });
+check("rang chunne par wahi rang lagta hai", edgeColored?.background.kind === "color");
+check("aur uski value bhi pahunchti hai", edgeColored?.background.value === "#101014");
+
+const edgeBranded = firstSceneFit({ kind: "brand", value: "brand.primary" });
+check(
+  "brand ka rang token ki tarah jaata hai",
+  edgeBranded?.background.value === "brand.primary",
+  "hex likh dene par brand badalne par ye akela purana reh jaata",
+);
+
+check(
+  "chunav se fit ka mode nahi badalta",
+  edgeColored?.mode === "contain",
+  "kinare bharne ka tarika alag sawaal hai, aur tasveer kaise baithe wo alag",
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *
