@@ -29,6 +29,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AssetPickerButton } from "@/components/editor/scenes/AssetPicker";
 import { ChoicePicker } from "@/components/editor/wizard/ChoicePicker";
+import { CollageDialog } from "@/components/editor/wizard/CollageDialog";
 import { HidePicker } from "@/components/editor/wizard/HidePicker";
 import { VideoTrimDialog } from "@/components/editor/wizard/VideoTrimDialog";
 import { useAssetUrl } from "@/lib/assetUrls";
@@ -153,6 +154,7 @@ function SceneRow({
    * upar likh deta.
    */
   const [trimFor, setTrimFor] = useState<{ assetId: string; part: number | "new" } | null>(null);
+  const [collageOpen, setCollageOpen] = useState(false);
 
   function setImage(assetId: string | null, kind: "image" | "video" = "image"): void {
     /*
@@ -634,6 +636,23 @@ function SceneRow({
             />
           </div>
 
+          {/*
+            Kai tasveerein jod kar ek.
+
+            ⚠️ Jodi hui tasveer ek NAYI file banti hai aur scene par wahi lagti
+            hai. Isliye baaki poora raasta — fit, harkat, chhupana, render — bina
+            kisi badlav ke chalta rehta hai. Scene ko "teen tasveerein" samajhna
+            sikhane ka matlab hota har us jagah ek naya case jodna.
+          */}
+          <button
+            type="button"
+            onClick={() => setCollageOpen(true)}
+            title="Do ya zyada tasveerein ek me jod do"
+            className="shrink-0 rounded border border-ink-600 px-1.5 py-1 text-[10px] text-chalk-400 transition-colors hover:border-terracotta hover:text-chalk-100"
+          >
+            Jodo
+          </button>
+
           {scene.visualAssetId ? (
             <button
               type="button"
@@ -933,6 +952,16 @@ function SceneRow({
             ) : null}
           </div>
         ) : null}
+
+        <CollageDialog
+          open={collageOpen}
+          frame={{ width: project.width, height: project.height }}
+          onCancel={() => setCollageOpen(false)}
+          onDone={(assetId) => {
+            setImage(assetId, "image");
+            setCollageOpen(false);
+          }}
+        />
 
         <VideoTrimDialog
           open={trimFor !== null}

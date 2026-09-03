@@ -39,6 +39,9 @@ import {
   mouthRegion,
   readFaceData,
   sampleFace,
+  COLLAGE_LAYOUTS,
+  collageSlots,
+  coverCrop,
   blinkAt,
   browLiftAt,
   buildEyeMesh,
@@ -889,6 +892,73 @@ check(
   middle.intensity > before.intensity && middle.intensity < after.intensity,
 );
 check("khaali track par aaram", visemeStateAt([], 1).shape.id === REST_VISEME);
+
+/* ------------------------------------------ kai tasveerein jod kar ek */
+
+console.log("\nkai tasveerein jod kar ek");
+
+const collageFrame = { width: 1080, height: 1920 };
+
+const rows3 = collageSlots({ count: 3, layout: "rows", frame: collageFrame });
+check("teen tasveeron par teen khaane", rows3.length === 3);
+check("upar-neeche me har khaana poori chaudai leta hai", rows3.every((slot) => slot.width === 1080));
+check(
+  "khaane ek doosre par nahi chadhte",
+  rows3.every((slot, at) => at === 0 || slot.y >= rows3[at - 1]!.y + rows3[at - 1]!.height),
+);
+check(
+  "saare khaane frame ke andar rehte hain",
+  rows3.every((slot) => slot.y + slot.height <= 1920 + 2),
+);
+
+const cols2 = collageSlots({ count: 2, layout: "columns", frame: collageFrame });
+check("bagal-bagal me har khaana poori oonchai leta hai", cols2.every((slot) => slot.height === 1920));
+check("aur wo aage-peeche baithte hain", cols2[1]!.x >= cols2[0]!.x + cols2[0]!.width);
+
+/*
+ * ⚠️ Jaali ka asli imtihaan teen tasveerein hain: 2x2 me ek khaana khaali reh
+ * jaata, aur wo khaali chaukor collage me ek chhed jaisa dikhta hai.
+ */
+const grid3 = collageSlots({ count: 3, layout: "grid", frame: collageFrame });
+check("jaali me teen tasveeron par teen hi khaane", grid3.length === 3);
+check(
+  "aakhri qatar poori chaudai baant leti hai",
+  grid3[2]!.width === 1080,
+  "khaali khaana chhodne par wo chhed jaisa dikhta hai — 'kuch load nahi hua' jaisa",
+);
+check("jaali me chaar par chaar khaane", collageSlots({ count: 4, layout: "grid", frame: collageFrame }).length === 4);
+check("jaali me chaar barabar chaude hote hain", (() => {
+  const four = collageSlots({ count: 4, layout: "grid", frame: collageFrame });
+  return four[0]!.width === four[1]!.width && four[2]!.width === four[3]!.width;
+})());
+
+check("ek hi tasveer par ek hi khaana, poora frame", (() => {
+  const one = collageSlots({ count: 1, layout: "rows", frame: collageFrame });
+  return one.length === 1 && one[0]!.width === 1080 && one[0]!.height === 1920;
+})());
+
+check("shunya par khaali", collageSlots({ count: 0, layout: "rows", frame: collageFrame }).length === 0);
+check("galat naap par khaali", collageSlots({ count: 3, layout: "rows", frame: { width: 0, height: 0 } }).length === 0);
+check("har layout ka apna naam hai", COLLAGE_LAYOUTS.every((entry) => entry.label.trim().length > 0));
+
+console.log("\nkhaane me crop");
+
+const wideCrop = coverCrop({ width: 4000, height: 1000 }, { width: 1080, height: 1080 });
+check("chaudi tasveer daayen-baayen se katti hai", wideCrop!.height === 1000 && wideCrop!.width === 1000);
+check("aur beech me se katti hai", wideCrop!.x === 1500, "kinare se kaatne par aadhe chehre kat jaate hain");
+
+const tallCrop = coverCrop({ width: 1000, height: 4000 }, { width: 1080, height: 1080 });
+check("lambi tasveer upar-neeche se katti hai", tallCrop!.width === 1000 && tallCrop!.height === 1000);
+check("wo bhi beech me se", tallCrop!.y === 1500);
+
+check(
+  "theek naap wali tasveer bilkul nahi katti",
+  (() => {
+    const same = coverCrop({ width: 1080, height: 1920 }, { width: 540, height: 960 });
+    return same!.x === 0 && same!.y === 0 && same!.width === 1080;
+  })(),
+);
+check("galat naap par null", coverCrop({ width: 0, height: 0 }, { width: 10, height: 10 }) === null);
 
 /* ------------------------------------------------------------------ summary */
 

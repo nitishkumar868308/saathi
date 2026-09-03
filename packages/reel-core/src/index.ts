@@ -50,6 +50,7 @@ export * from "./keyframes/interpolate";
 // Media — fit ka hisaab (ffmpeg @reel/media me, faisla yahan)
 export * from "./media/fitPlan";
 export * from "./media/uploadSize";
+export * from "./media/collage";
 export * from "./face/affine";
 export * from "./face/landmarks";
 export * from "./face/rings";
