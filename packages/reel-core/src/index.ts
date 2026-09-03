@@ -52,6 +52,7 @@ export * from "./media/fitPlan";
 export * from "./media/uploadSize";
 export * from "./face/affine";
 export * from "./face/landmarks";
+export * from "./face/rings";
 export * from "./face/mesh";
 export * from "./visemes/shapes";
 export * from "./visemes/fromText";

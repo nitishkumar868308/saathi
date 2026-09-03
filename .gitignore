@@ -19,6 +19,15 @@ worker/out/
 # Render ka output — bade MP4 kabhi repo me nahi jaate (REEL_OUTPUT_DIR).
 render-out/
 
+# MediaPipe ka WASM (34MB) — `npm run copy:mediapipe` ise node_modules se
+# public/ me le aata hai (dev aur build dono se apne aap). Repo me rakhna bekaar
+# hai: wahi bytes npm package me pehle se utar rahe hote hain.
+#
+# ⚠️ Model file (public/models/face_landmarker.task) is niyam me NAHI hai — wo
+# committed hai, kyunki wo npm par hai hi nahi aur use build par download karne
+# ka matlab hota har deploy ka ek bahari URL par tikna.
+studio/public/models/wasm/
+
 # Asli keys. Sirf .example files commit hoti hain.
 .env
 .env.local

@@ -37,6 +37,8 @@ import {
   mouthRegion,
   readFaceData,
   sampleFace,
+  ringsFromConnections,
+  pointsFromConnections,
   createEmptyProject,
   createItem,
   getItemType,
@@ -637,6 +639,55 @@ check(
   "AI ko dikhne wale scene type utne hi hain jitne pehle the",
   listSceneTypes().length === 12,
   "ye ginti badal jaaye to AI ka prompt badal chuka hai — aur wo maujooda reel ka vyavhaar badalna hai",
+);
+
+/* ------------------------------------------------- connections se qatarein */
+
+console.log("\nconnections se chehre ke hisse");
+
+/* Ek chakkar: 0-1-2-3-0 */
+const circle = [
+  { start: 0, end: 1 },
+  { start: 1, end: 2 },
+  { start: 2, end: 3 },
+  { start: 3, end: 0 },
+];
+/* Ek lakeer: 10-11-12 */
+const line = [
+  { start: 10, end: 11 },
+  { start: 11, end: 12 },
+];
+
+check("ghera ek hi qatar deta hai", ringsFromConnections(circle).length === 1);
+check("ghere ke saare point aate hain", ringsFromConnections(circle)[0]!.length === 4);
+check(
+  "ghera kram me chalta hai",
+  ringsFromConnections(circle)[0]!.join(",") === "0,1,2,3",
+);
+
+check("lakeer bhi ek qatar deti hai", ringsFromConnections(line).length === 1);
+check(
+  "lakeer sire se shuru hoti hai",
+  ringsFromConnections(line)[0]!.join(",") === "10,11,12",
+  "beech se shuru karne par aadhi lakeer chhoot jaati hai",
+);
+
+const both = ringsFromConnections([...circle, ...line]);
+check("do alag guchhe alag qatarein banti hain", both.length === 2);
+check(
+  "bada guchha pehle aata hai",
+  both[0]!.length >= both[1]!.length,
+  "bulane wale ko aksar sabse bada chahiye hota hai — bahari honth andaruni se bada hota hai",
+);
+
+check("khaali par khaali", ringsFromConnections([]).length === 0);
+check(
+  "apne aap se jude point par nahi phatta",
+  ringsFromConnections([{ start: 5, end: 5 }]).length === 0,
+);
+check(
+  "sab points ek list me mil jaate hain",
+  pointsFromConnections([...circle, ...line]).length === 7,
 );
 
 /* ------------------------------------------------------------------ summary */
