@@ -144,14 +144,22 @@ function SceneRow({
    * bina tasveer wala scene bilkul sthir reh jaata tha. Ab `suggestAnimation`
    * khud text ke liye text wala preset deta hai, isliye dono taraf jawab hai.
    */
-  const [trimFor, setTrimFor] = useState<string | null>(null);
+  /**
+   * Kaunsa hissa abhi chuna ja raha hai — `null` = dialog band.
+   *
+   * ⚠️ Ismein sirf assetId nahi, **kaunsa hissa** bhi hai. Pehle sirf assetId
+   * tha, aur ek se zyada hisse aane par dialog ko ye pata hi nahi chalta ki wo
+   * pehla badal raha hai ya doosra jod raha hai — aur wo har baar pehle wale ke
+   * upar likh deta.
+   */
+  const [trimFor, setTrimFor] = useState<{ assetId: string; part: number | "new" } | null>(null);
 
   function setImage(assetId: string | null, kind: "image" | "video" = "image"): void {
     /*
      * Video chunte hi trim ka sawaal — baad me nahi. Baad me poochhne par aadmi
      * aage badh chuka hota hai, aur galat hissa reel bante waqt hi dikhta hai.
      */
-    if (assetId && kind === "video") setTrimFor(assetId);
+    if (assetId && kind === "video") setTrimFor({ assetId, part: 0 });
 
     onChange(scene.index, {
       visualAssetId: assetId,
@@ -168,7 +176,7 @@ function SceneRow({
       visualFitAssetId: null,
       visualFitOff: false,
       visualFitKey: null,
-      ...(assetId && kind === "video" ? {} : { visualTrim: null }),
+      ...(assetId && kind === "video" ? {} : { visualTrim: null, visualMoreTrims: [] }),
       /*
        * ⚠️ Tasveer hatne par harkat ab **null nahi hoti, text wali ho jaati hai**.
        * Pehle yahan `null` likha tha, is dar se ki zoom text par lag jaayega. Us
@@ -846,30 +854,111 @@ function SceneRow({
           </div>
         ) : null}
 
-        {/* Video ho to uska chuna hua hissa saaf dikhe, aur badla ja sake. */}
+        {/*
+          Video ke chune hue hisse — har ek alag qatar me, aur naya jodne ka raasta.
+
+          ⚠️ Hisse **usi kram me** bajte hain jis kram me yahan dikh rahe hain.
+          Waqt ke hisaab se apne aap tarteeb dena galat hoga: kabhi-kabhi baad ka
+          hissa pehle dikhana hi poora maqsad hota hai (jawab pehle, sawaal baad
+          me).
+        */}
         {scene.visualAssetKind === "video" && scene.visualAssetId ? (
-          <button
-            type="button"
-            onClick={() => setTrimFor(scene.visualAssetId)}
-            className="flex items-center gap-1 text-[10px] text-chalk-400 transition-colors hover:text-chalk-100"
-          >
-            <Film size={9} />
-            {scene.visualTrim
-              ? `${scene.visualTrim.startSeconds.toFixed(1)}s se ${scene.visualTrim.endSeconds.toFixed(1)}s`
-              : "poori video"}
-            <span className="underline">badlo</span>
-          </button>
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => setTrimFor({ assetId: scene.visualAssetId as string, part: 0 })}
+              className="flex items-center gap-1 text-[10px] text-chalk-400 transition-colors hover:text-chalk-100"
+            >
+              <Film size={9} />
+              {scene.visualTrim
+                ? `1. ${scene.visualTrim.startSeconds.toFixed(1)}s se ${scene.visualTrim.endSeconds.toFixed(1)}s`
+                : "poori video"}
+              <span className="underline">badlo</span>
+            </button>
+
+            {scene.visualMoreTrims.map((part, order) => (
+              <div key={order} className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTrimFor({ assetId: scene.visualAssetId as string, part: order + 1 })
+                  }
+                  className="flex items-center gap-1 text-[10px] text-chalk-400 transition-colors hover:text-chalk-100"
+                >
+                  <Film size={9} />
+                  {`${order + 2}. ${part.startSeconds.toFixed(1)}s se ${part.endSeconds.toFixed(1)}s`}
+                  <span className="underline">badlo</span>
+                </button>
+                <button
+                  type="button"
+                  title="Ye hissa hata do"
+                  onClick={() =>
+                    onChange(scene.index, {
+                      visualMoreTrims: scene.visualMoreTrims.filter((_, other) => other !== order),
+                    })
+                  }
+                  className="rounded border border-ink-600 px-1 py-0.5 text-[9px] text-chalk-500 transition-colors hover:border-red-400 hover:text-red-300"
+                >
+                  hatao
+                </button>
+              </div>
+            ))}
+
+            {/*
+              ⚠️ "Aur hissa jodo" tabhi dikhta hai jab pehla hissa chuna ja chuka
+              ho. Bina pehle ke doosra jodna matlab ek aisi list jisme pehla khaana
+              khaali hai — aur wahan "poori video + ek hissa" ka koi saaf matlab
+              nahi banta.
+            */}
+            {scene.visualTrim ? (
+              <button
+                type="button"
+                onClick={() =>
+                  setTrimFor({ assetId: scene.visualAssetId as string, part: "new" })
+                }
+                className="text-[10px] text-terracotta underline transition-colors hover:text-chalk-100"
+              >
+                + Video ka aur hissa jodo
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         <VideoTrimDialog
           open={trimFor !== null}
-          assetId={trimFor}
+          assetId={trimFor?.assetId ?? null}
           sceneSeconds={scene.durationSeconds}
           fallbackSeconds={sourceSeconds}
-          value={scene.visualTrim}
+          value={
+            trimFor?.part === 0
+              ? scene.visualTrim
+              : typeof trimFor?.part === "number"
+                ? (scene.visualMoreTrims[trimFor.part - 1] ?? null)
+                : null
+          }
           onCancel={() => setTrimFor(null)}
           onSave={(trim) => {
-            onChange(scene.index, { visualTrim: trim });
+            const part = trimFor?.part;
+            if (part === 0) {
+              onChange(scene.index, { visualTrim: trim });
+            } else if (part === "new" && trim) {
+              onChange(scene.index, {
+                visualMoreTrims: [...scene.visualMoreTrims, trim],
+              });
+            } else if (typeof part === "number") {
+              /*
+               * `trim === null` matlab "poori video" — par ek jude hue hisse ka
+               * "poori video" ka koi matlab nahi hota, isliye wahan wo hissa hat
+               * jaata hai.
+               */
+              onChange(scene.index, {
+                visualMoreTrims: trim
+                  ? scene.visualMoreTrims.map((entry, other) =>
+                      other === part - 1 ? trim : entry,
+                    )
+                  : scene.visualMoreTrims.filter((_, other) => other !== part - 1),
+              });
+            }
             setTrimFor(null);
           }}
         />

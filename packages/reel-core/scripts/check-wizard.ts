@@ -2476,6 +2476,97 @@ for (const preset of EFFECT_PRESETS) {
   );
 }
 
+/* ------------------------------------------------ video ke do alag hisse */
+
+console.log("\nvideo ke do alag hisse");
+
+function draftWithParts(more: { startSeconds: number; endSeconds: number }[]) {
+  const base = autoFill(draftFromScript(script));
+  return {
+    ...base,
+    scenes: base.scenes.map((scene, at) =>
+      at === 0
+        ? {
+            ...scene,
+            type: "video",
+            visualAssetId: "as_clip",
+            visualAssetKind: "video" as const,
+            visualFitOff: true,
+            visualFitAssetId: null,
+            visualTrim: { startSeconds: 2, endSeconds: 5 },
+            visualMoreTrims: more,
+            durationOverrideSeconds: null,
+          }
+        : scene,
+    ),
+  };
+}
+
+function partsDoc(more: { startSeconds: number; endSeconds: number }[]) {
+  return applyWizard({
+    doc: createEmptyProject({ name: "Do hisse", fps: 30 }),
+    draft: draftWithParts(more),
+  }).doc;
+}
+
+const onePart = partsDoc([]);
+check(
+  "ek hi hissa chuna ho to ek hi clip banta hai",
+  onePart.items.filter((item) => item.assetId === "as_clip").length === 1,
+);
+
+const twoParts = partsDoc([{ startSeconds: 20, endSeconds: 24 }]);
+const clips = twoParts.items.filter((item) => item.assetId === "as_clip");
+check("doosra hissa chunne par doosra clip banta hai", clips.length === 2);
+
+check(
+  "doosra hissa pehle ke THEEK peeche lagta hai",
+  clips.length === 2 &&
+    clips[1]!.startFrame === clips[0]!.startFrame + clips[0]!.durationInFrames,
+  "beech me jagah chhodne par wahan kaala frame aata hai",
+);
+check(
+  "doosra hissa video ke sahi lamhe se shuru hota hai",
+  clips[1]?.trimStartFrame === 20 * 30,
+  "trimStartFrame galat hone par wo hissa aata hai jo chuna hi nahi tha",
+);
+check(
+  "doosre hisse ki lambai chuni hui lambai hai",
+  clips[1]?.durationInFrames === 4 * 30,
+);
+check(
+  "dono hisse ek jaise dikhte hain",
+  clips[0]?.fit.mode === clips[1]?.fit.mode,
+  "alag fit par do hisse do alag video jaise lagte hain",
+);
+check(
+  "doosra hissa bhi usi scene ka hai",
+  twoParts.scenes.some((scene) => scene.itemIds.includes(clips[1]?.id ?? "")),
+);
+
+/*
+ * Scene ki lambai me saare hisse jud'ne chahiye — warna doosra hissa beech me
+ * hi kat jaata hai.
+ */
+const threeParts = partsDoc([
+  { startSeconds: 20, endSeconds: 24 },
+  { startSeconds: 30, endSeconds: 32 },
+]);
+const three = threeParts.items.filter((item) => item.assetId === "as_clip");
+check("teen hisse chune to teen clip", three.length === 3);
+check(
+  "scene teeno hisson jitna lamba hai",
+  three.length === 3 &&
+    three[2]!.startFrame + three[2]!.durationInFrames <= threeParts.project.durationInFrames,
+  "chhota reh jaane par aakhri hissa MP4 me aata hi nahi",
+);
+
+check(
+  "hisse usi kram me rehte hain jis kram me chune the",
+  three.length === 3 && three[1]!.trimStartFrame === 20 * 30 && three[2]!.trimStartFrame === 30 * 30,
+  "waqt ke hisaab se apne aap tarteeb dena galat hoga — kabhi baad ka hissa pehle dikhana hi maqsad hota hai",
+);
+
 /*
  * ⚠️ Sirf ek summary, aur wo **file ke bilkul ant me**.
  *

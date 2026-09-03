@@ -469,6 +469,21 @@ export interface WizardScene {
    */
   visualTrim: { startSeconds: number; endSeconds: number } | null;
   /**
+   * Video ke **aur** hisse — pehle wale (`visualTrim`) ke baad, ek ke peeche ek.
+   *
+   * ⚠️ Ye `visualTrim` ki jagah nahi leta, uske **baad** aata hai — aur wo
+   * jaan-boojhkar hai. Ek hi list rakhne par har purana raasta badalna padta
+   * (fit ki cache key, scene ki lambai, trim ka dialog, apply ka hisaab), aur us
+   * badlav ki keemat un logon par padti jinhe do hisse chahiye hi nahi the — jo
+   * ki zyadatar log hain. Pehla hissa wahi ka wahi chalta hai; ye sirf uske aage
+   * jud'ta hai.
+   *
+   * ⚠️ Hisse **usi kram me** jud'te hain jis kram me yahan likhe hain. Waqt ke
+   * hisaab se apne aap tarteeb dena galat hoga: kabhi-kabhi baad ka hissa pehle
+   * dikhana hi poora maqsad hota hai (jawab pehle, sawaal baad me).
+   */
+  visualMoreTrims: { startSeconds: number; endSeconds: number }[];
+  /**
    * Video ko phone ke frame me dikhao — app ki recording ke liye.
    *
    * ⚠️ Ye sirf sajawat nahi hai, **saaf dikhne ka sawaal** hai. Ek 386x850 ki
@@ -960,6 +975,7 @@ export function draftFromScript(script: AiScript): WizardDraft {
         visualFitKey: null,
         visualSize: null,
         visualTrim: null,
+        visualMoreTrims: [],
         phoneFrame: false,
         textPosition: "center",
         voiceAssetId: null,
@@ -1013,6 +1029,7 @@ export function blankScene(index: number): WizardScene {
     index,
     containBackground: null,
     hideRegions: [],
+    visualMoreTrims: [],
     type: "text",
     name: `Scene ${index + 1}`,
     /*
@@ -1355,9 +1372,21 @@ export function sceneSeconds(scene: WizardScene): number {
     );
   }
 
-  const trimmed = scene.visualTrim
-    ? Math.max(0.5, scene.visualTrim.endSeconds - scene.visualTrim.startSeconds)
-    : null;
+  /*
+   * ⚠️ Saare chune hue hisse jud'te hain, sirf pehla nahi. Do hisse chunne par
+   * agar sirf pehla ginn'a jaaye to scene chhota reh jaata hai aur doosra hissa
+   * beech me hi kat jaata — aur wo galti sirf bani hui reel dekh kar pakdi jaati.
+   */
+  const trimmedParts = scene.visualTrim
+    ? [scene.visualTrim, ...scene.visualMoreTrims]
+    : scene.visualMoreTrims;
+  const trimmed =
+    trimmedParts.length > 0
+      ? Math.max(
+          0.5,
+          trimmedParts.reduce((sum, part) => sum + Math.max(0, part.endSeconds - part.startSeconds), 0),
+        )
+      : null;
 
   const voice = usableVoiceSeconds(scene);
 
@@ -1871,6 +1900,74 @@ export function applyWizard(args: { doc: Doc; draft: WizardDraft }): ApplyWizard
         startSeconds: source.visualTrim.startSeconds,
         endSeconds: source.visualTrim.endSeconds,
       });
+    }
+
+    /*
+     * Video ke baaki hisse — pehle wale ke theek peeche, ek ke baad ek.
+     *
+     * ⚠️ Yahan koi nayi file nahi banti aur ffmpeg kahin nahi chalta. Har hissa
+     * usi asli video ka ek alag item hai, apne `trimStartFrame` ke saath, aur
+     * timeline unhe ek ke peeche ek baja deta hai. Isi wajah se ye Vercel par bhi
+     * chalta hai (wahan ffmpeg hai hi nahi) aur ek bhi extra byte storage me nahi
+     * jaata.
+     *
+     * ⚠️ Sirf tab jab fit ki hui copy na lagi ho. Fit ki hui video me pehla hissa
+     * pehle se kata hua hota hai — uspar doosra hissa maangna matlab us kate hue
+     * tukde ke andar se dobara kaatna, jo kuch aur hi nikalta hai.
+     */
+    if (
+      source.visualMoreTrims.length > 0 &&
+      source.visualFitAssetId === null &&
+      primary.assetId === fitVisual
+    ) {
+      const fps = doc.project.fps;
+      const extras: Item[] = [];
+
+      /*
+       * ⚠️ Item ko **doc se dobara padho**, `primary` se nahi. `primary` upar ka
+       * snapshot hai — aur uspar abhi-abhi trim laga hai, yaani uski lambai badal
+       * chuki hai. Purane snapshot par bharosa karne se doosra hissa pehle ke
+       * upar ya usse door ja girta hai, aur wahan kaala frame aata hai. Ye galti
+       * yahan ek baar ho chuki hai aur jaanch ne pakdi thi.
+       */
+      const trimmedPrimary = doc.items.find((item) => item.id === primary.id) ?? primary;
+      let at = trimmedPrimary.startFrame + trimmedPrimary.durationInFrames;
+
+      for (const [order, part] of source.visualMoreTrims.entries()) {
+        const seconds = Math.max(0.1, part.endSeconds - part.startSeconds);
+        const frames = Math.max(1, Math.round(seconds * fps));
+        const piece = createItem(trimmedPrimary.type, {
+          fps,
+          trackId: trimmedPrimary.trackId,
+          name: `${trimmedPrimary.name} — hissa ${order + 2}`,
+          assetId: trimmedPrimary.assetId,
+          startFrame: at,
+          durationInFrames: frames,
+        });
+        extras.push({
+          ...piece,
+          sceneId: scene.id,
+          /* Wahi shakal jo pehle hisse ki hai — warna do hisse alag dikhte hain. */
+          fit: trimmedPrimary.fit,
+          transform: trimmedPrimary.transform,
+          trimStartFrame: Math.max(0, Math.round(part.startSeconds * fps)),
+          sourceDurationFrames: trimmedPrimary.sourceDurationFrames,
+        });
+        at += frames;
+      }
+
+      const items = [...doc.items];
+      const after = items.findIndex((item) => item.id === primary.id);
+      items.splice(after + 1, 0, ...extras);
+      doc = {
+        ...doc,
+        items,
+        scenes: doc.scenes.map((entry) =>
+          entry.id === scene.id
+            ? { ...entry, itemIds: [...entry.itemIds, ...extras.map((piece) => piece.id)] }
+            : entry,
+        ),
+      };
     }
 
     /*
