@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 import { getPosts } from "@/lib/blog-server";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com/";
 
 /**
  * sitemap.xml — Google Search Console me `https://apkasaathi.com/sitemap.xml`
