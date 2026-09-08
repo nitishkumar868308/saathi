@@ -2,7 +2,10 @@ import type { MetadataRoute } from "next";
 
 import { getPosts } from "@/lib/blog-server";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com/";
+// const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com/";
+const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com"
+).replace(/\/+$/, "");
 
 /**
  * sitemap.xml — Google Search Console me `https://apkasaathi.com/sitemap.xml`
@@ -24,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const posts = await getPosts();
 
   const staticPages: MetadataRoute.Sitemap = [
-    { url: SITE_URL, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: `${SITE_URL}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
     {
       url: `${SITE_URL}/blog`,
       // Blog index tab badalta hai jab nayi post aati hai.
