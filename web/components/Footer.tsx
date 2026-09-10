@@ -21,10 +21,9 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   const linkCls = (href: string) =>
-    `transition ${
-      pathname === href
-        ? "font-semibold text-terracotta"
-        : "text-ink-soft hover:text-terracotta"
+    `transition ${pathname === href
+      ? "font-semibold text-terracotta"
+      : "text-ink-soft hover:text-terracotta"
     }`;
 
   return (
@@ -41,17 +40,19 @@ export default function Footer() {
             </p>
 
             {/* Play Store coming soon */}
-            <span className="mt-5 inline-flex items-center gap-2.5 rounded-2xl border border-line bg-surface px-4 py-2.5 shadow-soft">
-              <Play size={18} className="fill-terracotta text-terracotta" />
-              <span className="leading-tight">
-                <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
-                  Android
-                </span>
-                <span className="block text-sm font-semibold text-ink">
-                  {t.playstore}
+            <Link href="https://play.google.com/store/apps/details?id=com.apkasaathi.app">
+              <span className="mt-5 inline-flex items-center gap-2.5 rounded-2xl border border-line bg-surface px-4 py-2.5 shadow-soft">
+                <Play size={18} className="fill-terracotta text-terracotta" />
+                <span className="leading-tight">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+                    Android
+                  </span>
+                  <span className="block text-sm font-semibold text-ink">
+                    {t.playstore}
+                  </span>
                 </span>
               </span>
-            </span>
+            </Link>
           </div>
 
           {/* Product */}

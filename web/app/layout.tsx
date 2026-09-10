@@ -107,6 +107,8 @@ const jsonLd = {
       "@id": `${SITE_URL}/#organization`,
       name: SITE_NAME,
       url: SITE_URL,
+      downloadUrl:
+        "https://play.google.com/store/apps/details?id=com.apkasaathi.app",
       logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
       email: "info@apkasaathi.com",
       description:
