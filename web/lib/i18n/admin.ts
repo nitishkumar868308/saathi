@@ -720,7 +720,6 @@ export type AdminDict = {
       noneYet: string;
       type: string;
       expiry: string;
-      aiUnderstood: string;
       loadingPreview: string;
       previewFailed: string;
     };
@@ -1437,7 +1436,7 @@ const en: AdminDict = {
       document: "Document", uploadedWhen: "Uploaded", size: "Size",
       storage: "Storage", view: "View",
       noneYet: "Nobody has uploaded a document yet.",
-      type: "Type", expiry: "Expiry", aiUnderstood: "What the AI understood",
+      type: "Type", expiry: "Expiry",
       loadingPreview: "Loading preview…", previewFailed: "Preview could not load.",
     },
     seo: {
@@ -2112,7 +2111,7 @@ const hi: AdminDict = {
       document: "डॉक्युमेंट", uploadedWhen: "कब अपलोड", size: "साइज़",
       storage: "स्टोरेज", view: "देखें",
       noneYet: "अभी किसी ने डॉक्युमेंट अपलोड नहीं किया।",
-      type: "टाइप", expiry: "एक्सपायरी", aiUnderstood: "AI ने क्या समझा",
+      type: "टाइप", expiry: "एक्सपायरी",
       loadingPreview: "प्रीव्यू ला रहे हैं…", previewFailed: "प्रीव्यू लोड नहीं हुआ।",
     },
     seo: {
@@ -2789,7 +2788,7 @@ const hinglish: AdminDict = {
       document: "Document", uploadedWhen: "Kab upload", size: "Size",
       storage: "Storage", view: "Dekho",
       noneYet: "Abhi kisi ne document upload nahi kiya.",
-      type: "Type", expiry: "Expiry", aiUnderstood: "AI ne kya samjha",
+      type: "Type", expiry: "Expiry",
       loadingPreview: "Preview la rahe hain…", previewFailed: "Preview load nahi hua.",
     },
     seo: {

@@ -22,7 +22,6 @@ type Doc = {
   name: string;
   type: string;
   expiry: string | null;
-  summary: string | null;
   fileSize: number | null;
   filePath: string | null;
   mimeType: string | null;
@@ -431,14 +430,13 @@ function DocPreview({ doc, onClose }: { doc: Doc | null; onClose: () => void }) 
           <Meta label={dd.storage} value={doc.inStorage ? t.common.yes : t.common.no} />
         </div>
 
-        {doc.summary && (
-          <div className="rounded-2xl border border-line bg-cream-deep/20 p-3">
-            <p className="text-[11px] uppercase tracking-wide text-ink-soft">{dd.aiUnderstood}</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-ink">
-              {doc.summary}
-            </p>
-          </div>
-        )}
+        {/*
+          ⚠️ Yahan pehle "AI ne kya samjha" wala box tha — yaani document ka
+          poora content saaf shabdon me. Wo hata diya gaya, aur wapas nahi
+          aana chahiye: support ke kisi sawaal ka jawab usme tha hi nahi, par
+          har team member har user ke Aadhaar/passport/bacche ke certificate
+          ka content padh sakta tha. Ab wo column server se aata bhi nahi.
+        */}
 
         {!url ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-line bg-cream-deep/20 py-12 text-center">

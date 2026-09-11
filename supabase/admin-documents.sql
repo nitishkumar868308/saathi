@@ -30,7 +30,17 @@ begin
           d.name,
           d.type,
           d.expiry,
-          d.summary,
+          -- ⚠️ `d.summary` YAHAN JAAN-BOOJH KE NAHI HAI.
+          --
+          -- Wo column AI ka poora padha hua document hai — naam, number,
+          -- pata, sab kuch saaf shabdon me. Admin panel me wo chup-chaap
+          -- khul jaata tha, yaani har team member har user ke Aadhaar,
+          -- passport, bacche ke birth certificate ka content padh sakta tha.
+          --
+          -- Aur support ke kisi sawaal ka jawab usme tha hi nahi: "document
+          -- dikh nahi raha" ka jawab `in_storage`/`file_size` dete hain,
+          -- "kaunsa document" ka jawab `name`/`type`. Jo cheez kaam ki nahi
+          -- thi, wo sabse niji thi.
           d.file_size,
           d.file_path,
           d.mime_type,

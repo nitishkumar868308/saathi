@@ -515,7 +515,14 @@ export type AdminDocument = {
   name: string;
   type: string;
   expiry: string | null;
-  summary: string | null;
+  /**
+   * ⚠️ `summary` yahan JAAN-BOOJH KE nahi hai — aur wapas mat jodna.
+   *
+   * Wo AI ka poora padha hua document hai (naam, number, pata). Support ke
+   * kisi sawaal ka jawab usme nahi hota, par har team member ko har user ke
+   * document ka content dikh jaata tha. `supabase/admin-documents.sql` me
+   * bhi wo column ab select hi nahi hota.
+   */
   fileSize: number | null;
   filePath: string | null;
   mimeType: string | null;
@@ -555,7 +562,6 @@ export async function getDocuments(
     name: String(r.name ?? ""),
     type: String(r.type ?? ""),
     expiry: (r.expiry as string) ?? null,
-    summary: (r.summary as string) ?? null,
     fileSize: r.file_size == null ? null : Number(r.file_size),
     filePath: (r.file_path as string) ?? null,
     mimeType: (r.mime_type as string) ?? null,
