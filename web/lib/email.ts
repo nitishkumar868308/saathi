@@ -248,7 +248,19 @@ export function renderEmail(
             <td align="center" style="padding:24px 12px 0;color:${SOFT};font-size:12.5px;line-height:1.75;">
               <strong style="color:${INK};">Apka Saathi</strong> — ${f.slogan}<br/>
               <a href="${SITE_URL}" style="color:${SOFT};text-decoration:underline;">apkasaathi.com</a><br/>
-              <span style="color:${SOFT};">${f.why} 🤍</span>
+              <span style="color:${SOFT};">${f.why} 🤍</span><br/>
+              <!--
+                Company ka registered naam HAR email par.
+
+                ⚠️ Ye sabse zyada payment wale email par kaam aata hai: user ke
+                bank/UPI statement me "RAHVIAN TECHNOLOGIES PRIVATE LIMITED"
+                aata hai, aur agar wo naam humse aaye kisi bhi kaagaz par kahin
+                na ho to wo charge anjaan lagta hai — aur anjaan charge log
+                bank me "dispute" kar dete hain. Par ye sirf payment ki baat
+                nahi: har email me hona hi wo cheez hai jo use khaana-poori se
+                pehchaan bana deti hai.
+              -->
+              <span style="color:${SOFT};font-size:11px;letter-spacing:0.2px;">RAHVIAN TECHNOLOGIES PRIVATE LIMITED</span>
             </td>
           </tr>
 
@@ -631,6 +643,180 @@ export async function sendPlanExpiredEmail(
     html: renderEmail(c.heading, inner, c.preheader, locale),
     fromName: "Apka Saathi",
     kind: "plan_expired",
+    userId,
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Plus mil gaya — kharidari ki pusht                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ⚠️ Ye ek INVOICE nahi hai, aur jaan-boojh ke nahi hai.
+ *
+ * Google Play par bechne wala Google KHUD hota hai (merchant of record) — paisa
+ * usi ke paas jaata hai, GST wahi sambhalta hai, aur asli receipt/invoice wahi
+ * bhejta hai. Uske upar apni "invoice" bhej dena do tarah se galat hota: ek hi
+ * kharidari ke do alag kaagaz ban jaate, aur GST ka hisaab bhi jhootha ho jaata.
+ *
+ * Par kuch na bhejna bhi galat tha. User ne paisa Saathi ke liye diya hai, aur
+ * uske inbox me sirf "Google Play" ka mail aata hai — jisme Saathi ka naam
+ * kahin nahi hota. Wahi se do sabse aam ticket aati hain: "paisa kat gaya par
+ * Plus mila kya?" aur "mujhe invoice nahi mila".
+ *
+ * Isliye ye mail wo teen baatein kehta hai jo sirf HUM keh sakte hain: Plus
+ * chalu ho gaya, kab tak chalega, aur asli receipt kahan milegi.
+ */
+type PurchaseCopy = {
+  subject: string;
+  heading: string;
+  preheader: string;
+  intro: string;
+  detailsLabel: string;
+  planLine: (plan: string) => string;
+  amountLine: (amount: string) => string;
+  tillLine: (date: string) => string;
+  tillForever: string;
+  receiptLabel: string;
+  receiptBody: string;
+  cta: string;
+  outro: string;
+};
+
+const PURCHASE: Record<EmailLocale, PurchaseCopy> = {
+  hinglish: {
+    subject: "Apka Saathi Plus chalu ho gaya 🎉",
+    heading: "Plus chalu ho gaya 🎉",
+    preheader: "Ab sab kuch khula hai — unlimited documents aur reminders.",
+    intro:
+      "Namaste{name}! Aapka <b>Saathi Plus</b> chalu ho gaya hai. Ab aapke saare documents khule hain aur saare reminders chaalu — aur khabar ab email aur WhatsApp par bhi aayegi, sirf phone ki notification par nahi.",
+    detailsLabel: "Kya liya aapne",
+    planLine: (plan) => `Plan: <b>${plan}</b>`,
+    amountLine: (amount) => `Diya gaya: <b>${amount}</b>`,
+    tillLine: (date) => `Chalega: <b>${date}</b> tak`,
+    tillForever: "Chalega: <b>hamesha</b>",
+    receiptLabel: "Aapki receipt / invoice",
+    receiptBody:
+      "Payment Google Play ne liya hai, isliye pakki receipt (GST invoice ke saath) <b>Google</b> bhejta hai — usi Google account par jisse aapne kharida. Wo aapko <b>Play Store → Menu → Payments &amp; subscriptions → Budget &amp; order history</b> me kabhi bhi mil jaayegi.",
+    cta: "Saathi kholo",
+    outro:
+      "Kuch bhi poochhna ho to is email ka jawab de do — hum padhte hain. 🤍",
+  },
+  hi: {
+    subject: "Apka Saathi Plus चालू हो गया 🎉",
+    heading: "Plus चालू हो गया 🎉",
+    preheader: "अब सब कुछ खुला है — अनलिमिटेड डॉक्युमेंट और रिमाइंडर।",
+    intro:
+      "नमस्ते{name}! आपका <b>Saathi Plus</b> चालू हो गया है। अब आपके सारे डॉक्युमेंट खुले हैं और सारे रिमाइंडर चालू — और ख़बर अब ईमेल और WhatsApp पर भी आएगी, सिर्फ़ फ़ोन की नोटिफिकेशन पर नहीं।",
+    detailsLabel: "आपने क्या लिया",
+    planLine: (plan) => `प्लान: <b>${plan}</b>`,
+    amountLine: (amount) => `दिया गया: <b>${amount}</b>`,
+    tillLine: (date) => `चलेगा: <b>${date}</b> तक`,
+    tillForever: "चलेगा: <b>हमेशा</b>",
+    receiptLabel: "आपकी रसीद / इनवॉइस",
+    receiptBody:
+      "पेमेंट Google Play ने लिया है, इसलिए पक्की रसीद (GST इनवॉइस के साथ) <b>Google</b> भेजता है — उसी Google अकाउंट पर जिससे आपने ख़रीदा। वह आपको <b>Play Store → Menu → Payments &amp; subscriptions → Budget &amp; order history</b> में कभी भी मिल जाएगी।",
+    cta: "साथी खोलें",
+    outro: "कुछ भी पूछना हो तो इसी ईमेल का जवाब दे दीजिए — हम पढ़ते हैं। 🤍",
+  },
+  en: {
+    subject: "Your Apka Saathi Plus is active 🎉",
+    heading: "Plus is active 🎉",
+    preheader: "Everything is unlocked — unlimited documents and reminders.",
+    intro:
+      "Hi{name}! Your <b>Saathi Plus</b> is now active. All your documents are unlocked and all your reminders are running — and alerts will now reach you on email and WhatsApp too, not just your phone's notification.",
+    detailsLabel: "What you bought",
+    planLine: (plan) => `Plan: <b>${plan}</b>`,
+    amountLine: (amount) => `Paid: <b>${amount}</b>`,
+    tillLine: (date) => `Active until: <b>${date}</b>`,
+    tillForever: "Active: <b>forever</b>",
+    receiptLabel: "Your receipt / invoice",
+    receiptBody:
+      "The payment was taken by Google Play, so the official receipt (with the GST invoice) is sent by <b>Google</b> — to the same Google account you bought with. You can find it any time under <b>Play Store → Menu → Payments &amp; subscriptions → Budget &amp; order history</b>.",
+    cta: "Open Saathi",
+    outro: "If you have any question, just reply to this email — we read them. 🤍",
+  },
+};
+
+/** "plus_yearly" → "Plus (yearly)". Naam na mile to saada "Plus". */
+function planLabel(productId: string | null): string {
+  const id = (productId ?? "").toLowerCase();
+  if (id.includes("year")) return "Plus (yearly)";
+  if (id.includes("month")) return "Plus (monthly)";
+  return "Plus";
+}
+
+export async function sendPlusPurchaseEmail(
+  to: string,
+  name: string,
+  details: {
+    productId: string | null;
+    /** Kitna kata — user ki apni currency me. */
+    amount: number | null;
+    currency: string | null;
+    /** Kab tak chalega. `null` = koi expiry nahi. */
+    until: string | null;
+  },
+  locale: EmailLocale = "hinglish",
+  userId?: string | null,
+): Promise<{ sent: boolean; skipped?: boolean }> {
+  const c = PURCHASE[locale] ?? PURCHASE.hinglish;
+  const nameBit = name.trim() ? ` ${escapeHtml(name.trim().split(" ")[0])}` : "";
+
+  /**
+   * ⚠️ Daam wahi dikhana jo SACH ME kata — hamara koi apna hisaab nahi.
+   *
+   * Webhook me Play ka apna `price_in_purchased_currency` aata hai, yaani user
+   * ne jis currency me diya usi me. Use dobara convert karna ya "₹99" jaisa
+   * hardcode karna wahi purani galti hoti: user ke statement me kuch aur, hamare
+   * email me kuch aur.
+   */
+  const amountText =
+    details.amount !== null && details.currency
+      ? `${escapeHtml(details.currency)} ${details.amount.toFixed(2)}`
+      : null;
+
+  const tillText = details.until
+    ? c.tillLine(
+        escapeHtml(
+          new Date(details.until).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          }),
+        ),
+      )
+    : c.tillForever;
+
+  const rows = [
+    `<li style="margin:0 0 8px;">${c.planLine(escapeHtml(planLabel(details.productId)))}</li>`,
+    amountText ? `<li style="margin:0 0 8px;">${c.amountLine(amountText)}</li>` : "",
+    `<li style="margin:0;">${tillText}</li>`,
+  ].join("");
+
+  const inner =
+    emailParagraph(c.intro.replace("{name}", nameBit)) +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 18px;">
+       <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-left:4px solid ${BRAND};border-radius:14px;background:${CREAM};">
+         <div style="font-size:11.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:${SOFT};">${escapeHtml(c.detailsLabel)}</div>
+         <ul style="margin:10px 0 0;padding-left:18px;font-size:14.5px;line-height:1.65;color:${INK};">${rows}</ul>
+       </td></tr>
+     </table>` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;">
+       <tr><td style="padding:18px 20px;border:1px solid ${LINE};border-radius:14px;">
+         <div style="font-size:11.5px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:${SOFT};">${escapeHtml(c.receiptLabel)}</div>
+         <div style="margin-top:8px;font-size:14.5px;line-height:1.65;color:${INK};">${c.receiptBody}</div>
+       </td></tr>
+     </table>` +
+    emailButton(SITE_URL, c.cta) +
+    emailParagraph(c.outro);
+
+  return sendMail({
+    to,
+    subject: c.subject,
+    html: renderEmail(c.heading, inner, c.preheader, locale),
+    fromName: "Apka Saathi",
+    kind: "plus_purchase",
     userId,
   });
 }

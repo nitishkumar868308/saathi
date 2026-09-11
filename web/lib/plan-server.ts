@@ -89,6 +89,45 @@ async function applyPlanLimits(userId: string): Promise<void> {
   }
 }
 
+/** Email bhejne ke liye jitna chahiye — utna hi. */
+export type PlanUser = {
+  email: string | null;
+  name: string;
+  language: "hinglish" | "hi" | "en";
+};
+
+/**
+ * Webhook ke paas sirf user id hoti hai — email/naam/bhasha yahan se aate hain.
+ *
+ * Fail ho to `null`: email na ja paana plan dene se kabhi zyada zaroori nahi
+ * hai. User ne paisa de diya hai, aur uske liye "Plus mila" sabse badi baat hai
+ * — pusht uske baad ki cheez hai.
+ */
+export async function getPlanUser(userId: string): Promise<PlanUser | null> {
+  if (!planDbConfigured()) return null;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=email,full_name,language`,
+      { headers: headers(), cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const [row] = (await res.json()) as {
+      email: string | null;
+      full_name: string | null;
+      language: string | null;
+    }[];
+    if (!row) return null;
+    const lang = row.language;
+    return {
+      email: row.email,
+      name: row.full_name ?? "",
+      language: lang === "hi" || lang === "en" ? lang : "hinglish",
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * User ko Plus banao.
  *

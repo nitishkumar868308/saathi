@@ -9,9 +9,11 @@ import {
 import {
   activatePlus,
   deactivatePlus,
+  getPlanUser,
   planDbConfigured,
   recordPlayEvent,
 } from "@/lib/plan-server";
+import { sendPlusPurchaseEmail } from "@/lib/email";
 import { logServerError } from "@/lib/errors-server";
 
 export const runtime = "nodejs";
@@ -114,6 +116,50 @@ export async function POST(request: Request) {
           ? { until: ev.until, source: "google_play" }
           : { source: "google_play" },
       );
+
+      /**
+       * Kharidari ki pusht — user ke apne inbox me.
+       *
+       * ⚠️ Ye INVOICE nahi hai. Play par bechne wala Google khud hota hai, GST
+       * wahi sambhalta hai, aur asli receipt wahi bhejta hai. Par uske mail me
+       * Saathi ka naam kahin nahi hota — aur wahi se do sabse aam ticket aati
+       * hain: "paisa kat gaya, Plus mila kya?" aur "invoice nahi mila". Ye mail
+       * wahi teen baatein kehta hai jo sirf hum keh sakte hain (poori wajah
+       * `lib/email.ts` ke `sendPlusPurchaseEmail` par).
+       *
+       * ⚠️ DO shartein, aur dono zaroori hain:
+       *
+       *   • `recorded` — yaani ye event pehli baar aaya hai. RevenueCat fail par
+       *     dobara bhejta hai, aur `recordPlayEvent` `event_id` par duplicate
+       *     chhod deta hai. Is shart ke bina ek hi kharidari par user ko teen-
+       *     chaar "Plus chalu ho gaya" mail chale jaate.
+       *   • `amount` — paisa sach me kata ho. Free trial ya promo par bhi yahi
+       *     event aata hai, aur wahan "aapne itna diya" likhna seedha jhooth hai.
+       *
+       * Best-effort: email na ja paaye to bhi Plus mil chuka hai. Isliye ye
+       * `catch` ke andar hai aur webhook ko kabhi fail nahi karta.
+       */
+      if (recorded && ev.amount) {
+        try {
+          const u = await getPlanUser(ev.userId);
+          if (u?.email) {
+            await sendPlusPurchaseEmail(
+              u.email,
+              u.name,
+              {
+                productId: ev.productId,
+                amount: ev.amount,
+                currency: ev.currency,
+                until: ev.until,
+              },
+              u.language,
+              ev.userId,
+            );
+          }
+        } catch (e) {
+          void logServerError(e, { where: "play/webhook", action: "purchase-email" });
+        }
+      }
     } else {
       await deactivatePlus(ev.userId);
     }
