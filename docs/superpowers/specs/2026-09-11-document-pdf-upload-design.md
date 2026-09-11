@@ -84,9 +84,14 @@ PDF `expo-file-system` se base64 me padha jaayega aur
 `scanDocumentAI(base64, locale, "application/pdf")` par chala jaayega. Saare
 page. Server par ek line nahi badal rahi.
 
-**5MB ki hadd.** Base64 file ko ~33% mota kar deta hai, aur edge function ka
-request utna bada nahi jaata. 5MB se badi file **save to hogi**, bas AI use nahi
-padhega — us par neeche wali tabeel ka teesra khana lagega.
+**5MB SAKHT hadd hai — sirf AI ki nahi, upload ki bhi.** 5MB se badi koi bhi
+file R2 par jaayegi hi nahi, save hi nahi hogi. Do wajah ek saath: base64 file ko
+~33% mota kar deta hai aur edge function ka request utna bada nahi jaata; aur
+R2 ka free tier 10GB hai, jise ek-do badi file bahut jaldi kha jaati hai.
+
+**Image pehle daba kar aati hai.** `expo-image-manipulator` se `compress: 0.4` —
+wahi jo aaj `ImagePicker` ka `quality: 0.4` karta hai. Isliye phone ki aam photo
+hadd ke andar hi rahegi; rok lagbhag sirf badi PDF par lagegi.
 
 **Kharche ki baat (saaf-saaf):** Gemini PDF ke har page ka alag paisa leta hai.
 10 page ka PDF ≈ 10 photo jitna. Ye jaan-boojh ke maana gaya hai — cap isi liye
@@ -102,23 +107,26 @@ hai. Ek jaisa bolna hi purani dikkat thi.
 | `unclear` | AI ne padha, **kuch mila hi nahi** — yaani selfie/photo hai | **ROK.** R2 par kuch nahi, `documents` row bhi nahi |
 | `offline` | Net nahi hai | Save hone do |
 | `busy` / `slow` / `server` | AI chala hi nahi (Gemini bhara, server ki dikkat) | Save hone do |
-| File 5MB+ | AI ko bheji hi nahi gayi | Save hone do |
+| File 5MB+ | Hadd se badi | **ROK.** R2 par kuch nahi, row bhi nahi |
 
 **"Save hone do" ka matlab sirf itna hai ki AI ki wajah se rok nahi lagegi.**
 Uske baad neeche wali (Section 5) "pehle R2, phir device" wali tarteeb waise ki
 waise lagti hai — yaani upload fail hua to wahan apna alag sawaal aayega. Do alag
 baatein hain, dono alag jagah dikhengi.
 
-Rok ki lines:
+Do rok, do alag lines:
 
 > **Isme koi document nahi mila**
 > Saaf photo ya PDF dobara daalo — Saathi documents aur unki expiry ke liye hai.
+
+> **File 5MB se badi hai**
+> Isse chhoti file daalo — ya kam page wali PDF.
 
 "Kuch galat hua" **nahi** likha ja raha. Selfie par wo jhooth hai, aur user usi
 selfie ko dus baar daalta rahega. Seedhi baat dobara-koshish ko sahi disha deti
 hai.
 
-**Sirf `unclear` par rok.** Baaki teen par kabhi nahi. Warna net kharab hone par
+**AI ki wajah se rok sirf `unclear` par.** Baaki teen par kabhi nahi. Warna net kharab hone par
 app har asli Aadhaar par kahegi "isme document nahi mila", user dobara daalega,
 phir wahi — aur wo bharosa wapas nahi aata. Aur storage bhi wahan nahi bach raha,
 kyunki wo asli document tha.
@@ -219,7 +227,7 @@ par nayi file `-v2` naam se chadhti hai, wo waisa hi rahega.
 
 - Image se document — aaj jaisa hi chalta rahe (camera aur "Chuno", dono se).
 - 3-page PDF — AI teenon page padhe, naam/expiry bhare.
-- 6MB PDF — save ho, AI na chale, saaf line dikhe.
+- 6MB PDF — save **na** ho, R2 par kuch **na** jaaye, "File 5MB se badi hai" dikhe.
 - Selfie — save **na** ho, R2 par kuch **na** jaaye, "koi document nahi mila" dikhe.
 - Flight mode — OfflineScreen khule, purana PDF wahan se khul jaaye.
 - Purana image document — jaisa tha waisa hi khule (kuch toota na ho).
