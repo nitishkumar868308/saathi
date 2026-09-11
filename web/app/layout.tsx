@@ -106,6 +106,15 @@ const jsonLd = {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
       name: SITE_NAME,
+      /**
+       * ⚠️ `legalName` alag se — `name` brand hai, ye company hai.
+       *
+       * Google isi field se site ko ek asli registered company se jodta hai. Uske
+       * bina "Apka Saathi" sirf ek app ka naam rehta hai, jiske peeche koi hai ya
+       * nahi ye kahin likha hi nahi hota — aur payment lene wali site par wo
+       * khaali jagah sabse zyada chubhti hai.
+       */
+      legalName: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
       url: SITE_URL,
       downloadUrl:
         "https://play.google.com/store/apps/details?id=com.apkasaathi.app",

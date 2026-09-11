@@ -395,6 +395,17 @@ export default function Upgrade() {
                 )}
               </Pressable>
               <Text style={styles.payNote}>{u.payNote}</Text>
+              {/*
+                ⚠️ Statement me kaunsa naam aayega — paisa dene se PEHLE.
+
+                User ke bank/UPI me "RAHVIAN TECHNOLOGIES PRIVATE LIMITED" aata
+                hai, "Apka Saathi" nahi. Wo naam usne kabhi dekha hi na ho to
+                charge anjaan lagta hai — aur anjaan charge log bank me dispute
+                kar dete hain, jiska nuksan refund se kahin bada hota hai
+                (chargeback fees, aur Play par account ki saakh). Ek line yahan
+                likh dena us poore silsile ko rok deta hai.
+              */}
+              <Text style={styles.payMerchant}>{u.payMerchant}</Text>
             </View>
 
             {/* Referral — paise ke bina Plus (spec item 11) */}
@@ -555,6 +566,13 @@ const useStyles = makeStyles((c) => ({
     marginTop: 10,
     textAlign: "center",
     fontSize: 12,
+    color: c.onInkSoft,
+  },
+  payMerchant: {
+    marginTop: 6,
+    textAlign: "center",
+    fontSize: 10.5,
+    letterSpacing: 0.2,
     color: c.onInkSoft,
   },
   referCard: {

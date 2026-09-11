@@ -888,6 +888,7 @@ export type Dict = {
     /** {price} */
     payBtn: string;
     payNote: string;
+    payMerchant: string;
     /** {ip} {profile} */
     mismatchTitle: string;
     mismatchBody: string;
@@ -2025,6 +2026,7 @@ const hinglish: Dict = {
     perYear: "/saal",
     payBtn: "{price} — Securely pay",
     payNote: "Google Play se secure · UPI, card, netbanking",
+    payMerchant: "Aapke statement me aayega: RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     mismatchTitle: "Aapka desh confirm karo",
     mismatchBody:
       "Internet {ip} ka lag raha hai, phone {profile} ka. Kaunse desh ka price dikhayein?\n\nPaisa hamesha aapke Google Play account wale desh se katta hai.",
@@ -2969,6 +2971,7 @@ const hi: Dict = {
     perYear: "/साल",
     payBtn: "{price} — सुरक्षित pay करें",
     payNote: "Google Play से सुरक्षित · UPI, card, netbanking",
+    payMerchant: "आपके स्टेटमेंट में आएगा: RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     mismatchTitle: "अपना देश कन्फ़र्म करें",
     mismatchBody:
       "इंटरनेट {ip} का लग रहा है, फ़ोन {profile} का। किस देश का प्राइस दिखाएँ?\n\nपैसा हमेशा आपके Google Play अकाउंट वाले देश से कटता है।",
@@ -3902,6 +3905,7 @@ const en: Dict = {
     perYear: "/year",
     payBtn: "{price} — Pay securely",
     payNote: "Secure via Google Play · UPI, card, netbanking",
+    payMerchant: "On your statement you'll see: RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     mismatchTitle: "Confirm your country",
     mismatchBody:
       "Your internet looks like {ip}, your phone like {profile}. Which country's price?\n\nYou're always charged in your Google Play account's country.",
