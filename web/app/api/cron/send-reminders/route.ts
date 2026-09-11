@@ -10,6 +10,7 @@ import {
 } from "@/lib/reminder-channels";
 import { sendReminderEmail } from "@/lib/email";
 import { logDeliverySkip } from "@/lib/delivery-log";
+import { recordDelivery } from "@/lib/delivery-record";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -231,6 +232,28 @@ export async function POST(request: Request) {
        */
       if (!profile.isPlus) {
         skippedFree++;
+        /**
+         * ⚠️ Pehle yahan sirf `skippedFree++` tha — ek ginti, bina kisi user
+         * ke naam ke. Yaani "mujhe WhatsApp/email nahi aaya" ka sabse AAM
+         * jawab ("aap Free plan par ho") admin panel me kahin dikhta hi nahi
+         * tha. Support har baar haath se plan check karta tha.
+         *
+         * Notification ki row yahan nahi likhi jaati — wo app khud likhti hai
+         * jab alert sach me user ke saamne aata hai. Server ne wo bheji hi
+         * nahi hoti, isliye uska "gaya" likhna andaza hota, sach nahi.
+         */
+        for (const channel of ["whatsapp", "email"] as const) {
+          await recordDelivery({
+            kind: "reminder",
+            itemId: r.id,
+            userId: r.user_id,
+            dueAt: r.remind_at,
+            channel,
+            status: "skipped",
+            reason: "free_plan",
+            plan: "free",
+          });
+        }
       } else {
         /**
          * ⚠️ Yahan se aage har chhooti hui delivery admin > Logs me jaati hai.
@@ -253,6 +276,16 @@ export async function POST(request: Request) {
             userId: r.user_id,
             itemId: r.id,
           });
+          await recordDelivery({
+            kind: "reminder",
+            itemId: r.id,
+            userId: r.user_id,
+            dueAt: r.remind_at,
+            channel: "whatsapp",
+            status: "skipped",
+            reason: has ? "phone_unverified" : "no_phone",
+            plan: "plus",
+          });
         } else {
           try {
             const res = await sendReminderWhatsApp(
@@ -269,7 +302,18 @@ export async function POST(request: Request) {
               // kar deta hai, yaani us user ka reminder bilkul hi nahi jaata.
               profile.name,
             );
-            if (res.sent) wa++;
+            if (res.sent) {
+              wa++;
+              await recordDelivery({
+                kind: "reminder",
+                itemId: r.id,
+                userId: r.user_id,
+                dueAt: r.remind_at,
+                channel: "whatsapp",
+                status: "sent",
+                plan: "plus",
+              });
+            }
             // `skipped` = Twilio ka env hi set nahi tha.
             else {
               logDeliverySkip({
@@ -278,6 +322,16 @@ export async function POST(request: Request) {
                 reason: "twilio_off",
                 userId: r.user_id,
                 itemId: r.id,
+              });
+              await recordDelivery({
+                kind: "reminder",
+                itemId: r.id,
+                userId: r.user_id,
+                dueAt: r.remind_at,
+                channel: "whatsapp",
+                status: "skipped",
+                reason: "twilio_off",
+                plan: "plus",
               });
             }
           } catch (e) {
@@ -288,6 +342,17 @@ export async function POST(request: Request) {
               reason: "send_failed",
               userId: r.user_id,
               itemId: r.id,
+              detail: String(e),
+            });
+            await recordDelivery({
+              kind: "reminder",
+              itemId: r.id,
+              userId: r.user_id,
+              dueAt: r.remind_at,
+              channel: "whatsapp",
+              status: "failed",
+              reason: "send_failed",
+              plan: "plus",
               detail: String(e),
             });
           }
@@ -301,6 +366,16 @@ export async function POST(request: Request) {
             userId: r.user_id,
             itemId: r.id,
           });
+          await recordDelivery({
+            kind: "reminder",
+            itemId: r.id,
+            userId: r.user_id,
+            dueAt: r.remind_at,
+            channel: "email",
+            status: "skipped",
+            reason: "no_email",
+            plan: "plus",
+          });
         } else {
           try {
             const res = await sendReminderEmail(
@@ -311,7 +386,18 @@ export async function POST(request: Request) {
               r.note,
               r.user_id,
             );
-            if (res.sent) mail++;
+            if (res.sent) {
+              mail++;
+              await recordDelivery({
+                kind: "reminder",
+                itemId: r.id,
+                userId: r.user_id,
+                dueAt: r.remind_at,
+                channel: "email",
+                status: "sent",
+                plan: "plus",
+              });
+            }
             // `skipped` = SMTP ka env hi set nahi tha.
             else {
               logDeliverySkip({
@@ -320,6 +406,16 @@ export async function POST(request: Request) {
                 reason: "smtp_off",
                 userId: r.user_id,
                 itemId: r.id,
+              });
+              await recordDelivery({
+                kind: "reminder",
+                itemId: r.id,
+                userId: r.user_id,
+                dueAt: r.remind_at,
+                channel: "email",
+                status: "skipped",
+                reason: "smtp_off",
+                plan: "plus",
               });
             }
           } catch (e) {
@@ -330,6 +426,17 @@ export async function POST(request: Request) {
               reason: "send_failed",
               userId: r.user_id,
               itemId: r.id,
+              detail: String(e),
+            });
+            await recordDelivery({
+              kind: "reminder",
+              itemId: r.id,
+              userId: r.user_id,
+              dueAt: r.remind_at,
+              channel: "email",
+              status: "failed",
+              reason: "send_failed",
+              plan: "plus",
               detail: String(e),
             });
           }

@@ -3,6 +3,7 @@ import { requireCron } from "@/lib/cron-auth";
 import { sendDocumentWhatsApp, twilioConfigured, waTemplateState } from "@/lib/twilio";
 import { sendDocumentExpiryEmail, emailConfigured } from "@/lib/email";
 import { logDeliverySkip } from "@/lib/delivery-log";
+import { recordDelivery } from "@/lib/delivery-record";
 import {
   PROFILE_SELECT,
   toReminderProfile,
@@ -278,6 +279,27 @@ export async function POST(request: Request) {
      */
     if (!profile.isPlus) {
       skippedFree++;
+      /**
+       * ⚠️ Pehle yahan sirf ginti thi — kisi user ke naam ke bina. Yaani
+       * "mujhe expiry ka email/WhatsApp nahi aaya" ka sabse aam jawab
+       * ("aap Free plan par ho") admin panel me kahin dikhta hi nahi tha.
+       *
+       * Notification ki row yahan nahi banti — wo app khud likhti hai jab
+       * alert sach me user ke saamne aata hai (`scheduleDocumentExpiry` ne use
+       * lagaya hota hai, server ne bheja hi nahi hota).
+       */
+      for (const channel of ["whatsapp", "email"] as const) {
+        await recordDelivery({
+          kind: "document",
+          itemId: doc.id,
+          userId: doc.user_id,
+          dueAt: dueIso,
+          channel,
+          status: "skipped",
+          reason: "free_plan",
+          plan: "free",
+        });
+      }
       continue;
     }
 
@@ -297,6 +319,15 @@ export async function POST(request: Request) {
           if (res.sent) {
             mail++;
             claimed = false; // sach me chala gaya — claim ab sahi hai, rehne do
+            await recordDelivery({
+              kind: "document",
+              itemId: doc.id,
+              userId: doc.user_id,
+              dueAt: dueIso,
+              channel: "email",
+              status: "sent",
+              plan: "plus",
+            });
           } else {
             // SMTP env hi nahi tha — claim jalane ka koi matlab nahi (upar
             // `unclaim` par poori wajah likhi hai).
@@ -307,6 +338,16 @@ export async function POST(request: Request) {
               reason: "smtp_off",
               userId: doc.user_id,
               itemId: doc.id,
+            });
+            await recordDelivery({
+              kind: "document",
+              itemId: doc.id,
+              userId: doc.user_id,
+              dueAt: dueIso,
+              channel: "email",
+              status: "skipped",
+              reason: "smtp_off",
+              plan: "plus",
             });
           }
         }
@@ -322,6 +363,17 @@ export async function POST(request: Request) {
           itemId: doc.id,
           detail: String(e),
         });
+        await recordDelivery({
+          kind: "document",
+          itemId: doc.id,
+          userId: doc.user_id,
+          dueAt: dueIso,
+          channel: "email",
+          status: "failed",
+          reason: "send_failed",
+          plan: "plus",
+          detail: String(e),
+        });
       }
       if (claimed) await unclaim(doc.id, dueIso, "email");
     } else {
@@ -331,6 +383,16 @@ export async function POST(request: Request) {
         reason: "no_email",
         userId: doc.user_id,
         itemId: doc.id,
+      });
+      await recordDelivery({
+        kind: "document",
+        itemId: doc.id,
+        userId: doc.user_id,
+        dueAt: dueIso,
+        channel: "email",
+        status: "skipped",
+        reason: "no_email",
+        plan: "plus",
       });
     }
 
@@ -344,12 +406,25 @@ export async function POST(request: Request) {
     if (!phone) {
       // ⚠️ Pehle yahan seedha `continue` tha — poori tarah chup. Yahi wo sabse
       // aam wajah hai jiska jawab admin ko kabhi milta hi nahi tha.
+      const noPhoneReason = (await hasPhone(doc.user_id))
+        ? ("phone_unverified" as const)
+        : ("no_phone" as const);
       logDeliverySkip({
         channel: "whatsapp",
         kind: "document",
-        reason: (await hasPhone(doc.user_id)) ? "phone_unverified" : "no_phone",
+        reason: noPhoneReason,
         userId: doc.user_id,
         itemId: doc.id,
+      });
+      await recordDelivery({
+        kind: "document",
+        itemId: doc.id,
+        userId: doc.user_id,
+        dueAt: dueIso,
+        channel: "whatsapp",
+        status: "skipped",
+        reason: noPhoneReason,
+        plan: "plus",
       });
       continue;
     }
@@ -371,6 +446,15 @@ export async function POST(request: Request) {
         if (res.sent) {
           wa++;
           waClaimed = false; // sach me chala gaya — claim rehne do
+          await recordDelivery({
+            kind: "document",
+            itemId: doc.id,
+            userId: doc.user_id,
+            dueAt: dueIso,
+            channel: "whatsapp",
+            status: "sent",
+            plan: "plus",
+          });
         } else {
           // Twilio ka env hi nahi tha — claim jalane ka koi matlab nahi.
           errors.push(`wa ${doc.id}: not sent (Twilio configured?)`);
@@ -380,6 +464,16 @@ export async function POST(request: Request) {
             reason: "twilio_off",
             userId: doc.user_id,
             itemId: doc.id,
+          });
+          await recordDelivery({
+            kind: "document",
+            itemId: doc.id,
+            userId: doc.user_id,
+            dueAt: dueIso,
+            channel: "whatsapp",
+            status: "skipped",
+            reason: "twilio_off",
+            plan: "plus",
           });
         }
       }
@@ -393,6 +487,17 @@ export async function POST(request: Request) {
         reason: "send_failed",
         userId: doc.user_id,
         itemId: doc.id,
+        detail: String(e),
+      });
+      await recordDelivery({
+        kind: "document",
+        itemId: doc.id,
+        userId: doc.user_id,
+        dueAt: dueIso,
+        channel: "whatsapp",
+        status: "failed",
+        reason: "send_failed",
+        plan: "plus",
         detail: String(e),
       });
     }
