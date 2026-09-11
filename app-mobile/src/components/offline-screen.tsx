@@ -19,6 +19,8 @@ import { useT } from "@/lib/i18n/LanguageProvider";
 import { useAuth } from "@/components/auth-provider";
 import { recheckNow } from "@/lib/network";
 import { readCachedDocs, resolveDocUri } from "@/lib/doc-cache";
+import { openLocalFile } from "@/lib/open-file";
+import { isPdf } from "@/utils/doc-intake";
 import { saveDocumentToDevice } from "@/lib/save-to-device";
 import { shareDocument } from "@/lib/share";
 import { iconForType } from "@/theme/status";
@@ -48,7 +50,7 @@ export function OfflineScreen() {
   const tc = useColors();
   const styles = useStyles();
   const toast = useToast();
-  const { network: t, documents: d } = useT();
+  const { network: t, documents: d, addDocument: a } = useT();
   const { session } = useAuth();
   const uid = session?.user?.id;
   const { width, height } = useWindowDimensions();
@@ -256,13 +258,39 @@ export function OfflineScreen() {
                 <Ionicons name="close" size={24} color={tc.onInk} />
               </Pressable>
             </View>
-            {!!viewing && (
-              <Image
-                source={{ uri: viewing.uri }}
-                style={{ width: width - 24, height: height * 0.7, alignSelf: "center" }}
-                resizeMode="contain"
-              />
-            )}
+            {!!viewing &&
+              (isPdf(viewing.doc.mime_type) ? (
+                /**
+                 * ⚠️ PDF bina net ke bhi khulti hai — aur yahi is screen ka
+                 * poora waada hai.
+                 *
+                 * File phone ke apne cache me padi hai (`resolveDocUri` sabse
+                 * pehle wahi dekhta hai), isliye use kholne me net lagta hi
+                 * nahi. `<Image>` yahan sirf ek khaali parda dikhata — theek
+                 * us waqt jab user ke paas doosra koi raasta hai hi nahi.
+                 */
+                <Pressable
+                  onPress={async () => {
+                    if (!(await openLocalFile(viewing.uri, "application/pdf"))) {
+                      toast.show(a.openFailed, "error");
+                    }
+                  }}
+                  style={({ pressed }) => [styles.pdfCard, pressed && { opacity: 0.9 }]}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="document-text-outline" size={52} color={tc.onInk} />
+                  <View style={styles.pdfOpen}>
+                    <Ionicons name="open-outline" size={15} color={tc.ink} />
+                    <Text style={styles.pdfOpenText}>{a.openFile}</Text>
+                  </View>
+                </Pressable>
+              ) : (
+                <Image
+                  source={{ uri: viewing.uri }}
+                  style={{ width: width - 24, height: height * 0.7, alignSelf: "center" }}
+                  resizeMode="contain"
+                />
+              ))}
           </SafeAreaView>
         </View>
       </Modal>
@@ -365,6 +393,17 @@ const useStyles = makeStyles((c) => ({
     paddingVertical: 14,
   },
   viewerName: { flex: 1, fontSize: 15.5, fontWeight: "700", color: c.onInk },
+  pdfCard: { flex: 1, alignItems: "center", justifyContent: "center", gap: 18 },
+  pdfOpen: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: c.onInk,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  pdfOpenText: { fontSize: 14, fontWeight: "700", color: c.ink },
 }));
 
 export default OfflineScreen;

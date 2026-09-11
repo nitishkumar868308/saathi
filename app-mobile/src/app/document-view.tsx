@@ -15,6 +15,8 @@ import { makeStyles, useColors } from "@/theme/theme";
 import { ImageViewer } from "@/components/image-viewer";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { resolveDocUri, type DocFile } from "@/lib/doc-cache";
+import { openLocalFile } from "@/lib/open-file";
+import { isPdf } from "@/utils/doc-intake";
 import { listVersions, versionDocFile, type DocVersion } from "@/lib/doc-versions";
 import { getDocument, type Document } from "@/lib/documents";
 import { useDataChanged } from "@/lib/data-events";
@@ -29,7 +31,7 @@ import { useT, useLocale } from "@/lib/i18n/LanguageProvider";
 export default function DocumentView() {
   const tc = useColors();
   const styles = useStyles();
-  const { documents: d } = useT();
+  const { documents: d, addDocument: a } = useT();
   const { locale } = useLocale();
   const toast = useToast();
   const { id, uri, path, mime, name, type, expiry } = useLocalSearchParams<{
@@ -312,6 +314,34 @@ export default function DocumentView() {
       >
         {loading ? (
           <ScreenLoader />
+        ) : resolved && isPdf(doc.mime_type) ? (
+          /**
+           * PDF — photo ki jagah ek card, aur phone ke apne app me kholne ka raasta.
+           *
+           * ⚠️ Zoom (`ImageViewer`) yahan jaan-boojh ke NAHI lagta. Wo `<Image>`
+           * par chalta hai aur PDF par sirf ek khaali kaala parda dikhata — jo
+           * "document kho gaya" jaisa lagta hai. Kuch na dikhane se behtar hai
+           * saaf batana ki file hai, aur khulti kahan hai.
+           */
+          <Pressable
+            onPress={async () => {
+              if (!(await openLocalFile(resolved, "application/pdf"))) {
+                toast.show(a.openFailed, "error");
+              }
+            }}
+            style={({ pressed }) => [styles.pdfCard, pressed && { opacity: 0.9 }]}
+            accessibilityRole="button"
+            accessibilityLabel={docName}
+          >
+            <Ionicons name="document-text-outline" size={44} color={tc.inkSoft} />
+            <Text style={styles.pdfName} numberOfLines={2}>
+              {docName}
+            </Text>
+            <View style={styles.zoomHint}>
+              <Ionicons name="open-outline" size={14} color={tc.white} />
+              <Text style={styles.zoomHintText}>{a.openFile}</Text>
+            </View>
+          </Pressable>
         ) : resolved ? (
           /**
            * Photo par tap = poori screen + zoom.
@@ -432,7 +462,7 @@ export default function DocumentView() {
                        * ghere rehti hai, warna list har download par hilti hai.
                        */}
                       <View style={styles.versionThumb}>
-                        {uri ? (
+                        {uri && !isPdf(v.mime_type) ? (
                           <Image
                             source={{ uri }}
                             style={styles.versionThumbImg}
@@ -440,7 +470,13 @@ export default function DocumentView() {
                           />
                         ) : (
                           <Ionicons
-                            name={uri === null ? "cloud-offline-outline" : "image-outline"}
+                            name={
+                              isPdf(v.mime_type)
+                                ? "document-text-outline"
+                                : uri === null
+                                  ? "cloud-offline-outline"
+                                  : "image-outline"
+                            }
                             size={18}
                             color={tc.inkSoft}
                           />
@@ -478,7 +514,28 @@ export default function DocumentView() {
                     </View>
 
                     {open &&
-                      (uri ? (
+                      (uri && isPdf(v.mime_type) ? (
+                        // PDF yahan bhi zoom me nahi khulti — phone ke apne
+                        // app me jaati hai, bilkul current document ki tarah.
+                        <Pressable
+                          onPress={async () => {
+                            if (!(await openLocalFile(uri, "application/pdf"))) {
+                              toast.show(a.openFailed, "error");
+                            }
+                          }}
+                          style={({ pressed }) => [
+                            styles.pdfCard,
+                            pressed && { opacity: 0.9 },
+                          ]}
+                          accessibilityRole="button"
+                        >
+                          <Ionicons name="document-text-outline" size={36} color={tc.inkSoft} />
+                          <View style={styles.zoomHint}>
+                            <Ionicons name="open-outline" size={14} color={tc.white} />
+                            <Text style={styles.zoomHintText}>{a.openFile}</Text>
+                          </View>
+                        </Pressable>
+                      ) : uri ? (
                         // Purani version ki photo bhi utni hi zaroori hoti hai
                         // (purana passport, purani policy) — wahi zoom yahan bhi.
                         <Pressable
@@ -758,6 +815,18 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: "rgba(0,0,0,0.55)",
   },
   zoomHintText: { fontSize: 11.5, fontWeight: "700", color: "#FFFFFF" },
+  pdfCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 44,
+  },
+  pdfName: {
+    fontSize: 14,
+    color: c.ink,
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
   empty: { alignItems: "center", gap: 12, paddingVertical: 40 },
   emptyText: { fontSize: 15, color: c.inkSoft, textAlign: "center" },
 

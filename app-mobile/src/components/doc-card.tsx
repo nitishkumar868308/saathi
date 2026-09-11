@@ -26,7 +26,7 @@ export function DocCard({
 }) {
   const tc = useColors();
   const styles = useStyles();
-  const { documents: d, common: c } = useT();
+  const { documents: d, common: c, addDocument: a } = useT();
   const locked = doc.is_locked;
   const hasExpiry = !!doc.expiry;
   const s = hasExpiry ? statusStyleFor(tc)[expiryStatus(doc.expiry as string)] : neutralStyleFor(tc);
@@ -68,6 +68,21 @@ export function DocCard({
           {doc.name}
         </Text>
         <Text style={styles.exp}>{locked ? d.lockedSub : label}</Text>
+        {/**
+          * ⚠️ Jo document abhi sirf is phone par hai, wo ab DIKHTA hai.
+          *
+          * Ye baat pehle sirf admin panel me thi ("Sirf device"), aur user
+          * ko iska pata tab chalta tha jab phone hi kho chuka hota. Nishaan
+          * `file_path` par tika hai — wo column server upload poora hone par
+          * hi bharta hai, isliye ye khud hi sach bolta hai aur file chadhte
+          * hi apne aap hat jaata hai.
+          */}
+        {!doc.file_path && !locked && (
+          <View style={styles.phoneOnly}>
+            <Ionicons name="phone-portrait-outline" size={10} color={tc.inkSoft} />
+            <Text style={styles.phoneOnlyText}>{a.onlyOnPhone}</Text>
+          </View>
+        )}
       </View>
       {locked ? (
         <View style={styles.lockBadge}>
@@ -148,6 +163,8 @@ const useStyles = makeStyles((c) => ({
     borderRadius: 14,
   },
   name: { fontSize: 15.5, fontWeight: "600", color: c.ink },
+  phoneOnly: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
+  phoneOnlyText: { fontSize: 11, color: c.inkSoft },
   exp: { marginTop: 2, fontSize: 13, color: c.inkSoft },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontSize: 12, fontWeight: "700" },
