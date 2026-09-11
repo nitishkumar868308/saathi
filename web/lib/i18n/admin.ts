@@ -1398,7 +1398,7 @@ const en: AdminDict = {
       none: "No payments in this period yet.",
       offTitle: "Play Billing is switched off",
       offBody:
-        "Purchases can happen in the app, but no webhook will reach us — so nothing will be recorded here. Reason: {status}. Set PLAY_BILLING_ENABLED=1 and REVENUECAT_WEBHOOK_SECRET once you go live on Play Console.",
+        "Nobody can buy Plus right now — the app refuses to start a purchase while this is off, on purpose: without the webhook the money would be taken and Plus would never be granted. Reason: {status}. Set PLAY_BILLING_ENABLED=1 and REVENUECAT_WEBHOOK_SECRET, then buying works again on its own.",
       testTag: "test",
     },
     notes: {
@@ -2077,7 +2077,7 @@ const hi: AdminDict = {
       none: "इस अवधि में अभी कोई पेमेंट नहीं।",
       offTitle: "Play Billing बंद है",
       offBody:
-        "ऐप में परचेज़ हो सकती है, पर webhook हम तक आएगा ही नहीं — यानी यहाँ कुछ रिकॉर्ड नहीं होगा। वजह: {status}. Play Console पर live होते ही PLAY_BILLING_ENABLED=1 और REVENUECAT_WEBHOOK_SECRET सेट करें।",
+        "अभी कोई Plus नहीं खरीद सकता — ऐप परचेज़ शुरू ही नहीं करती, और यह जान-बूझकर है: webhook के बिना पैसा कट जाता और Plus कभी नहीं मिलता। वजह: {status}. PLAY_BILLING_ENABLED=1 और REVENUECAT_WEBHOOK_SECRET सेट करते ही खरीदना अपने आप चालू हो जाएगा।",
       testTag: "टेस्ट",
     },
     notes: {
@@ -2758,7 +2758,7 @@ const hinglish: AdminDict = {
       none: "Is range me abhi koi payment nahi.",
       offTitle: "Play Billing band hai",
       offBody:
-        "App me kharidari ho sakti hai, par webhook hum tak aayega hi nahi — yaani yahan kuch record nahi hoga. Wajah: {status}. Play Console par live hote hi PLAY_BILLING_ENABLED=1 aur REVENUECAT_WEBHOOK_SECRET set karo.",
+        "Abhi koi Plus nahi kharid sakta — app purchase shuru hi nahi karti, aur ye jaan-boojh ke hai: webhook ke bina paisa kat jaata aur Plus kabhi nahi milta. Wajah: {status}. PLAY_BILLING_ENABLED=1 aur REVENUECAT_WEBHOOK_SECRET set karte hi kharidna apne aap chalu ho jaayega.",
       testTag: "test",
     },
     notes: {

@@ -206,8 +206,13 @@ export default function AdminPayments() {
       {/*
         ⚠️ Ye banner khaali screen ki WAJAH batata hai, aur wahi is screen ka
         sabse kaam ka hissa hai jab tak Play live nahi hota. "Abhi koi payment
-        nahi hua" aur "payment ho bhi jaye to khabar aayegi hi nahi" — dono ek
-        jaisi khaali table dikhate hain, par doosri ek toota hua setup hai.
+        nahi hua" aur "koi kharid hi nahi sakta" — dono ek jaisi khaali table
+        dikhate hain, par doosri ek toota hua setup hai.
+
+        ⚠️ Aur ab iska matlab pehle se BADA hai. App ab in env ke bina purchase
+        shuru hi nahi karti (`/api/play/status` → `lib/purchases.ts`), yaani ye
+        banner "khabar nahi aayegi" nahi, "kamai ho hi nahi rahi" keh raha hai.
+        Isse hafton chhoda jaana sabse mehnga hai.
       */}
       {billing && !billing.on && (
         <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-warm/40 bg-amber-warm/5 p-4">

@@ -918,6 +918,7 @@ export type Dict = {
     loginFirst: string;
     noPlan: string;
     paymentFailed: string;
+    billingNotReady: string;
   };
   membership: {
     title: string;
@@ -2048,6 +2049,8 @@ const hinglish: Dict = {
     loginFirst: "Pehle login karo",
     noPlan: "Koi plan available nahi",
     paymentFailed: "Payment shuru nahi hua",
+    billingNotReady:
+      "Payment abhi shuru nahi ho sakta — thodi der me dobara koshish karo. Aapka paisa nahi kata hai.",
   },
   membership: {
     title: "Meri membership",
@@ -2989,6 +2992,8 @@ const hi: Dict = {
     loginFirst: "पहले लॉगिन करें",
     noPlan: "कोई प्लान available नहीं",
     paymentFailed: "पेमेंट शुरू नहीं हुई",
+    billingNotReady:
+      "पेमेंट अभी शुरू नहीं हो सकती — थोड़ी देर में दोबारा कोशिश कीजिए। आपका पैसा नहीं कटा है।",
   },
   membership: {
     title: "मेरी membership",
@@ -3919,6 +3924,8 @@ const en: Dict = {
     loginFirst: "Please sign in first",
     noPlan: "No plan available",
     paymentFailed: "Couldn't start the payment",
+    billingNotReady:
+      "Payments can't start right now — please try again in a little while. You have not been charged.",
   },
   membership: {
     title: "My membership",

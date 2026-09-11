@@ -13,7 +13,7 @@ import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { useAuth } from "@/components/auth-provider";
 import { useToast } from "@/components/toast";
-import { waitForPlusFromServer, enforcePlanLimits, type PlanId } from "@/lib/plan";
+import { waitForPlusFromServer, enforcePlanLimits, WEB_URL, type PlanId } from "@/lib/plan";
 import { usePlan } from "@/lib/use-plan";
 import { refreshPlan } from "@/lib/plan-store";
 import {
@@ -21,6 +21,7 @@ import {
   initPurchases,
   getPlusPackages,
   purchasePlus,
+  billingReady,
   type PurchasePackage,
 } from "@/lib/purchases";
 import { getUserDetails, isDetailsComplete } from "@/lib/user-details";
@@ -226,6 +227,25 @@ export default function Upgrade() {
 
     setPaying(true);
     try {
+      /**
+       * ⚠️ Kharidne se PEHLE: Plus DIYA bhi ja sakega ya nahi?
+       *
+       * App khud `profiles.plan` likh nahi sakti, isliye Plus dene ka ek hi
+       * raasta hai — RevenueCat ka webhook, jo server ke env se chalta hai.
+       * Wo env set na ho to jo hota tha wo poori tarah CHUP tha: paisa sach
+       * me kat jaata, webhook 503 khaata, plan kabhi na badalta, aur ye
+       * screen "Plus chalu ho raha hai…" par hamesha ke liye atki rehti. Na
+       * error, na alert — bas ek user jisne paisa diya aur use kuch nahi mila.
+       *
+       * Ab wo soorat ban hi nahi sakti. Jawab na aaye to bhi hum ROKTE hain:
+       * net kharab hone par ek sahi user do minute baad dobara kharid lega,
+       * par kata hua paisa apne aap wapas nahi aata.
+       */
+      if (!(await billingReady(WEB_URL))) {
+        toast.show(u.billingNotReady, "error");
+        return;
+      }
+
       // Taaza list lo (screen khule ko der ho sakti hai), par chunne ka niyam
       // wahi ek — `packageFor`. Warna dikhaya hua price ek package ka hota aur
       // kharida doosra jaata.

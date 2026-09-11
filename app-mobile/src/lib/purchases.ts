@@ -65,6 +65,39 @@ export async function getPlusPackages(): Promise<PurchasePackage[]> {
   }
 }
 
+/**
+ * Kharidari ke baad Plus DIYA ja sakega ya nahi — server se poochho.
+ *
+ * ── Ye kyun zaroori hai ────────────────────────────────────────────────
+ *
+ * ⚠️ App khud `profiles.plan` likh hi nahi sakti (aur ye sahi hai — warna APK
+ * me padi anon key se koi bhi khud ko Plus de leta). Isliye Plus dene ka EK hi
+ * raasta hai: RevenueCat ka webhook. Aur wo webhook server ke env se chalta hai,
+ * jiska app ko kuch pata nahi hota.
+ *
+ * Un env ke bina jo hota tha wo sabse bura tha, aur poori tarah CHUP tha: paisa
+ * sach me kat jaata, webhook 503 khaata, `plan` kabhi na badalta, aur app
+ * "Plus chalu ho raha hai…" par hamesha ke liye atki rehti. Na koi error, na
+ * koi alert — bas ek user jisne paisa diya aur use kuch nahi mila.
+ *
+ * ⚠️ Jawab na mile to hum `false` maante hain — kharidari ROK dete hain.
+ *
+ * Ye jaan-boojh ke hai. Do me se ek nuksan chunna hi tha: ya to net kharab hone
+ * par ek sahi user thodi der kharid na paye (wo do minute baad dobara kharid
+ * lega), ya wo paisa de kar kuch na paye (wo paisa apne aap wapas nahi aata,
+ * aur bharosa to bilkul nahi). Pehla nuksan sasta hai.
+ */
+export async function billingReady(webUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${webUrl}/api/play/status`, { cache: "no-store" });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { ready?: boolean };
+    return body.ready === true;
+  } catch {
+    return false;
+  }
+}
+
 export type PurchaseResult = {
   active: boolean;
   /** ISO date, ya `null` = lifetime (koi expiry nahi). */
