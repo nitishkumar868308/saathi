@@ -32,6 +32,43 @@ export function planDbConfigured(): boolean {
 export type PlanSource = "google_play" | "admin";
 
 /**
+ * Plan badalne ke BAAD access bhi usi hisaab se khol/band karo.
+ *
+ * ⚠️ Ye alag se bulana ZAROORI hai, aur yahi wo baat thi jo chhoot gayi thi.
+ *
+ * `profiles.plan` badalna aadha kaam hai. Documents par `is_locked` aur
+ * reminders par `is_paused` alag column hain — wo apne aap nahi badalte.
+ * `grant_plus_days()` (referral / admin wala raasta) ye hamesha karta aaya hai,
+ * aur uske upar likha bhi hai: "kisi bhi tarah Plus milte hi paused reminders
+ * aur locked documents turant wapas aa jaayein". Play se kharidne wala raasta
+ * wahi ek line bhool gaya tha.
+ *
+ * Dono taraf ka nuksan asli tha:
+ *
+ *   • Kharid ke baad — user ne paisa de diya, plan 'plus' ho gaya, par uske
+ *     purane documents LOCKED hi pade rahe. App dobara khulne tak. Wahi "paisa
+ *     diya par kaam nahi kar raha" wali sabse buri shikayat.
+ *   • Khatam hone ke baad — plan 'free' ho gaya par extra documents khule aur
+ *     extra reminders chalu hi rahe. Yaani paisa dena band, feature chaalu.
+ *
+ * Best-effort: ye fail ho to bhi plan to badal hi chuka hai, aur app agli baar
+ * khulte hi `enforce_my_limits()` chala kar khud sudhaar leti hai. Isliye ye
+ * plan dene/hatane ko kabhi rok nahi sakta.
+ */
+async function applyPlanLimits(userId: string): Promise<void> {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/enforce_plan_limits`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ p_uid: userId }),
+      cache: "no-store",
+    });
+  } catch {
+    /* app apne agle session me khud sudhaar legi */
+  }
+}
+
+/**
  * User ko Plus banao.
  *
  * `until` ho to wahi expiry lagti hai (Play/RevenueCat ki asli expiry). Warna
@@ -83,6 +120,9 @@ export async function activatePlus(
     }),
     cache: "no-store",
   });
+
+  // Plus mil gaya — locked documents aur paused reminders TURANT wapas.
+  await applyPlanLimits(userId);
 }
 
 /** Subscription khatam/cancel — wapas free. */
@@ -94,6 +134,9 @@ export async function deactivatePlus(userId: string): Promise<void> {
     body: JSON.stringify({ plan: "free" }),
     cache: "no-store",
   });
+
+  // Plus khatam — free ki hadd dobara lagao, warna paid feature chalte rehte.
+  await applyPlanLimits(userId);
 }
 
 /**
