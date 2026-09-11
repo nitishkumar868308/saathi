@@ -77,10 +77,19 @@ order by p.proname;
 -- Ye NA hona bhi theek hai — table aur functions iske bina bhi poora kaam karte
 -- hain. Bas 90 din se purani rows apne aap nahi hatengi, aur wo kaam kabhi bhi
 -- baad me lagaya ja sakta hai.
+--
+-- ⚠️ `cron.job` ko `to_regclass` se pehle tola jaata hai — seedha padha nahi
+-- jaata. pg_cron enable na ho (ya ijaazat na ho) to seedha `select ... from
+-- cron.job` KHUD error phenk deta hai, aur ye jaanch-file wahin ruk jaati —
+-- yaani jo file bata rahi thi ki kya toota hai, wo khud toot jaati. Ek
+-- diagnostic ka fail hona sabse bekaar tarah ka fail hai.
 select
-  case when exists (select 1 from cron.job where jobname = 'prune-delivery-log')
-       then '✅ roz ki safai lagi hui hai'
-       else '⚠️ safai ka cron nahi laga — zaroori nahi, par 90 din baad rows badhti rahengi'
+  case
+    when to_regclass('cron.job') is null
+      then 'ℹ️ pg_cron is database me hai hi nahi — safai ka cron nahi lagega. Table aur functions iske bina poora kaam karte hain.'
+    when exists (select 1 from cron.job where jobname = 'prune-delivery-log')
+      then '✅ roz ki safai lagi hui hai'
+    else '⚠️ safai ka cron nahi laga — zaroori nahi, par 90 din baad rows badhti rahengi'
   end as cleanup_cron;
 
 /* ------------------------------------------------------------------ */
