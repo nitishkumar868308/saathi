@@ -165,8 +165,18 @@ export function buildAlarmNotification(opts: {
   body: string;
   kind: AlarmKind;
   labels?: ActionLabels;
+  /**
+   * Kis lamhe par ye alarm laga tha (ISO).
+   *
+   * ⚠️ Ye `Date.now()` se badla nahi ja sakta, aur wahi is poore raaste
+   * ki jaan hai. Server bhi apni delivery-row ISI lamhe par likhta hai
+   * (`remind_at` / expiry ka notice-moment). Dono ka ek hona hi email,
+   * WhatsApp aur notification ko admin panel me EK hi khabar banata hai.
+   * Alag hone par har khabar do tukdon me bant jaati hai.
+   */
+  due?: string;
 }): Notification {
-  const { id, title, body, kind, labels } = opts;
+  const { id, title, body, kind, labels, due } = opts;
   const isReminder = kind === "reminder";
   /**
    * Test alarm ko asli reminder jaisa hi bajna chahiye — warna wo kuch saabit
@@ -180,7 +190,7 @@ export function buildAlarmNotification(opts: {
     id,
     title,
     body,
-    data: { kind, body, title, id },
+    data: { kind, body, title, id, ...(due ? { due } : {}) },
     android: {
       channelId: CHANNEL_ID,
       importance: AndroidImportance.HIGH,

@@ -36,15 +36,36 @@ import {
   queueNotificationAction,
 } from "@/lib/notification-background";
 import { acknowledgeDocument, renewDocument } from "@/lib/doc-ack";
+import { logNotificationSeen } from "@/lib/notif-delivery";
 import { emitDataChanged } from "@/lib/data-events";
 import { documentFollowUp, type DocFollowUp } from "@/lib/ai";
 import { listDocuments } from "@/lib/documents";
 
-type Alert = { id: string; title: string; body: string; kind: "reminder" | "expiry" };
+type Alert = {
+  id: string;
+  title: string;
+  body: string;
+  kind: "reminder" | "expiry";
+  /**
+   * Kis lamhe par ye alarm laga tha (ISO).
+   *
+   * ⚠️ Server bhi apni email/WhatsApp wali row ISI lamhe par likhta hai.
+   * Dono ka ek hona hi teenon raaston ko admin panel me EK khabar banata hai.
+   * Purane version se lagi hui notification me ye nahi hota — tab hum kuch
+   * likhte hi nahi, kyunki galat lamhe par likhna ek jhoothi doosri khabar
+   * bana deta hai.
+   */
+  due: string | null;
+};
 
 function fromNotification(n?: Notification | null): Alert | null {
   if (!n) return null;
-  const data = (n.data ?? {}) as { kind?: string; body?: string; id?: string };
+  const data = (n.data ?? {}) as {
+    kind?: string;
+    body?: string;
+    id?: string;
+    due?: string;
+  };
 
   // ⚠️ Sirf reminder aur expiry ka hi full-screen alert khulna chahiye.
   //
@@ -66,7 +87,29 @@ function fromNotification(n?: Notification | null): Alert | null {
     title: n.title ?? "Saathi",
     body: n.body ?? (data.body as string) ?? "",
     kind: data.kind === "expiry" ? "expiry" : "reminder",
+    due: typeof data.due === "string" ? data.due : null,
   };
+}
+
+/**
+ * Is alert ka sach server par likho.
+ *
+ * ⚠️ Alert ka DIKHNA hi saboot hai ki notification baji aur user ke saamne
+ * aayi — server ye kabhi jaan nahi sakta, kyunki wo notification usne bheji hi
+ * nahi hoti (app khud local schedule karti hai). Free plan wale user ke liye
+ * to yahi IKLAUTA raasta hai; bina iske admin panel me uska khaana hamesha
+ * khaali rehta.
+ *
+ * `due` na ho (purane version se laga hua alarm) to kuch nahi likhte. Galat
+ * lamhe par likhna ek jhoothi doosri khabar bana deta hai, aur adhoora sach
+ * khaali jagah se zyada nuksan karta hai.
+ */
+function reportAlert(a: Alert | null, seen: boolean): void {
+  if (!a?.due) return;
+  const docId = a.kind === "expiry" ? docIdFrom(a.id) : null;
+  const itemId = a.kind === "expiry" ? docId : a.id;
+  if (!itemId) return;
+  void logNotificationSeen(a.kind === "expiry" ? "document" : "reminder", itemId, a.due, seen);
 }
 
 /** "doc:<uuid>:<lead>" se document id nikaalo (expiry ack ke liye). */
@@ -100,6 +143,8 @@ export function ReminderAlertHost() {
    * hai, aur user ko turant pata chalta hai ki KUCH HUA hai.
    */
   const ring = useRef(new Animated.Value(0)).current;
+  /** Abhi khula hua alert — purane closure se padhne se bachne ke liye. */
+  const alertRef = useRef<Alert | null>(null);
   const handledId = useRef<string | null>(null);
 
   /**
@@ -122,6 +167,18 @@ export function ReminderAlertHost() {
       if (handledId.current === a.id) return; // dobara na dikhe
       handledId.current = a.id;
       setAlert(a);
+      /**
+       * ⚠️ Ref bhi — sirf state kaafi nahi.
+       *
+       * `dismiss()` is effect ke ANDAR se bhi bulaya jaata hai (upar wala
+       * `handledId` wala raasta), aur us effect ki deps `[]` hain. Yaani wahan
+       * `alert` hamesha PEHLE render ka hota hai — `null`. Us purane closure se
+       * padhne par "user ne dekha" kabhi likha hi nahi jaata, aur galti chup
+       * rehti: admin panel me har alert bina dekhe wala dikhta.
+       */
+      alertRef.current = a;
+      // Yahi wo lamha hai jab notification sach me user ke saamne aayi.
+      reportAlert(a, false);
     };
 
     // Foreground: notification aaye (DELIVERED) ya tap ho (PRESS) -> modal.
@@ -344,6 +401,9 @@ export function ReminderAlertHost() {
 
   function dismiss() {
     stopAlert();
+    // Band karna bhi ek jawab hai — user ne ise dekh liya.
+    reportAlert(alertRef.current, true);
+    alertRef.current = null;
     setAlert(null);
     setAi(null);
     setStep("ask");
@@ -440,6 +500,7 @@ export function ReminderAlertHost() {
   /** Expiry: "haan, ho gaya" — aage ke sab reminder band + naya daalne ko kaho. */
   function onDocDone() {
     stopAlert();
+    reportAlert(alertRef.current, true);
     const docId = alert ? docIdFrom(alert.id) : null;
     if (docId) void renewDocument(docId).finally(emitDataChanged);
     setStep("done");
@@ -448,6 +509,7 @@ export function ReminderAlertHost() {
   /** Expiry: "abhi nahi" — bas dekh liya maano, reminder chalte rahenge. */
   function onDocLater() {
     stopAlert();
+    reportAlert(alertRef.current, true);
     const docId = alert ? docIdFrom(alert.id) : null;
     if (docId) acknowledgeDocument(docId);
     setStep("later");

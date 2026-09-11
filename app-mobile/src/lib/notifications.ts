@@ -108,6 +108,9 @@ async function schedule(
       body,
       kind,
       labels: { done: n.alertDone, later: n.alertLater },
+      // Wahi lamha jo server bhi apni row me likhta hai — wajah
+      // `notify-core.ts` ke `due` par poori likhi hai.
+      due: when.toISOString(),
     }),
     when,
     {
