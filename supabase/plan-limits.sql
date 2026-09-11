@@ -195,6 +195,16 @@ revoke all on function public.enforce_plan_limits(uuid) from public, anon, authe
 revoke all on function public.is_plus_active(uuid)      from public, anon, authenticated;
 -- ye dono sirf server / doosri functions ke andar se.
 
+-- ⚠️ Par server ko ijaazat DENI padegi — revoke ke baad wo apne aap nahi bachti.
+--
+-- Payment ka webhook (`web/lib/plan-server.ts` ka `applyPlanLimits`) plan badalne
+-- ke turant baad isse bulaata hai, warna kharid ke baad bhi user ke purane
+-- documents LOCKED pade rehte hain (aur subscription khatam hone par khule reh
+-- jaate hain). Bina is grant ke PostgREST us function ko dikhata hi nahi — call
+-- 404 khaati hai aur chup-chaap kuch nahi hota. Wahi sabse bura roop hai: sab
+-- theek dikhta hai, aur user ko Plus lene ke baad bhi apna document nahi khulta.
+grant execute on function public.enforce_plan_limits(uuid) to service_role;
+
 revoke all on function public.enforce_my_limits() from public, anon;
 revoke all on function public.can_add_reminder()  from public, anon;
 revoke all on function public.can_add_document()  from public, anon;

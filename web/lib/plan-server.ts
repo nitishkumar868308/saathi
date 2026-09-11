@@ -1,3 +1,5 @@
+import { logServerError } from "@/lib/errors-server";
+
 /**
  * Server-side plan updates in Supabase (service_role key se).
  *
@@ -57,14 +59,33 @@ export type PlanSource = "google_play" | "admin";
  */
 async function applyPlanLimits(userId: string): Promise<void> {
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/rpc/enforce_plan_limits`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/enforce_plan_limits`, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({ p_uid: userId }),
       cache: "no-store",
     });
+    /**
+     * ⚠️ Fail hua to CHUP mat raho — chahe hum aage badh hi rahe hon.
+     *
+     * Sabse aasan galti yahan 404 hai: `enforce_plan_limits` par service_role ko
+     * grant na ho to PostgREST use dikhata hi nahi. Us haal me sab theek dikhta
+     * hai — plan 'plus' ho jaata hai, payment record ban jaata hai — par user ka
+     * document Plus lene ke baad bhi nahi khulta. Bina is line ke wo galti
+     * mahinon chhupi reh sakti hai. Ilaaj: supabase/plan-limits.sql dobara chalao.
+     */
+    if (!res.ok) {
+      void logServerError(
+        new Error(
+          `enforce_plan_limits chala nahi — HTTP ${res.status} ` +
+            `(supabase/plan-limits.sql dobara run karo: service_role ko grant chahiye)`,
+        ),
+        { where: "plan-server", action: "enforce-limits", user: userId },
+        { level: "warn" },
+      );
+    }
   } catch {
-    /* app apne agle session me khud sudhaar legi */
+    /* net ka jhatka — app apne agle session me khud sudhaar legi */
   }
 }
 

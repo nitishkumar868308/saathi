@@ -302,9 +302,17 @@ revoke all on function public.prune_delivery_log() from public, anon, authentica
 grant execute on function public.prune_delivery_log() to service_role;
 
 -- Roz raat 3:20 (UTC) — koi bhi kam-bheed wala waqt chalega.
--- Job pehle se na ho to neeche wali line error deti hai — usse ignore kar dena.
--- (Bina iske poori file dobara chalane par "job already exists" aata hai.)
-select cron.unschedule('prune-delivery-log');
+-- ⚠️ Purani job hatao — par SIRF tab jab wo sach me ho.
+--
+-- `select cron.unschedule('naam')` seedha likhna yahan galat hai: job na hone par
+-- wo "could not find valid entry for job" phenkta hai, aur Supabase SQL Editor
+-- POORI script wahin rok deta hai. Yaani pehli baar chalane wale ke liye ye file
+-- kabhi poori chalti hi nahi — theek us waqt jab use sabse zyada chalni chahiye.
+--
+-- `cron.job` se jodkar chalane par job na hone par zero row aati hai aur kuch
+-- nahi hota. Isliye ye file pehli baar aur das-vi baar, dono par ek jaisi chalti
+-- hai.
+select cron.unschedule(jobid) from cron.job where jobname = 'prune-delivery-log';
 
 select cron.schedule(
   'prune-delivery-log',
