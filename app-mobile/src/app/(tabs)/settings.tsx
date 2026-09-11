@@ -443,6 +443,15 @@ export default function Settings() {
         <Text style={styles.version}>
           {tpl(s.version, { v: Application.nativeApplicationVersion ?? "1.0.0" })} ❤️
         </Text>
+        {/*
+          ⚠️ Company ka registered naam — jaan-boojh ke, aur yahin.
+          User ke bank/UPI statement me "RAHVIAN TECHNOLOGIES PRIVATE LIMITED"
+          hi aata hai. Wo naam app me kahin dikhta hi na ho to log use pehchante
+          nahi, aur anjaan payment "fraud" lagta hai — support par sabse aam
+          ghabrahat wali ticket wahi hoti hai. App ka naam bharosa banata hai,
+          company ka naam use sach saabit karta hai.
+        */}
+        <Text style={styles.company}>{s.company}</Text>
       </ScrollView>
 
       <ReferralCodeModal visible={refModal} onClose={() => setRefModal(false)} />
@@ -744,6 +753,13 @@ const useStyles = makeStyles((c) => ({
     marginTop: 18,
     textAlign: "center",
     fontSize: 13,
+    color: c.inkSoft,
+  },
+  company: {
+    marginTop: 4,
+    textAlign: "center",
+    fontSize: 11,
+    letterSpacing: 0.3,
     color: c.inkSoft,
   },
 

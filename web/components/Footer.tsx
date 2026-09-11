@@ -126,9 +126,20 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-line pt-6 text-sm text-ink-soft sm:flex-row">
-          <p>
-            © {year} Apka Saathi. {t.rights}
-          </p>
+          {/*
+            ⚠️ Company ka registered naam yahan JAAN-BOOJH KE likha hai, har page
+            par. Ye sirf kaanooni khaana-poori nahi hai: user ke bank/UPI statement
+            me "RAHVIAN TECHNOLOGIES PRIVATE LIMITED" hi aata hai, aur agar wo naam
+            site par kahin dikhta hi na ho to log use pehchante nahi — payment
+            anjaan lagta hai, aur anjaan payment "fraud" lagta hai. Product ka naam
+            bharosa banata hai, company ka naam use sach saabit karta hai.
+          */}
+          <div className="text-center sm:text-left">
+            <p>
+              © {year} Apka Saathi. {t.rights}
+            </p>
+            <p className="mt-1 text-xs">{t.operatedBy}</p>
+          </div>
           <div className="flex items-center gap-4">
             <p className="flex items-center gap-1.5">{t.madeIn}</p>
             {/*

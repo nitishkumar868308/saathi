@@ -1145,6 +1145,7 @@ export type Dict = {
     about: string;
     logout: string;
     version: string;
+    company: string;
     langAlertTitle: string;
     langAlertBody: string;
     deleteTitle: string;
@@ -2222,6 +2223,7 @@ const hinglish: Dict = {
     about: "About Us",
     logout: "Logout",
     version: "Apka Saathi · v{v} · Made in India",
+    company: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     langAlertTitle: "Bhasha",
     langAlertBody: "Neeche se apni bhasha chuno — poora app usi me badal jayega.",
     deleteTitle: "Account delete karwana hai?",
@@ -3165,6 +3167,7 @@ const hi: Dict = {
     about: "हमारे बारे में",
     logout: "लॉगआउट",
     version: "Apka Saathi · v{v} · Made in India",
+    company: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     langAlertTitle: "भाषा",
     langAlertBody: "नीचे से अपनी भाषा चुनें — पूरा app उसी में बदल जाएगा।",
     deleteTitle: "अकाउंट डिलीट करवाना है?",
@@ -4097,6 +4100,7 @@ const en: Dict = {
     about: "About Us",
     logout: "Log out",
     version: "Apka Saathi · v{v} · Made in India",
+    company: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     langAlertTitle: "Language",
     langAlertBody: "Pick your language below — the whole app switches to it.",
     deleteTitle: "Request account deletion?",

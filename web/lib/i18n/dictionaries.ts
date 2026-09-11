@@ -220,6 +220,7 @@ type Dict = {
     social: string;
     playstore: string;
     rights: string;
+    operatedBy: string;
     madeIn: string;
   };
   /** /delete-account — Play Store ki data-deletion policy wala page. */
@@ -732,6 +733,7 @@ const hinglish: Dict = {
     social: "Follow karo",
     playstore: "Play Store pe uplabdh",
     rights: "Sabhi adhikaar surakshit.",
+    operatedBy: "Apka Saathi RAHVIAN TECHNOLOGIES PRIVATE LIMITED ka product hai.",
     madeIn: "Made with ❤️ for you",
   },
   deleteAccount: {
@@ -837,6 +839,10 @@ const hinglish: Dict = {
     privacyTitle: "Privacy Policy",
     privacy: [
       {
+        h: "Ye policy kiski hai",
+        p: "Apka Saathi ko RAHVIAN TECHNOLOGIES PRIVATE LIMITED chalati hai — ek India me registered private limited company. Is policy me \"hum\" ka matlab wahi company hai, aur aapke data ki zimmedari usi ki hai. Kisi bhi sawaal ya shikayat par isi naam se sampark kiya ja sakta hai.",
+      },
+      {
         h: "1. Hum kya collect karte hain",
         p: "Sirf wahi jo Saathi ko kaam karne ke liye chahiye: aapka email (account ke liye), aur woh documents/reminders jo aap khud add karte ho. Bas itna hi.",
       },
@@ -873,6 +879,10 @@ const hinglish: Dict = {
     ],
     termsTitle: "Terms of Service",
     terms: [
+      {
+        h: "Ye shartein kiske saath hain",
+        p: "Saathi ko RAHVIAN TECHNOLOGIES PRIVATE LIMITED chalati hai — ek India me registered private limited company. Ye shartein aapke aur usi company ke beech ka samjhauta hain. Plus ki kharidari par aapke bank ya UPI statement me bhi yahi naam aata hai.",
+      },
       {
         h: "1. Saathi kya hai",
         p: "Saathi ek personal AI companion hai jo aapke documents, dates aur kaam yaad rakhta hai aur reminders bhejta hai. Service Android par uplabdh hai.",
@@ -1324,6 +1334,7 @@ const hi: Dict = {
     social: "फ़ॉलो करें",
     playstore: "Play Store पर उपलब्ध",
     rights: "सभी अधिकार सुरक्षित।",
+    operatedBy: "Apka Saathi, RAHVIAN TECHNOLOGIES PRIVATE LIMITED का प्रोडक्ट है।",
     madeIn: "आपके लिए ❤️ से बना",
   },
   deleteAccount: {
@@ -1429,6 +1440,10 @@ const hi: Dict = {
     privacyTitle: "प्राइवेसी पॉलिसी",
     privacy: [
       {
+        h: "यह पॉलिसी किसकी है",
+        p: "Apka Saathi को RAHVIAN TECHNOLOGIES PRIVATE LIMITED चलाती है — भारत में रजिस्टर्ड एक प्राइवेट लिमिटेड कंपनी। इस पॉलिसी में \"हम\" का मतलब वही कंपनी है, और आपके डेटा की ज़िम्मेदारी उसी की है। किसी भी सवाल या शिकायत पर इसी नाम से संपर्क किया जा सकता है।",
+      },
+      {
         h: "1. हम क्या इकट्ठा करते हैं",
         p: "सिर्फ़ वही जो साथी को काम करने के लिए चाहिए: आपका ईमेल (अकाउंट के लिए), और वो डॉक्युमेंट्स/रिमाइंडर जो आप खुद जोड़ते हैं। बस इतना ही।",
       },
@@ -1459,6 +1474,10 @@ const hi: Dict = {
     ],
     termsTitle: "सेवा की शर्तें",
     terms: [
+      {
+        h: "ये शर्तें किसके साथ हैं",
+        p: "साथी को RAHVIAN TECHNOLOGIES PRIVATE LIMITED चलाती है — भारत में रजिस्टर्ड एक प्राइवेट लिमिटेड कंपनी। ये शर्तें आपके और उसी कंपनी के बीच का समझौता हैं। Plus ख़रीदने पर आपके बैंक या UPI स्टेटमेंट में भी यही नाम आता है।",
+      },
       {
         h: "1. साथी क्या है",
         p: "साथी एक पर्सनल AI साथी है जो आपके डॉक्युमेंट्स, तारीख़ें और काम याद रखता है और रिमाइंडर भेजता है। यह सेवा Android पर उपलब्ध है।",
@@ -1910,6 +1929,7 @@ const en: Dict = {
     social: "Follow us",
     playstore: "Available on Play Store",
     rights: "All rights reserved.",
+    operatedBy: "Apka Saathi is a product of RAHVIAN TECHNOLOGIES PRIVATE LIMITED.",
     madeIn: "Made with ❤️ for you",
   },
   deleteAccount: {
@@ -2015,6 +2035,10 @@ const en: Dict = {
     privacyTitle: "Privacy Policy",
     privacy: [
       {
+        h: "Who this policy is from",
+        p: "Apka Saathi is operated by RAHVIAN TECHNOLOGIES PRIVATE LIMITED, a private limited company registered in India. In this policy, \"we\" means that company, and it is responsible for your data. You can contact us under that name with any question or complaint.",
+      },
+      {
         h: "1. What we collect",
         p: "Only what Saathi needs to work: your email (for the account), and the documents/reminders you add yourself. That's all.",
       },
@@ -2045,6 +2069,10 @@ const en: Dict = {
     ],
     termsTitle: "Terms of Service",
     terms: [
+      {
+        h: "Who these terms are with",
+        p: "Saathi is operated by RAHVIAN TECHNOLOGIES PRIVATE LIMITED, a private limited company registered in India. These terms are an agreement between you and that company. If you buy Plus, this is also the name that appears on your bank or UPI statement.",
+      },
       {
         h: "1. What Saathi is",
         p: "Saathi is a personal AI companion that remembers your documents, dates and tasks, and sends you reminders. The service is available on Android.",
