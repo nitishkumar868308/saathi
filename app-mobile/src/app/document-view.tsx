@@ -308,6 +308,22 @@ export default function DocumentView() {
         <View style={{ width: 30 }} />
       </View>
 
+      {/**
+        * ⚠️ Jo document abhi cloud par nahi pahuncha, wo yahan bhi saaf dikhta
+        * hai — sirf list me nahi.
+        *
+        * Document kholna hi wo lamha hai jab user use sach me dekh raha hota
+        * hai; agar backup baaki hai to baat yahin sabse zyada kaam ki hai. Nishaan
+        * `file_path` par tika hai (server use upload poora hone par hi bharta
+        * hai), isliye file chadhte hi ye khud hat jaata hai.
+        */}
+      {!doc.file_path && (
+        <View style={styles.phoneOnlyLine}>
+          <Ionicons name="phone-portrait-outline" size={12} color={tc.inkSoft} />
+          <Text style={styles.phoneOnlyText}>{a.onlyOnPhone}</Text>
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={styles.body}
         showsVerticalScrollIndicator={false}
@@ -815,6 +831,14 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: "rgba(0,0,0,0.55)",
   },
   zoomHintText: { fontSize: 11.5, fontWeight: "700", color: "#FFFFFF" },
+  phoneOnlyLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingBottom: 6,
+  },
+  phoneOnlyText: { fontSize: 12, color: c.inkSoft },
   pdfCard: {
     alignItems: "center",
     justifyContent: "center",
