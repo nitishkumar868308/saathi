@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { isPdf } from "../utils/doc-intake";
 import { aiCallEnded, aiCallStarted, isReachable, reportOnline } from "./network";
 import { reportError } from "./report-error";
 
@@ -675,8 +676,17 @@ export async function scanDocumentAI(
   try {
     const data = await callAi<(Partial<DocumentAI> & { error?: string }) | null>(
       { task: "scan", image: base64, mime, locale },
-      // Image bhejni hai — scan ko thodi zyada mohlat.
-      TASK_TIMEOUT_MS * 2,
+      /**
+       * Image bhejni hai — scan ko thodi zyada mohlat. PDF ko usse bhi zyada.
+       *
+       * ⚠️ PDF wali chhoot zaroori hai. Gemini PDF ke HAR page ko alag tasveer
+       * ki tarah padhta hai, yaani 10 page ka document lagbhag 10 scan jitna
+       * waqt leta hai. 30 second ki purani hadd par wo hamesha kat jaata, aur
+       * user ko "Saathi busy hai" dikhta — jabki AI apna kaam theek kar raha
+       * hota. Us jhooth ka nateeja seedha tha: PDF wala poora raasta bekaar,
+       * har baar naam aur expiry khud bharo.
+       */
+      isPdf(mime) ? TASK_TIMEOUT_MS * 6 : TASK_TIMEOUT_MS * 2,
     );
     // Server ne jawab diya, par usme samajh nahi thi — ye AI ki apni baat hai,
     // net ki nahi. Isliye `unclear`, `server` nahi.

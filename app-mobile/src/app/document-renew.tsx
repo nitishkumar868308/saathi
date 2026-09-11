@@ -536,7 +536,14 @@ export default function DocumentRenew() {
               {/* Renew ke baad */}
               <View style={styles.compareCol}>
                 <Text style={[styles.compareLabel, styles.compareLabelNew]}>{r.afterLabel}</Text>
-                {newPhoto ? (
+                {newPhoto && isPdf(pickedMime) ? (
+                  /* PDF par zoom nahi — wahan `<Image>` khaali dabba dikhata
+                     hai aur user ko lagta hai file chuni hi nahi gayi. */
+                  <View style={[styles.thumb, styles.thumbNew, styles.pdfThumb]}>
+                    <Ionicons name="document-text-outline" size={28} color={tc.terracotta} />
+                    <Text style={styles.pdfThumbText}>PDF</Text>
+                  </View>
+                ) : newPhoto ? (
                   <Pressable
                     onPress={() => setZoom({ uri: newPhoto, title: r.afterLabel })}
                     style={{ width: "100%", alignItems: "center" }}
@@ -869,6 +876,8 @@ const useStyles = makeStyles((c) => ({
    * chaudi hoti hai (licence) aur kabhi lambi (passport ka page); dono ko ek hi
    * chaukor me `cover` karne se wo bhadde tarike se kat-te hain.
    */
+  pdfThumb: { alignItems: "center", justifyContent: "center", gap: 3 },
+  pdfThumbText: { fontSize: 10, fontWeight: "700", color: c.terracotta, letterSpacing: 0.5 },
   thumb: {
     width: "100%",
     aspectRatio: 1,

@@ -575,7 +575,18 @@ export default function AddDocument() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Photo scan — primary */}
           <View style={styles.scanBox}>
-            {imageUri ? (
+            {imageUri && isPdf(pickedMime) ? (
+              /**
+               * ⚠️ PDF ka preview `<Image>` se nahi ban sakta — wahan sirf ek
+               * khaali dabba dikhta hai, aur user ko lagta hai file chuni hi
+               * nahi gayi. Wo dobara picker kholta hai, phir dobara… Ek saaf
+               * icon aur file ka type usse kahin behtar hai.
+               */
+              <View style={[styles.preview, styles.pdfPreview]}>
+                <Ionicons name="document-text-outline" size={34} color={tc.terracotta} />
+                <Text style={styles.pdfPreviewText}>PDF</Text>
+              </View>
+            ) : imageUri ? (
               <Image source={{ uri: imageUri }} style={styles.preview} resizeMode="cover" />
             ) : (
               <View style={styles.scanIcon}>
@@ -900,6 +911,8 @@ const useStyles = makeStyles((c) => ({
     borderRadius: 20,
     backgroundColor: "rgba(194,90,55,0.10)",
   },
+  pdfPreview: { alignItems: "center", justifyContent: "center", gap: 4 },
+  pdfPreviewText: { fontSize: 11, fontWeight: "700", color: c.terracotta, letterSpacing: 0.5 },
   preview: {
     height: 120,
     width: 120,
