@@ -271,7 +271,19 @@ export default function Upgrade() {
       } else {
         toast.show(u.purchaseFailed, "error");
       }
-    } catch {
+    } catch (e) {
+      /**
+       * ⚠️ User ka KHUD radd karna "fail" nahi hai.
+       *
+       * Play ki sheet par Back dabana sabse aam baat hai — user daam dekhta hai,
+       * sochta hai, aur wapas aa jaata hai. Uspar "Payment shuru nahi hua" wala
+       * laal toast dikhana jhooth hai aur dara deta hai: usne kuch toda nahi,
+       * usne bas mana kiya. Kai log wahi dekh kar dobara koshish hi nahi karte.
+       *
+       * RevenueCat is soorat me `userCancelled` lagata hai — usme chup rehna hi
+       * sahi jawab hai.
+       */
+      if ((e as { userCancelled?: boolean } | null)?.userCancelled) return;
       toast.show(u.paymentFailed, "error");
     } finally {
       setPaying(false);
