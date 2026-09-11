@@ -25,6 +25,7 @@ import { useAdminT } from "@/lib/i18n/admin";
  * sakta.
  */
 import type { DeliveryBlocker, DeliveryCheck } from "@/lib/delivery-check";
+import type { DeliveryHistoryRow } from "@/lib/delivery-history";
 
 /** Bhasha ka naam — teenon ka apna, translate karne ki cheez nahi. */
 const LANG_LABEL: Record<DeliveryCheck["language"], string> = {
@@ -126,6 +127,24 @@ function fmtDate(iso: string | null): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+  });
+}
+
+/**
+ * Delivery ke itihaas me WAQT bhi chahiye, sirf taareekh nahi.
+ *
+ * ⚠️ `fmtDate` yahan kaafi nahi hai. Ek hi din ke do reminder (subah 8, shaam 6)
+ * usme bilkul ek jaise dikhte, aur support ka sawaal hamesha "kaunsa wala" hota
+ * hai. Expiry wale alert bhi 9 baje ke hote hain — bina waqt ke wo reminder se
+ * alag hi nahi dikhte.
+ */
+function fmtMoment(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -464,6 +483,48 @@ export default function AdminUsers() {
 
 /* ---------------------------- Detail panel ---------------------------- */
 
+const CHANNELS = ["notification", "email", "whatsapp"] as const;
+
+const CHANNEL_LABEL: Record<(typeof CHANNELS)[number], string> = {
+  notification: "Notification",
+  email: "Email",
+  whatsapp: "WhatsApp",
+};
+
+/**
+ * Ek raaste ka nateeja — ek chhoti si chip.
+ *
+ * ⚠️ Khaali khaana (`undefined`) aur "ruk gaya" (`skipped`) do alag baatein
+ * hain, aur unhe ek dikhana sabse bada jhooth hota. Khaali ka matlab hai us
+ * raaste par koshish hui hi nahi — jaise purane app version se lagi hui
+ * notification, jo apna record bhejti hi nahi.
+ */
+function ChannelChip({
+  label,
+  r,
+}: {
+  label: string;
+  r?: { status: string; reason: string | null; seen_at: string | null };
+}) {
+  const tone = !r
+    ? "border-line text-ink-soft"
+    : r.status === "sent"
+      ? "border-emerald-600/40 text-emerald-700"
+      : r.status === "failed"
+        ? "border-terracotta/50 text-terracotta-dark"
+        : "border-line text-ink-soft";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] ${tone}`}
+    >
+      <span className="font-semibold">{label}</span>
+      <span>{!r ? "—" : r.status === "sent" ? "✓" : r.reason || r.status}</span>
+      {/* Dekh liya — abhi sirf notification par sach hota hai. */}
+      {r?.seen_at && <span title={r.seen_at}>👁</span>}
+    </span>
+  );
+}
+
 /** Lazy — sirf expand karne pe fetch hota hai, list me har user ke liye nahi. */
 function Detail({ id }: { id: string }) {
   const t = useAdminT();
@@ -471,6 +532,7 @@ function Detail({ id }: { id: string }) {
   const sh = t.data.shared;
   const [detail, setDetail] = useState<UserDetail | null>(null);
   const [delivery, setDelivery] = useState<DeliveryCheck | null>(null);
+  const [log, setLog] = useState<DeliveryHistoryRow[] | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -481,11 +543,13 @@ function Detail({ id }: { id: string }) {
         const body = (await res.json()) as {
           detail?: UserDetail;
           delivery?: DeliveryCheck | null;
+          deliveryLog?: DeliveryHistoryRow[] | null;
           error?: string;
         };
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
         if (alive) setDetail(body.detail ?? null);
         if (alive) setDelivery(body.delivery ?? null);
+        if (alive) setLog(body.deliveryLog ?? null);
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : d.detailFailed);
       }
@@ -587,6 +651,51 @@ function Detail({ id }: { id: string }) {
               <p className="text-xs text-ink-soft">{d.waWrongLang}</p>
             )}
           </>
+        )}
+
+        {/*
+          Kya-kya gaya — jo HO CHUKA uska record.
+
+          ⚠️ Ye upar wale check se alag hai, aur dono chahiye. Upar wala AAGE ki
+          baat karta hai ("jaayega ya nahi, aur nahi to kyun"). Ye PEECHE ki:
+          us din sach me kya hua. Support ka sawaal aksar dono ko chhoota hai.
+
+          ⚠️ "Bheja" aur "dekha" jaan-boojh ke alag dikhte hain. Notification
+          par hi "dekha" ka pakka saboot hota hai (app ka alert user ke saamne
+          aaya); email/WhatsApp par wo abhi khaali rehta hai — aur usse bharna
+          andaza hota, sach nahi.
+        */}
+        <h4 className="pt-3 text-xs font-bold uppercase tracking-wider text-ink-soft">
+          {d.deliveryLog}
+        </h4>
+        {log === null ? (
+          <p className="text-sm text-ink-soft">{d.deliveryLogUnknown}</p>
+        ) : log.length === 0 ? (
+          <p className="text-sm text-ink-soft">{d.deliveryLogEmpty}</p>
+        ) : (
+          <ul className="space-y-2">
+            {log.map((row) => (
+              <li
+                key={`${row.kind}:${row.item_id}:${row.due_at}`}
+                className="rounded-xl border border-line bg-cream-deep/20 p-2.5"
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm font-semibold text-ink">
+                    {row.item_name ?? d.deliveryLogDeleted}
+                  </span>
+                  <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-soft">
+                    {row.plan}
+                  </span>
+                </div>
+                <p className="text-[11px] text-ink-soft">{fmtMoment(row.due_at)}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {CHANNELS.map((ch) => (
+                    <ChannelChip key={ch} label={CHANNEL_LABEL[ch]} r={row.channels[ch]} />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

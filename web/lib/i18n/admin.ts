@@ -495,6 +495,10 @@ export type AdminDict = {
       /** Koi rok nahi — agla sawaal cron ka hai, isliye wo isi line me. */
       deliveryOk: string;
       deliveryUnknown: string;
+      deliveryLog: string;
+      deliveryLogUnknown: string;
+      deliveryLogEmpty: string;
+      deliveryLogDeleted: string;
       /** Template us bhasha me nahi hai — pahunchega, par Hinglish me. */
       waWrongLang: string;
       blockerNotPlus: string;
@@ -1330,6 +1334,10 @@ const en: AdminDict = {
       willSend: "Will send", wontSend: "Won't send",
       deliveryOk: "Nothing is blocking delivery — check that the cron is running.",
       deliveryUnknown: "Couldn't check delivery.",
+      deliveryLog: "What actually went out",
+      deliveryLogUnknown: "History unavailable — has supabase/delivery-log.sql been run?",
+      deliveryLogEmpty: "Nothing has gone out to this user yet.",
+      deliveryLogDeleted: "(deleted)",
       waWrongLang: "No template in this language — WhatsApp will arrive in Hinglish.",
       blockerNotPlus: "Not on Plus — email and WhatsApp are Plus-only.",
       blockerNoEmail: "No email on the profile.",
@@ -2005,6 +2013,10 @@ const hi: AdminDict = {
       willSend: "जाएगा", wontSend: "नहीं जाएगा",
       deliveryOk: "कोई रोक नहीं — अब देखें कि cron चल रहा है या नहीं।",
       deliveryUnknown: "डिलीवरी जाँची नहीं जा सकी।",
+      deliveryLog: "असल में क्या-क्या गया",
+      deliveryLogUnknown: "इतिहास नहीं मिला — supabase/delivery-log.sql चलाई थी?",
+      deliveryLogEmpty: "इस यूज़र को अभी तक कुछ नहीं गया।",
+      deliveryLogDeleted: "(मिटा दिया गया)",
       waWrongLang: "इस भाषा का टेम्पलेट नहीं — WhatsApp Hinglish में पहुँचेगा।",
       blockerNotPlus: "प्लस नहीं है — ईमेल और WhatsApp सिर्फ़ प्लस में।",
       blockerNoEmail: "प्रोफ़ाइल में ईमेल नहीं है।",
@@ -2682,6 +2694,10 @@ const hinglish: AdminDict = {
       willSend: "Jayega", wontSend: "Nahi jayega",
       deliveryOk: "Koi rok nahi — ab dekho ki cron chal raha hai ya nahi.",
       deliveryUnknown: "Delivery jaanchi nahi ja saki.",
+      deliveryLog: "Asal me kya-kya gaya",
+      deliveryLogUnknown: "Itihaas nahi mila — supabase/delivery-log.sql chalayi thi?",
+      deliveryLogEmpty: "Is user ko abhi tak kuch nahi gaya.",
+      deliveryLogDeleted: "(mita diya gaya)",
       waWrongLang: "Is bhasha ka template nahi — WhatsApp Hinglish me pahunchega.",
       blockerNotPlus: "Plus nahi hai — email aur WhatsApp sirf Plus me.",
       blockerNoEmail: "Profile me email nahi hai.",

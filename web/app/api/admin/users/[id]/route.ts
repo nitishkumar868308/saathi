@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/admin-guard";
 import { getUserDetail, RewardsNotConfigured } from "@/lib/rewards-server";
 import { getDeliveryCheck } from "@/lib/delivery-check";
+import { getDeliveryHistory } from "@/lib/delivery-history";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,8 +24,16 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
      * ulta sauda hota.
      */
     const delivery = await getDeliveryCheck(params.id).catch(() => null);
+    /**
+     * Itihaas bhi usi soch par: fail hone par `null`, poora panel nahi toot-ta.
+     *
+     * ⚠️ `supabase/delivery-log.sql` abhi chalayi na gayi ho to ye 404 deta hai.
+     * Us soorat me user ka baaki record phir bhi dikhna chahiye — ek naye
+     * section ke liye poora panel band ho jaana ulta sauda hai.
+     */
+    const deliveryLog = await getDeliveryHistory(params.id).catch(() => null);
 
-    return NextResponse.json({ detail, delivery });
+    return NextResponse.json({ detail, delivery, deliveryLog });
   } catch (err) {
     console.error("[admin/users/:id]", err);
     return NextResponse.json(
