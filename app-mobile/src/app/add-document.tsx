@@ -11,17 +11,32 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { KeyboardView } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { LoaderOverlay } from "@/components/loader";
 import { reportError } from "@/lib/report-error";
-import { addDocument, DocLimitError, uploadDocumentImage } from "@/lib/documents";
+import {
+  addDocument,
+  DocLimitError,
+  keepOnPhone,
+  uploadDocumentFile,
+} from "@/lib/documents";
+import { ConfirmModal } from "@/components/confirm-modal";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
 import { scanDocumentAI } from "@/lib/ai";
 import { withoutLock } from "@/lib/app-lock";
+import { fileSizeBytes } from "@/lib/storage";
+import {
+  intakeVerdict,
+  isPdf,
+  normalizeMime,
+  type IntakeVerdict,
+} from "@/utils/doc-intake";
 import { logEvent } from "@/lib/analytics";
 import { markFirstDocument } from "@/lib/reviews";
 import {
@@ -66,18 +81,17 @@ function impossibleDayParts(
   };
 }
 
-async function persistImage(cacheUri: string): Promise<string> {
-  const dir = FileSystem.documentDirectory + "documents/";
-  try {
-    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-  } catch {
-    /* already exists */
-  }
-  const ext = (cacheUri.split(".").pop() || "jpg").split("?")[0].slice(0, 5);
-  const dest = `${dir}${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
-  await FileSystem.copyAsync({ from: cacheUri, to: dest });
-  return dest;
-}
+/**
+ * ⚠️ Yahan pehle `persistImage()` tha — file app ke apne folder me copy hoti thi,
+ * upload se PEHLE. Wo hata diya gaya.
+ *
+ * Ab offline copy `primeCachedFile()` banata hai, aur wo R2 par chadhne ke BAAD
+ * chalta hai (`uploadDocumentFile`). Yaani device par file tabhi baithti hai jab
+ * wo cloud par pahunch chuki ho — ya jab user ne khud "Phone par rakho" kaha ho.
+ * Picker ki file OS ke apne cache me padi hi hoti hai; use pehle se copy karne ki
+ * zaroorat kabhi thi hi nahi, aur wahi copy "cloud par gaya ya nahi" wale sawaal
+ * ko chhupa deti thi.
+ */
 
 export default function AddDocument() {
   const tc = useColors();
@@ -87,7 +101,30 @@ export default function AddDocument() {
   const { addDocument: d } = useT();
   const { locale } = useLocale();
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [savedUri, setSavedUri] = useState<string | null>(null);
+  /**
+   * Picker se aayi file — jaisi hai waisi.
+   *
+   * ⚠️ Yahan pehle `savedUri` tha: file app ke apne folder me copy ho jaati
+   * thi (`persistImage`), upload se PEHLE. Ab wo copy R2 par chadhne ke BAAD
+   * banti hai (`uploadDocumentFile`), isliye yahan sirf picker ka apna rasta
+   * rakha jaata hai.
+   */
+  const [pickedUri, setPickedUri] = useState<string | null>(null);
+  const [pickedMime, setPickedMime] = useState("image/jpeg");
+  /** Aakhri scan ka faisla — Save yahi dekh kar rukta ya chalta hai. */
+  const [verdict, setVerdict] = useState<IntakeVerdict | null>(null);
+  /**
+   * Document ban gaya par file cloud par nahi pahunchi — user ka jawab baaki.
+   *
+   * Jab tak ye bhara hai, screen band nahi hoti. Yahi is poore badlav ki jaan
+   * hai: pehle ye soorat CHUP thi aur document chupchaap sirf phone par reh
+   * jaata tha.
+   */
+  const [pendingDoc, setPendingDoc] = useState<{
+    id: string;
+    uri: string;
+    mime: string;
+  } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [type, setType] = useState("other");
@@ -159,15 +196,124 @@ export default function AddDocument() {
    */
   const [permModal, setPermModal] = useState(false);
 
-  async function pickImage(source: "camera" | "gallery") {
+  /**
+   * Chuni hui file ko lena — camera aur "Chuno", dono yahin aate hain.
+   *
+   * ⚠️ Size ki rok YAHIN lagti hai, `save()` par nahi. Do wajah: badi file par AI
+   * chalana bekaar ka kharcha hai (Gemini PDF ke har page ka alag paisa leta
+   * hai), aur user ko rok ki khabar ABHI milni chahiye — naam aur expiry bhar
+   * lene ke baad nahi.
+   */
+  async function intake(uri: string, mime: string, bytes: number) {
+    setImageUri(uri);
+    setPickedUri(uri);
+    setPickedMime(mime);
+
+    const size = intakeVerdict({ bytes, failure: null });
+    if (!size.save) {
+      setVerdict(size);
+      setScanned(true);
+      return toast.show(d.fileTooBig, "error");
+    }
+
+    setScanning(true);
     try {
-      const opts: ImagePicker.ImagePickerOptions = {
-        base64: true,
-        quality: 0.4,
-        allowsEditing: true,
-      };
+      let rType = "other";
+      let rName = "";
+      let rExpiry: string | null = null;
+
       /**
-       * ⚠️ Camera/gallery ke poore waqt lock band rehta hai.
+       * Document sirf AI (Gemini vision) padhta hai.
+       *
+       * ⚠️ Yahan pehle ek local OCR fallback tha (OCR.space + keyword matching)
+       * jo AI fail hone par chal jaata tha. Wo hata diya gaya. Wajah: wo aksar
+       * galat naam aur galat expiry nikaalta tha, aur user ko wo bilkul AI ke
+       * jawab jaisa hi dikhta tha. Ek galat expiry date sabse mehngi galti hai
+       * — us document ka reminder galat din bajta hai, aur kisi ko pata bhi
+       * nahi chalta ki wo kahan se aayi thi.
+       *
+       * AI na chale to hum khaali chhod dete hain aur user khud bhar leta hai.
+       * Khaali khaana galat khaane se hamesha behtar hai.
+       *
+       * ⚠️ base64 ab FILE se padha jaata hai, picker ke `asset.base64` se nahi.
+       * `DocumentPicker` base64 deta hi nahi, aur PDF isi raaste se aati hai.
+       * (Isi wajah se `ImagePicker` ka `base64: true` bhi hata diya — wo ab
+       * bekaar ka kaam tha aur badi photo par yaad kha jaata tha.)
+       */
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+      const scan = await scanDocumentAI(base64, locale, mime);
+
+      /**
+       * ── Fail hua to WAJAH batao ──────────────────────────────────────
+       *
+       * ⚠️ Pehle yahan paanch bilkul alag halaat ek hi line dikhati thi:
+       * "Padha, par saaf nahi — details khud daal do". Net band ho, net dheema
+       * ho, Gemini bhara ho, server ki dikkat ho, ya AI ne sach me kuch na
+       * dhoondha ho — user ke liye sab ek jaisa tha.
+       *
+       * Pehli chaar soorat me wo line JHOOTH thi: AI ne kuch padha hi nahi
+       * tha. Aur wo jhooth mehnga tha — user "saaf nahi" padh kar photo dobara
+       * kheenchta tha, behtar roshni me, ek aur baar… jabki dikkat photo ki
+       * thi hi nahi, net ki thi.
+       *
+       * ⚠️ Aur `unclear` ab sirf ek line nahi — wo ROK hai. Wahi iklauti soorat
+       * hai jisme AI SACH ME chala aur usme kuch mila hi nahi, yaani wo selfie
+       * ya ghar ki photo hai. Us par "details khud daal do" kehna ab jhooth
+       * hota, kyunki hum use save kar hi nahi rahe.
+       */
+      if (!scan.ok) {
+        setScanned(true);
+        const v = intakeVerdict({ bytes, failure: scan.failure });
+        setVerdict(v);
+        if (v.note === "noDocument") toast.show(d.ocrNoDocument, "error");
+        else if (v.note === "offline") toast.show(d.ocrOffline, "info");
+        else if (v.note === "busy") toast.show(d.ocrBusy, "info");
+        else toast.show(d.ocrFailed, "error");
+        return;
+      }
+      setVerdict(intakeVerdict({ bytes, failure: null }));
+
+      const ai = scan.data;
+      if (ai.name || ai.expiry || (ai.type && ai.type !== "other")) {
+        rType = ai.type || "other";
+        rName = ai.name || "";
+        rExpiry = ai.expiry && isValidDate(ai.expiry) ? ai.expiry : null;
+        // AI ka poora samajh save karo (DB me jaayega).
+        if (ai.summary) setSummary(ai.summary);
+      }
+
+      setType(rType);
+      if (rName) setName(rName);
+      if (rExpiry) setExpiry(rExpiry);
+      setScanned(true);
+
+      /**
+       * ⚠️ Yahan `d.ocrUnclear` jaan-boojh ke bacha hua hai.
+       *
+       * Ye wo soorat hai jisme AI ne jawab DIYA (`scan.ok`) par usme naam, expiry
+       * aur type — teenon khaali the. Ye upar wali `unclear` rok se ALAG hai:
+       * dhundhla par ASLI document aksar yahin girta hai. Use rokna user ka sach
+       * me kaam ka document rok dena hota, isliye yahan wahi purani baat rehti
+       * hai — "khud bhar do".
+       */
+      const bits: string[] = [];
+      if (rName) bits.push(rName);
+      if (rExpiry) bits.push(d.ocrExpiryFound);
+      toast.show(
+        bits.length ? tpl(d.ocrReadTpl, { bits: bits.join(" · ") }) : d.ocrUnclear,
+        bits.length ? "success" : "info",
+      );
+    } catch {
+      toast.show(d.ocrFailed, "error");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function pickCamera() {
+    try {
+      /**
+       * ⚠️ Camera ke poore waqt lock band rehta hai.
        *
        * Yahi wo jagah hai jahan shikayat sabse zyada thi: document ki photo
        * lene camera kholo, wapas aao — aur app PIN maang rahi hai. Camera app
@@ -176,100 +322,61 @@ export default function AddDocument() {
        * aksar 30-60 second lagte hain (photo lena, crop karna), to purani 60
        * second wali khidki har baar hi kat jaati thi.
        */
-      let result: ImagePicker.ImagePickerResult;
-      if (source === "camera") {
-        const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) return toast.show(d.cameraPermission, "info");
-        result = await withoutLock(() => ImagePicker.launchCameraAsync(opts));
-      } else {
-        result = await withoutLock(() => ImagePicker.launchImageLibraryAsync(opts));
-      }
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return toast.show(d.cameraPermission, "info");
+      const result = await withoutLock(() =>
+        ImagePicker.launchCameraAsync({ quality: 0.4, allowsEditing: true }),
+      );
       if (result.canceled) return;
       const asset = result.assets[0];
-      setImageUri(asset.uri);
-      try {
-        setSavedUri(await persistImage(asset.uri));
-      } catch {
-        setSavedUri(asset.uri);
+      await intake(asset.uri, "image/jpeg", await fileSizeBytes(asset.uri));
+    } catch {
+      toast.show(d.imageFailed, "error");
+    }
+  }
+
+  /**
+   * Ek hi picker — photo bhi, PDF bhi.
+   *
+   * ⚠️ `DocumentPicker` phone ka apna picker kholta hai (Photos + Downloads +
+   * Drive, sab ek jagah) — wahi jo WhatsApp/Gmail me attach karte waqt dikhta
+   * hai. Alag "PDF" wala button banane ka koi matlab nahi tha: user ko pehle se
+   * pata nahi hota ki uski cheez kis daraaz me padi hai.
+   *
+   * ⚠️ Image aane par use DABAYA jaata hai. `ImagePicker` ye `quality: 0.4` se
+   * khud kar deta tha; `DocumentPicker` nahi karta. Bina ise kiye phone ki aam
+   * 8MB wali photo 5MB ki rok me atak jaati — yaani user apna ASLI document daal
+   * hi na paata, aur wajah use kabhi samajh na aati. PDF ko haath nahi lagate.
+   */
+  async function pickFile() {
+    try {
+      const res = await withoutLock(() =>
+        DocumentPicker.getDocumentAsync({
+          type: ["image/*", "application/pdf"],
+          copyToCacheDirectory: true,
+          multiple: false,
+        }),
+      );
+      if (res.canceled) return;
+      const asset = res.assets[0];
+      /**
+       * ⚠️ mime yahin saaf hota hai. `DocumentPicker` use `; charset=...` ke
+       * saath de sakta hai, aur `doc-file-name.ts` ka `extForMime()` sirf theek
+       * `application/pdf` pehchanta hai — bina saaf kiye PDF cache me `.jpg` naam
+       * par baith jaati aur wahan dhoondhi hi nahi jaati.
+       */
+      const mime =
+        normalizeMime(asset.mimeType) ||
+        (asset.name?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+
+      if (isPdf(mime)) {
+        return intake(asset.uri, mime, asset.size ?? (await fileSizeBytes(asset.uri)));
       }
-      if (!asset.base64) return;
 
-      setScanning(true);
-      try {
-        let rType = "other";
-        let rName = "";
-        let rExpiry: string | null = null;
-
-        /**
-         * Document sirf AI (Gemini vision) padhta hai.
-         *
-         * ⚠️ Yahan pehle ek local OCR fallback tha (OCR.space + keyword matching)
-         * jo AI fail hone par chal jaata tha. Wo hata diya gaya. Wajah: wo aksar
-         * galat naam aur galat expiry nikaalta tha, aur user ko wo bilkul AI ke
-         * jawab jaisa hi dikhta tha. Ek galat expiry date sabse mehngi galti hai
-         * — us document ka reminder galat din bajta hai, aur kisi ko pata bhi
-         * nahi chalta ki wo kahan se aayi thi.
-         *
-         * AI na chale to hum khaali chhod dete hain aur user khud bhar leta hai.
-         * Khaali khaana galat khaane se hamesha behtar hai.
-         */
-        const scan = await scanDocumentAI(asset.base64, locale);
-
-        /**
-         * ── Fail hua to WAJAH batao ──────────────────────────────────────
-         *
-         * ⚠️ Pehle yahan paanch bilkul alag halaat ek hi line dikhati thi:
-         * "Padha, par saaf nahi — details khud daal do". Net band ho, net dheema
-         * ho, Gemini bhara ho, server ki dikkat ho, ya AI ne sach me kuch na
-         * dhoondha ho — user ke liye sab ek jaisa tha.
-         *
-         * Pehli chaar soorat me wo line JHOOTH thi: AI ne kuch padha hi nahi
-         * tha. Aur wo jhooth mehnga tha — user "saaf nahi" padh kar photo dobara
-         * kheenchta tha, behtar roshni me, ek aur baar… jabki dikkat photo ki
-         * thi hi nahi, net ki thi.
-         *
-         * `add-reminder.tsx` me ye pehle se theek hai (`tellWhyAiFailed`) —
-         * yahan wahi baat, usi tarah.
-         */
-        if (!scan.ok) {
-          setScanned(true);
-          if (scan.failure === "offline") toast.show(d.ocrOffline, "info");
-          else if (scan.failure === "busy" || scan.failure === "slow") {
-            toast.show(d.ocrBusy, "info");
-          } else if (scan.failure === "unclear") {
-            // Ek hi soorat jisme AI SACH ME chala tha — yahan "khud bhar do"
-            // kehna sahi hai.
-            toast.show(d.ocrUnclear, "info");
-          } else toast.show(d.ocrFailed, "error");
-          return;
-        }
-
-        const ai = scan.data;
-        if (ai.name || ai.expiry || (ai.type && ai.type !== "other")) {
-          rType = ai.type || "other";
-          rName = ai.name || "";
-          rExpiry = ai.expiry && isValidDate(ai.expiry) ? ai.expiry : null;
-          // AI ka poora samajh save karo (DB me jaayega).
-          if (ai.summary) setSummary(ai.summary);
-        }
-
-        setType(rType);
-        if (rName) setName(rName);
-        if (rExpiry) setExpiry(rExpiry);
-        setScanned(true);
-
-        const bits: string[] = [];
-        if (rName) bits.push(rName);
-        if (rExpiry) bits.push(d.ocrExpiryFound);
-        toast.show(
-          bits.length ? tpl(d.ocrReadTpl, { bits: bits.join(" · ") }) : d.ocrUnclear,
-          bits.length ? "success" : "info",
-        );
-      } catch {
-        toast.show(d.ocrFailed, "error");
-      } finally {
-        setScanning(false);
-      }
+      const ctx = ImageManipulator.manipulate(asset.uri);
+      const ref = await ctx.renderAsync();
+      const small = await ref.saveAsync({ compress: 0.4, format: SaveFormat.JPEG });
+      return intake(small.uri, "image/jpeg", await fileSizeBytes(small.uri));
     } catch {
       toast.show(d.imageFailed, "error");
     }
@@ -292,13 +399,25 @@ export default function AddDocument() {
      * hota. Jo cheez baad me kabhi bhari nahi ja sakti, use aage badhne se pehle
      * rokna hi sahi hai.
      *
-     * Rok `savedUri` par hai, `imageUri` par nahi: `savedUri` wo copy hai jo app
-     * ke apne folder me chali gayi (`persistImage`), aur wahi baad tak zinda
-     * rehti hai. Camera/gallery ka cache wala `imageUri` OS kabhi bhi saaf kar
-     * deta hai. `persistImage` fail hone par wo khud hi `imageUri` par gir jaata
-     * hai, isliye ye shart photo lene wale ko kabhi galat nahi rokti.
      */
-    if (!savedUri) return toast.show(d.photoRequired, "info");
+    if (!pickedUri) return toast.show(d.photoRequired, "info");
+    /**
+     * ⚠️ Yahi wo rok hai jiske liye ye poora kaam hua.
+     *
+     * `save: false` do soorat me aata hai:
+     *
+     *   • file 5MB se badi hai, ya
+     *   • AI ne use padha aur usme kuch mila hi nahi (selfie, ghar ki photo).
+     *
+     * Dono me na R2 par kuch jaata hai, na `documents` me row banti hai.
+     *
+     * ⚠️ Net/Gemini wali soorat me ye KABHI nahi rokta — wahan AI chala hi nahi
+     * tha, aur file asli document hoti hai. Wahan rokna user ka apna document
+     * use daalne se rok dena hota, aur storage bhi wahan bach nahi raha hota.
+     */
+    if (verdict && !verdict.save) {
+      return toast.show(verdict.note === "tooBig" ? d.fileTooBig : d.ocrNoDocument, "error");
+    }
     if (!name.trim()) return toast.show(d.nameRequired, "info");
     /**
      * ⚠️ Do bilkul alag galtiyan, do alag jawab.
@@ -320,25 +439,32 @@ export default function AddDocument() {
         type,
         expiry: expiry || null,
         summary: summary.trim() || null,
-        file_uri: savedUri,
+        /**
+         * ⚠️ Yahan pehle local rasta jaata tha. Ab `null`.
+         *
+         * Offline copy `uploadDocumentFile()` R2 par chadhne ke BAAD banata
+         * hai, aur `resolveDocUri()` sabse pehle wahi cache dekhta hai —
+         * isliye `file_uri` ki zaroorat hi nahi rehti. Picker ka temp rasta
+         * yahan likh dena ulta nuksan karta: OS us cache ko kabhi bhi saaf
+         * kar deta hai, aur DB me ek toota hua rasta pada reh jaata.
+         */
+        file_uri: null,
       });
 
       /**
-       * Cloud backup — document image Cloudflare R2 me (private).
+       * Cloud backup — file Cloudflare R2 me (private). PEHLE yahi, device baad me.
        *
-       * ⚠️ Ye ab "chalao aur bhool jao" nahi hai. `uploadDocumentImage` pehle
-       * file ko kataar me daalta hai aur uske BAAD upload ki koshish karta hai —
-       * yaani net na ho (ya beech me toot jaye) to bhi wo kataar me padi rehti
-       * hai aur app khulne/net aane par apne aap chali jaati hai.
+       * ⚠️ Ye ab "chalao aur bhool jao" nahi hai, aur na hi chup-chaap kataar me
+       * daal kar aage badhna hai. `uploadDocumentFile` seedha chadhata hai aur
+       * saaf-saaf batata hai ki chadha ya nahi. Fail hone par hum device par
+       * kuch rakhte HI nahi — neeche user se poochha jaata hai.
        *
-       * Pehle yahan seedha upload tha aur uska `.catch(() => {})` fail ko
-       * chup-chaap nigal jaata tha: document HAMESHA ke liye sirf us phone par
-       * reh jaata tha. Phone kho jaye to backup ka poora waada wahin toot-ta tha,
-       * aur kisi ko pata bhi nahi chalta tha.
+       * Pehle yahan `.catch(() => {})` tha aur uska nateeja chup tha: document
+       * hamesha ke liye sirf us phone par reh jaata tha, aur user ko "add ho gaya"
+       * dikh kar khatam. Phone kho jaye to backup ka poora waada wahin toot-ta,
+       * aur pata theek us din chalta jab document sach me chahiye hota.
        */
-      if (savedUri) {
-        uploadDocumentImage(doc.id, savedUri).catch(() => {});
-      }
+      const uploadOk = await uploadDocumentFile(doc.id, pickedUri, pickedMime);
 
       /**
        * Expiry ke liye notification (7 din pehle, 1 din pehle, aur us din).
@@ -377,6 +503,24 @@ export default function AddDocument() {
        *
        * Rok yahan bhi nahi hai — sirf saaf baat.
        */
+      /**
+       * ⚠️ File cloud par nahi ja payi — yahan RUK jao.
+       *
+       * Document ban chuka hai aur notification bhi lag chuki hai (wo dono net ke
+       * bina bhi sach hain), par file ka thikana abhi tay nahi hua. Isliye "add ho
+       * gaya" wala toast yahan jaan-boojh ke nahi dikhta — wo baat modal khud
+       * kehta hai, aur screen usi ke jawab par band hoti hai.
+       *
+       * Reliability wala modal is soorat me chhoot jaata hai. Ye jaan-boojh ke
+       * hai: do modal ek ke upar ek sabse uljhan wali cheez hoti hai, aur file ka
+       * thikana notification ki jaanch se zyada zaroori hai. Wo jaanch agli baar
+       * apne aap aa jaayegi.
+       */
+      if (!uploadOk) {
+        setPendingDoc({ id: doc.id, uri: pickedUri, mime: pickedMime });
+        return;
+      }
+
       const noExpiry = !doc.expiry;
       toast.show(
         noExpiry
@@ -448,7 +592,7 @@ export default function AddDocument() {
 
             <View style={styles.scanBtns}>
               <Pressable
-                onPress={() => pickImage("camera")}
+                onPress={pickCamera}
                 disabled={scanning}
                 style={({ pressed }) => [styles.sBtn, pressed && styles.pressed]}
               >
@@ -456,7 +600,7 @@ export default function AddDocument() {
                 <Text style={styles.sBtnText}>{d.camera}</Text>
               </Pressable>
               <Pressable
-                onPress={() => pickImage("gallery")}
+                onPress={pickFile}
                 disabled={scanning}
                 style={({ pressed }) => [styles.sBtnAlt, pressed && styles.pressed]}
               >
@@ -645,7 +789,7 @@ export default function AddDocument() {
           disabled={saving}
           style={({ pressed }) => [
             styles.save,
-            !savedUri && { opacity: 0.55 },
+            !pickedUri && { opacity: 0.55 },
             (pressed || saving) && { opacity: 0.85 },
           ]}
         >
@@ -655,6 +799,49 @@ export default function AddDocument() {
 
       {/* Scan + save — dono ke liye wahi ek center overlay loader. */}
       <LoaderOverlay visible={scanning || saving} />
+
+      {/**
+        * File cloud par nahi ja payi — faisla user ka.
+        *
+        * ⚠️ Yahan koi "Radd karo" nahi hai, aur ye jaan-boojh ke hai. Document
+        * ban chuka hai; sawaal sirf ye hai ki file kahan rahegi. Teesra button
+        * dene ka matlab hota user se poochhna ki wo apna abhi-abhi bana hua
+        * document mita de — jo is lamhe me sabse galat sawaal hai.
+        */}
+      <ConfirmModal
+        visible={!!pendingDoc}
+        icon="cloud-offline"
+        title={d.uploadFailedTitle}
+        message={d.uploadFailedMsg}
+        confirmLabel={d.uploadKeepOnPhone}
+        cancelLabel={d.uploadRetry}
+        onConfirm={async () => {
+          if (!pendingDoc) return;
+          await keepOnPhone(pendingDoc.id, pendingDoc.uri, pendingDoc.mime);
+          setPendingDoc(null);
+          toast.show(d.onlyOnPhone, "info");
+          router.back();
+        }}
+        onCancel={async () => {
+          if (!pendingDoc) return;
+          setSaving(true);
+          try {
+            const ok = await uploadDocumentFile(
+              pendingDoc.id,
+              pendingDoc.uri,
+              pendingDoc.mime,
+            );
+            if (ok) {
+              setPendingDoc(null);
+              toast.show(d.added, "success");
+              router.back();
+            }
+            // Phir fail hua to modal khula hi rehta hai — user dobara chun sakta hai.
+          } finally {
+            setSaving(false);
+          }
+        }}
+      />
 
       {/* Expiry ki khabar sach me pahunche iske liye — notification, exact
           alarm, full-screen alert, battery aur OEM auto-start, ek hi jagah.

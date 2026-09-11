@@ -186,7 +186,18 @@ export async function primeCachedFile(
    * aur purani copy cache me hamesha ke liye padi rehti hai.
    */
   version?: number,
-): Promise<void> {
+): Promise<string | null> {
+  /**
+   * ⚠️ Rasta LAUTANA zaroori hai — ye sirf soofiyana safai nahi hai.
+   *
+   * `documents.file_uri` ab isi par tikta hai. Pehle wahan picker ka apna
+   * rasta jaata tha, jise OS kabhi bhi saaf kar deta hai. Aur wo column ek
+   * asli jaal chalata hai: `requeueMissingUploads()` un documents ko dobara
+   * kataar me daalta hai jinki local file to hai par `file_path` nahi —
+   * yaani jo 25 koshishon ke baad haar chuke the. Us column ke khaali ya
+   * toote hue hone par wo document hamesha ke liye sirf phone par reh jaata
+   * hai, aur kisi ko pata nahi chalta.
+   */
   try {
     // ⚠️ `file_path` yahan jaan-boojh ke null hai — upload abhi hua hi nahi.
     // Naam mime + version se banta hai, aur dono wahi hain jo server ko bhi
@@ -202,9 +213,11 @@ export async function primeCachedFile(
     await ensureDir();
     await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => {});
     await FileSystem.copyAsync({ from: localUri, to: dest });
+    return dest;
   } catch {
-    /* copy na ho paye to bhi `file_uri` wala raasta bacha hua hai */
+    /* copy na ho paye to `null` — caller `file_uri` khaali chhod dega */
   }
+  return null;
 }
 
 /**

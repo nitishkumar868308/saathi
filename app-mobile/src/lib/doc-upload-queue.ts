@@ -12,7 +12,7 @@ import type { Document } from "./documents";
  *
  * ⚠️ Pehle upload ek hi baar hota tha, aur wo bhi aise:
  *
- *     if (savedUri) uploadDocumentImage(doc.id, savedUri).catch(() => {});
+ *     uploadDocumentImage(doc.id, savedUri).catch(() => {});
  *
  * Yaani: chalao, aur fail ho jaye to CHUP-CHAAP bhool jao. Koi retry nahi, koi
  * khabar nahi, kahin koi nishaan nahi.
@@ -106,6 +106,26 @@ export async function queueUpload(
   const rest = list.filter((x) => x.docId !== docId);
   rest.push({ docId, uri, mime, tries: 0, at: Date.now(), version });
   await write(rest);
+}
+
+/**
+ * Is document ki entry kataar se hatao.
+ *
+ * ⚠️ Ye tab chahiye jab file kataar se NAHI, seedhe chadh gayi ho
+ * (`uploadDocumentFile`). Entry bachi rehne par do cheezein bigadti hain, aur
+ * dono chup hain:
+ *
+ *   • `flushUploads()` wahi file dobara chadha deta hai — bekaar ka net.
+ *   • Aur zyada bura: agli baar renew par `pendingUploadVersion()` use dekh kar
+ *     "pichhla renew abhi cloud tak pahuncha hi nahi" samajh leta hai, aur nayi
+ *     photo USI version ke naam par bhej deta hai — yaani wo abhi-abhi chadhi
+ *     hui file ko upar se daba deti hai aur history me ek version gum ho jaata
+ *     hai.
+ */
+export async function dropPendingUpload(docId: string): Promise<void> {
+  const list = await read();
+  const rest = list.filter((x) => x.docId !== docId);
+  if (rest.length !== list.length) await write(rest);
 }
 
 export async function pendingUploadCount(): Promise<number> {
@@ -209,6 +229,12 @@ export async function flushUploads(): Promise<void> {
  *
  * Shart soch ke lagai hai: local file ho (`file_uri`) par cloud path na ho
  * (`file_path`). Bilkul wahi soorat jo ek chhoote hue upload ke baad banti hai.
+ *
+ * ⚠️ Isi jaal ki wajah se `keepOnPhone()` `file_uri` bharta hai. Jo document
+ * upload fail hone par sirf phone par raha, uska `file_path` khaali hai — aur
+ * agar `file_uri` bhi khaali ho to ye poora self-healing us par kabhi chalta hi
+ * nahi. Wo document 25 koshishein haar jaane ke baad hamesha ke liye us ek phone
+ * par reh jaata, aur kisi ko pata bhi nahi chalta.
  */
 export async function requeueMissingUploads(docs: Document[]): Promise<void> {
   const missing = docs.filter((d) => d.file_uri && !d.file_path);

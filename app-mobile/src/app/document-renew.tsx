@@ -4,6 +4,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { KeyboardView } from "@/components/keyboard-view";
@@ -13,7 +15,21 @@ import { LoaderOverlay, ScreenLoader } from "@/components/loader";
 import { PermissionModal } from "@/components/permission-modal";
 import { useToast } from "@/components/toast";
 import { reportError } from "@/lib/report-error";
-import { listDocuments, updateDocument, type Document } from "@/lib/documents";
+import {
+  keepOnPhone,
+  listDocuments,
+  updateDocument,
+  uploadDocumentFile,
+  type Document,
+} from "@/lib/documents";
+import { fileSizeBytes } from "@/lib/storage";
+import { ConfirmModal } from "@/components/confirm-modal";
+import {
+  intakeVerdict,
+  isPdf,
+  normalizeMime,
+  type IntakeVerdict,
+} from "@/utils/doc-intake";
 import { resolveDocUri } from "@/lib/doc-cache";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { shouldShowReliabilityPrompt } from "@/lib/reliability";
@@ -84,6 +100,20 @@ export default function DocumentRenew() {
   const [expiry, setExpiry] = useState("");
   /** Nayi photo ka local rasta — `null` = purani hi rehne do. */
   const [newPhoto, setNewPhoto] = useState<string | null>(null);
+  const [pickedMime, setPickedMime] = useState("image/jpeg");
+  /** Aakhri scan ka faisla — Save yahi dekh kar rukta ya chalta hai. */
+  const [verdict, setVerdict] = useState<IntakeVerdict | null>(null);
+  /**
+   * Renew ho gaya par nayi file cloud par nahi pahunchi — user ka jawab baaki.
+   *
+   * ⚠️ Yahan ye `add-document` se bhi zyada zaroori hai. Renew par purani file
+   * cloud par history ban kar padi rehti hai, aur nayi kahin nahi — yaani
+   * chup-chaap band ho jaana user ko "renew ho gaya" dikhata, jabki uska naya
+   * document kahin surakshit hota hi nahi.
+   */
+  const [pendingDoc, setPendingDoc] = useState<
+    { id: string; uri: string; mime: string; version?: number } | null
+  >(null);
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [permModal, setPermModal] = useState(false);
@@ -169,75 +199,101 @@ export default function DocumentRenew() {
     return () => clearInterval(t);
   }, [expiry]);
 
-  async function pickImage(source: "camera" | "gallery") {
+  /**
+   * Chuni hui file ko lena — camera aur "Chuno", dono yahin aate hain.
+   *
+   * ⚠️ `add-document` ke `intake()` se ek baat alag hai: yahan scan se SIRF
+   * expiry li jaati hai. Wahan naam aur type bharna sahi hai (document ban hi
+   * raha hai); yahan wo poore lock ko bekaar kar deta — user Passport ki jagah
+   * galti se Licence ki photo kheench le, aur AI naam/type chup-chaap badal de,
+   * theek wahi cheez jise rokne ke liye ye screen banayi gayi hai.
+   */
+  async function intake(uri: string, mime: string, bytes: number) {
+    setNewPhoto(uri);
+    setPickedMime(mime);
+
+    const size = intakeVerdict({ bytes, failure: null });
+    if (!size.save) {
+      setVerdict(size);
+      return toast.show(a.fileTooBig, "error");
+    }
+
+    setScanning(true);
     try {
-      const opts: ImagePicker.ImagePickerOptions = {
-        base64: true,
-        quality: 0.4,
-        allowsEditing: true,
-      };
-      // Camera/gallery ke poore waqt lock band — app user ko khud bahar bhej rahi
-      // hai, usne app chhodi nahi hai. (Wajah `lib/app-lock.ts` me poori likhi hai.)
-      let result: ImagePicker.ImagePickerResult;
-      if (source === "camera") {
-        const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) return toast.show(a.cameraPermission, "info");
-        result = await withoutLock(() => ImagePicker.launchCameraAsync(opts));
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+      const scan = await scanDocumentAI(base64, locale, mime);
+      if (!scan.ok) {
+        const v = intakeVerdict({ bytes, failure: scan.failure });
+        setVerdict(v);
+        if (v.note === "noDocument") toast.show(a.ocrNoDocument, "error");
+        else if (v.note === "offline") toast.show(a.ocrOffline, "info");
+        else if (v.note === "busy") toast.show(a.ocrBusy, "info");
+        else toast.show(a.ocrFailed, "error");
+        return;
+      }
+      setVerdict(intakeVerdict({ bytes, failure: null }));
+
+      const found = scan.data.expiry;
+      if (found && isValidDate(found)) {
+        setExpiry(found);
+        toast.show(tpl(a.ocrReadTpl, { bits: a.ocrExpiryFound }), "success");
       } else {
-        result = await withoutLock(() => ImagePicker.launchImageLibraryAsync(opts));
+        toast.show(a.ocrUnclear, "info");
       }
+    } catch {
+      toast.show(a.ocrFailed, "error");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function pickCamera() {
+    try {
+      // Camera ke poore waqt lock band — app user ko khud bahar bhej rahi hai,
+      // usne app chhodi nahi hai. (Wajah `lib/app-lock.ts` me poori likhi hai.)
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return toast.show(a.cameraPermission, "info");
+      const result = await withoutLock(() =>
+        ImagePicker.launchCameraAsync({ quality: 0.4, allowsEditing: true }),
+      );
       if (result.canceled) return;
-
       const asset = result.assets[0];
-      const dir = FileSystem.documentDirectory + "documents/";
-      try {
-        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-      } catch {
-        /* already exists */
-      }
-      const ext = (asset.uri.split(".").pop() || "jpg").split("?")[0].slice(0, 5);
-      const dest = `${dir}${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
-      try {
-        await FileSystem.copyAsync({ from: asset.uri, to: dest });
-        setNewPhoto(dest);
-      } catch {
-        setNewPhoto(asset.uri);
+      await intake(asset.uri, "image/jpeg", await fileSizeBytes(asset.uri));
+    } catch {
+      toast.show(a.imageFailed, "error");
+    }
+  }
+
+  /**
+   * Ek hi picker — photo bhi, PDF bhi. (Poori wajah `add-document.tsx` par.)
+   *
+   * ⚠️ Image yahan bhi dabayi jaati hai. `DocumentPicker` `ImagePicker` wala
+   * `quality: 0.4` nahi karta, aur bina uske phone ki aam 8MB wali photo 5MB ki
+   * rok me atak jaati.
+   */
+  async function pickFile() {
+    try {
+      const res = await withoutLock(() =>
+        DocumentPicker.getDocumentAsync({
+          type: ["image/*", "application/pdf"],
+          copyToCacheDirectory: true,
+          multiple: false,
+        }),
+      );
+      if (res.canceled) return;
+      const asset = res.assets[0];
+      const mime =
+        normalizeMime(asset.mimeType) ||
+        (asset.name?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg");
+
+      if (isPdf(mime)) {
+        return intake(asset.uri, mime, asset.size ?? (await fileSizeBytes(asset.uri)));
       }
 
-      if (!asset.base64) return;
-
-      /**
-       * ⚠️ Scan se yahan SIRF expiry li jaati hai.
-       *
-       * `add-document` wahi scan naam aur type bhi bharne ke liye use karta hai —
-       * wahan wo sahi hai, kyunki document abhi ban hi raha hai. Yahan wo poore
-       * lock ko bekaar kar deta: user Passport ki jagah galti se Licence ki photo
-       * kheench le, aur AI naam/type chup-chaap badal de — theek wahi cheez jise
-       * rokne ke liye ye screen banayi gayi hai.
-       */
-      setScanning(true);
-      try {
-        const scan = await scanDocumentAI(asset.base64, locale);
-        if (!scan.ok) {
-          if (scan.failure === "offline") toast.show(a.ocrOffline, "info");
-          else if (scan.failure === "busy" || scan.failure === "slow") {
-            toast.show(a.ocrBusy, "info");
-          } else if (scan.failure === "unclear") toast.show(a.ocrUnclear, "info");
-          else toast.show(a.ocrFailed, "error");
-          return;
-        }
-        const found = scan.data.expiry;
-        if (found && isValidDate(found)) {
-          setExpiry(found);
-          toast.show(tpl(a.ocrReadTpl, { bits: a.ocrExpiryFound }), "success");
-        } else {
-          toast.show(a.ocrUnclear, "info");
-        }
-      } catch {
-        toast.show(a.ocrFailed, "error");
-      } finally {
-        setScanning(false);
-      }
+      const ctx = ImageManipulator.manipulate(asset.uri);
+      const ref = await ctx.renderAsync();
+      const small = await ref.saveAsync({ compress: 0.4, format: SaveFormat.JPEG });
+      return intake(small.uri, "image/jpeg", await fileSizeBytes(small.uri));
     } catch {
       toast.show(a.imageFailed, "error");
     }
@@ -245,6 +301,16 @@ export default function DocumentRenew() {
 
   async function save() {
     if (saving || !doc) return;
+    /**
+     * ⚠️ Wahi do rok jo `add-document` par hain: 5MB se badi file, aur wo photo
+     * jisme AI ne kuch paaya hi nahi. Dono me nayi file R2 par jaati hi nahi.
+     *
+     * Net/Gemini wali soorat me ye KABHI nahi rokta — wahan AI chala hi nahi
+     * tha, aur renew ki file asli document hoti hai.
+     */
+    if (verdict && !verdict.save) {
+      return toast.show(verdict.note === "tooBig" ? a.fileTooBig : a.ocrNoDocument, "error");
+    }
 
     const next = expiry.trim() ? expiry.trim() : null;
     // Kuch badla hi nahi — chup-chaap "save ho gaya" kehna jhooth hai.
@@ -273,9 +339,13 @@ export default function DocumentRenew() {
 
     try {
       setSaving(true);
-      const updated = await updateDocument(doc, {
+      const {
+        doc: updated,
+        uploadOk,
+        version,
+      } = await updateDocument(doc, {
         expiry: next,
-        ...(newPhoto ? { file_uri: newPhoto } : {}),
+        ...(newPhoto ? { file_uri: newPhoto, mime: pickedMime } : {}),
       });
 
       const expired = !!updated.expiry && isPastDate(updated.expiry);
@@ -310,6 +380,20 @@ export default function DocumentRenew() {
       logEvent("document_renewed", { type: updated.type });
       // Documents tab, Home ka "Dhyan dena hai" — dono khule pade ho sakte hain.
       emitDataChanged();
+
+      /**
+       * ⚠️ Nayi file cloud par nahi ja payi — yahan RUK jao.
+       *
+       * Expiry badal chuki hai aur alarm bhi lag chuke hain (wo dono net ke
+       * bina bhi sach hain), par nayi file ka thikana abhi tay nahi hua. Isliye
+       * "renew ho gaya" wala toast yahan jaan-boojh ke nahi dikhta: cloud par
+       * abhi PURANI file padi hai (jo ab history hai) aur nayi kahin nahi.
+       * Us haalat me "ho gaya" kehna sabse mehnga jhooth hota.
+       */
+      if (!uploadOk && newPhoto) {
+        setPendingDoc({ id: updated.id, uri: newPhoto, mime: pickedMime, version });
+        return;
+      }
 
       toast.show(
         !updated.expiry
@@ -496,7 +580,7 @@ export default function DocumentRenew() {
                 comparison ka doosra hissa hai. */}
             <View style={styles.photoBtns}>
               <Pressable
-                onPress={() => pickImage("camera")}
+                onPress={pickCamera}
                 disabled={scanning}
                 style={({ pressed }) => [styles.sBtn, pressed && { opacity: 0.85 }]}
               >
@@ -504,7 +588,7 @@ export default function DocumentRenew() {
                 <Text style={styles.sBtnText}>{a.camera}</Text>
               </Pressable>
               <Pressable
-                onPress={() => pickImage("gallery")}
+                onPress={pickFile}
                 disabled={scanning}
                 style={({ pressed }) => [styles.sBtnAlt, pressed && { opacity: 0.85 }]}
               >
@@ -616,6 +700,55 @@ export default function DocumentRenew() {
       </KeyboardView>
 
       <LoaderOverlay visible={scanning || saving} />
+
+      {/**
+        * Nayi file cloud par nahi ja payi — faisla user ka.
+        *
+        * ⚠️ `version` DONO call me jaata hai. Bina uske cache ka naam
+        * `<id>.<ext>` banta hai jabki `file_path` `<id>-v3.<ext>` ho jaata hai,
+        * aur abhi-abhi rakhi hui file agli baar "mili hi nahi" gini jaati.
+        * (Poori wajah `doc-cache.ts` ke `cachePath()` par likhi hai.)
+        */}
+      <ConfirmModal
+        visible={!!pendingDoc}
+        icon="cloud-offline"
+        title={a.uploadFailedTitle}
+        message={a.uploadFailedMsg}
+        confirmLabel={a.uploadKeepOnPhone}
+        cancelLabel={a.uploadRetry}
+        onConfirm={async () => {
+          if (!pendingDoc) return;
+          await keepOnPhone(
+            pendingDoc.id,
+            pendingDoc.uri,
+            pendingDoc.mime,
+            pendingDoc.version,
+          );
+          setPendingDoc(null);
+          toast.show(a.onlyOnPhone, "info");
+          router.back();
+        }}
+        onCancel={async () => {
+          if (!pendingDoc) return;
+          setSaving(true);
+          try {
+            const ok = await uploadDocumentFile(
+              pendingDoc.id,
+              pendingDoc.uri,
+              pendingDoc.mime,
+              pendingDoc.version,
+            );
+            if (ok) {
+              setPendingDoc(null);
+              toast.show(r.saved, "success");
+              router.back();
+            }
+            // Phir fail hua to modal khula rehta hai — user dobara chun sakta hai.
+          } finally {
+            setSaving(false);
+          }
+        }}
+      />
 
       <PermissionModal
         visible={permModal}

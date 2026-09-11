@@ -1,7 +1,8 @@
 import { supabase } from "./supabase";
 import { canAddDocument, getOffers } from "./plan";
-import { deleteDocumentFile } from "./storage";
+import { deleteDocumentFile, uploadDocument } from "./storage";
 import {
+  dropPendingUpload,
   flushUploads,
   isUploadPending,
   pendingUploadVersion,
@@ -62,49 +63,113 @@ function mimeFromUri(uri: string): string {
 }
 
 /**
- * Document ki file R2 pe chadhao.
+ * Document ki file — PEHLE R2 par, device par uske BAAD.
  *
- * `file_path` / `file_size` / `mime_type` ab server khud bharta hai (upload ke
- * baad R2 se asli size poochh kar) — isliye yahan koi DB update nahi hai.
+ * `file_path` / `file_size` / `mime_type` server khud bharta hai (upload ke baad
+ * R2 se asli size poochh kar) — isliye yahan koi DB update nahi hai.
+ *
+ * ── Tarteeb kyun palti ────────────────────────────────────────────────
+ *
+ * Pehle device pehle bharta tha (`queueUpload` -> `primeCachedFile` ->
+ * `flushUploads`). Us tarteeb ki wajah asli thi: user document tab daalta hai
+ * jab wo saamne hota hai — bank ke bahar, RTO ke bahar — jahan signal aata-jaata
+ * rehta hai, aur wahan upload fail hone par document apne hi phone par "offline
+ * nahi khulta" ban jaata tha.
+ *
+ * ⚠️ Par usme ek chhupa hua chhed tha: upload BAAR-BAAR fail hota rahe to
+ * document hamesha ke liye sirf us phone par reh jaata tha, aur user ko iski
+ * khabar hi nahi hoti thi. Admin me wo "Sirf device" pada rehta tha — jo asal me
+ * "hum ise kho chuke hain" ka doosra naam hai. Phone gaya, document gaya.
+ *
+ * Ab fail hone par hum device par CHUPCHAAP kuch nahi rakhte: `false` lautate
+ * hain, aur screen user se poochhti hai (`keepOnPhone`). Chup rehna hi wo ek
+ * cheez thi jise theek karna tha — kataar khud bura nahi hai.
  */
-export async function uploadDocumentImage(
+  /**
+   * ⚠️ `mime` CALLER se aata hai, `mimeFromUri()` se nahi.
+   *
+   * Wo function rasta dekh kar andaza lagata hai, aur picker ki cached copy ke
+   * naam par extension bacha hoga — iski koi guarantee nahi hai. Andaza galat
+   * hone par PDF `.jpg` ban kar R2 par chadh jaati: phir `document-view` use
+   * `<Image>` me kholne ki koshish karta, cache ka naam alag ban jaata, aur
+   * download kiya hua document kisi app me khulta hi nahi. Jo baat picker ne
+   * saaf bata di thi, use dobara andaze se nikalne ki zaroorat hi nahi.
+   */
+export async function uploadDocumentFile(
   docId: string,
   localUri: string,
+  mime: string,
+  version?: number,
+): Promise<boolean> {
+  try {
+    await uploadDocument(docId, localUri, mime, version);
+  } catch {
+    return false;
+  }
+  /**
+   * R2 par chadh gayi — ab offline ke liye copy rakho.
+   *
+   * ⚠️ `version` bhejna ZAROORI hai — wahi number server bhi `file_path` me
+   * daalta hai. Bina iske cache ka naam aur `file_path` ka naam alag ho jaate
+   * hain, aur abhi-abhi rakhi hui file agli baar "mili hi nahi" gini jaati.
+   * (Poori wajah `doc-cache.ts` ke `cachePath()` par likhi hai.)
+   */
+  await primeCachedFile(docId, localUri, mime, version);
+  /**
+   * File seedhe chadh gayi — kataar me is document ki purani entry ab jhooth
+   * hai. Use hatana zaroori hai, warna agla renew use dekh kar version dobara
+   * istemaal kar leta hai aur history me ek version gum ho jaata hai.
+   * (Poori wajah `doc-upload-queue.ts` ke `dropPendingUpload()` par likhi hai.)
+   */
+  await dropPendingUpload(docId);
+  return true;
+}
+
+/**
+ * User ne "Phone par rakho" chuna.
+ *
+ * Kataar me daalo (net aane par apne aap chali jaayegi) aur offline copy bhi
+ * rakho. `file_path` tab tak `null` rehta hai — wahi "Sirf is phone par" wale
+ * nishaan ki jaan hai: nishaan kisi naye column par nahi, isi sachchai par tika
+ * hai, isliye upload hote hi wo khud hat jaata hai.
+ *
+ * ⚠️ Kataar me PEHLE, cache uske baad. Upload ke BEECH me app band ho jaye
+ * (Android low-memory par ye aam hai) to bhi entry padi rehti hai aur agli baar
+ * chal jaati hai.
+ */
+export async function keepOnPhone(
+  docId: string,
+  localUri: string,
+  mime: string,
   version?: number,
 ): Promise<void> {
-  const mime = mimeFromUri(localUri);
-  /**
-   * Kataar me PEHLE, upload BAAD me.
-   *
-   * ⚠️ Ye tarteeb jaan-boojh ke hai. Pehle upload ek "chalao aur bhool jao" call
-   * thi (`.catch(() => {})`) — fail hone par document HAMESHA ke liye sirf us
-   * phone par reh jaata tha: koi retry nahi, koi khabar nahi. Admin me wo "Sirf
-   * device" pada rehta tha, jo asal me "hum ise kho chuke hain" ka doosra naam
-   * hai. Aur document banta hi tab hai jab signal sabse kharab hota hai — bank
-   * ke bahar, RTO ke bahar.
-   *
-   * Kataar pehle bharne se ek aur soorat bhi bach jaati hai: upload ke BEECH me
-   * app band ho jaye (Android low-memory par ye aam hai) to bhi wo entry padi
-   * rehti hai aur agli baar chal jaati hai.
-   */
   await queueUpload(docId, localUri, mime, version);
+  const cached = await primeCachedFile(docId, localUri, mime, version);
   /**
-   * Offline copy PEHLE, upload BAAD me.
+   * ⚠️ `file_uri` SIRF isi raaste par bharta hai — aur bharna zaroori hai.
    *
-   * ⚠️ Tarteeb maayne rakhti hai. Cache aam taur par upload ke baad bharta hai
-   * (R2 se file WAPAS utaar ke), aur us poore chakkar ke liye net chahiye. Par
-   * user document tab daalta hai jab wo saamne hota hai — bank ke bahar, RTO ke
-   * bahar — jahan signal aata-jaata rehta hai. Wahan upload fail ho jaata tha
-   * aur document apne hi phone par "offline nahi khulta" ban jaata tha.
+   * Kaamyab upload ke baad uski zaroorat hi nahi rehti: `file_path` bhar jaata
+   * hai, aur `cachedFileUri()` usi se cache ka rasta bana leta hai. Par jo file
+   * abhi cloud par gayi hi nahi, uska `file_path` khaali hai — yaani cache ka
+   * rasta kahin se nikalta hi nahi, aur `resolveDocUri()` ke paas `file_uri` ke
+   * alawa koi chaara nahi bachta.
    *
-   * File to abhi is phone par padi hi hai; use copy karne me na net lagta hai
-   * na intezaar. Isliye offline ka intezaam pehle, cloud backup uske baad.
+   * Aur isi column par ek aur cheez tiki hai: `requeueMissingUploads()` un
+   * documents ko dobara kataar me laata hai jinki local file ho par `file_path`
+   * na ho. Ye khaali chhod dena us poore self-healing ko chup-chaap maar deta —
+   * 25 koshishein haarne ke baad wo document hamesha ke liye sirf us phone par
+   * reh jaata.
+   *
+   * Yahan picker ka temp rasta nahi, CACHE ka rasta jaata hai. Picker ki file OS
+   * kabhi bhi saaf kar deta hai; cache wali nahi.
    */
-  // ⚠️ `version` yahan bhejna ZAROORI hai — wahi number server bhi `file_path`
-  // me daalta hai. Bina iske cache ka naam aur `file_path` ka naam alag ho jaate
-  // hain, aur abhi-abhi rakhi hui file agli baar "mili hi nahi" gini jaati.
-  // (Poori wajah `doc-cache.ts` ke `cachePath()` par likhi hai.)
-  await primeCachedFile(docId, localUri, mime, version);
+  if (cached) {
+    try {
+      await client().from("documents").update({ file_uri: cached }).eq("id", docId);
+    } catch {
+      /* net nahi — `file_path` bharne par ye khud bekaar ho jaata hai */
+    }
+  }
   await flushUploads();
 }
 
@@ -284,6 +349,21 @@ export async function addDocument(input: {
  * warna ye lib file notifee (native module) par tik jaati aur headless task me
  * import hone layak nahi rehti.
  */
+/**
+ * `updateDocument()` ka jawab.
+ *
+ * ⚠️ Sirf `Document` lautana kaafi nahi tha: file R2 par pahunchi ya nahi, ye
+ * baat screen tak aani chahiye. Warna renew "ho gaya" dikhta hai aur nayi
+ * file kahin surakshit hoti hi nahi.
+ */
+export type UpdateResult = {
+  doc: Document;
+  /** File R2 par chadh gayi. Nayi file thi hi nahi, tab bhi `true`. */
+  uploadOk: boolean;
+  /** `keepOnPhone()` ko wahi number chahiye jo upload ne use kiya tha. */
+  version?: number;
+};
+
 export async function updateDocument(
   doc: Document,
   patch: {
@@ -291,9 +371,23 @@ export async function updateDocument(
     expiry: string | null;
     /** Nayi photo ka local rasta. `undefined` = photo waisi hi rehne do. */
     file_uri?: string;
+    /**
+     * Nayi file ka type — picker ne jo bataya, wahi.
+     *
+     * Na mile to raste se andaza lagta hai (purane callers ke liye), par
+     * caller ke paas ho to wahi sach hai. Wajah `uploadDocumentFile()` par.
+     */
+    mime?: string;
   },
-): Promise<Document> {
+): Promise<UpdateResult> {
   const sb = client();
+  /**
+   * Nayi file R2 par chadhi ya nahi.
+   *
+   * Nayi file thi hi nahi (sirf expiry badli) to `true` — kyunki chadhane ko
+   * kuch tha hi nahi, aur us soorat me user se kuch poochhna bekaar hai.
+   */
+  let uploadOk = true;
 
   /**
    * Purana haal PEHLE history me — kuch badalne se PEHLE.
@@ -395,7 +489,23 @@ export async function updateDocument(
      * (`<uid>/<docId>.<ext>`) chhoota hi nahi jaata, isliye purani file R2 par
      * jyon ki tyon padi rehti hai aur history use wahin se padh leti hai.
      */
-    await uploadDocumentImage(doc.id, patch.file_uri, nextVersion).catch(() => {});
+    /**
+     * ⚠️ Fail ab CHUP nahi hai.
+     *
+     * Pehle yahan `.catch(() => {})` tha. Upload na chadhne par renew ki NAYI
+     * file hamesha ke liye sirf us phone par reh jaati thi, aur screen "save
+     * ho gaya" keh kar band ho jaati thi. Cloud par purani file padi rehti
+     * (jo ab history hai) aur nayi kahin nahi — yaani user ko lagta ki renew
+     * ho gaya, jabki uska naya document kahin surakshit tha hi nahi.
+     *
+     * Ab ye baat upar jaati hai aur `document-renew` user se poochhta hai.
+     */
+    uploadOk = await uploadDocumentFile(
+      doc.id,
+      patch.file_uri,
+      patch.mime ?? mimeFromUri(patch.file_uri),
+      nextVersion,
+    );
 
     /**
      * ⚠️ Purani cloud file ab JAAN-BOOJH KE nahi hatti — wo ab history hai.
@@ -442,7 +552,7 @@ export async function updateDocument(
    *
    * ⚠️ `updated` upar `.update().select()` se aaya hai — yaani upload se PEHLE
    * ka haal. `file_path`, `file_size` aur `mime_type` app nahi bharti; wo server
-   * upload poora hone ke BAAD bharta hai (`uploadDocumentImage` par likha hai).
+   * upload poora hone ke BAAD bharta hai (`uploadDocumentFile` par likha hai).
    * Isliye `updated` me abhi bhi PURANI file ka rasta pada hota hai — jo ab
    * history ka hissa hai, is document ka current nahi.
    *
@@ -483,7 +593,7 @@ export async function updateDocument(
     }
   }
 
-  return latest;
+  return { doc: latest, uploadOk, version: nextVersion };
 }
 
 /**
