@@ -10,7 +10,7 @@ import {
 } from "@/lib/reminder-channels";
 import { sendReminderEmail } from "@/lib/email";
 import { logDeliverySkip } from "@/lib/delivery-log";
-import { recordDelivery } from "@/lib/delivery-record";
+import { flushDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-record";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -206,6 +206,15 @@ export async function POST(request: Request) {
     }
   }
 
+  /**
+   * Is run ka poora record — sabse aakhir me EK call me jaata hai.
+   *
+   * ⚠️ Har row par alag call bhejna yahan sach me khatarnak hai: 50 reminder
+   * × 2 raaste = 100 seedhi network call, ek ke baad ek, aur cron ke paas
+   * sirf kuch second hote hain. Wo kat gaya to REMINDER BHEJNA hi beech me
+   * ruk jaata. Poori wajah `lib/delivery-record.ts` par likhi hai.
+   */
+  const records: DeliveryRecord[] = [];
   let wa = 0;
   let mail = 0;
   /** Free plan wale — inka reminder bhi nikla, par email/WhatsApp Plus ka hai. */
@@ -243,7 +252,7 @@ export async function POST(request: Request) {
          * nahi hoti, isliye uska "gaya" likhna andaza hota, sach nahi.
          */
         for (const channel of ["whatsapp", "email"] as const) {
-          await recordDelivery({
+          records.push({
             kind: "reminder",
             itemId: r.id,
             userId: r.user_id,
@@ -276,7 +285,7 @@ export async function POST(request: Request) {
             userId: r.user_id,
             itemId: r.id,
           });
-          await recordDelivery({
+          records.push({
             kind: "reminder",
             itemId: r.id,
             userId: r.user_id,
@@ -304,7 +313,7 @@ export async function POST(request: Request) {
             );
             if (res.sent) {
               wa++;
-              await recordDelivery({
+              records.push({
                 kind: "reminder",
                 itemId: r.id,
                 userId: r.user_id,
@@ -323,7 +332,7 @@ export async function POST(request: Request) {
                 userId: r.user_id,
                 itemId: r.id,
               });
-              await recordDelivery({
+              records.push({
                 kind: "reminder",
                 itemId: r.id,
                 userId: r.user_id,
@@ -344,7 +353,7 @@ export async function POST(request: Request) {
               itemId: r.id,
               detail: String(e),
             });
-            await recordDelivery({
+            records.push({
               kind: "reminder",
               itemId: r.id,
               userId: r.user_id,
@@ -366,7 +375,7 @@ export async function POST(request: Request) {
             userId: r.user_id,
             itemId: r.id,
           });
-          await recordDelivery({
+          records.push({
             kind: "reminder",
             itemId: r.id,
             userId: r.user_id,
@@ -388,7 +397,7 @@ export async function POST(request: Request) {
             );
             if (res.sent) {
               mail++;
-              await recordDelivery({
+              records.push({
                 kind: "reminder",
                 itemId: r.id,
                 userId: r.user_id,
@@ -407,7 +416,7 @@ export async function POST(request: Request) {
                 userId: r.user_id,
                 itemId: r.id,
               });
-              await recordDelivery({
+              records.push({
                 kind: "reminder",
                 itemId: r.id,
                 userId: r.user_id,
@@ -428,7 +437,7 @@ export async function POST(request: Request) {
               itemId: r.id,
               detail: String(e),
             });
-            await recordDelivery({
+            records.push({
               kind: "reminder",
               itemId: r.id,
               userId: r.user_id,
@@ -458,6 +467,15 @@ export async function POST(request: Request) {
     // isliye dono kabhi alag din par nahi ja sakte.
     await advance(r.id);
   }
+
+  /**
+   * ⚠️ Record SABSE AAKHIR me — bhejne ka kaam poora hone ke BAAD.
+   *
+   * Tarteeb maayne rakhti hai: ye call fail bhi ho jaye to har khabar ja
+   * chuki hoti hai. Ulta karne par ek dheemi ya ruki hui log-call poore
+   * run ko le doobti.
+   */
+  await flushDeliveryRecords(records);
 
   return NextResponse.json({
     processed: due.length,

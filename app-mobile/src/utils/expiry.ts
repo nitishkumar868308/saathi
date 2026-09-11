@@ -141,6 +141,35 @@ export type ExpiryNotifyStep = {
  * `schedule()` lagata hai (beeta hua waqt par kuch nahi lagta). Isliye screen
  * par jo likha hai, phone par theek wahi hota hai.
  */
+/**
+ * Server ke hisaab se is khabar ka lamha — 09:00 IST, UTC me.
+ *
+ * ⚠️ Ye alarm ka waqt NAHI hai, aur dono ko ek maan lena is poore hisse ki
+ * sabse mehngi galti hoti.
+ *
+ * Alarm phone ke APNE 9 baje par bajta hai (`expiryNotifyPlan`) — wahi sahi
+ * hai, user ko khabar uski subah chahiye. Par server (`cron/document-expiry`)
+ * apni email/WhatsApp wali row hamesha 09:00 IST par likhta hai, kyunki uske
+ * paas phone ka timezone hai hi nahi.
+ *
+ * IST wale phone par dono ek hi lamha hote hain. Kisi aur timezone me (bahar
+ * gaya hua user, ya videsh me rehta parivaar) wo alag ho jaate hain — aur tab
+ * ek hi khabar admin panel me DO aadhe-adhoore tukdon me bant jaati: ek me
+ * sirf notification, doosre me sirf email/WhatsApp. Poori tasveer kabhi na
+ * dikhti.
+ *
+ * Isliye "khabar ki pehchaan" ke liye hamesha YAHI lamha jaata hai, aur bajne
+ * ka waqt alag rehta hai. Ye hisaab jaan-boojh ke server jaisa hi likha hai;
+ * dono ke alag hone par `scripts/check-logic.mjs` chillata hai.
+ */
+export function expiryNoticeMomentIso(expiry: string, lead: number): string {
+  const [y, m, d] = expiry.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d); // us din 00:00 UTC
+  const IST_9AM_UTC_MS = (3 * 60 + 30) * 60 * 1000;
+  const DAY = 24 * 60 * 60 * 1000;
+  return new Date(base + IST_9AM_UTC_MS - lead * DAY).toISOString();
+}
+
 export function expiryNotifyPlan(
   expiry: string,
   now: Date = new Date(),

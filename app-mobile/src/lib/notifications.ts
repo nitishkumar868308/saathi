@@ -26,7 +26,12 @@ import {
   type AlarmKind,
 } from "./notify-core";
 
-import { EXPIRY_LEAD_DAYS, expiryCatchUp, expiryNotifyPlan } from "../utils/expiry";
+import {
+  EXPIRY_LEAD_DAYS,
+  expiryCatchUp,
+  expiryNoticeMomentIso,
+  expiryNotifyPlan,
+} from "../utils/expiry";
 import { completeReminder, listReminders } from "./reminders";
 import { ensureDeviceState } from "./device-approval";
 import { emitDataChanged } from "./data-events";
@@ -97,6 +102,16 @@ async function schedule(
   body: string,
   when: Date,
   kind: AlarmKind = "reminder",
+  /**
+   * Is khabar ki PEHCHAAN ka lamha — bajne ka waqt nahi.
+   *
+   * ⚠️ Aam taur par dono ek hi hote hain (reminder apne waqt par bajta
+   * hai). Expiry par nahi: alarm phone ke apne 9 baje bajta hai, par
+   * server apni email/WhatsApp row hamesha 09:00 IST par likhta hai.
+   * Wahan caller `expiryNoticeMomentIso()` bhejta hai, warna IST ke
+   * bahar wale phone par ek khabar do tukdon me bant jaati hai.
+   */
+  dueIso?: string,
 ): Promise<boolean> {
   if (when.getTime() <= Date.now()) return false;
 
@@ -110,7 +125,7 @@ async function schedule(
       labels: { done: n.alertDone, later: n.alertLater },
       // Wahi lamha jo server bhi apni row me likhta hai — wajah
       // `notify-core.ts` ke `due` par poori likhi hai.
-      due: when.toISOString(),
+      due: dueIso ?? when.toISOString(),
     }),
     when,
     {
@@ -412,7 +427,16 @@ export async function scheduleDocumentExpiry(
       step.lead === 0
         ? tpl(n.expiryToday, { name })
         : tpl(n.expiryInDays, { name, n: step.lead });
-    await schedule(docNotifId(docId, step.lead), n.expiryTitle, body, step.at, "expiry");
+    await schedule(
+      docNotifId(docId, step.lead),
+      n.expiryTitle,
+      body,
+      step.at,
+      "expiry",
+      // ⚠️ Pehchaan ka lamha server jaisa — bajne ka waqt phone ka apna
+      // rehta hai. Wajah `expiryNoticeMomentIso()` par poori likhi hai.
+      expiryNoticeMomentIso(expiry, step.lead),
+    );
     anyStep = true;
   }
   if (anyStep) return;
@@ -440,6 +464,10 @@ export async function scheduleDocumentExpiry(
       tpl(n.expiryToday, { name }),
       catchUp,
       "expiry",
+      // Der se baj raha hai, par khabar wahi lead-0 wali hai — isliye
+      // pehchaan ka lamha bhi wahi. `catchUp` ka apna waqt yahan galat
+      // hota: server us par kuch likhta hi nahi.
+      expiryNoticeMomentIso(expiry, 0),
     );
   }
 }

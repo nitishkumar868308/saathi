@@ -209,6 +209,18 @@ export default function DocumentRenew() {
    * theek wahi cheez jise rokne ke liye ye screen banayi gayi hai.
    */
   async function intake(uri: string, mime: string, bytes: number) {
+    /**
+     * ⚠️ Purana faisla PEHLE saaf karo.
+     *
+     * Bina iske ek chupi hui rok reh jaati hai: user ek selfie chunta hai
+     * (faisla = rok), phir apna ASLI Aadhaar chunta hai, aur us par scan kisi
+     * wajah se beech me hi fail ho jaata (file padhi na ja saki). Us raaste
+     * par naya faisla likha hi nahi jaata — yaani purani rok bachi rehti hai
+     * aur Save asli document ko "isme koi document nahi mila" keh kar rok
+     * deta. User ko wajah kabhi samajh nahi aati, aur screen chhode bina wo
+     * kabhi nikal bhi nahi sakta.
+     */
+    setVerdict(null);
     setNewPhoto(uri);
     setPickedMime(mime);
 

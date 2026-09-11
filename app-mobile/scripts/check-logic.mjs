@@ -314,6 +314,47 @@ eq("pdf with charset", isPdf("application/pdf; charset=binary"), true);
 eq("jpeg pdf nahi", isPdf("image/jpeg"), false);
 eq("khaali pdf nahi", isPdf(null), false);
 
+/* ══════════════════ 6. Expiry ki khabar ka lamha ══════════════════ */
+
+const { expiryNoticeMomentIso } = await load("src/utils/expiry.ts");
+
+/**
+ * Server ka apna hisaab — `web/app/api/cron/document-expiry/route.ts` ka
+ * `noticeMoment()`. Yahan HAATH SE likha hai, taaki dono alag rahein: kal wahan
+ * niyam badle aur yahan na badle, to ye jaanch fail hogi — theek wahi hona
+ * chahiye.
+ *
+ * ⚠️ Ye milna kyun zaroori hai: app aur server dono apni delivery-row ISI lamhe
+ * par likhte hain. Alag hote hi ek khabar do tukdon me bant jaati hai — ek me
+ * sirf notification, doosre me sirf email/WhatsApp — aur admin ko poori tasveer
+ * kabhi nahi dikhti.
+ */
+const serverMoment = (expiry, lead) => {
+  const [y, m, d] = expiry.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  return new Date(base + (3 * 60 + 30) * 60 * 1000 - lead * 24 * 60 * 60 * 1000).toISOString();
+};
+
+for (const expiry of ["2026-03-15", "2026-01-01", "2026-12-31", "2028-02-29"]) {
+  for (const lead of [7, 1, 0]) {
+    eq(
+      `khabar ka lamha server jaisa (${expiry}, lead ${lead})`,
+      expiryNoticeMomentIso(expiry, lead),
+      serverMoment(expiry, lead),
+    );
+  }
+}
+
+// ── 09:00 IST = 03:30 UTC — usi din, na ek din pehle na baad.
+eq("lead 0 = us din 03:30 UTC", expiryNoticeMomentIso("2026-03-15", 0), "2026-03-15T03:30:00.000Z");
+eq("lead 1 = ek din pehle", expiryNoticeMomentIso("2026-03-15", 1), "2026-03-14T03:30:00.000Z");
+eq("lead 7 = saat din pehle", expiryNoticeMomentIso("2026-03-15", 7), "2026-03-08T03:30:00.000Z");
+
+// ── ⚠️ Mahine/saal ki seema paar karte waqt bhi — yahi wo jagah hai jahan
+//    "ek din peeche" wali galti chhupti hai.
+eq("mahine ki seema", expiryNoticeMomentIso("2026-03-01", 1), "2026-02-28T03:30:00.000Z");
+eq("saal ki seema", expiryNoticeMomentIso("2026-01-01", 7), "2025-12-25T03:30:00.000Z");
+
 /* ══════════════════ nateeja ══════════════════ */
 
 if (fails.length) {

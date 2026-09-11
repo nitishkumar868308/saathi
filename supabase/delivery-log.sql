@@ -3,7 +3,11 @@
 --
 -- Supabase SQL Editor me poori file Run karo. Dobara chalana safe hai.
 -- Pehle chal chuki honi chahiye: schema.sql, profiles.sql, reminders-notify.sql,
--- document-renewal.sql
+-- document-renewal.sql, aur plan-limits.sql
+--
+-- ⚠️ `plan-limits.sql` chhod dena sabse aasan galti hai aur wo YAHIN par dikh
+--    jaati hai: `log_notification()` uske `is_plus_active()` ko bulaata hai.
+--    Uske bina ye file chalegi hi nahi.
 -- ============================================================================
 --
 -- ── Ye kyun bana ───────────────────────────────────────────────────────────
@@ -141,6 +145,51 @@ $$;
 
 revoke all on function public.log_delivery(text, uuid, uuid, timestamptz, text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.log_delivery(text, uuid, uuid, timestamptz, text, text, text, text, text) to service_role;
+
+/* ------------------------------------------------------------------ */
+/* 2b. Kai rows ek hi call me                                          */
+/* ------------------------------------------------------------------ */
+--
+-- ⚠️ Ye sirf safai nahi hai — iske bina cron ka kat jaana pakka tha.
+--
+-- `send-reminders` ek baar me 50 reminder uthata hai, aur har ek par do
+-- raaste likhne hote hain. Ek-ek karke bhejne par wo 100 seedhi network call
+-- ban jaati hain, ek ke baad ek. Us cron ke paas Vercel par sirf kuch second
+-- hote hain — aur agar wo kat gaya to sirf ye record hi nahi, REMINDER bhejna
+-- bhi ruk jaata. Khabar rakhne ki koshish khabar bhejne ko kabhi nahi maar
+-- sakti.
+--
+-- Ab poora run ek hi call me nipat-ta hai.
+create or replace function public.log_delivery_batch(p_rows jsonb)
+returns void language sql security definer set search_path = public as $$
+  insert into public.delivery_log
+    (kind, item_id, user_id, due_at, channel, status, reason, plan, detail)
+  select
+    r->>'kind',
+    (r->>'item_id')::uuid,
+    nullif(r->>'user_id', '')::uuid,
+    (r->>'due_at')::timestamptz,
+    r->>'channel',
+    r->>'status',
+    r->>'reason',
+    coalesce(r->>'plan', 'free'),
+    left(r->>'detail', 500)
+  from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) as r
+  on conflict (kind, item_id, due_at, channel) do update
+    set status  = excluded.status,
+        reason  = excluded.reason,
+        plan    = excluded.plan,
+        detail  = excluded.detail,
+        user_id = coalesce(excluded.user_id, public.delivery_log.user_id);
+$$;
+--
+-- ⚠️ Ek hi call me ek (kaam, moment, raasta) DO baar mat bhejna. Postgres us
+--    par "ON CONFLICT DO UPDATE command cannot affect row a second time"
+--    phenk deta hai aur POORA batch gir jaata hai. Caller isi wajah se bhejne
+--    se pehle chhaan leta hai (`lib/delivery-record.ts`).
+
+revoke all on function public.log_delivery_batch(jsonb) from public, anon, authenticated;
+grant execute on function public.log_delivery_batch(jsonb) to service_role;
 
 /* ------------------------------------------------------------------ */
 /* 3. App ke liye — notification ka sach                               */

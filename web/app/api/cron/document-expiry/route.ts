@@ -3,7 +3,7 @@ import { requireCron } from "@/lib/cron-auth";
 import { sendDocumentWhatsApp, twilioConfigured, waTemplateState } from "@/lib/twilio";
 import { sendDocumentExpiryEmail, emailConfigured } from "@/lib/email";
 import { logDeliverySkip } from "@/lib/delivery-log";
-import { recordDelivery } from "@/lib/delivery-record";
+import { flushDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-record";
 import {
   PROFILE_SELECT,
   toReminderProfile,
@@ -241,6 +241,15 @@ export async function POST(request: Request) {
     }
   }
 
+  /**
+   * Is run ka poora record — sabse aakhir me EK call me jaata hai.
+   *
+   * ⚠️ Har row par alag call bhejna yahan sach me khatarnak hai: 50 reminder
+   * × 2 raaste = 100 seedhi network call, ek ke baad ek, aur cron ke paas
+   * sirf kuch second hote hain. Wo kat gaya to REMINDER BHEJNA hi beech me
+   * ruk jaata. Poori wajah `lib/delivery-record.ts` par likhi hai.
+   */
+  const records: DeliveryRecord[] = [];
   let mail = 0;
   let wa = 0;
   /** Free plan wale — inka expiry alert phone par gaya, email/WhatsApp Plus ka hai. */
@@ -289,7 +298,7 @@ export async function POST(request: Request) {
        * lagaya hota hai, server ne bheja hi nahi hota).
        */
       for (const channel of ["whatsapp", "email"] as const) {
-        await recordDelivery({
+        records.push({
           kind: "document",
           itemId: doc.id,
           userId: doc.user_id,
@@ -319,7 +328,7 @@ export async function POST(request: Request) {
           if (res.sent) {
             mail++;
             claimed = false; // sach me chala gaya — claim ab sahi hai, rehne do
-            await recordDelivery({
+            records.push({
               kind: "document",
               itemId: doc.id,
               userId: doc.user_id,
@@ -339,7 +348,7 @@ export async function POST(request: Request) {
               userId: doc.user_id,
               itemId: doc.id,
             });
-            await recordDelivery({
+            records.push({
               kind: "document",
               itemId: doc.id,
               userId: doc.user_id,
@@ -363,7 +372,7 @@ export async function POST(request: Request) {
           itemId: doc.id,
           detail: String(e),
         });
-        await recordDelivery({
+        records.push({
           kind: "document",
           itemId: doc.id,
           userId: doc.user_id,
@@ -384,7 +393,7 @@ export async function POST(request: Request) {
         userId: doc.user_id,
         itemId: doc.id,
       });
-      await recordDelivery({
+      records.push({
         kind: "document",
         itemId: doc.id,
         userId: doc.user_id,
@@ -416,7 +425,7 @@ export async function POST(request: Request) {
         userId: doc.user_id,
         itemId: doc.id,
       });
-      await recordDelivery({
+      records.push({
         kind: "document",
         itemId: doc.id,
         userId: doc.user_id,
@@ -446,7 +455,7 @@ export async function POST(request: Request) {
         if (res.sent) {
           wa++;
           waClaimed = false; // sach me chala gaya — claim rehne do
-          await recordDelivery({
+          records.push({
             kind: "document",
             itemId: doc.id,
             userId: doc.user_id,
@@ -465,7 +474,7 @@ export async function POST(request: Request) {
             userId: doc.user_id,
             itemId: doc.id,
           });
-          await recordDelivery({
+          records.push({
             kind: "document",
             itemId: doc.id,
             userId: doc.user_id,
@@ -489,7 +498,7 @@ export async function POST(request: Request) {
         itemId: doc.id,
         detail: String(e),
       });
-      await recordDelivery({
+      records.push({
         kind: "document",
         itemId: doc.id,
         userId: doc.user_id,
@@ -505,6 +514,15 @@ export async function POST(request: Request) {
     // bhej de. (Asli fail upar `catch` me hi nipat chuka hai.)
     if (waClaimed) await unclaim(doc.id, dueIso, "whatsapp");
   }
+
+  /**
+   * ⚠️ Record SABSE AAKHIR me — bhejne ka kaam poora hone ke BAAD.
+   *
+   * Tarteeb maayne rakhti hai: ye call fail bhi ho jaye to har khabar ja
+   * chuki hoti hai. Ulta karne par ek dheemi ya ruki hui log-call poore run
+   * ko le doobti.
+   */
+  await flushDeliveryRecords(records);
 
   return NextResponse.json({
     scanned: docs.length,
