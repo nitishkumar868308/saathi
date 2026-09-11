@@ -461,7 +461,7 @@ export default function AddDocument() {
                 style={({ pressed }) => [styles.sBtnAlt, pressed && styles.pressed]}
               >
                 <Ionicons name="images" size={18} color={tc.terracotta} />
-                <Text style={styles.sBtnAltText}>{d.gallery}</Text>
+                <Text style={styles.sBtnAltText}>{d.pickFile}</Text>
               </Pressable>
             </View>
           </View>

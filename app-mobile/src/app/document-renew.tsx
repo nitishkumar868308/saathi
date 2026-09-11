@@ -509,7 +509,7 @@ export default function DocumentRenew() {
                 style={({ pressed }) => [styles.sBtnAlt, pressed && { opacity: 0.85 }]}
               >
                 <Ionicons name="images" size={17} color={tc.terracotta} />
-                <Text style={styles.sBtnAltText}>{a.gallery}</Text>
+                <Text style={styles.sBtnAltText}>{a.pickFile}</Text>
               </Pressable>
               {!!newPhoto && (
                 <Pressable

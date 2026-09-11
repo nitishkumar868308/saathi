@@ -494,7 +494,16 @@ export type Dict = {
     summaryLabel: string;
     editHint: string;
     camera: string;
-    gallery: string;
+    pickFile: string;
+    ocrNoDocument: string;
+    fileTooBig: string;
+    uploadFailedTitle: string;
+    uploadFailedMsg: string;
+    uploadRetry: string;
+    uploadKeepOnPhone: string;
+    onlyOnPhone: string;
+    openFile: string;
+    openFailed: string;
     name: string;
     namePlaceholder: string;
     expiry: string;
@@ -1775,7 +1784,18 @@ const hinglish: Dict = {
     summaryLabel: "Saathi ne yeh padha",
     editHint: "(theek kar sakte ho)",
     camera: "Camera",
-    gallery: "Gallery",
+    pickFile: "Chuno",
+    ocrNoDocument:
+      "Isme koi document nahi mila. Saaf photo ya PDF dobara daalo — Saathi documents aur unki expiry ke liye hai.",
+    fileTooBig: "File 5MB se badi hai. Isse chhoti file daalo — ya kam page wali PDF.",
+    uploadFailedTitle: "Cloud par nahi ja paya",
+    uploadFailedMsg:
+      "Net kamzor hai. Sirf is phone par rakh lein? Net aate hi apne aap cloud par chala jaayega.",
+    uploadRetry: "Dobara koshish",
+    uploadKeepOnPhone: "Phone par rakho",
+    onlyOnPhone: "Sirf is phone par",
+    openFile: "Kholo",
+    openFailed: "Koi app nahi mila jo ise khol sake",
     name: "Naam",
     namePlaceholder: "Photo scan karo, ya naam khud daalo",
     expiry: "Expiry date",
@@ -1800,7 +1820,7 @@ const hinglish: Dict = {
     notifyPlanAtTime: "subah 9 baje",
     notifyPlanNow: "Abhi",
     notifyPlanNowSub: "subah wala waqt nikal chuka hai — Saathi kuch hi der me yaad dila dega",
-    photoRequired: "Pehle document ki photo lo ya gallery se chuno — bina photo ke document save nahi hota",
+    photoRequired: "Pehle document ki photo lo ya file chuno — bina uske document save nahi hota",
     saveFailed: "Save nahi ho paya",
     cameraPermission: "Camera permission chahiye",
     ocrExpiryFound: "expiry mil gayi",
@@ -2712,7 +2732,18 @@ const hi: Dict = {
     summaryLabel: "साथी ने यह पढ़ा",
     editHint: "(ठीक कर सकते हैं)",
     camera: "कैमरा",
-    gallery: "गैलरी",
+    pickFile: "चुनें",
+    ocrNoDocument:
+      "इसमें कोई डॉक्यूमेंट नहीं मिला। साफ़ फ़ोटो या PDF दोबारा डालिए — साथी डॉक्यूमेंट और उनकी expiry के लिए है।",
+    fileTooBig: "फ़ाइल 5MB से बड़ी है। इससे छोटी फ़ाइल डालिए — या कम पेज वाली PDF।",
+    uploadFailedTitle: "क्लाउड पर नहीं जा पाया",
+    uploadFailedMsg:
+      "नेट कमज़ोर है। सिर्फ़ इसी फ़ोन पर रख लें? नेट आते ही अपने आप क्लाउड पर चला जाएगा।",
+    uploadRetry: "दोबारा कोशिश",
+    uploadKeepOnPhone: "फ़ोन पर रखें",
+    onlyOnPhone: "सिर्फ़ इसी फ़ोन पर",
+    openFile: "खोलें",
+    openFailed: "इसे खोलने वाला कोई ऐप नहीं मिला",
     name: "नाम",
     namePlaceholder: "फ़ोटो स्कैन करें, या नाम खुद डालें",
     expiry: "एक्सपायरी डेट",
@@ -2737,7 +2768,7 @@ const hi: Dict = {
     notifyPlanAtTime: "सुबह 9 बजे",
     notifyPlanNow: "अभी",
     notifyPlanNowSub: "सुबह का समय निकल चुका है — साथी थोड़ी ही देर में याद दिला देगा",
-    photoRequired: "पहले डॉक्यूमेंट की फ़ोटो लीजिए या गैलरी से चुनिए — बिना फ़ोटो के डॉक्यूमेंट सेव नहीं होता",
+    photoRequired: "पहले डॉक्यूमेंट की फ़ोटो लीजिए या फ़ाइल चुनिए — बिना उसके डॉक्यूमेंट सेव नहीं होता",
     saveFailed: "सेव नहीं हो पाया",
     cameraPermission: "कैमरा permission चाहिए",
     ocrExpiryFound: "एक्सपायरी मिल गई",
@@ -3630,7 +3661,19 @@ const en: Dict = {
     summaryLabel: "What Saathi read",
     editHint: "(you can fix it)",
     camera: "Camera",
-    gallery: "Gallery",
+    pickFile: "Choose",
+    ocrNoDocument:
+      "No document found in this. Try a clear photo or PDF — Saathi is for documents and their expiry.",
+    fileTooBig:
+      "This file is larger than 5MB. Please pick a smaller file — or a PDF with fewer pages.",
+    uploadFailedTitle: "Couldn't reach the cloud",
+    uploadFailedMsg:
+      "Your connection is weak. Keep it on this phone only? It'll upload by itself once you're back online.",
+    uploadRetry: "Try again",
+    uploadKeepOnPhone: "Keep on phone",
+    onlyOnPhone: "On this phone only",
+    openFile: "Open",
+    openFailed: "No app found that can open this",
     name: "Name",
     namePlaceholder: "Scan a photo, or type the name",
     expiry: "Expiry date",
@@ -3655,7 +3698,7 @@ const en: Dict = {
     notifyPlanAtTime: "at 9 in the morning",
     notifyPlanNow: "Right away",
     notifyPlanNowSub: "the morning slot has passed — Saathi will remind you in a few minutes",
-    photoRequired: "Take a photo of the document or pick one from the gallery — a document can't be saved without it",
+    photoRequired: "Take a photo of the document or choose a file — a document can't be saved without it",
     saveFailed: "Couldn't save",
     cameraPermission: "Camera permission needed",
     ocrExpiryFound: "found the expiry",
