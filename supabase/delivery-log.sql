@@ -302,23 +302,34 @@ revoke all on function public.prune_delivery_log() from public, anon, authentica
 grant execute on function public.prune_delivery_log() to service_role;
 
 -- Roz raat 3:20 (UTC) — koi bhi kam-bheed wala waqt chalega.
--- ⚠️ Purani job hatao — par SIRF tab jab wo sach me ho.
 --
--- `select cron.unschedule('naam')` seedha likhna yahan galat hai: job na hone par
--- wo "could not find valid entry for job" phenkta hai, aur Supabase SQL Editor
--- POORI script wahin rok deta hai. Yaani pehli baar chalane wale ke liye ye file
--- kabhi poori chalti hi nahi — theek us waqt jab use sabse zyada chalni chahiye.
+-- ⚠️ Ye poora hissa ek `do` block me hai, aur uske andar `exception` hai.
 --
--- `cron.job` se jodkar chalane par job na hone par zero row aati hai aur kuch
--- nahi hota. Isliye ye file pehli baar aur das-vi baar, dono par ek jaisi chalti
--- hai.
-select cron.unschedule(jobid) from cron.job where jobname = 'prune-delivery-log';
-
-select cron.schedule(
-  'prune-delivery-log',
-  '20 3 * * *',
-  $$ select public.prune_delivery_log(); $$
-);
+-- Supabase ka SQL Editor poori file EK hi transaction me chalata hai. Yaani is
+-- file ke aakhir me aayi ek chhoti si galti upar ki har cheez ko roll back kar
+-- deti hai — table bhi nahi banta, ek bhi function nahi banta — aur pehli nazar
+-- me lagta hai ki file chal gayi.
+--
+-- Theek yahi ho chuka tha. Pehle yahan seedha `cron.unschedule('naam')` likha
+-- tha, jo job na hone par "could not find valid entry for job" phenkta hai. Us
+-- ek line ne poori migration gira di, aur uska pata tab chala jab cron ne
+-- `log_delivery_batch` maanga aur 404 khaaya.
+--
+-- Ab do parat ki hifazat hai: job `cron.job` se dhoondhi jaati hai (na ho to
+-- zero row, koi error nahi), aur poora block `exception` me lipta hai — pg_cron
+-- na ho, ya ijaazat na ho, tab bhi table aur functions surakshit chadh jaate
+-- hain. Safai ka cron achhi cheez hai; poori migration usse zyada zaroori hai.
+do $$
+begin
+  perform cron.unschedule(jobid) from cron.job where jobname = 'prune-delivery-log';
+  perform cron.schedule(
+    'prune-delivery-log',
+    '20 3 * * *',
+    $job$ select public.prune_delivery_log(); $job$
+  );
+exception when others then
+  raise notice 'prune-delivery-log schedule nahi ho payi (%). Table aur functions phir bhi ban gaye — safai baad me lagai ja sakti hai.', sqlerrm;
+end $$;
 
 -- Band karna ho to:
 --   select cron.unschedule('prune-delivery-log');
