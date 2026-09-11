@@ -242,6 +242,78 @@ eq(
   { message: "HTTP 404 Not Found — jawab JSON nahi tha: nope", code: "HTTP_404" },
 );
 
+/* ══════════════════ 5. Document lene ka faisla ══════════════════ */
+
+const { intakeVerdict, isPdf, normalizeMime, MAX_FILE_BYTES } = await load(
+  "src/utils/doc-intake.ts",
+);
+
+const OK = { bytes: 1000, failure: null };
+
+// ── Selfie: AI chala, kuch mila hi nahi -> ROK.
+eq("unclear -> rok", intakeVerdict({ ...OK, failure: "unclear" }), {
+  save: false,
+  note: "noDocument",
+});
+
+// ── Net nahi: AI chala hi nahi -> save hone do. Yahan rokna sabse bada nuksan:
+//    user ka ASLI document uske haath me hai aur app use ghusne nahi de rahi.
+eq("offline -> save", intakeVerdict({ ...OK, failure: "offline" }), {
+  save: true,
+  note: "offline",
+});
+
+// ── Gemini bhara / dheema -> save hone do.
+eq("busy -> save", intakeVerdict({ ...OK, failure: "busy" }), { save: true, note: "busy" });
+eq("slow -> save", intakeVerdict({ ...OK, failure: "slow" }), { save: true, note: "busy" });
+
+// ── Server ki dikkat -> save hone do.
+eq("server -> save", intakeVerdict({ ...OK, failure: "server" }), {
+  save: true,
+  note: "failed",
+});
+
+// ── AI ne theek padha.
+eq("ok -> save", intakeVerdict(OK), { save: true, note: "none" });
+
+// ── 5MB SAKHT hadd — theek 5MB chalta hai, usse ek byte upar nahi.
+eq("5MB theek", intakeVerdict({ bytes: MAX_FILE_BYTES, failure: null }), {
+  save: true,
+  note: "none",
+});
+eq("5MB+1 -> rok", intakeVerdict({ bytes: MAX_FILE_BYTES + 1, failure: null }), {
+  save: false,
+  note: "tooBig",
+});
+
+// ── ⚠️ Badi file par SIZE ki baat pehle aati hai — AI us par chala hi nahi tha.
+//    Ulta hone par app "isme koi document nahi mila" kehti aur user saaf photo
+//    dobara kheenchta rehta, jabki dikkat size ki thi.
+eq(
+  "badi file, unclear -> tooBig",
+  intakeVerdict({ bytes: MAX_FILE_BYTES + 1, failure: "unclear" }),
+  { save: false, note: "tooBig" },
+);
+
+/**
+ * ── ⚠️ mime ka saaf hona — ye chhota dikhta hai par mehnga hai.
+ *
+ * `DocumentPicker` mime ke saath `; charset=...` laga kar de sakta hai, aur
+ * `doc-file-name.ts` ka `extForMime()` sirf THEEK `application/pdf` pehchanta
+ * hai. Bina saaf kiye PDF cache me `.jpg` naam par baith jaati, aur phir wahan
+ * dhoondhi hi nahi jaati — yaani abhi-abhi rakhi file offline me nahi khulti.
+ */
+eq("mime saaf", normalizeMime("application/pdf; charset=binary"), "application/pdf");
+eq("mime chhota", normalizeMime("IMAGE/JPEG"), "image/jpeg");
+eq("mime ke aas-paas ki jagah", normalizeMime("  application/pdf  "), "application/pdf");
+eq("khaali mime", normalizeMime(null), "");
+
+// ── PDF pehchano.
+eq("pdf", isPdf("application/pdf"), true);
+eq("pdf with charset", isPdf("application/pdf; charset=binary"), true);
+eq("jpeg pdf nahi", isPdf("image/jpeg"), false);
+eq("khaali pdf nahi", isPdf(null), false);
+
 /* ══════════════════ nateeja ══════════════════ */
 
 if (fails.length) {
