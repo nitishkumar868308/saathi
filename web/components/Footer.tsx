@@ -2,17 +2,23 @@
 
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
-import { Instagram, Twitter, Linkedin, Mail, Play } from "lucide-react";
+import { Instagram, Facebook, Youtube, Play } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/LanguageProvider";
 import SaathiWordmark from "@/components/SaathiWordmark";
 
-// 👉 Apne asli social handles yahan daal dena jab pages ban jaayein.
+/**
+ * Apka Saathi ke asli social pages.
+ *
+ * ⚠️ Pehle yahan `instagram.com/`, `x.com/`, `linkedin.com/` jaise KHAALI link
+ * the (kisi profile par nahi jaate the) aur ek mail link. Ab sirf wahi teen jo
+ * sach me bane hain. Naya page bane to yahan aur `app/layout.tsx` ke `sameAs`
+ * dono me jodna — Google usi se site aur social pages ko ek brand maanta hai.
+ */
 const SOCIALS = [
-  { icon: Instagram, label: "Instagram", href: "https://instagram.com/" },
-  { icon: Twitter, label: "X (Twitter)", href: "https://x.com/" },
-  { icon: Linkedin, label: "LinkedIn", href: "https://linkedin.com/" },
-  { icon: Mail, label: "Email", href: "mailto:info@apkasaathi.com" },
+  { icon: Instagram, label: "Instagram", href: "https://www.instagram.com/apka.saathiapp/" },
+  { icon: Facebook, label: "Facebook", href: "https://www.facebook.com/apkasaathiapp/" },
+  { icon: Youtube, label: "YouTube", href: "https://www.youtube.com/@apkasaathiapp" },
 ];
 
 export default function Footer() {

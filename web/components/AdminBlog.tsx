@@ -5,6 +5,7 @@ import { AlertTriangle, Check, Plus, Save, Trash2, Eye, EyeOff, Search } from "l
 
 import Loader from "@/components/Loader";
 import Pagination, { usePagination } from "@/components/admin/Pagination";
+import Modal from "@/components/admin/Modal";
 import { useAdminT } from "@/lib/i18n/admin";
 
 /**
@@ -62,6 +63,9 @@ export default function AdminBlog() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [query, setQuery] = useState("");
+  /** Delete ki pushti wala modal — kaunsi post, aur request chal rahi hai ya nahi. */
+  const [toDelete, setToDelete] = useState<Post | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Blog badhta hi jaata hai — poori list ek saath dikhane ka koi faayda nahi.
   const filtered = useMemo(() => {
@@ -117,6 +121,7 @@ export default function AdminBlog() {
 
   async function remove(slug: string) {
     setError("");
+    setDeleting(true);
     try {
       const res = await fetch(`/api/admin/blog?slug=${encodeURIComponent(slug)}`, {
         method: "DELETE",
@@ -126,9 +131,14 @@ export default function AdminBlog() {
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
       if (editing?.slug === slug) setEditing(null);
+      setToDelete(null);
       await load();
     } catch (e) {
+      // Modal band kar do taaki upar wala error dikhe — post abhi bhi list me hai.
+      setToDelete(null);
       setError(e instanceof Error ? e.message : sh.loadFailed);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -220,12 +230,11 @@ export default function AdminBlog() {
                   aur dabate hi post BINA POOCHHE hat jaati thi. Admin ko dikhta hi
                   nahi tha ki delete ka raasta hai, aur galti se lag jaata to post
                   (aur uska Google wala link) turant gaya. Ab saaf likha button, aur
-                  pehle ek pushti — baaki admin screens (team, renewals) jaisa.
+                  pehle admin ka apna pushti wala modal (neeche) — browser ka
+                  `confirm` popup nahi, jo baaki panel se bilkul alag dikhta hai.
                 */}
                 <button
-                  onClick={() => {
-                    if (confirm(b.deleteConfirm.replace("{title}", p.title))) void remove(p.slug);
-                  }}
+                  onClick={() => setToDelete(p)}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-terracotta/30 px-3 py-1.5 text-xs font-semibold text-terracotta-dark transition hover:bg-terracotta/10"
                 >
                   <Trash2 size={14} /> {t.common.delete}
@@ -423,6 +432,43 @@ export default function AdminBlog() {
           </div>
         </div>
       )}
+
+      {/* Delete ki pushti — admin ka apna modal, baaki panel jaisa. */}
+      <Modal
+        open={toDelete !== null}
+        onClose={() => {
+          if (!deleting) setToDelete(null);
+        }}
+        title={t.common.delete}
+        subtitle={toDelete ? `/blog/${toDelete.slug}` : undefined}
+        size="sm"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setToDelete(null)}
+              disabled={deleting}
+              className="inline-flex h-10 items-center rounded-xl border border-line px-4 text-sm font-semibold text-ink-soft transition hover:text-ink disabled:opacity-60"
+            >
+              {t.common.cancel}
+            </button>
+            <button
+              onClick={() => toDelete && void remove(toDelete.slug)}
+              disabled={deleting}
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-terracotta-dark px-4 text-sm font-semibold text-white transition hover:bg-terracotta disabled:opacity-60"
+            >
+              {deleting ? <Loader size={16} /> : <Trash2 size={15} />}
+              {t.common.delete}
+            </button>
+          </div>
+        }
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={20} className="mt-0.5 shrink-0 text-terracotta-dark" />
+          <p className="text-sm leading-relaxed text-ink">
+            {toDelete ? b.deleteConfirm.replace("{title}", toDelete.title) : ""}
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -127,7 +127,12 @@ const jsonLd = {
        * website aur app ko ek hi company maanta hai. Instagram/LinkedIn/X profile
        * bane to wo bhi yahin jodo (sirf asli, apne profiles).
        */
-      sameAs: ["https://play.google.com/store/apps/details?id=com.apkasaathi.app"],
+      sameAs: [
+        "https://play.google.com/store/apps/details?id=com.apkasaathi.app",
+        "https://www.instagram.com/apka.saathiapp/",
+        "https://www.facebook.com/apkasaathiapp/",
+        "https://www.youtube.com/@apkasaathiapp",
+      ],
       logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
       email: "info@apkasaathi.com",
       description:
