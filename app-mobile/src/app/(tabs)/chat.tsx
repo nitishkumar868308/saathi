@@ -616,6 +616,12 @@ export default function Chat() {
         app_lock: "/app-lock",
         support: "/support",
         upgrade: "/upgrade",
+        // "Refer kaise karun", "mera plan kab tak hai", "help chahiye" — jawab
+        // inhi screens par hai, isliye Saathi ab seedha wahan le jaata hai.
+        referral: "/referral",
+        membership: "/membership",
+        help: "/help",
+        contact: "/contact",
       };
       const path = ROUTES[action.to];
       if (path) router.push(path as never);

@@ -391,6 +391,104 @@ async function isPlusUser(userId: string | null): Promise<boolean> {
   }
 }
 
+/** Free hadd aur referral ke din — admin panel (`app_config`) se, app jaisa hi. */
+type AppOffers = {
+  freeReminders: number;
+  freeDocuments: number;
+  referralDays: number;
+  referralsEnabled: boolean;
+};
+
+const DEFAULT_APP_OFFERS: AppOffers = {
+  freeReminders: 5,
+  freeDocuments: 3,
+  referralDays: 15,
+  referralsEnabled: true,
+};
+
+/**
+ * Live numbers — `app-mobile/src/lib/plan.ts` ke `getOffers()` wala hi hisaab.
+ *
+ * ⚠️ Server khud padhta hai, app se nahi maangta: tab purani app build par bhi
+ * Saathi sahi number bolta hai. Fail ho to wahi default jo app dikhati hai.
+ */
+async function appOffers(): Promise<AppOffers> {
+  if (!SB_URL || !SB_SERVICE) return DEFAULT_APP_OFFERS;
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/app_config?select=key,value` +
+        `&key=in.(free_reminders,free_documents,referral_days,referrals_enabled)`,
+      {
+        headers: { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}` },
+        signal: AbortSignal.timeout(2500),
+      },
+    );
+    if (!res.ok) return DEFAULT_APP_OFFERS;
+    const rows = (await res.json()) as { key: string; value: unknown }[];
+    const m = new Map(rows.map((r) => [r.key, r.value]));
+    const num = (k: string, d: number) => {
+      const raw = m.get(k);
+      if (raw === null || raw === undefined || raw === "") return d;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : d;
+    };
+    const flag = m.get("referrals_enabled");
+    return {
+      freeReminders: num("free_reminders", DEFAULT_APP_OFFERS.freeReminders),
+      freeDocuments: num("free_documents", DEFAULT_APP_OFFERS.freeDocuments),
+      referralDays: num("referral_days", DEFAULT_APP_OFFERS.referralDays),
+      referralsEnabled: typeof flag === "boolean" ? flag : DEFAULT_APP_OFFERS.referralsEnabled,
+    };
+  } catch {
+    return DEFAULT_APP_OFFERS;
+  }
+}
+
+/**
+ * App ki SACHI jaankari — chat ke har "app kaise chalti hai" wale jawab ki jad.
+ *
+ * ⚠️ Pehle prompt Saathi ko kehta tha "plan, price, referral, app kaise use
+ * karein — inka jawab do", par ye jaankari kahin di hi nahi thi. Model andaze
+ * se jawab banata tha: free limit ka galat number, Plus me jo nahi hai wo
+ * feature, ya koi aisa raasta jo app me hai hi nahi. Ab sab kuch yahan hai —
+ * app ke apne text (Help, Upgrade, Refer & Earn, Settings) se liya hua — aur
+ * saaf rok hai ki is ke bahar kuch mat gadho.
+ *
+ * ⚠️ Price ka NUMBER jaan-boojh ke nahi. Wo Google Play desh ke hisaab se deta
+ * hai; yahan likha koi bhi number kisi na kisi user ke liye jhooth hoga.
+ *
+ * App me koi screen/label badle to ye text bhi badalna — warna Saathi purana
+ * raasta batayega.
+ */
+function appGuide(o: AppOffers, plus: boolean): string {
+  const referral = o.referralsEnabled
+    ? `\n• Refer & Earn: dost aapke code se join kare, apna pehla document (photo/file ke saath) daale aur ek reminder set kare — tab DONO ko ${o.referralDays} din ka Saathi Plus free. Har successful referral par ${o.referralDays} din. Apna code dekhne/share karne ke liye pehle khud ek document + ek reminder daalo aur profile poori karo. Screen: navigate referral (You → Refer & Earn). Kisi dost ka code daalna ho: You → "Referral code daalein".`
+    : `\n• Refer & Earn abhi band hai — iske baare me koi din ya reward mat batao.`;
+  return (
+    `\n\nAPP GUIDE — "Apka Saathi" ki SACHI jaankari. App ke baare me har jawab SIRF isi se do.` +
+    ` Yahan jo NAHI likha, uska andaza KABHI mat lagao — koi number, price, feature, button ya raasta apne se mat banao.` +
+    ` Pakka pata na ho to saaf bolo ki Help me dekh lo ya Support se pooch lo, aur navigate help ya support do.` +
+    `\n• Neeche 5 tabs: Home, Saathi (ye chat), Docs (documents), Reminders, You (profile + settings).` +
+    `\n• Document add: Docs tab me '+' → photo khincho, gallery se chuno ya PDF file chuno. Saathi document padh ke naam aur expiry khud bhar deta hai; user check karke Save kare. Expiry aane se pehle yaad dilata hai. Chat se document nahi banta — navigate add_document.` +
+    `\n• Reminder: Reminders tab me '+' → likh ke ya 🎤 mic se bol ke. Ya yahin chat me bolo — tum bana doge. Roz/har hafte wale bhi bante hain; roz wale reminder par "Ho gaya" sirf AAJ ka band karta hai, kal phir aayega.` +
+    `\n• Notes: Notes screen me note likho; chaaho to note par reminder bhi lag jaata hai. navigate notes.` +
+    `\n• Reminder time par nahi aaya: You → "Reminders reliable banao" me battery optimization off karo aur notifications allow rakho.` +
+    `\n• Free plan (₹0, hamesha): ${o.freeReminders} chalu reminders, ${o.freeDocuments} documents, expiry reminders, voice + text reminders.` +
+    `\n• Saathi Plus: unlimited reminders, unlimited documents, AI Saathi (smart chat + daily brief), email + WhatsApp par bhi reminder. WhatsApp reminder ke liye phone number verify hona zaroori hai (You → Meri details).` +
+    `\n• Plus kaise lein: You → Saathi Plus (navigate upgrade). Mahine ya saal ka plan; saal wale me 2 mahine free. Payment Google Play se (UPI, card, netbanking). Bank statement me naam "RAHVIAN TECHNOLOGIES PRIVATE LIMITED" aata hai.` +
+    ` ⚠️ PRICE ka number KABHI mat batao (wo desh ke hisaab se Google Play dikhata hai) — upgrade screen par le chalo.` +
+    `\n• Plus khatam hone par kuch bhi delete nahi hota: free hadd se upar ke documents lock aur reminders pause ho jaate hain; Plus lete hi sab wapas khul jaata hai.` +
+    referral +
+    `\n• Meri membership (plan, expiry, referral se kamaaye din): navigate membership.` +
+    `\n• App lock: You → App lock me PIN (aur fingerprint) lagao; PIN bhool jao to email par aaye code se reset hota hai. navigate app_lock.` +
+    `\n• Naya phone: ek account ke reminders ek waqt me EK hi phone par bajte hain; naye phone ko email par aaye code se approve karna hota hai.` +
+    `\n• Profile (naam, phone, address, photo): You → Meri details — navigate profile. Saathi ka naam badalna: You → "Saathi ka naam".` +
+    `\n• Account delete: You → "Account delete karwao" — request team tak jaati hai.` +
+    `\n• Madad: aam sawaal → Help (navigate help); koi dikkat/complaint → Support ticket (navigate support) ya "Humein likho" (navigate contact); email info@apkasaathi.com.` +
+    `\n• Is user ka abhi ka plan: ${plus ? "Saathi Plus" : "Free"}.`
+  );
+}
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -611,6 +709,12 @@ const NAV_TARGETS = new Set([
   "app_lock",
   "support",
   "upgrade",
+  // App ke baare me sawaal ka jawab aksar inhi screens par hota hai — pehle
+  // Saathi yahan le ja hi nahi sakta tha, sirf raasta likh deta tha.
+  "referral",
+  "membership",
+  "help",
+  "contact",
 ]);
 const THEME_VALUES = new Set(["light", "dark", "system"]);
 const LANG_VALUES = new Set(["hinglish", "hi", "en"]);
@@ -878,6 +982,10 @@ Deno.serve(async (req) => {
         : "";
       // Abhi ka LOCAL time (app naive-local ISO bhejti hai) — remind_at isse nikaalo.
       const now = payload.now ?? payload.context?.today ?? new Date().toISOString();
+      // App ki sachi jaankari + is user ka plan — dono server khud padhta hai
+      // (wajah `appGuide` par). Dono fail-safe hain, chat kabhi nahi rukti.
+      const [plus, offers] = await Promise.all([isPlusUser(uid), appOffers()]);
+      const guide = appGuide(offers, plus);
       /**
        * Saathi ka daayra — aur uske bahar ka jawab.
        *
@@ -926,7 +1034,7 @@ Deno.serve(async (req) => {
 
       const scope =
         ` TUM SIRF is app "Apka Saathi" ke baare me madad karte ho: (a) user ke reminders, tasks, documents aur unki expiry/dates, (b) app kaise use karein,` +
-        ` (c) app khud kya hai — features, plan, price, referral, Saathi Plus, aur (d) saadharan salaam-dua/haal-chaal (neeche CHHOTI BAAT dekho).` +
+        ` (c) app khud kya hai — features, plan, referral, Saathi Plus (sab neeche APP GUIDE se; price ka number kabhi nahi), aur (d) saadharan salaam-dua/haal-chaal (neeche CHHOTI BAAT dekho).` +
         `\n\nBAHAR KI BAAT — ye sab is app se bahar hai, aur inka jawab tum KABHI nahi dete:` +
         ` general knowledge, itihaas, bhugol, science, news/current affairs, cricket/khel, mausam, share market/crypto,` +
         ` math ya calculation, coding, translation, recipe, health/dawai ki salah, kanoon ya paisa ki salah, shayari/kahani/joke likhna,` +
@@ -995,9 +1103,11 @@ Deno.serve(async (req) => {
         ` alert ki awaaz {"type":"set_alert_mode","value":"ring|vibrate|silent"}.` +
         ` Karne ke baad reply me chhota sa confirm karo.` +
         ` Phone ki APNI settings (WiFi, volume, phone ka notification switch) tum nahi badal sakte — un par saaf mana karo.` +
-        `\nSCREEN: Kisi screen par le jaane ko kahe to action {"type":"navigate","to":"..."} do —` +
-        ` add_document, add_reminder, documents, reminders, notes, profile, settings, app_lock, support, upgrade.` +
-        ` Raasta samjhane ki jagah seedha le chalo.` +
+        `\nSCREEN: Kisi screen par le jaane ko kahe, ya jawab kisi screen par ho, to action {"type":"navigate","to":"..."} do. Sirf ye naam:` +
+        ` add_document (document jodna), add_reminder (naya reminder form), documents (Docs list), reminders (Reminders list), notes,` +
+        ` profile (Meri details), settings (You tab), app_lock, support (ticket), contact (Humein likho), help (FAQ),` +
+        ` upgrade (Saathi Plus lena), membership (mera plan/expiry), referral (Refer & Earn).` +
+        ` Raasta samjhane ki jagah seedha le chalo — par reply me EK chhoti line me raasta bhi likho (jaise "You → Refer & Earn"), taaki screen na khule to bhi user ko pata rahe.` +
         `\n\nOUTPUT: SIRF strict JSON do, aur kuch nahi: {"reply":"<chat message, user ki bhasha me>","action": null | {create_reminder|navigate|set_theme|set_language|set_alert_mode}}. reply HAMESHA bharo, chhota rakho.`;
 
       const userMsg = payload.message ?? "";
@@ -1050,7 +1160,7 @@ Ye SAB ek hi baat hain. Khud tay karo ki insaan ne asal me kya kaha (jo guess Hi
 
       const raw = await gemini({
         model: MODEL,
-        system: base + agentic + nameNote + ctx,
+        system: base + agentic + guide + nameNote + ctx,
         contents,
         json: true,
         // ⚠️ 700 kam pad jaata tha. Naye (thinking) model pehle apna soch-vichaar
@@ -1088,6 +1198,7 @@ Ye SAB ek hi baat hain. Khud tay karo ki insaan ne asal me kya kaha (jo guess Hi
           model: MODEL,
           system:
             base +
+            guide +
             nameNote +
             ctx +
             `\n\nAbhi ka local time: ${now}.` +

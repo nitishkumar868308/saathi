@@ -99,7 +99,11 @@ export type SaathiAction =
         | "settings"
         | "app_lock"
         | "support"
-        | "upgrade";
+        | "upgrade"
+        | "referral"
+        | "membership"
+        | "help"
+        | "contact";
     }
   /**
    * App ki setting badlo — theme, bhasha, alert ki awaaz.
