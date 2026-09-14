@@ -67,8 +67,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       // Play Store console me yahi URL deti hai — index hona chahiye.
+      //
+      // ⚠️ `lastModified: now` jaan-boojh ke hataya. Sitemap har 10 minute me
+      // dobara banta hai, to ye date bhi har 10 minute badal jaati thi — page
+      // badle bina. Google aisi jhoothi `lastmod` dekh ke poori sitemap ki dates
+      // par bharosa karna chhod deta hai (baaki static pages jaisa, bina date).
       url: `${SITE_URL}/delete-account`,
-      lastModified: now,
       changeFrequency: "yearly",
       priority: 0.3,
     },
