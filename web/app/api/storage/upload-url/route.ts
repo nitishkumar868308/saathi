@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { appUserId } from "@/lib/app-auth";
 import { presignUpload, r2Key, R2NotConfigured, r2Configured } from "@/lib/r2";
 import {
-  documentBelongsTo,
+  documentAccess,
   documentFileName,
   extFor,
   parseVersion,
@@ -83,8 +83,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "supabase env missing" }, { status: 503 });
     }
     // Document row pehle se honi chahiye, aur isi user ki.
-    if (!(await documentBelongsTo(docId, uid))) {
+    const access = await documentAccess(docId, uid);
+    if (!access) return NextResponse.json({ error: "db unavailable" }, { status: 503 });
+    if (!access.exists) {
       return NextResponse.json({ error: "document nahi mila" }, { status: 404 });
+    }
+    // ⚠️ Locked (free plan ki hadd) document par nayi file/renew nahi — wahi
+    // rok jo `download-url` par hai. Naya document hamesha unlocked banta hai.
+    if (access.locked) {
+      return NextResponse.json({ error: "document locked", locked: true }, { status: 403 });
     }
     // Naam ek hi jagah se banta hai — `commit` bhi bilkul yahi bulata hai.
     path = `${uid}/${documentFileName(docId, ext, version)}`;

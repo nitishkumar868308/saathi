@@ -84,9 +84,36 @@ export async function countDocuments(): Promise<number> {
   return countOwn("documents");
 }
 
-/** Kitne reminders hain (sirf apne). */
+/** Kitne reminders hain (sirf apne) — sab, band/nipte hue bhi. */
 export async function countReminders(): Promise<number> {
   return countOwn("reminders");
+}
+
+/**
+ * Kitne CHALU reminders hain — `is_on` aur paused nahi. Free limit isi par.
+ *
+ * ⚠️ Pehle limit `countReminders()` (saare) par lagti thi, jabki message kehta
+ * hai "sirf 5 ACTIVE reminders". Nateeja: 5 purane nipte hue (ya band) reminder
+ * wala free user naya reminder bana hi nahi paata tha, aur use wajah kabhi
+ * samajh nahi aati — uske paas ek bhi chalu reminder nahi hota.
+ *
+ * Server ka trigger bhi theek yahi ginta hai (`is_on and not is_paused`), taaki
+ * app aur server kabhi alag jawab na dein. `countReminders()` jaan-boojh ke
+ * waisa hi hai — referral ki shart ("ek reminder banaya") aur plan-expiry wala
+ * alert saare reminders ginte hain.
+ */
+export async function countActiveReminders(): Promise<number> {
+  const sb = client();
+  const { data: u } = await sb.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return 0;
+  const { count } = await sb
+    .from("reminders")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", uid)
+    .eq("is_on", true)
+    .eq("is_paused", false);
+  return count ?? 0;
 }
 
 async function countOwn(table: "documents" | "reminders"): Promise<number> {
@@ -115,11 +142,11 @@ export async function canAddDocument(): Promise<boolean> {
   return isPlus || count < offers.freeDocuments;
 }
 
-/** Free reminder limit se aage nahi (admin config se; fallback 5). */
+/** Free reminder limit se aage nahi (admin config se; fallback 5). Sirf chalu gine jaate hain. */
 export async function canAddReminder(): Promise<boolean> {
   const [{ isPlus }, count, offers] = await Promise.all([
     getPlan(),
-    countReminders(),
+    countActiveReminders(),
     getOffers(),
   ]);
   return isPlus || count < offers.freeReminders;

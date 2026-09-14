@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/admin-guard";
+import { deleteObject, listObjects, r2Configured, r2Key } from "@/lib/r2";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,8 +125,14 @@ async function countRows(table: string, col: string, uid: string): Promise<numbe
   }
 }
 
-/** Is user ki storage files (documents bucket me `<uid>/…`). */
-async function listUserFiles(uid: string): Promise<string[]> {
+/**
+ * Is user ki PURANI storage files (Supabase ke documents bucket me `<uid>/…`).
+ *
+ * ⚠️ Ye sirf legacy files hain — naye upload R2 par jaate hain (neeche
+ * `listR2Files`). Bucket hi na ho (4xx) to "koi file nahi" maante hain, par 5xx
+ * ya net ka fail `error` me aata hai: us haal me "0 files" kehna jhooth hota.
+ */
+async function listUserFiles(uid: string): Promise<{ files: string[]; error: string | null }> {
   try {
     const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${DOC_BUCKET}`, {
       method: "POST",
@@ -133,12 +140,113 @@ async function listUserFiles(uid: string): Promise<string[]> {
       body: JSON.stringify({ prefix: `${uid}/`, limit: 1000 }),
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      return { files: [], error: res.status >= 500 ? `legacy storage list: HTTP ${res.status}` : null };
+    }
     const rows = (await res.json()) as { name?: string }[];
-    return rows.map((r) => `${uid}/${r.name}`).filter((p) => !p.endsWith("/"));
-  } catch {
-    return [];
+    return {
+      files: rows.map((r) => `${uid}/${r.name}`).filter((p) => !p.endsWith("/")),
+      error: null,
+    };
+  } catch (e) {
+    return { files: [], error: `legacy storage list: ${e instanceof Error ? e.message : String(e)}` };
   }
+}
+
+/**
+ * Is user ki R2 files — documents (har version) aur profile photo.
+ *
+ * ⚠️ Pehle purge yahan dekhta hi nahi tha. Asli files R2 par hain, aur purge
+ * sirf purana Supabase bucket saaf karke "deleted" likh deta tha — user ka
+ * passport R2 me pada rehta tha. `documents/<uid>/` prefix se list isliye ki
+ * DB ki rows par bharosa nahi kar sakte: renew wale purane versions, adhoore
+ * upload — sab isi folder me hote hain par har ek ki row nahi hoti.
+ *
+ * R2 set hi nahi (`r2Configured()` false) to `skipped` — us haal me R2 par kuch
+ * ho hi nahi sakta.
+ */
+async function listR2Files(
+  uid: string,
+): Promise<{ keys: string[]; skipped: boolean; error: string | null }> {
+  if (!r2Configured()) return { keys: [], skipped: true, error: null };
+  try {
+    const docs = await listObjects(r2Key.documentPath(`${uid}/`));
+    // Avatar ka folder bhi prefix se — `avatar.jpg` ke alawa kuch pada ho to wo bhi.
+    const avatarDir = r2Key.avatar(uid).replace(/[^/]+$/, "");
+    const avatars = await listObjects(avatarDir);
+    return { keys: [...docs, ...avatars], skipped: false, error: null };
+  } catch (e) {
+    return {
+      keys: [],
+      skipped: false,
+      error: `R2 list: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/** Kai keys hata do — thodi-thodi ek saath, taaki 500 files me timeout na ho. */
+async function deleteR2Keys(keys: string[]): Promise<string[]> {
+  const failed: string[] = [];
+  for (let i = 0; i < keys.length; i += 8) {
+    const slice = keys.slice(i, i + 8);
+    const results = await Promise.all(
+      slice.map((k) => deleteObject(k).catch(() => false)),
+    );
+    results.forEach((ok, j) => {
+      if (!ok) failed.push(slice[j]);
+    });
+  }
+  return failed;
+}
+
+type DeleteRequestRow = { id: string; user_id: string | null; email: string };
+
+async function getRequest(id: string): Promise<DeleteRequestRow | null> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/account_delete_requests?id=eq.${id}&select=id,user_id,email`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`account_delete_requests: ${res.status}`);
+  const rows = (await res.json()) as DeleteRequestRow[];
+  return rows[0] ?? null;
+}
+
+async function profileEmail(uid: string): Promise<string | null> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}&select=email`, {
+    headers: headers(),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`profiles: ${res.status}`);
+  const rows = (await res.json()) as { email: string | null }[];
+  return rows[0]?.email ?? null;
+}
+
+/**
+ * Hide/purge se pehle: ye uid sach me isi request ka hai?
+ *
+ * ⚠️ Pehle request me `user_id` form me likhe EMAIL se apne aap jud jaata tha.
+ * Koi bhi kisi ka email daal ke uske account ki delete request bana sakta tha,
+ * aur admin ko wo bilkul asli jaisi dikhti thi. Ab `user_id` sirf tab judta hai
+ * jab request login token ke saath aayi ho (email verified). Bina uske admin ko
+ * email se mila account "suggested" dikhta hai — aur us par kaam tabhi hota hai
+ * jab admin ne alag se `unverified_ok` diya ho (UI me ek aur pushti).
+ *
+ * `null` = theek hai. Warna wo error jo admin ko dikhana hai.
+ */
+async function checkOwnership(
+  id: string,
+  uid: string,
+  unverifiedOk: boolean,
+): Promise<string | null> {
+  const req = await getRequest(id);
+  if (!req) return "request nahi mili";
+  if (req.user_id) return req.user_id === uid ? null : "user_id is request ka nahi hai";
+  if (!unverifiedOk) return "email verified nahi hai — pehle alag se pushti chahiye";
+  const email = await profileEmail(uid);
+  if (!email || email.trim().toLowerCase() !== req.email.trim().toLowerCase()) {
+    return "is account ka email request ke email se nahi milta";
+  }
+  return null;
 }
 
 export async function GET() {
@@ -151,7 +259,47 @@ export async function GET() {
       { headers: headers(), cache: "no-store" },
     );
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
-    const requests = (await res.json()) as { user_id: string | null }[];
+    const requests = (await res.json()) as {
+      id: string;
+      user_id: string | null;
+      email: string | null;
+    }[];
+
+    /**
+     * Bina `user_id` wali (email verified NAHI) requests ke liye email se mila
+     * account — sirf SUJHAAV.
+     *
+     * ⚠️ Ye request par likha nahi jaata. Form me koi bhi kisi ka email daal
+     * sakta hai; is sujhaav par kaam tabhi hota hai jab admin alag se pushti de
+     * (`unverified_ok`, upar `checkOwnership` dekho).
+     */
+    const suggested: Record<string, string> = {};
+    const unlinked = requests.filter((r) => !r.user_id && r.email);
+    if (unlinked.length > 0) {
+      const emails = Array.from(
+        new Set(
+          unlinked.flatMap((r) => {
+            const e = String(r.email).trim().replace(/"/g, "");
+            return [e, e.toLowerCase()];
+          }),
+        ),
+      );
+      const list = emails.map((e) => `"${e}"`).join(",");
+      const er = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?email=in.(${encodeURIComponent(list)})&select=id,email`,
+        { headers: headers(), cache: "no-store" },
+      );
+      if (er.ok) {
+        const rows = (await er.json()) as { id: string; email: string | null }[];
+        const byEmail = new Map(
+          rows.filter((p) => p.email).map((p) => [String(p.email).toLowerCase(), p.id]),
+        );
+        for (const r of unlinked) {
+          const hit = byEmail.get(String(r.email).trim().toLowerCase());
+          if (hit) suggested[r.id] = hit;
+        }
+      }
+    }
 
     /**
      * Har pending request ke user ka profile — taaki admin ko dikhe ki account
@@ -159,7 +307,10 @@ export async function GET() {
      * ki uska pichhla "hide" laga bhi tha ya nahi.
      */
     const uids = Array.from(
-      new Set(requests.map((r) => r.user_id).filter(Boolean) as string[]),
+      new Set([
+        ...(requests.map((r) => r.user_id).filter(Boolean) as string[]),
+        ...Object.values(suggested),
+      ]),
     );
     let profiles: Record<string, { deleted_at: string | null; email: string | null }> = {};
     if (uids.length > 0) {
@@ -179,7 +330,7 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ requests, profiles });
+    return NextResponse.json({ requests, profiles, suggested });
   } catch (err) {
     console.error("[admin/delete-requests GET]", err);
     return NextResponse.json(
@@ -203,8 +354,15 @@ async function inventory(uid: string) {
       count: await countRows(t.table, t.col, uid),
     })),
   );
-  const files = await listUserFiles(uid);
-  return { items, files: files.length };
+  const legacy = await listUserFiles(uid);
+  const r2 = await listR2Files(uid);
+  return {
+    items,
+    // R2 + purana bucket — dono milake. List fail hui to `filesError` me, taaki
+    // UI "0 files" ka jhootha sukoon na de.
+    files: legacy.files.length + r2.keys.length,
+    filesError: legacy.error ?? r2.error,
+  };
 }
 
 export async function POST(request: Request) {
@@ -221,6 +379,8 @@ export async function POST(request: Request) {
   const action = String(body.action ?? "");
   const id = String(body.id ?? "").trim();
   const uid = String(body.user_id ?? "").trim();
+  // Bina verified email wali request par kaam — admin ki alag pushti ke baad hi.
+  const unverifiedOk = body.unverified_ok === true;
 
   // Shakal pehle — dono aage URL filter me jaate hain (upar `badId` dekho).
   if (uid && badId(uid)) {
@@ -240,6 +400,10 @@ export async function POST(request: Request) {
     /* ---- soft: user side band, data DB me safe ---- */
     if (action === "hide" || action === "unhide") {
       if (!uid) return NextResponse.json({ error: "user_id chahiye" }, { status: 400 });
+      if (id) {
+        const bad = await checkOwnership(id, uid, unverifiedOk);
+        if (bad) return NextResponse.json({ error: bad }, { status: 409 });
+      }
       const deleted_at = action === "hide" ? new Date().toISOString() : null;
       const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}`, {
         method: "PATCH",
@@ -263,20 +427,72 @@ export async function POST(request: Request) {
     /* ---- hard: sab kuch sach me mita do ---- */
     if (action === "purge") {
       if (!uid) return NextResponse.json({ error: "user_id chahiye" }, { status: 400 });
+      if (id) {
+        const bad = await checkOwnership(id, uid, unverifiedOk);
+        if (bad) return NextResponse.json({ error: bad }, { status: 409 });
+      }
 
       const removed: Record<string, number> = {};
+      /**
+       * ⚠️ Pehle har fail chup-chaap nigal liya jaata tha — file delete na ho,
+       * table ki DELETE 500 de, auth user na hate — aur aakhir me request
+       * "deleted" mark ho jaati thi. Yaani Play Store ki shart ke saamne hum
+       * "sab hata diya" ka saboot rakh rahe the jabki data pada tha.
+       *
+       * Ab har fail yahan jama hota hai. Ek bhi ho to status NAHI badalta
+       * (DB ka check constraint sirf pending/hidden/deleted/rejected maanta hai,
+       * "partial" jaisa koi status hai hi nahi) — admin ko poori list dikhti hai
+       * aur wo dobara purge chala sakta hai. Purge dobara chalana safe hai: jo
+       * hat chuka wo 0 ginta hai.
+       */
+      const failures: string[] = [];
 
       // 1. Storage ki files. Rows se PEHLE — rows chali gayi to file ka rasta
       //    hi nahi bachta aur wo bucket me hamesha ke liye padi reh jaati hai.
-      const files = await listUserFiles(uid);
-      if (files.length > 0) {
-        const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${DOC_BUCKET}`, {
-          method: "DELETE",
-          headers: headers(),
-          body: JSON.stringify({ prefixes: files }),
-          cache: "no-store",
-        });
-        if (del.ok) removed["files"] = files.length;
+      //
+      // 1a. R2 — asli files yahin hain.
+      const r2 = await listR2Files(uid);
+      if (r2.error) failures.push(r2.error);
+      if (r2.keys.length > 0) {
+        const failed = await deleteR2Keys(r2.keys);
+        const done = r2.keys.length - failed.length;
+        if (done > 0) removed["Files (R2)"] = done;
+        if (failed.length > 0) {
+          failures.push(`R2 delete: ${failed.length} file nahi hati (${failed.slice(0, 3).join(", ")})`);
+        }
+      }
+
+      // 1b. Purana Supabase bucket — legacy files.
+      const legacy = await listUserFiles(uid);
+      if (legacy.error) failures.push(legacy.error);
+      if (legacy.files.length > 0) {
+        try {
+          const del = await fetch(`${SUPABASE_URL}/storage/v1/object/${DOC_BUCKET}`, {
+            method: "DELETE",
+            headers: headers(),
+            body: JSON.stringify({ prefixes: legacy.files }),
+            cache: "no-store",
+          });
+          if (del.ok) removed["files"] = legacy.files.length;
+          else failures.push(`legacy storage delete: HTTP ${del.status}`);
+        } catch (e) {
+          failures.push(`legacy storage delete: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      /**
+       * ⚠️ Storage adhoori hai to yahin ruko — rows aur login ko haath mat lagao.
+       *
+       * Files ki key uid se banti hai, isliye dobara purge unhe phir dhoondh
+       * leta hai. Par agar yahan se aage badh ke auth user hata dete to request
+       * ka `user_id` (on delete set null) khaali ho jaata, aur admin ke paas
+       * dobara chalane ko uid hi na bachta — bachi hui files anaath reh jaatin.
+       */
+      if (failures.length > 0) {
+        return NextResponse.json(
+          { ok: false, partial: true, removed, failures },
+          { status: 502 },
+        );
       }
 
       // 2. Har table ki rows. Ginti pehle le lete hain — delete ke baad ginne
@@ -285,20 +501,43 @@ export async function POST(request: Request) {
         const before = await countRows(t.table, t.col, uid);
         if (before === null) continue; // table hi nahi hai — chhod do
         if (before === 0) continue;
-        const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/${t.table}?${t.col}=eq.${uid}`,
-          { method: "DELETE", headers: headers({ Prefer: "return=minimal" }), cache: "no-store" },
-        );
-        if (res.ok) removed[t.label] = (removed[t.label] ?? 0) + before;
+        try {
+          const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/${t.table}?${t.col}=eq.${uid}`,
+            { method: "DELETE", headers: headers({ Prefer: "return=minimal" }), cache: "no-store" },
+          );
+          if (res.ok) removed[t.label] = (removed[t.label] ?? 0) + before;
+          else failures.push(`${t.table}.${t.col}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+        } catch (e) {
+          failures.push(`${t.table}.${t.col}: ${e instanceof Error ? e.message : String(e)}`);
+        }
       }
 
       // 3. Aakhir me auth user. Iske baad login ka koi raasta nahi bachta.
-      const au = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
-        method: "DELETE",
-        headers: headers(),
-        cache: "no-store",
-      });
-      removed["Login"] = au.ok ? 1 : 0;
+      //
+      // ⚠️ Sirf tab jab upar sab saaf hua ho — wajah wahi jo storage wale
+      // return par likhi hai (login hatte hi request ka user_id khaali).
+      if (failures.length === 0) {
+        try {
+          const au = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${uid}`, {
+            method: "DELETE",
+            headers: headers(),
+            cache: "no-store",
+          });
+          // 404 = pehle hi hat chuka (dobara purge) — wo fail nahi hai.
+          if (au.ok) removed["Login"] = 1;
+          else if (au.status !== 404) failures.push(`auth user: HTTP ${au.status}`);
+        } catch (e) {
+          failures.push(`auth user: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        return NextResponse.json(
+          { ok: false, partial: true, removed, failures },
+          { status: 502 },
+        );
+      }
 
       if (id) await setStatus(id, "deleted", removed);
       return NextResponse.json({ ok: true, removed });
@@ -327,10 +566,13 @@ async function setStatus(
   if (removed) patch.removed = removed;
   if (note !== undefined) patch.note = note;
 
-  await fetch(`${SUPABASE_URL}/rest/v1/account_delete_requests?id=eq.${id}`, {
+  // ⚠️ Pehle iska jawab dekha hi nahi jaata tha — status na bache to bhi UI
+  // "ho gaya" dikhata. Fail par throw, taaki admin ko error dikhe.
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/account_delete_requests?id=eq.${id}`, {
     method: "PATCH",
     headers: headers({ Prefer: "return=minimal" }),
     body: JSON.stringify(patch),
     cache: "no-store",
   });
+  if (!res.ok) throw new Error(`status save nahi hua: ${res.status} ${await res.text()}`);
 }

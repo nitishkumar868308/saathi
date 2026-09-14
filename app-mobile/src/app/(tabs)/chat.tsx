@@ -6,8 +6,9 @@ import {
   TextInput,
   Pressable,
   ScrollView,
+  Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { KeyboardView } from "@/components/keyboard-view";
@@ -29,6 +30,8 @@ import {
   localNowIso,
   type AiFailure,
   type SaathiAction,
+  deleteServerChat,
+  deleteServerChatMessage,
 } from "@/lib/ai";
 import { ReminderLimitError } from "@/lib/reminders";
 import { listRemindersWithPending, saveReminder } from "@/lib/reminder-outbox";
@@ -41,6 +44,7 @@ import { reportNetFailure, reportIfNetwork } from "@/lib/net-alert";
 import { markFirstReminder } from "@/lib/reviews";
 import { useToast } from "@/components/toast";
 import { emitDataChanged } from "@/lib/data-events";
+import { ConfirmModal } from "@/components/confirm-modal";
 
 /** Chat ki ek line — saathi ki line ke saath tappable document chips ho sakti hain. */
 type DocRef = { id: string; name: string; uri: string; path: string; mime: string; type: string };
@@ -215,6 +219,17 @@ export default function Chat() {
   const tc = useColors();
   const styles = useStyles();
   const router = useRouter();
+  /**
+   * ⚠️ Keyboard ke upar nav bar jitni jagah aur.
+   *
+   * Is tab par `tabBarHideOnKeyboard` hai, yaani keyboard khulte hi tab bar
+   * hat jaata hai aur screen neeche tak (nav bar ke peeche) chali jaati hai.
+   * Par Android keyboard ki jo oonchai batata hai usme 3-button nav bar shaamil
+   * NAHI hota — input bar ka neeche wala hissa keyboard ke peeche kat jaata tha.
+   * `support.tsx` par bhi yahi tareeka hai. Keyboard band ho to `KeyboardView`
+   * kuch nahi jodta, isliye tab bar ke saath double jagah nahi banti.
+   */
+  const insets = useSafeAreaInsets();
   const name = useUserName();
   const { session } = useAuth();
   const toast = useToast();
@@ -246,6 +261,13 @@ export default function Chat() {
    */
   const [messages, setMessages] = useState<Msg[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+  /**
+   * Kya delete karna hai — `"all"` = poori chat, warna us ek message ka id.
+   *
+   * Chat ki save ki hui copy sirf isi phone par (AsyncStorage) hai, isliye
+   * delete bhi yahin hota hai.
+   */
+  const [deleteAsk, setDeleteAsk] = useState<"all" | string | null>(null);
 
   /**
    * Bol ke chhoda hua message apne aap jaa raha hai — abhi roka ja sakta hai.
@@ -692,11 +714,24 @@ export default function Chat() {
             <Text style={styles.headerSub}>{ch.online}</Text>
           </View>
         </View>
+        {messages.length > 0 && (
+          <Pressable
+            onPress={() => setDeleteAsk("all")}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={ch.clearChat}
+            style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Ionicons name="trash-outline" size={20} color={tc.inkSoft} />
+          </Pressable>
+        )}
       </View>
 
       <UpgradeBanner compact />
 
-      <KeyboardView>
+      {/* Nav bar ki jagah sirf Android par — iOS ki keyboard oonchai me home
+          indicator pehle se ginta hai, wahan jodne se faltu khaali patti banti. */}
+      <KeyboardView extra={Platform.OS === "android" ? insets.bottom : 0}>
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
@@ -706,7 +741,13 @@ export default function Chat() {
         >
           {[greeting, ...messages].map((m) =>
             m.role === "saathi" ? (
-              <View key={m.id} style={styles.saathiRow}>
+              <Pressable
+                key={m.id}
+                style={styles.saathiRow}
+                // Greeting save hi nahi hota — use delete karne ka matlab nahi.
+                onLongPress={m.id === GREETING_ID ? undefined : () => setDeleteAsk(m.id)}
+                delayLongPress={400}
+              >
                 <View style={styles.miniAvatar}>
                   <SaathiLogo size={26} radius={10} />
                 </View>
@@ -741,11 +782,16 @@ export default function Chat() {
                     </View>
                   )}
                 </View>
-              </View>
+              </Pressable>
             ) : (
-              <View key={m.id} style={styles.userBubble}>
+              <Pressable
+                key={m.id}
+                style={styles.userBubble}
+                onLongPress={() => setDeleteAsk(m.id)}
+                delayLongPress={400}
+              >
                 <Text style={styles.userText}>{m.text}</Text>
-              </View>
+              </Pressable>
             ),
           )}
           {sending && <TypingBubble lines={ch} />}
@@ -822,6 +868,9 @@ export default function Chat() {
         {/* input */}
         <View style={styles.inputBar}>
           <VoiceButton
+            // Mic sabse baayin taraf hai — patti daayin taraf badhe, warna
+            // screen ke baayin kinare se bahar nikal jaati.
+            pillAlign="left"
             onText={(t, alts) => {
               /**
                * Transcript aa gaya — input me jodo aur ginti shuru.
@@ -894,6 +943,37 @@ export default function Chat() {
       {/* Chat se bana reminder time pe baje — notification, exact-alarm,
           battery aur OEM auto-start, sab ek hi jagah se allow. */}
       <PermissionModal visible={permModal} onClose={() => setPermModal(false)} />
+
+      <ConfirmModal
+        visible={deleteAsk !== null}
+        destructive
+        icon="trash-outline"
+        title={deleteAsk === "all" ? ch.clearChatTitle : ch.deleteMsgTitle}
+        message={deleteAsk === "all" ? ch.clearChatMsg : undefined}
+        confirmLabel={c.delete}
+        cancelLabel={c.cancel}
+        onCancel={() => setDeleteAsk(null)}
+        onConfirm={() => {
+          if (deleteAsk === "all") {
+            cancelVoiceSend();
+            voiceAlts.current = null;
+            setFailedTurn(null);
+            setFailReason(null);
+            setMessages([]);
+            // State ka effect `[]` likh deta hai; ye seedha hata bhi deta hai.
+            AsyncStorage.removeItem(storeKey).catch(() => {});
+            // Server wali copy bhi — `ai` function har baat `messages` me likhta hai.
+            void deleteServerChat();
+            toast.show(ch.chatCleared, "success");
+          } else if (deleteAsk) {
+            const id = deleteAsk;
+            const gone = messages.find((x) => x.id === id);
+            setMessages((m) => m.filter((x) => x.id !== id));
+            if (gone) void deleteServerChatMessage(gone.role, gone.text);
+          }
+          setDeleteAsk(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -922,6 +1002,13 @@ const useStyles = makeStyles((c) => ({
   onlineRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
   dot: { height: 7, width: 7, borderRadius: 4, backgroundColor: c.sage },
   headerSub: { fontSize: 12.5, color: c.sage, fontWeight: "500" },
+  clearBtn: {
+    height: 40,
+    width: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+  },
   list: { padding: 16, gap: 14, paddingBottom: 8 },
   saathiRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, maxWidth: "88%" },
   miniAvatar: {
@@ -960,6 +1047,13 @@ const useStyles = makeStyles((c) => ({
   docChipText: { fontSize: 12.5, fontWeight: "600", color: c.terracotta },
   userBubble: {
     alignSelf: "flex-end",
+    /**
+     * ⚠️ Daayin kinare par theme wala button (`ThemeFab`, ~30px) baitha hai.
+     * Bina is jagah ke wo apne bubble ka ~14px dhak leta tha — aur kinare ke
+     * paas long-press (message delete) karne par theme badal jaata tha.
+     * Button ki jagah jaan-boojh ke nahi hilayi (wajah uski file me hai).
+     */
+    marginRight: 16,
     maxWidth: "82%",
     backgroundColor: c.terracotta,
     borderRadius: 20,
@@ -990,7 +1084,9 @@ const useStyles = makeStyles((c) => ({
     paddingVertical: 10,
   },
   retryText: { fontSize: 13.5, fontWeight: "700", color: c.terracotta },
-  chipsScroll: { flexGrow: 0, maxHeight: 56 },
+  // ⚠️ `maxHeight: 56` hata diya — bade font par chip 56 se oonche ho jaate the
+  // aur neeche se kat jaate the. `flexGrow: 0` hi kaafi hai (list ko jagah na khaye).
+  chipsScroll: { flexGrow: 0 },
   chips: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: "center" },
   chip: {
     borderRadius: 999,

@@ -206,9 +206,22 @@ async function currentUid(): Promise<string | null> {
  * context, teenon bina kisi badlav ke offline kaam karne lagte hain.
  */
 export async function listDocuments(): Promise<Document[]> {
+  return (await listDocumentsWithSource()).docs;
+}
+
+/**
+ * `listDocuments()` jaisa hi — saath me ye bhi ki list SERVER se aayi (`live`)
+ * ya offline cache se.
+ *
+ * ⚠️ `syncNotifications()` ko ye farq chahiye. Wo "list me nahi hai" dekh kar
+ * delete ho chuke documents ke alarm hatata hai — aur ye faisla purane cache par
+ * lena asli alarm mita sakta hai. Module-level jhanda yahan galat hota: screens
+ * bhi saath-saath `listDocuments()` chalati hain aur jhanda beech me palat jaata.
+ */
+export async function listDocumentsWithSource(): Promise<{ docs: Document[]; live: boolean }> {
   const sb = client();
   const uid = await currentUid();
-  if (!uid) return [];
+  if (!uid) return { docs: [], live: false };
 
   try {
     const { data, error } = await sb
@@ -230,10 +243,10 @@ export async function listDocuments(): Promise<Document[]> {
      * rehte — aur wahi asli shikayat hai.
      */
     void requeueMissingUploads(docs).then(flushUploads);
-    return docs;
+    return { docs, live: true };
   } catch (e) {
     const cached = await readCachedDocs(uid);
-    if (cached) return cached;
+    if (cached) return { docs: cached, live: false };
     // Cache bhi nahi hai — pehli baar hai aur net bhi nahi. Ab sach batana hi
     // theek hai; screen error dikha degi.
     throw e;
@@ -305,7 +318,21 @@ export async function addDocument(input: {
     })
     .select()
     .single();
-  if (error) throw error;
+  /**
+   * ⚠️ Server ki apni rok — wahi `DocLimitError`.
+   *
+   * Upar wali jaanch app ki hai aur toot sakti hai (do phone se ek saath save,
+   * ya `getUser()` net na hone par khaali user deta hai aur ginti 0 aati hai).
+   * DB ka trigger aisi row par `plan_limit_documents` uchhalta hai. Bina is
+   * mapping ke user ko "Save nahi ho paya" dikhta — asli wajah (limit, Plus lo)
+   * kabhi nahi.
+   */
+  if (error) {
+    if (error.message?.includes("plan_limit_documents")) {
+      throw new DocLimitError((await getOffers()).freeDocuments);
+    }
+    throw error;
+  }
 
   const doc = data as Document;
   /**

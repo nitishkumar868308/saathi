@@ -29,19 +29,58 @@ const API_KEY =
     : process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY) ?? "";
 const ENTITLEMENT = "plus";
 let configured = false;
+/**
+ * RevenueCat abhi KIS user ke naam par chal raha hai. `null` = anonymous.
+ *
+ * ⚠️ Iske bina kharidari galat account me ja sakti thi. `configure()` sirf ek
+ * baar chalta hai (app ke poore process me), aur pehle uske baad user badalne
+ * par RevenueCat ko kabhi bataya hi nahi jaata tha. Logout karke doosre account
+ * se login karo, "Plus lo" dabao — paisa naye user ka kata, par webhook
+ * PURANE user ki id le kar aata, aur Plus usi ko mil jaata.
+ */
+let configuredFor: string | null = null;
 
 export function purchasesAvailable(): boolean {
   return Boolean(Purchases && API_KEY);
 }
 
 export async function initPurchases(appUserId?: string): Promise<void> {
-  if (!purchasesAvailable() || configured) return;
-  try {
-    await Purchases.configure({ apiKey: API_KEY, appUserID: appUserId });
-    configured = true;
-  } catch {
-    /* ignore */
+  if (!purchasesAvailable()) return;
+  if (!configured) {
+    try {
+      await Purchases.configure({ apiKey: API_KEY, appUserID: appUserId });
+      configured = true;
+      configuredFor = appUserId ?? null;
+    } catch {
+      /* ignore */
+    }
+    return;
   }
+  // Pehle se configure hai par user badal gaya — RevenueCat ko naya user batao.
+  if (appUserId && appUserId !== configuredFor) {
+    try {
+      await Purchases.logIn(appUserId);
+      configuredFor = appUserId;
+    } catch {
+      /* ignore — agli baar upgrade screen khulte hi phir koshish hogi */
+    }
+  }
+}
+
+/**
+ * Logout par RevenueCat se bhi bahar.
+ *
+ * `logOut()` anonymous user par THROW karta hai — isliye `configuredFor` ki
+ * shart, aur `catch` bhi. Logout isse kabhi rukna nahi chahiye.
+ */
+export async function logOutPurchases(): Promise<void> {
+  if (!purchasesAvailable() || !configured || !configuredFor) return;
+  try {
+    await Purchases.logOut();
+  } catch {
+    /* best-effort */
+  }
+  configuredFor = null;
 }
 
 /**

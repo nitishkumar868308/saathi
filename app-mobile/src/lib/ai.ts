@@ -385,6 +385,51 @@ export function localNowIso(): string {
   return localIso(new Date());
 }
 
+/**
+ * Server par padi chat ki copy hatao — poori.
+ *
+ * ⚠️ Chat sirf phone par nahi rehti: `ai` function har sawaal-jawab `messages`
+ * table me bhi likhta hai. Pehle "Chat delete" sirf phone ki copy hatata tha, aur
+ * user ko lagta tha chat mit gayi jabki server par wo poori padi rehti. RLS user
+ * ko apni hi rows hatane deta hai. Best-effort — net na ho to phone se to hat hi
+ * chuki hai, aur fail chup-chaap.
+ */
+export async function deleteServerChat(): Promise<void> {
+  if (!supabase) return;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user?.id;
+    if (!uid) return;
+    await supabase.from("messages").delete().eq("user_id", uid);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Server par padi ek line hatao.
+ *
+ * Server ki row ka id app ke paas nahi hota, isliye milaan role + poore text
+ * se. Ek hi text do baar bola gaya ho to dono hat jaati hain — delete maangne
+ * wale ke liye ye zyada hatna hai, kam nahi.
+ */
+export async function deleteServerChatMessage(role: "user" | "saathi", content: string): Promise<void> {
+  if (!supabase || !content) return;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const uid = data.session?.user?.id;
+    if (!uid) return;
+    await supabase
+      .from("messages")
+      .delete()
+      .eq("user_id", uid)
+      .eq("role", role)
+      .eq("content", content);
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Saathi se jawab lo. Network/config fail ho to bhi kuch na kuch lautata hai. */
 export async function askSaathi(
   message: string,

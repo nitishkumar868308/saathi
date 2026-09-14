@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sendAccountDeletionEmails } from "@/lib/email";
 import { asLocale } from "@/lib/user-locale";
 import { hit, requestKey } from "@/lib/rate-limit";
+import { appUser } from "@/lib/app-auth";
 
 export const runtime = "nodejs";
 // Rate-limit ki ginti memory me rehti hai — cache/prerender ho gaya to wo
@@ -46,25 +47,24 @@ function headers(extra?: Record<string, string>) {
 }
 
 /**
- * Is email ka user id, agar mile.
+ * Request bhejne wala sach me is email ka maalik hai? Hai to uska user id.
  *
- * Form bina login ke bhara ja sakta hai (Play Store yahi maangta hai), isliye
- * `user_id` optional hai. Yahin mil jaye to admin ko ek kadam kam karna padta
- * hai — wo seedha dekh sakta hai ki is user ka kya-kya data hai.
+ * ⚠️ Pehle yahan form ke EMAIL se hi profile dhoondh ke `user_id` jod diya
+ * jaata tha. Form bina login ke khula hai — yaani koi bhi kisi ka email daal ke
+ * uske account ki request bana deta, aur admin panel me wo bilkul asli jaisi
+ * dikhti (account juda hua, data ginti ke saath). Ek galat purge aur kisi ka
+ * poora data gaya.
+ *
+ * Ab `user_id` sirf tab judta hai jab request ke saath Supabase ka access token
+ * aaye (`Authorization: Bearer …`) AUR us token wale user ka email wahi ho jo
+ * form me hai. Bina token ke request phir bhi darj hoti hai (Play Store yahi
+ * maangta hai) — bas `user_id` khaali rehta hai, aur admin panel use "email
+ * verified nahi hai" dikha ke alag pushti maangta hai.
  */
-async function findUserId(email: string): Promise<string | null> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
-      { headers: headers(), cache: "no-store" },
-    );
-    if (!res.ok) return null;
-    const rows = (await res.json()) as { id: string }[];
-    return rows[0]?.id ?? null;
-  } catch {
-    return null;
-  }
+async function verifiedUserId(request: Request, email: string): Promise<string | null> {
+  const user = await appUser(request);
+  if (!user?.email) return null;
+  return user.email.trim().toLowerCase() === email.trim().toLowerCase() ? user.id : null;
 }
 
 /**
@@ -134,7 +134,30 @@ export async function POST(request: Request) {
    * flag app ko ye batane deta hai ki "aapki request pehle se darj hai" — ek
    * duplicate confirmation email bhejne ki bhi zaroorat nahi.
    */
+  const userId = await verifiedUserId(request, email);
+
   if (await alreadyPending(email)) {
+    /**
+     * ⚠️ Pehle se pending row kisi aur ne (bina login) bhi banayi ho sakti hai.
+     * Asli maalik token ke saath aaye to use wahi row par jod do — warna uski
+     * verified request "pending" keh ke hamesha unverified hi padi rehti.
+     */
+    if (userId) {
+      try {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/account_delete_requests` +
+            `?email=eq.${encodeURIComponent(email)}&status=eq.pending&user_id=is.null`,
+          {
+            method: "PATCH",
+            headers: headers({ Prefer: "return=minimal" }),
+            body: JSON.stringify({ user_id: userId }),
+            cache: "no-store",
+          },
+        );
+      } catch {
+        /* request darj hai — judna na ho paaye to admin email se pushti kar lega */
+      }
+    }
     return NextResponse.json({ ok: true, pending: true });
   }
 
@@ -144,7 +167,8 @@ export async function POST(request: Request) {
       headers: headers({ Prefer: "return=minimal" }),
       body: JSON.stringify([
         {
-          user_id: await findUserId(email),
+          // Sirf verified maalik — upar `verifiedUserId` dekho.
+          user_id: userId,
           name,
           email,
           reason: reason || null,

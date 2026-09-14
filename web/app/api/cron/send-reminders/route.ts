@@ -14,6 +14,26 @@ import { flushDeliveryRecords, type DeliveryRecord } from "@/lib/delivery-record
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Bade run ke liye — neeche `TIME_BUDGET_MS` isse kaafi pehle rok deta hai.
+export const maxDuration = 60;
+
+/**
+ * Ek run ki hadd.
+ *
+ * ⚠️ Pehle `limit=50` tha — ek minute me 50 se zyada reminder due hon (subah 9
+ * baje sabka) to baaki agle minute, phir agle… line lambi hoti jaati aur
+ * reminder der se pahunchte. Ab `(remind_at, id)` par keyset paging: order
+ * pakka, aur jo rows `advance_reminder` ke baad query se nikal jaati hain wo
+ * cursor ko nahi hilaatin (offset hota to rows chhoot jaatin).
+ *
+ * ⚠️ Waqt ki hadd minute se kaafi kam rakhi hai. Cron har minute chalta hai;
+ * ek run agle run me ghus jaaye to dono ek hi reminder utha sakte hain aur
+ * user ko do WhatsApp/email chale jaate. Jo reh gaye wo agle minute (sabse
+ * purane pehle) nikal jaate hain.
+ */
+const PAGE = 100;
+const MAX_DUE = 1000;
+const TIME_BUDGET_MS = 40_000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -80,16 +100,41 @@ export async function POST(request: Request) {
 
   const nowIso = new Date().toISOString();
 
-  let due: DueReminder[];
+  const started = Date.now();
+  /** Kuch due reminder is run me nahi nikle (chhat / waqt / page fail). */
+  let truncated = false;
+  const due: DueReminder[] = [];
   try {
-    due = await sbGet<DueReminder>(
-      `reminders?select=id,title,note,time_label,remind_at,user_id` +
-        `&is_on=eq.true&is_paused=eq.false&notified_at=is.null&remind_at=lte.${nowIso}` +
-        `&order=remind_at.asc&limit=50`,
-    );
+    let cursor: DueReminder | null = null;
+    for (;;) {
+      // Keyset: (remind_at, id) cursor ke BAAD wali rows. Timestamp me `+` aur
+      // `:` hote hain — isliye quote + poora `or` encode.
+      const after: string = cursor
+        ? `&or=${encodeURIComponent(
+            `(remind_at.gt."${cursor.remind_at}",and(remind_at.eq."${cursor.remind_at}",id.gt.${cursor.id}))`,
+          )}`
+        : "";
+      const page: DueReminder[] = await sbGet<DueReminder>(
+        `reminders?select=id,title,note,time_label,remind_at,user_id` +
+          `&is_on=eq.true&is_paused=eq.false&notified_at=is.null&remind_at=lte.${nowIso}` +
+          after +
+          `&order=remind_at.asc,id.asc&limit=${PAGE}`,
+      );
+      due.push(...page);
+      if (page.length < PAGE) break;
+      if (due.length >= MAX_DUE) {
+        truncated = true;
+        break;
+      }
+      cursor = page[page.length - 1];
+    }
   } catch (err) {
     console.error("[cron/send-reminders] fetch due failed", err);
-    return NextResponse.json({ error: "fetch failed" }, { status: 500 });
+    // Pehla page hi na aaya to kuch nahi. Warna jo mila wo bhejo — baaki agla run.
+    if (due.length === 0) {
+      return NextResponse.json({ error: "fetch failed" }, { status: 500 });
+    }
+    truncated = true;
   }
 
   // Per-user profile (email + bhasha + plan) cache (N+1 avoid).
@@ -220,7 +265,14 @@ export async function POST(request: Request) {
   /** Free plan wale — inka reminder bhi nikla, par email/WhatsApp Plus ka hai. */
   let skippedFree = 0;
 
+  let processed = 0;
   for (const r of due) {
+    // Waqt khatam — baaki agle minute (upar `TIME_BUDGET_MS` par wajah).
+    if (Date.now() - started > TIME_BUDGET_MS) {
+      truncated = true;
+      break;
+    }
+    processed++;
     const label = whenLabel(r);
 
     if (r.user_id) {
@@ -478,7 +530,9 @@ export async function POST(request: Request) {
   await flushDeliveryRecords(records);
 
   return NextResponse.json({
-    processed: due.length,
+    processed,
+    fetched: due.length,
+    truncated,
     whatsapp: wa,
     email: mail,
     // Ye ginti dikhna zaroori hai: "email 0 kyun gaye" ka jawab yahin milta hai

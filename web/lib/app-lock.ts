@@ -1,5 +1,7 @@
 import { createHash, randomInt } from "node:crypto";
 
+import { clientIpFrom } from "@/lib/rate-limit";
+
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -35,10 +37,32 @@ const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
  * badalna pade (ya leak ho) to PIN reset ke zinda code uske saath na girein.
  * Set na ho to phone wale par gir jaate hain — dev me chalane ke liye.
  */
-const PEPPER =
-  process.env.APP_LOCK_PEPPER ||
-  process.env.OTP_PEPPER ||
-  "saathi-dev-pepper-set-APP_LOCK_PEPPER-in-prod";
+const PEPPER_FALLBACK = "saathi-dev-pepper-set-APP_LOCK_PEPPER-in-prod";
+const PEPPER = process.env.APP_LOCK_PEPPER || process.env.OTP_PEPPER || PEPPER_FALLBACK;
+
+/**
+ * Pepper — aur production me dev wala fallback lage to ek baar zor se bolo.
+ *
+ * ⚠️ Fallback code me hi likha hai, yaani public repo/bundle dekhne wala use
+ * jaanta hai — us haal me DB ke hash ka pepper koi raaz nahi. Par yahan throw
+ * nahi karte: live site par env na ho to PIN reset hi band ho jaata, aur user
+ * apne documents se bahar. Isliye sirf `console.error` (Vercel logs me dikhta
+ * hai) — env set karna owner ka kaam hai.
+ */
+let pepperWarned = false;
+function pepper(): string {
+  if (
+    PEPPER === PEPPER_FALLBACK &&
+    !pepperWarned &&
+    (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production")
+  ) {
+    pepperWarned = true;
+    console.error(
+      "[app-lock] APP_LOCK_PEPPER / OTP_PEPPER set nahi hai — production me dev wala pepper chal raha hai. Vercel env me set karo.",
+    );
+  }
+  return PEPPER;
+}
 
 function headers() {
   return {
@@ -73,7 +97,7 @@ export function generateResetCode(): string {
 
 /** User id bhi hash me — ek user ka hash doosre ki row par chipkaya na ja sake. */
 export function hashResetCode(userId: string, code: string): string {
-  return createHash("sha256").update(`${PEPPER}:${userId}:${code}`).digest("hex");
+  return createHash("sha256").update(`${pepper()}:${userId}:${code}`).digest("hex");
 }
 
 export type ResetIssue =
@@ -126,9 +150,12 @@ export function looksLikeHex(s: string, minLen: number): boolean {
   return typeof s === "string" && s.length >= minLen && s.length <= 256 && /^[0-9a-f]+$/i.test(s);
 }
 
-/** Request kis "jagah" se aayi — ginti/fraud ke liye. */
+/**
+ * Request kis "jagah" se aayi — ginti/fraud ke liye.
+ *
+ * ⚠️ `x-forwarded-for` ka pehla hissa client khud likh sakta hai; bharosemand
+ * header `rate-limit.ts` ke `clientIpFrom` me hain.
+ */
 export function clientIp(request: Request): string | null {
-  const fwd = request.headers.get("x-forwarded-for") ?? "";
-  const first = fwd.split(",")[0]?.trim();
-  return first || request.headers.get("x-real-ip") || null;
+  return clientIpFrom(request);
 }

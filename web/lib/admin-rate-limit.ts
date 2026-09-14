@@ -1,3 +1,5 @@
+import { clientIpFrom } from "@/lib/rate-limit";
+
 /**
  * Admin login par brute-force ki rok.
  *
@@ -49,14 +51,15 @@ function prune(now: number): void {
 /**
  * Request kis "jagah" se aayi.
  *
- * Vercel `x-forwarded-for` bharta hai; sabse pehla hissa asli client hota hai.
+ * ⚠️ Pehle `x-forwarded-for` ka pehla hissa — jo client khud likh sakta hai.
+ * Har koshish par naya fake IP bhejo aur ye rok kabhi lagti hi nahi. Ab wahi
+ * bharosemand header jo `rate-limit.ts` ka `clientIpFrom` padhta hai.
+ *
  * Kuch na mile to ek hi bucket ("unknown") — us soorat me rok sabke liye ek
  * saath lagti hai, jo galat password ke liye theek hi hai.
  */
 export function clientKey(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for") ?? "";
-  const first = fwd.split(",")[0]?.trim();
-  return first || request.headers.get("x-real-ip") || "unknown";
+  return clientIpFrom(request) || "unknown";
 }
 
 /** Abhi koshish karne di jaye? Nahi to kitne second baad. */

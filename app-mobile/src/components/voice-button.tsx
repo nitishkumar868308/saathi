@@ -543,7 +543,16 @@ const MAX_ALTERNATIVES = 5;
 
 export function VoiceButton({
   onText,
+  pillAlign = "right",
 }: {
+  /**
+   * "Sun raha hoon" patti kis kinare se chipke.
+   *
+   * ⚠️ Default `right` — patti button ke daayin kinare se BAAYIN taraf badhti
+   * hai. Jahan mic row me sabse baayin hai (chat, note), wahan wo screen ke
+   * bahar nikal jaati thi; wahan `left` do.
+   */
+  pillAlign?: "left" | "right";
   /**
    * Jo suna gaya.
    *
@@ -1659,7 +1668,10 @@ export function VoiceButton({
        * hota). `pointerEvents="none"` taaki tap patti me nahi, button me jaye.
        */}
       {listening && (
-        <View pointerEvents="none" style={styles.pill}>
+        <View
+          pointerEvents="none"
+          style={[styles.pill, pillAlign === "left" ? styles.pillLeft : styles.pillRight]}
+        >
           <View style={styles.pillDot} />
           <Text style={styles.pillText} numberOfLines={1}>
             {v.listening} {clock} · {v.tapToStop}
@@ -1748,7 +1760,7 @@ const useStyles = makeStyles((c) => ({
   pill: {
     position: "absolute",
     bottom: 56,
-    right: 0,
+    // left/right `pillLeft` / `pillRight` se — prop ke hisaab se.
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -1760,6 +1772,8 @@ const useStyles = makeStyles((c) => ({
     elevation: 6,
     zIndex: 10,
   },
+  pillRight: { right: 0 },
+  pillLeft: { left: 0 },
   /** Laal bindi — "abhi chal raha hai" ka sabse seedha nishaan. */
   pillDot: { height: 7, width: 7, borderRadius: 4, backgroundColor: c.danger },
   pillText: { color: c.cream, fontSize: 12, fontWeight: "700" },

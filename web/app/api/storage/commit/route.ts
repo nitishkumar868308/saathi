@@ -3,7 +3,7 @@ import { appUserId } from "@/lib/app-auth";
 import { r2Configured, r2Key, R2NotConfigured } from "@/lib/r2";
 import {
   commitUpload,
-  documentBelongsTo,
+  documentAccess,
   documentFileName,
   extFor,
   parseVersion,
@@ -71,8 +71,14 @@ export async function POST(request: Request) {
   const ext = extFor(contentType);
   if (!ext) return NextResponse.json({ error: "unknown type" }, { status: 415 });
 
-  if (!(await documentBelongsTo(docId, uid))) {
+  const access = await documentAccess(docId, uid);
+  if (!access) return NextResponse.json({ error: "db unavailable" }, { status: 503 });
+  if (!access.exists) {
     return NextResponse.json({ error: "document nahi mila" }, { status: 404 });
+  }
+  // ⚠️ Wahi lock jo `upload-url` par — locked document ki file badli nahi ja sakti.
+  if (access.locked) {
+    return NextResponse.json({ error: "document locked", locked: true }, { status: 403 });
   }
 
   const path = `${uid}/${documentFileName(docId, ext, version)}`;

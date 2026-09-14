@@ -72,6 +72,78 @@ export function readToken(token: string | null | undefined): string | null {
   return id;
 }
 
+/**
+ * Admin ke link (`d=url`) ka apna HMAC — send id AUR url dono par.
+ *
+ * ⚠️ Sirf `k` ka sahi hona kaafi nahi tha: ek asli email se `k` utha ke koi bhi
+ * `u` me apna phishing link laga deta, aur `apkasaathi.com/api/t/c?...` wala
+ * link use wahan le jaata. `url:` ka prefix isliye ki token wala hmac yahan
+ * chipkaya na ja sake.
+ */
+function signUrl(sendId: string, url: string): string {
+  return createHmac("sha256", SECRET)
+    .update(`url:${sendId}:${url}`)
+    .digest("base64url")
+    .slice(0, 16);
+}
+
+/** `s` sahi hai? (Naye email me hamesha hota hai; purane me nahi.) */
+export function urlSignatureOk(sendId: string, url: string, sig: string | null): boolean {
+  if (!sig) return false;
+  const expected = signUrl(sendId, url);
+  if (sig.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+/** Hamari apni site ka link? (Purane, bina `s` wale link ke liye.) */
+export function isOwnSiteUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    const own = new URL(SITE_URL).hostname.toLowerCase().replace(/^www\./, "");
+    return (
+      host === own ||
+      host.endsWith(`.${own}`) ||
+      host === "apkasaathi.com" ||
+      host.endsWith(".apkasaathi.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ye url us send ke message me sach me tha? (Purane, bina `s` wale link.)
+ *
+ * Signature aane se PEHLE bheje gaye email ke link bhi chalte rehne chahiye. Unke
+ * liye batch ka asli `body` padh ke dekhte hain ki url wahan likha tha ya nahi.
+ * Fail ho to `false` — shak me apni site par bhejna, anjaan jagah bhejne se behtar.
+ */
+export async function urlInSend(sendId: string, url: string): Promise<boolean> {
+  if (!SUPABASE_URL || !SERVICE || !/^[0-9a-fA-F-]{36}$/.test(sendId)) return false;
+  try {
+    const s = await fetch(
+      `${SUPABASE_URL}/rest/v1/message_sends?id=eq.${sendId}&select=batch_id`,
+      { headers: sbHeaders(), cache: "no-store" },
+    );
+    if (!s.ok) return false;
+    const batchId = ((await s.json()) as { batch_id: string | null }[])[0]?.batch_id;
+    if (!batchId) return false;
+    const b = await fetch(
+      `${SUPABASE_URL}/rest/v1/message_batches?id=eq.${batchId}&select=body`,
+      { headers: sbHeaders(), cache: "no-store" },
+    );
+    if (!b.ok) return false;
+    const body = ((await b.json()) as { body: string | null }[])[0]?.body ?? "";
+    return body.includes(url);
+  } catch {
+    return false;
+  }
+}
+
 /* ------------------------------- write ------------------------------- */
 
 export type SendRow = {
@@ -259,7 +331,11 @@ export type ClickDest = "app" | "web" | "url";
 
 export function clickUrl(sendId: string, dest: ClickDest, url?: string): string {
   const q = new URLSearchParams({ k: trackToken(sendId), d: dest });
-  if (dest === "url" && url) q.set("u", url);
+  if (dest === "url" && url) {
+    q.set("u", url);
+    // Url ka apna hmac — `/api/t/c` isi se maanta hai ki link hamara hi bheja hua hai.
+    q.set("s", signUrl(sendId, url));
+  }
   return `${SITE_URL}/api/t/c?${q.toString()}`;
 }
 

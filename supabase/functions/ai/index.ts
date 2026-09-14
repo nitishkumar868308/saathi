@@ -74,6 +74,222 @@ const SB_ANON = Deno.env.get("SUPABASE_ANON_KEY");
 const SB_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 /**
+ * `task: "health"` ka taala.
+ *
+ * ⚠️ Health GEMINI_API_KEY ki lambai, prefix, model list aur Google ka poora
+ * error body lautata hai. Pehle wo HAR logged-in user ke liye khula tha — yaani
+ * app ka koi bhi user hamari key ki shakal aur hamara pura model setup padh
+ * sakta tha. Ab poori jaankari sirf tab jab header `x-ai-health-secret` is env
+ * se mile; warna sirf `{ ok: true }`. Env set hi na ho to bhi sirf `{ ok: true }`.
+ */
+const HEALTH_SECRET = Deno.env.get("AI_HEALTH_SECRET") ?? "";
+
+/**
+ * Payload ki haddein.
+ *
+ * ⚠️ Pehle koi hadd nahi thi: 50MB image, 5000 turn ki history, 1MB context —
+ * sab seedha Gemini ko jaata, aur token ka bill hamara. Ek script ek hi request
+ * me poore din ka budget uda sakti thi.
+ *
+ * `imageChars` 7.2M isliye (task me ~6MB likha tha, par wo asli users ko todta):
+ * app ki apni hadd `MAX_FILE_BYTES = 5MB` hai (app-mobile/src/utils/doc-intake.ts),
+ * aur 5MB ka base64 ~6.99M characters banta hai. 6M par har 4.5-5MB wali photo/PDF
+ * ka scan "server" fail dikhata — jabki app ne use khud allow kiya tha.
+ */
+const LIMITS = {
+  imageChars: 7_200_000,
+  messageChars: 2000,
+  // Reminder ka text kaata jaata hai, mana nahi (wajah `sanitizePayload` par).
+  textChars: 8000,
+  historyTurns: 10,
+  historyChars: 2000,
+  contextChars: 20_000,
+  nameChars: 60,
+  altsCount: 4,
+} as const;
+
+/**
+ * Rozana hadd — per user, per task. Env `AI_DAILY_LIMITS` (JSON) se badal sakti hai,
+ * jaise {"chat":300,"scan":80}.
+ *
+ * Asli user in tak nahi pahunchta: din me 200 chat message ya 50 document scan
+ * ek insaan ka kaam nahi, script ka hai. Hadd paar = 429, jise app "busy" dikhati
+ * hai (`classify()` in app-mobile/src/lib/ai.ts) — koi naya UI nahi chahiye.
+ */
+const DAILY_LIMITS: Record<string, number> = {
+  chat: 200,
+  scan: 50,
+  reminder: 150,
+  docfollow: 60,
+  brief: 30,
+  ...envDailyLimits(),
+};
+
+function envDailyLimits(): Record<string, number> {
+  const raw = Deno.env.get("AI_DAILY_LIMITS");
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(parsed ?? {})) {
+      const n = Number(v);
+      if (Number.isFinite(n) && n > 0) out[k] = Math.floor(n);
+    }
+    return out;
+  } catch {
+    console.warn("[ai] AI_DAILY_LIMITS JSON nahi hai — default haddein chalengi");
+    return {};
+  }
+}
+
+/** Timing-safe string milaan — secret ko ek-ek akshar se andaaza lagane se bachao. */
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const x = enc.encode(a);
+  const y = enc.encode(b);
+  let diff = x.length ^ y.length;
+  const n = Math.max(x.length, y.length);
+  for (let i = 0; i < n; i++) diff |= (i < x.length ? x[i] : 0) ^ (i < y.length ? y[i] : 0);
+  return diff === 0;
+}
+
+function clip(v: unknown, max: number): string {
+  return String(v ?? "").slice(0, max);
+}
+
+/**
+ * JSON ko hadd me lao — mana nahi karo, chhota karo.
+ *
+ * ⚠️ Context me user ke SAARE reminders/documents jaate hain. Ek bade Plus user
+ * ka context sach me 20KB paar kar sakta hai — use "payload bada hai" keh ke chat
+ * hi band kar dena galat hoga. Isliye arrays aadhe-aadhe hote hain jab tak fit na
+ * ho; phir bhi na ho to context hi chhod do (chat bina context ke bhi chalti hai).
+ */
+function capJson(v: unknown, maxChars: number): unknown {
+  if (v == null) return v;
+  let s: string;
+  try {
+    s = JSON.stringify(v);
+  } catch {
+    return null;
+  }
+  if (s.length <= maxChars) return v;
+  if (typeof v !== "object" || Array.isArray(v)) return null;
+  const copy: Record<string, unknown> = { ...(v as Record<string, unknown>) };
+  for (let round = 0; round < 12; round++) {
+    let shrunk = false;
+    for (const k of Object.keys(copy)) {
+      const val = copy[k];
+      if (Array.isArray(val) && val.length > 0) {
+        copy[k] = val.slice(0, Math.floor(val.length / 2));
+        shrunk = true;
+      } else if (typeof val === "string" && val.length > 200) {
+        copy[k] = val.slice(0, 200);
+        shrunk = true;
+      }
+    }
+    if (JSON.stringify(copy).length <= maxChars) return copy;
+    if (!shrunk) break;
+  }
+  return null;
+}
+
+/**
+ * Payload ko hadd me lao. Lautata hai: null (theek hai) ya error code (413).
+ *
+ * Do tarah ka bartaav, jaan-boojh ke:
+ *   • image bahut badi ho → 413 (use kaata nahi ja sakta).
+ *   • chat `message` aur reminder ka `text` → KAATO, mana mat karo. App ka chat
+ *     box koi hadd nahi lagata — log lamba SMS/email paste karte hain, aur 413
+ *     par app sirf "AI nahi chal raha" dikhati (wajah kabhi pata na chalti).
+ *     Note se reminder me poora note jaata hai. 8000 akshar kaafi se zyada hain.
+ *   • app ka joda hua saath ka data (history, context, name, alts) → chup-chaap
+ *     kaat do. Wo sirf madad hai; uske liye poori request girana bemtlab hai.
+ */
+function sanitizePayload(task: string, p: any): string | null {
+  if (p.message != null) p.message = clip(p.message, LIMITS.textChars);
+  if (p.text != null) p.text = clip(p.text, LIMITS.textChars);
+
+  if (task === "scan") {
+    if (p.image != null && typeof p.image !== "string") return "image_invalid";
+    if (typeof p.image === "string" && p.image.length > LIMITS.imageChars) {
+      return "image_too_large";
+    }
+    if (p.mime != null) p.mime = clip(p.mime, 100);
+  }
+
+  if (p.name != null) p.name = clip(p.name, LIMITS.nameChars);
+
+  p.history = Array.isArray(p.history)
+    ? p.history.slice(-LIMITS.historyTurns).map((h: any) => ({
+        role: h?.role === "user" ? "user" : "assistant",
+        content: clip(h?.content, LIMITS.historyChars),
+      }))
+    : [];
+
+  if (Array.isArray(p.alts)) {
+    p.alts = p.alts.slice(0, LIMITS.altsCount).map((a: unknown) => clip(a, LIMITS.messageChars));
+  } else {
+    delete p.alts;
+  }
+
+  if (p.context != null) p.context = capJson(p.context, LIMITS.contextChars);
+  if (p.data != null) p.data = capJson(p.data, LIMITS.contextChars);
+
+  if (p.document != null) {
+    const d = typeof p.document === "object" ? p.document : {};
+    p.document = {
+      name: clip(d.name, 200),
+      type: clip(d.type ?? "other", 40),
+      expiry: d.expiry == null ? null : clip(d.expiry, 40),
+    };
+  }
+
+  for (const k of ["now", "locale", "part"]) {
+    if (p[k] != null) p[k] = clip(p[k], 40);
+  }
+  return null;
+}
+
+/**
+ * Aaj ki ginti +1 karo aur batao ki hadd ke andar hai ya nahi.
+ *
+ * ⚠️ FAIL OPEN — jaan-boojh ke. `ai_usage_bump` (supabase/audit-fixes-2026-09.sql)
+ * abhi chala na ho, ya DB ek pal ke liye na mile, to AI chalta rehta hai. Hadd
+ * ek bachaav hai; uske na hone par poora AI band kar dena usse bada nuksaan hai.
+ * Har aisi soorat console me dikhti hai (Supabase → Edge Functions → Logs).
+ *
+ * Ginti Gemini call se PEHLE hoti hai — warna 20 request ek saath aayein to sab
+ * "abhi 0" padh ke nikal jaati.
+ */
+async function underDailyLimit(uid: string, task: string): Promise<boolean> {
+  const limit = DAILY_LIMITS[task];
+  if (!limit || !SB_URL || !SB_SERVICE) return true;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/ai_usage_bump`, {
+      method: "POST",
+      headers: {
+        apikey: SB_SERVICE,
+        Authorization: `Bearer ${SB_SERVICE}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ p_user: uid, p_task: task }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) {
+      console.warn(`[ai] ai_usage_bump ${res.status} — rozana hadd nahi lagi (fail open)`);
+      return true;
+    }
+    const count = Number(await res.json());
+    if (!Number.isFinite(count)) return true;
+    return count <= limit;
+  } catch (e) {
+    console.warn("[ai] ai_usage_bump nahi chala — rozana hadd nahi lagi (fail open):", e);
+    return true;
+  }
+}
+
+/**
  * Caller kaun hai — ya wo kyun pata nahi chala.
  *
  * ⚠️ Pehle ye sirf `string | null` lautata tha, aur har fail ek jaisa dikhta
@@ -512,7 +728,23 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "invalid body" }, 400);
   }
-  const task = payload.task ?? "chat";
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return json({ error: "invalid body" }, 400);
+  }
+  const task = typeof payload.task === "string" ? payload.task : "chat";
+
+  // Haddein — Gemini ki kisi bhi call se pehle. 413 ko app "server" fail
+  // maanti hai (sirf 429/503 "busy" hain), jo is soorat me sahi baat hai.
+  const tooBig = sanitizePayload(task, payload);
+  if (tooBig) {
+    console.warn(`[ai] payload bada: ${tooBig} task=${task} uid=${uid}`);
+    return json({ error: "payload_too_large", code: tooBig }, 413);
+  }
+
+  // Rozana hadd. `health` isme nahi aata (DAILY_LIMITS me hai hi nahi).
+  if (!(await underDailyLimit(uid, task))) {
+    return json({ error: "daily_limit" }, 429);
+  }
 
   /**
    * `task: "health"` — "AI kyun nahi chal raha?" ka jawab, ek call me.
@@ -528,6 +760,13 @@ Deno.serve(async (req) => {
    * aur usse Google ka jawab bilkul "key hi nahi bheji" jaisa ho jaata hai.
    */
   if (task === "health") {
+    // ⚠️ Poori jaankari sirf secret ke saath (upar `HEALTH_SECRET` par wajah).
+    // Bina secret ke bhi 200 `{ ok: true }` — "function zinda hai" itna kaafi hai,
+    // aur alag status dene se bhi andaaza lagta ki secret wala raasta maujood hai.
+    const given = req.headers.get("x-ai-health-secret") ?? "";
+    if (!HEALTH_SECRET || !safeEqual(given, HEALTH_SECRET)) {
+      return json({ ok: true });
+    }
     const raw = KEY ?? "";
     const trimmed = raw.trim();
     const shape = {
@@ -621,7 +860,9 @@ Deno.serve(async (req) => {
       if (userMsg.trim()) await recordChat(uid, userMsg, STUB_REPLY);
       return json({ reply: STUB_REPLY, stub: true });
     }
-    return json({ error: "GEMINI_API_KEY set nahi hai" }, 500);
+    // Env ka naam client ko nahi — sirf server log me.
+    console.error("[ai] GEMINI_API_KEY set nahi hai");
+    return json({ error: "AI not configured" }, 500);
   }
 
   try {
@@ -1171,6 +1412,14 @@ Ye SAB ek hi baat hain. Faisla tum karo ki insaan ne asal me kya kaha — jo gue
 
     return json({ error: "unknown task" }, 400);
   } catch (e) {
-    return json({ error: "AI error", detail: String(e) }, 502);
+    /**
+     * ⚠️ Pehle yahan `detail: String(e)` jaata tha — aur `gemini()` ka error
+     * Google ka POORA response body hota hai (model ka naam, project/quota ki
+     * tafseel, kabhi request ka hissa). Wo seedha har user ke phone tak aur
+     * wahan se `log_app_error` me. Ab wo sirf server ke log me; client ko wahi
+     * `error` field aur wahi 502, jisse app ka `classify()` pehle jaisa chalta hai.
+     */
+    console.error(`[ai] task=${task} uid=${uid} fail:`, e);
+    return json({ error: "AI error" }, 502);
   }
 });

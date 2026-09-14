@@ -355,13 +355,17 @@ const useStyles = makeStyles((c) => ({
   },
   cta: {
     marginTop: 14,
-    height: 50,
+    // ⚠️ `minHeight` — "Baaki phones se logout" bade font par do line ka ho
+    // jaata hai; tay `height` use kaat deti thi.
+    minHeight: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: c.terracotta,
   },
-  ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white },
+  ctaText: { fontSize: 15.5, fontWeight: "800", color: c.white, textAlign: "center" },
   ghost: {
     marginTop: 9,
     height: 46,

@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { appUserId } from "@/lib/app-auth";
 import { presignDownload, r2Configured, R2NotConfigured } from "@/lib/r2";
-import { documentKeyFor } from "@/lib/storage-server";
+import {
+  docIdFromPath,
+  documentAccess,
+  documentAccessByPath,
+  documentKeyFor,
+  storageDbConfigured,
+} from "@/lib/storage-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +43,25 @@ export async function POST(request: Request) {
 
   const key = documentKeyFor(path, uid);
   if (!key) return NextResponse.json({ error: "bad path" }, { status: 400 });
+
+  /**
+   * ⚠️ Locked document ki file nahi milegi.
+   *
+   * Pehle yahan sirf path ki jaanch thi — `is_locked` (free plan ki hadd) sirf
+   * app ki UI me lagta tha, server par nahi. Seedhi API call se locked document
+   * bhi utar jaata tha. Row na mile (document delete ho chuka) to pehle jaisa
+   * chalne dete hain — lock ek row par hi lag sakta hai.
+   */
+  if (storageDbConfigured()) {
+    const docId = docIdFromPath(path);
+    const access = docId
+      ? await documentAccess(docId, uid)
+      : await documentAccessByPath(path, uid);
+    if (!access) return NextResponse.json({ error: "db unavailable" }, { status: 503 });
+    if (access.locked) {
+      return NextResponse.json({ error: "document locked", locked: true }, { status: 403 });
+    }
+  }
 
   try {
     // 10 minute — badi file dheeme net par utarne ke liye kaafi.

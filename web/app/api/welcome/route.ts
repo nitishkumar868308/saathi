@@ -63,38 +63,83 @@ export async function POST(request: Request) {
     `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=welcomed_at,full_name,language`,
     { headers: svcHeaders, cache: "no-store" },
   );
-  if (profRes.ok) {
-    const rows = (await profRes.json()) as {
-      welcomed_at: string | null;
-      full_name: string | null;
-      language: string | null;
-    }[];
-    const prof = rows[0];
-    if (prof?.welcomed_at) {
-      return NextResponse.json({ ok: true, already: true });
-    }
-    // DB ki bhasha source-of-truth — client ne na bheji ho to yahi use karo.
-    const dbLang = prof?.language;
-    if (dbLang === "hi" || dbLang === "en" || dbLang === "hinglish") {
-      locale = dbLang;
-    }
+  if (!profRes.ok) {
+    return NextResponse.json({ error: "profile read failed" }, { status: 500 });
+  }
+  const rows = (await profRes.json()) as {
+    welcomed_at: string | null;
+    full_name: string | null;
+    language: string | null;
+  }[];
+  const prof = rows[0];
+  // Profile trigger ne abhi row banayi hi nahi — agle login par dobara koshish.
+  if (!prof) return NextResponse.json({ ok: true, skipped: "no-profile" });
+  if (prof.welcomed_at) {
+    return NextResponse.json({ ok: true, already: true });
+  }
+  // DB ki bhasha source-of-truth — client ne na bheji ho to yahi use karo.
+  const dbLang = prof.language;
+  if (dbLang === "hi" || dbLang === "en" || dbLang === "hinglish") {
+    locale = dbLang;
   }
 
   const name = user.user_metadata?.full_name || user.user_metadata?.name || "";
 
-  // 3. Bhejo + welcomed_at SIRF tabhi set karo jab email SACH ME bhej gaya ho.
-  //    (Pehle skip hone pe bhi set ho jaata tha — SMTP env na hone par welcomed_at
-  //     stamp ho jaata aur user ko kabhi welcome nahi milta. Ab skip pe retry hoga.)
-  const result = await sendWelcomeEmail(email, name, locale);
-
-  if (result.sent) {
-    await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}`, {
+  /**
+   * 3. PEHLE claim, PHIR bhejo.
+   *
+   * ⚠️ Pehle tarteeb thi: padho (`welcomed_at` null?) -> bhejo -> stamp karo.
+   * App login ke waqt ye call do jagah se ek saath maar deti hai (Google sign-in
+   * + session restore), aur dono ko "null" dikhta tha — user ko do welcome mail.
+   *
+   * Ab `welcomed_at=is.null` wali shart ke saath PATCH: Postgres me row lock ke
+   * saath sirf EK request jeet sakti hai. Row wapas aayi = hum jeete, bhejo.
+   * Khaali aayi = koi aur bhej raha hai / bhej chuka.
+   */
+  const stamp = new Date().toISOString();
+  const claimRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&welcomed_at=is.null&select=id`,
+    {
       method: "PATCH",
-      headers: { ...svcHeaders, Prefer: "return=minimal" },
-      body: JSON.stringify({ welcomed_at: new Date().toISOString() }),
+      headers: { ...svcHeaders, Prefer: "return=representation" },
+      body: JSON.stringify({ welcomed_at: stamp }),
       cache: "no-store",
-    }).catch(() => {});
+    },
+  );
+  if (!claimRes.ok) {
+    return NextResponse.json({ error: "claim failed" }, { status: 500 });
   }
+  const claimed = (await claimRes.json()) as unknown[];
+  if (!Array.isArray(claimed) || claimed.length === 0) {
+    return NextResponse.json({ ok: true, already: true });
+  }
+
+  /**
+   * Mail nahi gaya to claim wapas — warna `welcomed_at` bhara reh jaata aur
+   * user ko welcome KABHI na milta (SMTP env na hone wala purana bug yahi tha).
+   * `welcomed_at=eq.<stamp>` isliye ki sirf APNA stamp hataayein.
+   */
+  const release = () =>
+    fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&welcomed_at=eq.${encodeURIComponent(stamp)}`,
+      {
+        method: "PATCH",
+        headers: { ...svcHeaders, Prefer: "return=minimal" },
+        body: JSON.stringify({ welcomed_at: null }),
+        cache: "no-store",
+      },
+    ).catch(() => {});
+
+  let result: Awaited<ReturnType<typeof sendWelcomeEmail>>;
+  try {
+    result = await sendWelcomeEmail(email, name, locale);
+  } catch (err) {
+    await release();
+    console.error("[welcome] send failed", err);
+    return NextResponse.json({ error: "send failed" }, { status: 500 });
+  }
+
+  if (!result.sent) await release();
 
   return NextResponse.json({ ok: true, sent: result.sent, skipped: result.skipped ?? false });
 }

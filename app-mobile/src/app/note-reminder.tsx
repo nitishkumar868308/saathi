@@ -11,8 +11,8 @@ import { useToast } from "@/components/toast";
 import { Loader } from "@/components/loader";
 import { PermissionModal } from "@/components/permission-modal";
 import { reportError } from "@/lib/report-error";
-import { addReminder, ReminderLimitError } from "@/lib/reminders";
-import { linkNoteReminder } from "@/lib/notes";
+import { ReminderLimitError } from "@/lib/reminders";
+import { saveReminder } from "@/lib/reminder-outbox";
 import { ensureNotifPermission, scheduleReminderSeries } from "@/lib/notifications";
 import { shouldShowReliabilityPrompt } from "@/lib/reliability";
 import { markFirstReminder } from "@/lib/reviews";
@@ -120,7 +120,18 @@ export default function NoteReminder() {
       const firstLine = task.split("\n")[0].trim();
       const title = firstLine.length > 70 ? `${firstLine.slice(0, 67)}…` : firstLine || task;
 
-      const made = await addReminder({
+      /**
+       * ⚠️ `addReminder` (seedha insert) nahi — `saveReminder`, bilkul
+       * add-reminder aur chat ki tarah.
+       *
+       * Note aksar wahin likha jaata hai jahan net nahi hota. Pehle yahan net na
+       * hone par poora save fail hota tha aur "Save nahi ho paya" aata tha, jabki
+       * alarm ko internet chahiye hi nahi. Ab reminder kataar me jaata hai, alarm
+       * turant lagta hai, aur note se rishta (`noteId`) bhi kataar ke saath jaata
+       * hai — flush ke baad asli id milte hi jud jaata hai.
+       */
+      const made = await saveReminder({
+        noteId: typeof noteId === "string" ? noteId : null,
         title,
         note: task,
         time_label: `${dateLabel}, ${timeLabel}`,
@@ -129,10 +140,6 @@ export default function NoteReminder() {
         repeat_every_days: everyDays || null,
         repeat_until: null,
       });
-
-      // Note se jod do — best-effort. Fail ho to reminder phir bhi bajega, bas
-      // note par uska nishaan nahi lagega.
-      if (noteId) void linkNoteReminder(noteId, made.id).catch(() => {});
 
       const notifOk = await ensureNotifPermission();
       if (notifOk) {
@@ -143,7 +150,12 @@ export default function NoteReminder() {
       markFirstReminder().catch(() => {});
       checkReferralQualification().catch(() => {});
       emitDataChanged();
-      toast.show(notifOk ? t.saved : a.savedNeedPerm, notifOk ? "success" : "info");
+      // Offline bana: alarm lag gaya, par server par jaana baaki — ye alag
+      // dikhna chahiye (wajah add-reminder ke `setOkOffline` par).
+      toast.show(
+        !notifOk ? a.savedNeedPerm : made.pending ? a.setOkOffline : t.saved,
+        notifOk && !made.pending ? "success" : "info",
+      );
 
       // Ek bhi permission baaki ho to alarm sach me nahi bajega — pehle wo
       // dikhao, band karne par screen bhi band.

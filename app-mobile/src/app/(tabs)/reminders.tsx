@@ -23,6 +23,7 @@ import {
   deleteReminder,
   completeReminder,
   isRepeating,
+  ReminderLimitError,
   type Reminder,
 } from "@/lib/reminders";
 import {
@@ -124,7 +125,13 @@ export default function Reminders() {
       }
       emitDataChanged();
     } catch (e) {
-      if (!reportIfNetwork(e, "save")) toast.show(r0.title + " ✕", "error");
+      // Free hadd — band reminder chalu karna bhi ek naya slot hai (DB trigger).
+      // Wahi raasta jo naya reminder banate waqt: upgrade screen.
+      if (e instanceof ReminderLimitError) {
+        router.push("/upgrade" as never);
+      } else if (!reportIfNetwork(e, "save")) {
+        toast.show(r0.title + " ✕", "error");
+      }
       load();
     }
   }
@@ -507,6 +514,14 @@ function DetailSheet({
         >
           <View style={styles.sheetHandle} />
 
+          {/**
+           * ⚠️ `maxHeight` ke saath scroll bhi chahiye tha. Lamba note + bada font
+           * par sheet hadd par ruk to jaati thi, par andar ka content bina scroll
+           * ke kat jaata — aur sabse neeche wala "Ho gaya" button bhi saath me.
+           * Ab sirf beech ka hissa scroll hota hai (`flexShrink: 1`), button
+           * bahar hai isliye hamesha dikhta hai.
+           */}
+          <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.sheetHead}>
             <View style={styles.rIcon}>
               <Ionicons name="notifications" size={18} color={tc.terracotta} />
@@ -549,6 +564,7 @@ function DetailSheet({
               <Text style={styles.noteText}>{r.note.trim()}</Text>
             </View>
           )}
+          </ScrollView>
 
           {/* "Ho gaya" — roz wale me sirf aaj ka, ek baar wale me poora band.
               Button ka text bhi wahi batata hai, taaki user ko dar na ho ki
@@ -730,6 +746,7 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.line,
     marginBottom: 18,
   },
+  sheetScroll: { flexShrink: 1 },
   sheetHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   sheetLabel: {
     fontSize: 12.5,

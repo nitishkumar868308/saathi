@@ -231,7 +231,7 @@ export default function AdminDevices() {
        */}
       {confirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-line bg-surface p-6">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-line bg-surface p-6">
             <h3 className="text-lg font-extrabold text-ink">Is phone ko chaalu karein?</h3>
             <p className="mt-3 text-sm leading-relaxed text-ink-soft">
               <span className="font-semibold text-ink">

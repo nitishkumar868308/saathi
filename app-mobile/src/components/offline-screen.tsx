@@ -280,7 +280,7 @@ export function OfflineScreen() {
                 >
                   <Ionicons name="document-text-outline" size={52} color={tc.onInk} />
                   <View style={styles.pdfOpen}>
-                    <Ionicons name="open-outline" size={15} color={tc.ink} />
+                    <Ionicons name="open-outline" size={15} color={tc.onAccent} />
                     <Text style={styles.pdfOpenText}>{a.openFile}</Text>
                   </View>
                 </Pressable>
@@ -403,7 +403,12 @@ const useStyles = makeStyles((c) => ({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  pdfOpenText: { fontSize: 14, fontWeight: "700", color: c.ink },
+  /**
+   * ⚠️ `c.ink` NAHI — dark theme me `ink` ulta ho ke ujla (#F2EAE0) ho jaata hai,
+   * yaani `onInk` ki ujli goli par ujla text: "Kholo" bilkul gayab. `onAccent`
+   * dono theme me gehra rehta hai, aur goli dono theme me ujli.
+   */
+  pdfOpenText: { fontSize: 14, fontWeight: "700", color: c.onAccent },
 }));
 
 export default OfflineScreen;

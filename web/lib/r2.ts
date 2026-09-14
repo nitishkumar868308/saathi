@@ -285,6 +285,71 @@ export async function deleteObject(key: string): Promise<boolean> {
   return res.ok || res.status === 404;
 }
 
+/** XML ke paanch entity — R2 ki list me key inke saath aa sakti hai. */
+function xmlDecode(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * Ek prefix ke neeche ki SAARI keys (ListObjectsV2, har page).
+ *
+ * ⚠️ Account purge ke liye bana hai. Pehle purge sirf purane Supabase bucket ko
+ * saaf karta tha — jabki asli files ab R2 par hain. Yaani "sab delete ho gaya"
+ * kehne ke baad bhi user ke passport/bill ki photo bucket me padi rehti thi.
+ *
+ * ⚠️ Ek page me zyada se zyada 1000 key aati hain. `IsTruncated` dekhe bina
+ * pehla page hi poori list maan lena wahi "aadha delete" wala bug hota —
+ * isliye continuation token ke saath aakhri page tak chalte hain. `maxKeys`
+ * sirf ek suraksha ki chhat hai, taaki koi toota jawab loop ko anant na banaye.
+ *
+ * Fail (R2 ka non-2xx) par throw — caller ko pata hona chahiye ki list adhoori
+ * hai, "khaali" samajh ke aage badh jaana galat hota.
+ */
+export async function listObjects(prefix: string, maxKeys = 50_000): Promise<string[]> {
+  const c = cfg();
+  if (!r2Configured()) throw new R2NotConfigured();
+
+  const keys: string[] = [];
+  let token: string | null = null;
+
+  do {
+    const extraQuery: Record<string, string> = { "list-type": "2", prefix };
+    if (token) extraQuery["continuation-token"] = token;
+
+    const url = presignUrl({
+      method: "GET",
+      host: `${c.accountId}.r2.cloudflarestorage.com`,
+      // Bucket level ka GET — key nahi, isliye path sirf `/<bucket>`.
+      path: `/${c.bucket}`,
+      region: REGION,
+      service: SERVICE,
+      accessKeyId: c.accessKeyId,
+      secretAccessKey: c.secretAccessKey,
+      expiresIn: 60,
+      extraQuery,
+    });
+
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`R2 list ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const xml = await res.text();
+
+    const re = /<Key>([\s\S]*?)<\/Key>/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(xml)) !== null) keys.push(xmlDecode(m[1]));
+
+    const truncated = /<IsTruncated>\s*true\s*<\/IsTruncated>/i.test(xml);
+    const next = /<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/.exec(xml);
+    token = truncated && next ? xmlDecode(next[1]) : null;
+  } while (token && keys.length < maxKeys);
+
+  return keys;
+}
+
 /**
  * Object ke bytes server par (avatar proxy ke liye).
  * Na mile to `null` — caller 404 de.

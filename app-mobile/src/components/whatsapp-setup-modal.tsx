@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, Modal, Animated, Easing } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  Modal,
+  Animated,
+  Easing,
+  ScrollView,
+  useWindowDimensions,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -53,6 +63,15 @@ export function WhatsAppSetupModal() {
 
   const [show, setShow] = useState(false);
   const [scale] = useState(() => new Animated.Value(0.94));
+
+  /**
+   * ⚠️ Card ki hadd + safe-area. Pehle na scroll tha na `maxHeight`: chhote
+   * phone + bade font par heading status bar ke neeche aur "Number verify karo"
+   * nav bar ke neeche chala jaata tha. `device-owner-warning` wala hi tareeka.
+   */
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const maxCardHeight = Math.max(320, height - insets.top - insets.bottom - 48);
 
   const check = useCallback(async () => {
     if (!uid) {
@@ -126,19 +145,27 @@ export function WhatsAppSetupModal() {
 
   return (
     <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={() => void later()}>
-      <View style={styles.backdrop}>
+      <View
+        style={[
+          styles.backdrop,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+        ]}
+      >
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
-          <View style={styles.card}>
+          <View style={[styles.card, { maxHeight: maxCardHeight }]}>
             <View style={styles.iconWrap}>
               <Ionicons name="logo-whatsapp" size={26} color={tc.sage} />
             </View>
-            <Text style={styles.title}>{w.title}</Text>
-            <Text style={styles.body}>{w.body}</Text>
+            {/* flexShrink: sirf text scroll hota hai — dono button hamesha dikhte hain. */}
+            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.title}>{w.title}</Text>
+              <Text style={styles.body}>{w.body}</Text>
 
-            <View style={styles.note}>
-              <Ionicons name="information-circle" size={15} color={tc.terracotta} />
-              <Text style={styles.noteText}>{w.note}</Text>
-            </View>
+              <View style={styles.note}>
+                <Ionicons name="information-circle" size={15} color={tc.terracotta} />
+                <Text style={styles.noteText}>{w.note}</Text>
+              </View>
+            </ScrollView>
 
             <Pressable
               onPress={() => void go()}
@@ -165,9 +192,11 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
+    // Upar/neeche ki padding component me insets se lagti hai.
+    paddingHorizontal: 18,
   },
   cardWrap: { width: "100%", maxWidth: 420 },
+  scroll: { flexShrink: 1 },
   card: {
     backgroundColor: c.surface,
     borderRadius: 26,

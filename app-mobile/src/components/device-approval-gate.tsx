@@ -328,9 +328,7 @@ export function DeviceApprovalGate() {
                   onPress={() => setOpen(false)}
                   style={({ pressed }) => [styles.footBtn, pressed && styles.footBtnPressed]}
                 >
-                  <Text style={styles.footBtnText} numberOfLines={1}>
-                    {d.later}
-                  </Text>
+                  <Text style={styles.footBtnText}>{d.later}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
@@ -340,9 +338,7 @@ export function DeviceApprovalGate() {
                   style={({ pressed }) => [styles.footBtn, pressed && styles.footBtnPressed]}
                 >
                   <Ionicons name="help-buoy-outline" size={15} color={tc.inkSoft} />
-                  <Text style={styles.footBtnText} numberOfLines={1}>
-                    {d.support}
-                  </Text>
+                  <Text style={styles.footBtnText}>{d.support}</Text>
                 </Pressable>
               </View>
             </View>
@@ -511,6 +507,13 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.surface,
   },
   ghostText: { fontSize: 14, fontWeight: "700", color: c.inkSoft },
+  /**
+   * ⚠️ Dono aadhi-aadhi chaudai ke hain, isliye label ko do line me jaane dete
+   * hain (`numberOfLines={1}` hata diya). Pehle support wala label "Code nahi
+   * a…" par kat jaata tha — aur wahi button un logon ka ekmatra raasta hai
+   * jinka code aata hi nahi. Ek ke neeche ek rakhne se card aur lamba hota,
+   * jabki yahan keyboard pehle hi aadhi screen le leta hai.
+   */
   footRow: { flexDirection: "row", gap: 8, marginTop: 10 },
   footBtn: {
     flex: 1,
@@ -520,8 +523,15 @@ const useStyles = makeStyles((c) => ({
     gap: 6,
     minHeight: 44,
     paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 14,
   },
   footBtnPressed: { backgroundColor: c.creamDeep },
-  footBtnText: { fontSize: 13, fontWeight: "700", color: c.inkSoft },
+  footBtnText: {
+    flexShrink: 1,
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: "700",
+    color: c.inkSoft,
+  },
 }));

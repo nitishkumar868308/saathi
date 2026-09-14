@@ -1,5 +1,7 @@
 import { createHash, randomInt } from "node:crypto";
 
+import { clientIpFrom } from "@/lib/rate-limit";
+
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -34,11 +36,33 @@ const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
  * pade (ya leak ho) to baaki do ke zinda code uske saath na girein. Set na ho to
  * PIN wale par, phir phone wale par gir jaata hai — dev me chalane ke liye.
  */
+const PEPPER_FALLBACK = "saathi-dev-pepper-set-DEVICE_APPROVAL_PEPPER-in-prod";
 const PEPPER =
   process.env.DEVICE_APPROVAL_PEPPER ||
   process.env.APP_LOCK_PEPPER ||
   process.env.OTP_PEPPER ||
-  "saathi-dev-pepper-set-DEVICE_APPROVAL_PEPPER-in-prod";
+  PEPPER_FALLBACK;
+
+/**
+ * Pepper — production me dev wala fallback lage to ek baar zor se bolo.
+ *
+ * ⚠️ Throw nahi karte — wajah `app-lock.ts` ke `pepper()` par likhi hai (live
+ * site par naya phone approve hona hi band ho jaata). Sirf Vercel logs me error.
+ */
+let pepperWarned = false;
+function pepper(): string {
+  if (
+    PEPPER === PEPPER_FALLBACK &&
+    !pepperWarned &&
+    (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production")
+  ) {
+    pepperWarned = true;
+    console.error(
+      "[device-approval] DEVICE_APPROVAL_PEPPER / APP_LOCK_PEPPER / OTP_PEPPER set nahi hai — production me dev wala pepper chal raha hai. Vercel env me set karo.",
+    );
+  }
+  return PEPPER;
+}
 
 function headers() {
   return {
@@ -81,7 +105,7 @@ export function generateApprovalCode(): string {
  * yahi wo ek cheez hai jo is poore feature ko dikhawa bana deti.
  */
 export function hashApprovalCode(userId: string, deviceId: string, code: string): string {
-  return createHash("sha256").update(`${PEPPER}:${userId}:${deviceId}:${code}`).digest("hex");
+  return createHash("sha256").update(`${pepper()}:${userId}:${deviceId}:${code}`).digest("hex");
 }
 
 export type ApprovalIssue =
@@ -136,9 +160,12 @@ export function looksLikeDeviceId(s: unknown): s is string {
   return typeof s === "string" && s.length >= 8 && s.length <= 100 && /^[A-Za-z0-9._:-]+$/.test(s);
 }
 
-/** Request kis "jagah" se aayi — ginti/fraud ke liye. */
+/**
+ * Request kis "jagah" se aayi — ginti/fraud ke liye.
+ *
+ * ⚠️ `x-forwarded-for` ka pehla hissa client khud likh sakta hai; bharosemand
+ * header `rate-limit.ts` ke `clientIpFrom` me hain.
+ */
 export function clientIp(request: Request): string | null {
-  const fwd = request.headers.get("x-forwarded-for") ?? "";
-  const first = fwd.split(",")[0]?.trim();
-  return first || request.headers.get("x-real-ip") || null;
+  return clientIpFrom(request);
 }

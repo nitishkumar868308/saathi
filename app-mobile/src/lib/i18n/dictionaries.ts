@@ -38,6 +38,8 @@ export type Dict = {
     today: string;
     tomorrow: string;
     done: string;
+    /** Code wale khaanon ke neeche — clipboard se code chipkao. */
+    paste: string;
   };
   langSelect: {
     welcome: string;
@@ -846,6 +848,13 @@ export type Dict = {
      */
     voiceSending: string;
     voiceStop: string;
+    /** Header ka delete button — poori chat is phone se hatao. */
+    clearChat: string;
+    clearChatTitle: string;
+    clearChatMsg: string;
+    /** Kisi ek message par long-press. */
+    deleteMsgTitle: string;
+    chatCleared: string;
   };
   /**
    * Plus khatam ho gaya — poori screen wala samjhane wala page.
@@ -1513,6 +1522,7 @@ const hinglish: Dict = {
     today: "Aaj",
     tomorrow: "Kal",
     done: "Ho gaya",
+    paste: "Code paste karo",
   },
   langSelect: {
     welcome: "Welcome to Apka Saathi",
@@ -2003,6 +2013,11 @@ const hinglish: Dict = {
     settingChanged: "Setting badal di ✓",
     voiceSending: "Bhej raha hoon…",
     voiceStop: "Roko",
+    clearChat: "Chat delete karo",
+    clearChatTitle: "Poori chat delete karein?",
+    clearChatMsg: "Saare message is phone se hat jayenge. Aapke reminder aur document waise hi rahenge.",
+    deleteMsgTitle: "Ye message delete karein?",
+    chatCleared: "Chat delete ho gayi",
   },
   planExpired: {
     title: "Aapka Plus khatam ho gaya",
@@ -2224,7 +2239,7 @@ const hinglish: Dict = {
     help: "Help & support",
     about: "About Us",
     logout: "Logout",
-    version: "Apka Saathi · v{v} · Made in India",
+    version: "Apka Saathi · Made in India",
     company: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     langAlertTitle: "Bhasha",
     langAlertBody: "Neeche se apni bhasha chuno — poora app usi me badal jayega.",
@@ -2466,6 +2481,7 @@ const hi: Dict = {
     today: "आज",
     tomorrow: "कल",
     done: "हो गया",
+    paste: "कोड पेस्ट करें",
   },
   langSelect: {
     welcome: "Apka Saathi में आपका स्वागत है",
@@ -2948,6 +2964,11 @@ const hi: Dict = {
     settingChanged: "सेटिंग बदल दी ✓",
     voiceSending: "भेज रहा हूँ…",
     voiceStop: "रोकें",
+    clearChat: "चैट डिलीट करें",
+    clearChatTitle: "पूरी चैट डिलीट करें?",
+    clearChatMsg: "सारे मैसेज इस फ़ोन से हट जाएँगे। आपके रिमाइंडर और डॉक्यूमेंट वैसे ही रहेंगे।",
+    deleteMsgTitle: "यह मैसेज डिलीट करें?",
+    chatCleared: "चैट डिलीट हो गई",
   },
   planExpired: {
     title: "आपका Plus खत्म हो गया",
@@ -3169,7 +3190,7 @@ const hi: Dict = {
     help: "हेल्प & support",
     about: "हमारे बारे में",
     logout: "लॉगआउट",
-    version: "Apka Saathi · v{v} · Made in India",
+    version: "Apka Saathi · Made in India",
     company: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     langAlertTitle: "भाषा",
     langAlertBody: "नीचे से अपनी भाषा चुनें — पूरा app उसी में बदल जाएगा।",
@@ -3400,6 +3421,7 @@ const en: Dict = {
     today: "Today",
     tomorrow: "Tomorrow",
     done: "Done",
+    paste: "Paste code",
   },
   langSelect: {
     welcome: "Welcome to Apka Saathi",
@@ -3882,6 +3904,11 @@ const en: Dict = {
     settingChanged: "Setting changed ✓",
     voiceSending: "Sending…",
     voiceStop: "Stop",
+    clearChat: "Delete chat",
+    clearChatTitle: "Delete the whole chat?",
+    clearChatMsg: "All messages will be removed from this phone. Your reminders and documents stay as they are.",
+    deleteMsgTitle: "Delete this message?",
+    chatCleared: "Chat deleted",
   },
   planExpired: {
     title: "Your Plus has ended",
@@ -4103,7 +4130,7 @@ const en: Dict = {
     help: "Help & support",
     about: "About Us",
     logout: "Log out",
-    version: "Apka Saathi · v{v} · Made in India",
+    version: "Apka Saathi · Made in India",
     company: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
     langAlertTitle: "Language",
     langAlertBody: "Pick your language below — the whole app switches to it.",

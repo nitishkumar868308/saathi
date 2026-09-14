@@ -148,7 +148,8 @@ export function DeviceOwnerWarning() {
     try {
       await signOut();
     } catch {
-      /* net na ho to session waise bhi local se hat jaata hai */
+      /* `signOut()` khud net na hone par `scope: "local"` par gir jaata hai,
+         isliye session phone se hat hi jaata hai — ye catch sirf aakhri bachav */
     }
     setOwner(null);
     setBusy(false);

@@ -35,12 +35,17 @@ import {
 import { completeReminder, listReminders } from "./reminders";
 import { ensureDeviceState } from "./device-approval";
 import { emitDataChanged } from "./data-events";
-import { listDocuments } from "./documents";
+import { listDocumentsWithSource } from "./documents";
+import { isNetworkError } from "./net-alert";
 import { reportError } from "./report-error";
 import { dictionaries, DEFAULT_LOCALE, tpl, type Locale } from "./i18n/dictionaries";
 // Background/headless handler ab `index.js` se sabse pehle lagta hai. Yahan se
 // sirf takePendingAlert aage bheja jaata hai (purane import na tootein).
-import { takeNotificationActions, takePendingAlert } from "./notification-background";
+import {
+  queueNotificationAction,
+  takeNotificationActions,
+  takePendingAlert,
+} from "./notification-background";
 
 export { takePendingAlert };
 // Snooze/repeat wale id se asli reminder id — modal aur tray, dono isi ko use
@@ -163,11 +168,37 @@ const REPEAT_WINDOW = 14;
 /** Ek occurrence ka notification id. Pehla = reminder id (purane ids na tootein). */
 const occId = (id: string, i: number) => (i === 0 ? id : `${id}#${i}`);
 
+/**
+ * Ye phone abhi alarm laga sakta hai?
+ *
+ * ⚠️ Pehle ye rok SIRF `runSync()` me thi. Par reminder banate hi (add-reminder,
+ * chat, note, outbox flush, "Ho gaya" ke baad agli baari) screens seedha
+ * `scheduleReminderSeries()` bulati hain — sync ka intezaar kiye bina. Yaani
+ * jis phone ko "active nahi" kaha gaya tha, us par bhi naya reminder turant
+ * baj jaata, aur doosre (active) phone par bhi. Wahi "ek reminder do phone par"
+ * wali dikkat jiske liye device-approval bana hai.
+ *
+ * Rok yahan exported raaston par lagti hai, `schedule()` me nahi: test alarm
+ * usi `schedule()` se jaata hai aur use JAAN-BOOJH KE nahi rokna (wajah
+ * `scheduleTestAlarm` par). `runSync` andar wale `…Now` raaste use karta hai —
+ * wo khud ek baar jaanch chuka hota hai, aur net na hone par har reminder par
+ * dobara server poochna 30 reminder wale user par 30 bekaar call hota.
+ */
+async function deviceMayAlarm(): Promise<boolean> {
+  try {
+    return (await ensureDeviceState()).active;
+  } catch {
+    // Pata na chale to alarm lagne do — chhoota hua reminder zyada bura hai.
+    return true;
+  }
+}
+
 export async function scheduleReminder(
   id: string,
   title: string,
   when: Date,
 ): Promise<boolean> {
+  if (!(await deviceMayAlarm())) return false;
   const d = await notifDict();
   return schedule(id, d.reminderTitle, title, when);
 }
@@ -180,6 +211,23 @@ export async function scheduleReminder(
  * reminder 91ve din chup ho jaata hai, apne aap.
  */
 export async function scheduleReminderSeries(
+  id: string,
+  title: string,
+  first: Date,
+  everyDays?: number | null,
+  until?: string | null,
+): Promise<boolean> {
+  // Inactive phone — naye alarm nahi, aur purane bhi hata do (wajah
+  // `deviceMayAlarm` aur `runSync` par).
+  if (!(await deviceMayAlarm())) {
+    await cancelReminder(id);
+    return false;
+  }
+  return scheduleReminderSeriesNow(id, title, first, everyDays, until);
+}
+
+/** `scheduleReminderSeries` bina device-rok ke — sirf `runSync` ke liye. */
+async function scheduleReminderSeriesNow(
   id: string,
   title: string,
   first: Date,
@@ -342,14 +390,26 @@ export async function flushNotificationActions(): Promise<void> {
         );
       } else await cancelReminder(id);
       changed = true;
-    } catch {
+    } catch (e) {
       /**
        * Net nahi tha — alarm to hata hi do.
        *
        * User ne kaam kar liya hai; use wahi notification dobara dena sabse
-       * chidhchida hoga. Server agli sync par apne aap sahi ho jaayega.
+       * chidhchida hoga.
        */
       await cancelReminder(id).catch(() => {});
+      /**
+       * ⚠️ …aur "Ho gaya" ko KATAAR ME WAPAS daalo.
+       *
+       * `takeNotificationActions()` kataar network call se PEHLE hi khaali kar
+       * deta hai. Pehle yahan likha tha "server agli sync par apne aap sahi ho
+       * jaayega" — wo sach nahi tha: server ko kabhi bataya hi nahi jaata tha.
+       * Agli sync server ki list se wahi (anipta) reminder dekh kar uska alarm
+       * DOBARA laga deti, aur roz wale reminder ki agli baari kabhi aage hi nahi
+       * sarakti. Sirf NET wali galti par — reminder delete ho chuka ho to use
+       * hamesha dohraate rehna bekaar hai.
+       */
+      if (isNetworkError(e)) await queueNotificationAction(a.id, "done").catch(() => {});
     }
   }
   // Home/Reminders khule ho sakte hain — unhe turant sach dikhna chahiye.
@@ -411,6 +471,21 @@ const docNotifId = (docId: string, lead: number) => `doc:${docId}:${lead}`;
  * wajah `expiryCatchUp()` par likhi hai. Na do to "abhi" maan liya jaata hai.
  */
 export async function scheduleDocumentExpiry(
+  docId: string,
+  name: string,
+  expiry: string | null,
+  addedAt?: string | null,
+): Promise<void> {
+  // Wahi device-rok jo reminder par hai (`deviceMayAlarm`).
+  if (!(await deviceMayAlarm())) {
+    await cancelDocumentExpiry(docId);
+    return;
+  }
+  return scheduleDocumentExpiryNow(docId, name, expiry, addedAt);
+}
+
+/** `scheduleDocumentExpiry` bina device-rok ke — sirf `runSync` ke liye. */
+async function scheduleDocumentExpiryNow(
   docId: string,
   name: string,
   expiry: string | null,
@@ -577,6 +652,39 @@ export async function quietenNotification(a: {
  * Login/permission jaisi jagah par `force: true` chahiye — wahan sach me kuch
  * badla hota hai.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Alarm-ids me se wo jinka reminder/document ab list me nahi — unhe hatao.
+ *
+ * Id ka dhaancha (sab isi file aur `notify-core.ts` me banta hai):
+ *   • reminder  — `<uuid>`, `<uuid>#3`, `snooze:<uuid>`
+ *   • document  — `doc:<uuid>:<lead>`, `snooze:doc:<uuid>:<lead>`
+ *   • kataar    — `local:…` (abhi server par gaya hi nahi) — KABHI nahi chhoona
+ *   • test      — `saathi-test-alarm` — kabhi nahi chhoona
+ *
+ * ⚠️ Reminder wala hissa sirf UUID-shakl par chalta hai. Jo id pehchaan me na
+ * aaye use chhod dete hain — anjaan alarm ek din zyada baj jaye, wo kisi asli
+ * alarm ko galti se mita dene se sasta hai.
+ */
+async function cancelOrphanAlarms(
+  ids: string[],
+  reminderIds: Set<string>,
+  docIds: Set<string>,
+): Promise<void> {
+  for (const nid of ids) {
+    const bare = nid.startsWith(SNOOZE_PREFIX) ? nid.slice(SNOOZE_PREFIX.length) : nid;
+    if (bare === TEST_ID || bare.startsWith("local:")) continue;
+    if (bare.startsWith("doc:")) {
+      const docId = bare.split(":")[1] ?? "";
+      if (UUID_RE.test(docId) && !docIds.has(docId)) await cancel(nid);
+      continue;
+    }
+    const base = baseReminderId(nid);
+    if (UUID_RE.test(base) && !reminderIds.has(base)) await cancel(nid);
+  }
+}
+
 let lastSyncAt = 0;
 let syncInFlight: Promise<void> | null = null;
 const SYNC_MIN_GAP_MS = 60_000;
@@ -628,13 +736,25 @@ async function runSync(): Promise<void> {
       return;
     }
 
-    const [reminders, documents] = await Promise.all([listReminders(), listDocuments()]);
+    /**
+     * Lists padhne se PEHLE ki alarm-ids — neeche wali safai sirf inhi par.
+     *
+     * ⚠️ Baad me padhne par ek race hai: sync ne list utaar li, beech me user ne
+     * naya reminder banaya (row + alarm), aur safai us naye alarm ko "list me
+     * nahi hai" samajh ke mita deti. Pehle ki ids me wo naya alarm hota hi nahi.
+     * (Jo alarm yahan dikh raha hai uski row insert pehle hi ho chuki hoti hai —
+     * har raasta pehle row banata hai, phir alarm lagata hai.)
+     */
+    const idsBefore = await notifee.getTriggerNotificationIds().catch(() => null);
+
+    const [reminders, docsRes] = await Promise.all([listReminders(), listDocumentsWithSource()]);
+    const documents = docsRes.docs;
 
     for (const r of reminders) {
       // Har sync par repeat ki khidki aage sarak jaati hai — isi wajah se 90 din
       // wala reminder sirf 14 alarm rakh ke bhi poore 90 din chalta hai.
       if (r.is_on && !r.is_paused && r.remind_at) {
-        await scheduleReminderSeries(
+        await scheduleReminderSeriesNow(
           r.id,
           r.title,
           new Date(r.remind_at),
@@ -648,7 +768,28 @@ async function runSync(): Promise<void> {
       // catch-up alert usi lamhe se ginta hai, "abhi" se nahi — warna app jitni
       // baar khulti, utni baar ek naya alert lag jaata (wajah `expiryCatchUp()`
       // par likhi hai).
-      await scheduleDocumentExpiry(d.id, d.name, d.expiry, d.created_at);
+      await scheduleDocumentExpiryNow(d.id, d.name, d.expiry, d.created_at);
+    }
+
+    /**
+     * ⚠️ Jo reminder/document ab server par HAI HI NAHI, uske alarm hatao.
+     *
+     * Upar ka loop sirf un ids ko chhoota hai jo list me hain. Doosre phone (ya
+     * website) se delete kiya hua reminder is list me aata hi nahi — yaani uska
+     * alarm is phone par hamesha bajta rehta, aur app me use rokne ke liye koi
+     * row bhi nahi hoti.
+     *
+     * Sirf tab jab dono list SACH ME server se aayi hon: `listReminders` fail
+     * par throw karta hai (yahan tak aate hi nahi), aur documents cache se aaye
+     * hon to `live` false hai — purane cache ke bharose asli alarm mitana galat
+     * hoga.
+     */
+    if (idsBefore && docsRes.live) {
+      await cancelOrphanAlarms(
+        idsBefore,
+        new Set(reminders.map((r) => r.id)),
+        new Set(documents.map((d) => d.id)),
+      );
     }
   } catch (e) {
     // Sync toota to har reminder ka alarm miss hota hai — sabse mehnga chup

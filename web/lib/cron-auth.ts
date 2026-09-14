@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { beatCron, type CronJobName } from "@/lib/cron-heartbeat";
@@ -62,6 +62,20 @@ function fingerprint(v: string | null | undefined) {
 }
 
 /**
+ * Do string barabar hain? — constant-time, lambai alag ho to bhi.
+ *
+ * ⚠️ `===` pehle alag akshar par ruk jaata hai, aur us waqt ke farak se secret
+ * akshar-dar-akshar andaza lagaya ja sakta hai. `timingSafeEqual` barabar lambai
+ * maangta hai (warna throw), isliye dono ka sha256 milate hain — wo hamesha 32
+ * byte hota hai, aur lambai ka farak bhi bahar nahi dikhta.
+ */
+function sameSecret(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a, "utf8").digest();
+  const hb = createHash("sha256").update(b, "utf8").digest();
+  return timingSafeEqual(ha, hb);
+}
+
+/**
  * Cron ka pehra.
  *
  *     const denied = requireCron(request, "send-reminders");
@@ -77,19 +91,26 @@ export function requireCron(request: Request, job: CronJobName): NextResponse | 
   // taraf 7 akshar extra ginte aur milaan bekaar ho jaata.
   const got = header?.startsWith("Bearer ") ? header.slice(7) : null;
 
-  if (!CRON_SECRET || got !== CRON_SECRET) {
+  if (!CRON_SECRET || got === null || !sameSecret(got, CRON_SECRET)) {
     return NextResponse.json(
       {
         error: "unauthorized",
-        // ⚠️ Ye do object hi is 401 ka poora maqsad hain. Inhe hataane se wahi
-        // purana andhera wapas aa jaata hai (upar poori wajah likhi hai).
-        expected: fingerprint(CRON_SECRET),
+        /**
+         * ⚠️ `expected` (ASLI secret ka md5 + lambai) ab sirf `CRON_DEBUG=1` par.
+         *
+         * Ye 401 duniya ke kisi ko bhi milta hai. Secret ka md5 aur uski lambai
+         * public jawab me dena offline guess ka seedha nishaana tha — md5 bahut
+         * tez hai, chhota ya kamzor secret minute me toot sakta hai. Jaanch
+         * karni ho to Vercel par `CRON_DEBUG=1` lagao, milao, phir hata do.
+         * `got` rehta hai — wo sirf caller ki apni bheji value ka nishaan hai.
+         */
+        ...(process.env.CRON_DEBUG === "1" ? { expected: fingerprint(CRON_SECRET) } : {}),
         got: fingerprint(got),
         hint: !CRON_SECRET
           ? "Vercel par CRON_SECRET set hi nahi hai (ya deploy purana hai — env badalne ke baad naya deploy chahiye)"
           : !got
             ? "Authorization header aaya hi nahi — cron job ka command dekho"
-            : "Dono taraf secret hai par alag hai — md5/len milao (space ya newline to nahi aa gaya?)",
+            : "Dono taraf secret hai par alag hai — md5/len milao (space ya newline to nahi aa gaya?). Server wala nishaan dekhne ke liye thodi der CRON_DEBUG=1 lagao.",
       },
       { status: 401 },
     );

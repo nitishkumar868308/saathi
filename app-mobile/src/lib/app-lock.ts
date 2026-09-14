@@ -228,7 +228,7 @@ export async function setBiometricOn(on: boolean): Promise<void> {
  * bhejta hai. Isliye yahan koi error nahi uchhalte: PIN phone par lag CHUKA hai,
  * aur user ko "PIN set nahi hua" kehna jhooth hoga.
  */
-async function pushLock(hash: string, salt: string): Promise<void> {
+async function pushLock(hash: string, salt: string): Promise<boolean> {
   try {
     const { error } = (await supabase?.rpc("set_app_lock", {
       p_hash: hash,
@@ -236,19 +236,23 @@ async function pushLock(hash: string, salt: string): Promise<void> {
       p_biometric: (await get(BIO_KEY)) === "1",
     })) ?? { error: new Error("no client") };
     if (!error) await del(DIRTY_KEY);
+    return !error;
   } catch {
     /* dirty laga rehne do */
+    return false;
   }
 }
 
-async function pushClear(): Promise<void> {
+async function pushClear(): Promise<boolean> {
   try {
     const { error } = (await supabase?.rpc("clear_app_lock")) ?? {
       error: new Error("no client"),
     };
     if (!error) await del(DIRTY_KEY);
+    return !error;
   } catch {
     /* dirty laga rehne do */
+    return false;
   }
 }
 
@@ -269,26 +273,35 @@ type ServerLock = { enabled: boolean; hash: string | null; salt: string | null }
  * ⚠️ Net na ho to KUCH MAT BADLO. Ye sabse zaroori shart hai: fail hue call ko
  * "server par lock nahi hai" maan lena lock ko flight mode me poori tarah hata
  * deta — yaani lock bypass karne ka sabse aasan raasta ban jaata.
+ *
+ * Lautata hai: `true` = server se sach me baat hui (sync poora). `false` = net/
+ * RPC fail, kuch nahi badla.
+ *
+ * ⚠️ Ye jawab zaroori hai. Pehle ye `void` tha aur har fail andar hi nigal
+ * leta tha — yaani `lock-gate` ka `try` kabhi `catch` me jaata hi nahi tha, aur
+ * "is install par sync ho chuka" wala nishaan net na hone par bhi lag jaata.
+ * Naye phone par pehli baar OFFLINE khulne se nishaan lag jaata, aur uske baad
+ * gate server ka intezaar kabhi nahi karta — lock wale account ke documents
+ * bina PIN ke khule dikhte.
  */
-export async function syncAppLock(): Promise<void> {
-  if (!supabase) return;
+export async function syncAppLock(): Promise<boolean> {
+  if (!supabase) return false;
 
   // Pehle apna bina bheja badlaav — warna server ka purana jawab use dabа dega.
   if ((await get(DIRTY_KEY)) === "1") {
     const [hash, salt] = await Promise.all([get(PIN_KEY), get(SALT_KEY)]);
-    if (hash && salt) await pushLock(hash, salt);
-    else await pushClear();
-    return;
+    if (hash && salt) return pushLock(hash, salt);
+    return pushClear();
   }
 
   let row: ServerLock | null = null;
   try {
     const { data, error } = await supabase.rpc("get_app_lock");
-    if (error) return; // net/RPC fail — upar wali wajah, kuch mat badlo
+    if (error) return false; // net/RPC fail — upar wali wajah, kuch mat badlo
     const first = Array.isArray(data) ? data[0] : data;
     row = (first as ServerLock | undefined) ?? { enabled: false, hash: null, salt: null };
   } catch {
-    return;
+    return false;
   }
 
   if (row.enabled && row.hash && row.salt) {
@@ -303,13 +316,14 @@ export async function syncAppLock(): Promise<void> {
        */
       resetGrace();
     }
-    return;
+    return true;
   }
 
   // Server keh raha hai ki lock hai hi nahi — phone se bhi hata do.
   if (await get(PIN_KEY)) {
     await Promise.all([del(PIN_KEY), del(SALT_KEY), del(BIO_KEY)]);
   }
+  return true;
 }
 
 /**

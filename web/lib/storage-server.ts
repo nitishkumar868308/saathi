@@ -123,6 +123,70 @@ export async function documentBelongsTo(docId: string, uid: string): Promise<boo
   return Array.isArray(rows) && rows.length > 0;
 }
 
+/**
+ * Document hai? Aur locked to nahi?
+ *
+ * ⚠️ `is_locked` free-plan ki hadd hai (`supabase/plan-limits.sql`). Pehle
+ * server ise dekhta hi nahi tha — app locked document ko sirf UI me band
+ * dikhati thi, par `download-url` seedha file ka URL de deta tha. Yaani Plus
+ * khatam hone ke baad bhi har document ek API call door tha.
+ *
+ * `null` = DB se jawab nahi aaya (caller 503 de; andaze se kholna galat hai).
+ */
+export async function documentAccess(
+  docId: string,
+  uid: string,
+): Promise<{ exists: boolean; locked: boolean } | null> {
+  if (!/^[0-9a-fA-F-]{36}$/.test(docId)) return { exists: false, locked: false };
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/documents?select=is_locked&id=eq.${docId}&user_id=eq.${uid}`,
+      { headers: sbHeaders(), cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { is_locked: boolean | null }[];
+    if (!Array.isArray(rows) || rows.length === 0) return { exists: false, locked: false };
+    return { exists: true, locked: rows[0].is_locked === true };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Wahi jaanch, par `file_path` se — jab file ka naam docId wali shakal ka na ho
+ * (bahut purane upload). Row na mile to `exists: false` (lock nahi lagta).
+ */
+export async function documentAccessByPath(
+  filePath: string,
+  uid: string,
+): Promise<{ exists: boolean; locked: boolean } | null> {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/documents?select=is_locked&user_id=eq.${uid}` +
+        `&file_path=eq.${encodeURIComponent(filePath)}`,
+      { headers: sbHeaders(), cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const rows = (await res.json()) as { is_locked: boolean | null }[];
+    if (!Array.isArray(rows) || rows.length === 0) return { exists: false, locked: false };
+    return { exists: true, locked: rows.some((r) => r.is_locked === true) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `<uid>/<docId>.<ext>` ya `<uid>/<docId>-v<n>.<ext>` se docId.
+ *
+ * Purane versions ki file bhi usi document ki hai — isliye lock unpar bhi lagta
+ * hai. Naam is shakal ka na ho to `null`.
+ */
+export function docIdFromPath(filePath: string): string | null {
+  const name = filePath.split("/")[1] ?? "";
+  const m = /^([0-9a-fA-F-]{36})(?:-v\d{1,4})?\.[A-Za-z0-9]{1,10}$/.exec(name);
+  return m ? m[1] : null;
+}
+
 /** Upload ke baad document row par file ki asli jaankari likho. */
 export async function saveDocumentFile(
   docId: string,

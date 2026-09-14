@@ -3,7 +3,6 @@ import { View, Text, ScrollView, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import * as Application from "expo-application";
 
 import { makeStyles, useColors } from "@/theme/theme";
 import { UserAvatar } from "@/components/user-avatar";
@@ -438,11 +437,9 @@ export default function Settings() {
           <Text style={styles.logoutText}>{s.logout}</Text>
         </Pressable>
 
-        {/* Version app.json se — hardcode karne par har release me purana ho
-            jaata tha (settings me "v0.1.0" dikhta raha jabki app 1.0.0 thi). */}
-        <Text style={styles.version}>
-          {tpl(s.version, { v: Application.nativeApplicationVersion ?? "1.0.0" })} ❤️
-        </Text>
+        {/* ⚠️ Yahan version number jaan-boojh ke NAHI hai — user ko "v1.0.0"
+            se kuch lena-dena nahi, aur wo sirf bhatkata tha. */}
+        <Text style={styles.version}>{s.version} ❤️</Text>
         {/*
           ⚠️ Company ka registered naam — jaan-boojh ke, aur yahin.
           User ke bank/UPI statement me "RAHVIAN TECHNOLOGIES PRIVATE LIMITED"

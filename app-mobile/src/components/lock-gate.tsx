@@ -82,10 +82,14 @@ export function LockGate({ children }: { children: ReactNode }) {
     async (blocking: boolean) => {
       if (!uid) return;
       try {
-        await syncAppLock();
         // Nishaan sirf KAAMYAAB sync par. Fail (net nahi) par nahi — warna
         // pehli baar offline khulne se lock hamesha ke liye chhoot jaata.
-        await AsyncStorage.setItem(`${SYNCED_PREFIX}${uid}`, "1").catch(() => {});
+        // ⚠️ `syncAppLock` apni galti khud nigal leta hai (throw nahi karta),
+        // isliye uska jawab dekhna zaroori hai — sirf `try` par bharosa karne se
+        // nishaan fail par bhi lag jaata tha.
+        if (await syncAppLock()) {
+          await AsyncStorage.setItem(`${SYNCED_PREFIX}${uid}`, "1").catch(() => {});
+        }
       } catch {
         /* net nahi — local jo hai wahi chalega */
       }

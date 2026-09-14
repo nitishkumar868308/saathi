@@ -335,7 +335,9 @@ const useStyles = makeStyles((c) => ({
   },
   title: { fontSize: 26, fontWeight: "700", color: c.ink },
   sub: { marginTop: 4, fontSize: 14, color: c.inkSoft },
-  chips: { flexDirection: "row", gap: 8, paddingHorizontal: 20, paddingTop: 16 },
+  // flexWrap: 320dp phone / bade font par teesra chip ("Expire ho gaye") kinare
+  // se kat jaata tha. `gap` dono taraf lagta hai, isliye doosri line me bhi jagah.
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 20, paddingTop: 16 },
   chip: {
     borderRadius: 999,
     borderWidth: 1,

@@ -6,6 +6,7 @@ import {
   Pressable,
   Modal,
   FlatList,
+  Platform,
 } from "react-native";
 import {
   getCountries,
@@ -13,6 +14,7 @@ import {
   type CountryCode,
 } from "libphonenumber-js";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboardPad } from "@/components/keyboard-view";
 import { makeStyles, useColors } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
 
@@ -53,6 +55,14 @@ export function PhoneField({
   const tc = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
+  /**
+   * ⚠️ Keyboard ki oonchai — country list ka search `autoFocus` par khulta hai,
+   * yaani keyboard hamesha saath aata hai. Pehle list ka neeche wala hissa aur
+   * "Band karo" button dono keyboard ke peeche the. Android keyboard ki oonchai
+   * me nav bar nahi ginta, isliye `insets.bottom` bhi joda (chat jaisa) — sirf
+   * Android par; iOS ki oonchai me home indicator pehle se shaamil hai.
+   */
+  const kbPad = useKeyboardPad(Platform.OS === "android" ? insets.bottom : 0);
   const { phoneField: p } = useT();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -111,7 +121,7 @@ export function PhoneField({
         <View
           style={[
             styles.modal,
-            { paddingTop: insets.top + 16, paddingBottom: insets.bottom },
+            { paddingTop: insets.top + 16, paddingBottom: kbPad || insets.bottom },
           ]}
         >
           <TextInput

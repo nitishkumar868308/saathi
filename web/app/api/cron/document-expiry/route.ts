@@ -14,6 +14,23 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Bade page wale run ke liye — neeche `TIME_BUDGET_MS` isse kaafi pehle rok deta hai.
+export const maxDuration = 60;
+
+/**
+ * Ek run ki hadd — page ka naap, kul chhat, aur waqt.
+ *
+ * ⚠️ Pehle ek hi query thi: `limit=500`, bina `order` ke. 500 se zyada document
+ * range me hote to baaki kabhi uthte hi nahi — aur bina order ke HAR run me
+ * wahi (ya koi bhi) 500 aate, yaani kuch documents ka alert hamesha chhoot
+ * sakta tha. Ab `id` par keyset paging (offset nahi — beech me rows badlein to
+ * offset rows chhod deta hai), aur waqt ki hadd taaki Vercel function beech me
+ * na kate. Jo is run me reh gaye, unhe 15 minute baad wala run utha leta hai
+ * (khidki 25 ghante ki hai, aur `claim` dobara bhejne se rokta hai).
+ */
+const PAGE = 500;
+const MAX_DOCS = 10_000;
+const TIME_BUDGET_MS = 45_000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -108,15 +125,35 @@ export async function POST(request: Request) {
   const lo = new Date(now - 20 * DAY).toISOString().slice(0, 10);
   const hi = new Date(now + 20 * DAY).toISOString().slice(0, 10);
 
-  let docs: DueDoc[];
+  const started = Date.now();
+  /** Kuch document is run me nahi dekhe gaye (chhat / waqt / page fail). */
+  let truncated = false;
+  const docs: DueDoc[] = [];
   try {
-    docs = await sbGet<DueDoc>(
-      `documents?select=id,name,expiry,user_id,expiry_ack_at,renewed_at` +
-        `&expiry=gte.${lo}&expiry=lte.${hi}&renewed_at=is.null&limit=500`,
-    );
+    let lastId: string | null = null;
+    for (;;) {
+      const page: DueDoc[] = await sbGet<DueDoc>(
+        `documents?select=id,name,expiry,user_id,expiry_ack_at,renewed_at` +
+          `&expiry=gte.${lo}&expiry=lte.${hi}&renewed_at=is.null` +
+          (lastId ? `&id=gt.${lastId}` : "") +
+          `&order=id.asc&limit=${PAGE}`,
+      );
+      docs.push(...page);
+      if (page.length < PAGE) break;
+      if (docs.length >= MAX_DOCS) {
+        truncated = true;
+        break;
+      }
+      lastId = page[page.length - 1].id;
+    }
   } catch (err) {
     console.error("[cron/document-expiry] fetch failed", err);
-    return NextResponse.json({ error: "fetch failed" }, { status: 500 });
+    // Pehla page hi na aaya to kuch nahi kar sakte. Beech ka page fail hua to
+    // jo mil chuka use bhej do — agla run baaki utha lega.
+    if (docs.length === 0) {
+      return NextResponse.json({ error: "fetch failed" }, { status: 500 });
+    }
+    truncated = true;
   }
 
   const profileCache = new Map<string, ReminderProfile>();
@@ -256,7 +293,14 @@ export async function POST(request: Request) {
   let skippedFree = 0;
   const errors: string[] = [];
 
+  let processed = 0;
   for (const doc of docs) {
+    // Waqt khatam — baaki agla run (upar `TIME_BUDGET_MS` par wajah).
+    if (Date.now() - started > TIME_BUDGET_MS) {
+      truncated = true;
+      break;
+    }
+    processed++;
     if (!doc.user_id || !doc.expiry) continue;
 
     // Sabse haal wala moment jo nikal chuka hai (khidki ke andar).
@@ -526,6 +570,8 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     scanned: docs.length,
+    processed,
+    truncated,
     email: mail,
     whatsapp: wa,
     // "email 0 kyun gaye" ka jawab — free users the, SMTP kharab nahi hai.

@@ -116,13 +116,34 @@ export async function addReminder(input: {
     .insert({ ...input, user_id: uid })
     .select()
     .single();
-  if (error) throw error;
+  /**
+   * ⚠️ Server ki apni rok (DB trigger) — wahi `ReminderLimitError`.
+   *
+   * Upar wali jaanch app ki hai: do phone se ek saath save, ya offline kataar
+   * ka baad me flush — dono use paar kar jaate hain. Trigger aisi row par
+   * `plan_limit_reminders` uchhalta hai. Isko pehchaan-na zaroori hai: ye NET
+   * ki galti nahi hai, aur `saveReminder` / `flushOutbox` ko ye saaf dikhna
+   * chahiye warna wo use "baad me bhej denge" samajh ke hamesha dohraate.
+   */
+  if (error) {
+    if (error.message?.includes("plan_limit_reminders")) {
+      throw new ReminderLimitError((await getOffers()).freeReminders);
+    }
+    throw error;
+  }
   return data as Reminder;
 }
 
 export async function setReminderOn(id: string, is_on: boolean): Promise<void> {
   const { error } = await client().from("reminders").update({ is_on }).eq("id", id);
-  if (error) throw error;
+  if (error) {
+    // Band reminder chalu karna bhi ek naya "chalu" slot hai — free hadd paar ho
+    // to DB trigger wahi `plan_limit_reminders` deta hai jo naya banane par.
+    if (error.message?.includes("plan_limit_reminders")) {
+      throw new ReminderLimitError((await getOffers()).freeReminders);
+    }
+    throw error;
+  }
 }
 
 export async function deleteReminder(id: string): Promise<void> {

@@ -88,7 +88,7 @@ export function hmacMatches(body: string, signature: string, secret: string): bo
  * ya **band**. Baaki (BILLING_ISSUE, PRODUCT_CHANGE…) ko chhod dena surakshit
  * hai — unke baad hamesha ek RENEWAL ya EXPIRATION aata hi hai.
  */
-const GRANTS = new Set([
+export const GRANTS = new Set([
   "INITIAL_PURCHASE",
   "RENEWAL",
   "UNCANCELLATION",

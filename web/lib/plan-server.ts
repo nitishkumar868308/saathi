@@ -170,7 +170,16 @@ export async function activatePlus(
     }
   }
 
-  await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+  /**
+   * ⚠️ Jawab DEKHNA zaroori hai. `fetch` sirf net toot-ne par reject karta hai —
+   * PostgREST ka 400/401/500 ek "kaamyab" promise hai. Pehle yahan jawab dekha
+   * hi nahi jaata tha: plan likha hi nahi gaya, webhook ne 200 de diya, aur
+   * RevenueCat ne event hamesha ke liye bhula diya. User ne paisa diya, Plus
+   * kabhi nahi mila, aur retry ka koi mauka nahi bacha.
+   *
+   * Throw -> webhook 500 -> RevenueCat dobara bhejta hai.
+   */
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
     method: "PATCH",
     headers: headers({ Prefer: "return=minimal" }),
     body: JSON.stringify({
@@ -180,23 +189,82 @@ export async function activatePlus(
     }),
     cache: "no-store",
   });
+  if (!res.ok) {
+    throw new Error(`activatePlus: profiles PATCH ${res.status} ${await res.text()}`);
+  }
 
   // Plus mil gaya — locked documents aur paused reminders TURANT wapas.
   await applyPlanLimits(userId);
 }
 
-/** Subscription khatam/cancel — wapas free. */
-export async function deactivatePlus(userId: string): Promise<void> {
-  if (!planDbConfigured()) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+/** Store ka apna source — sirf isi ka Plus store ka event wapas le sakta hai. */
+const STORE_SOURCE: PlanSource = "google_play";
+
+/** Revoke ka nateeja — webhook jawab me bata deta hai ki kya hua. */
+export type RevokeResult = "revoked" | "kept_non_store";
+
+/**
+ * Subscription khatam / refund — wapas free.
+ *
+ * ⚠️ Pehle ye HAMESHA `plan: "free"` likh deta tha. Par Plus sirf store se nahi
+ * aata: admin ka diya hua, referral ke din (`grant_plus_days`) — sab usi
+ * `profiles.plan` me hote hain. Kisi purani Play subscription ka EXPIRATION
+ * aata aur admin ka abhi-abhi diya hua 6 mahine ka Plus bhi saath me mit jaata.
+ * Uska koi nishaan bhi nahi bachta tha.
+ *
+ * Ab:
+ *   • `plan_source` store ka NAHI hai, aur Plus abhi chalu hai (expiry aage
+ *     hai, ya lifetime) -> kuch mat chhuo. Wo Plus is subscription ka tha hi nahi.
+ *   • Store ka hai -> pehle jaisa free. REFUND par `plan_expires_at` bhi abhi
+ *     par, taaki paisa wapas jaane ke baad bache hue din na chalte rahein.
+ *
+ * ⚠️ Seema: `grant_plus_days()` store wale user ka source `google_play` hi
+ * rehne deta hai (referral ke din jodne par bhi). Aise user ke referral ke din
+ * store ke EXPIRATION par ab bhi kat sakte hain — wo SQL function badle bina
+ * yahan se pehchaane nahi ja sakte.
+ */
+export async function deactivatePlus(
+  userId: string,
+  opts: { refund?: boolean } = {},
+): Promise<RevokeResult> {
+  if (!planDbConfigured()) return "revoked";
+
+  const cur = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=plan,plan_expires_at,plan_source`,
+    { headers: headers(), cache: "no-store" },
+  );
+  // Padh hi na paaye to andaze se free mat karo — throw, webhook retry karega.
+  if (!cur.ok) throw new Error(`deactivatePlus: profiles read ${cur.status}`);
+  const [row] = (await cur.json()) as {
+    plan: string | null;
+    plan_expires_at: string | null;
+    plan_source: string | null;
+  }[];
+
+  const fromStore = row?.plan_source === STORE_SOURCE;
+  if (row && !fromStore && row.plan === "plus") {
+    const exp = row.plan_expires_at;
+    const stillActive = exp === null || new Date(exp).getTime() > Date.now();
+    if (stillActive) return "kept_non_store";
+  }
+
+  const patch: Record<string, unknown> = { plan: "free" };
+  if (opts.refund && fromStore) patch.plan_expires_at = new Date().toISOString();
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
     method: "PATCH",
     headers: headers({ Prefer: "return=minimal" }),
-    body: JSON.stringify({ plan: "free" }),
+    body: JSON.stringify(patch),
     cache: "no-store",
   });
+  // Wahi wajah jo `activatePlus` me — chup-chaap 200 dene se retry khatam.
+  if (!res.ok) {
+    throw new Error(`deactivatePlus: profiles PATCH ${res.status} ${await res.text()}`);
+  }
 
   // Plus khatam — free ki hadd dobara lagao, warna paid feature chalte rehte.
   await applyPlanLimits(userId);
+  return "revoked";
 }
 
 /**
@@ -315,4 +383,57 @@ export async function recordPlayEvent(entry: PlayPaymentRecord): Promise<boolean
   } catch {
     return false;
   }
+}
+
+/**
+ * Plan lagana fail hua — is event ka record hata do, taaki retry "pehli baar"
+ * jaisa chale.
+ *
+ * ⚠️ Record plan se PEHLE banta hai (wajah webhook me likhi hai). Par kharidari
+ * ka email `recorded` (yaani nayi row) par hi jaata hai. Plan fail -> 500 ->
+ * RevenueCat retry -> row pehle se hai -> `recorded = false` -> Plus to mil
+ * jaata, par pusht ka email kabhi nahi jaata. Row hata dene se retry par wahi
+ * sab dobara hota hai. Duplicate email ka dar nahi: email plan lagne ke BAAD
+ * hi jaata hai, aur yahan tak aaye matlab plan laga hi nahi tha.
+ */
+export async function forgetPlayEvent(eventId: string): Promise<boolean> {
+  if (!planDbConfigured() || !eventId) return false;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/payments?event_id=eq.${encodeURIComponent(eventId)}`,
+      { method: "DELETE", headers: headers({ Prefer: "return=minimal" }), cache: "no-store" },
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Is user ka sabse naya grant (kharid/renewal) kab ka hai — `payments` se.
+ *
+ * ⚠️ Webhook tarteeb se aane ki koi guarantee nahi. RevenueCat retry karta hai,
+ * aur ek purana EXPIRATION naye RENEWAL ke BAAD pahunch sakta hai — bina is
+ * jaanch ke wo abhi-abhi renew hua Plus mita deta. Revoke ka `event_at` isse
+ * purana ho to wo revoke bekaar hai.
+ *
+ * Sandbox grant tabhi ginte hain jab wo Plus de bhi sakte hon (`includeSandbox`).
+ * Padh na paaye to throw — andaze se revoke karna usse bura hai.
+ */
+export async function latestGrantEventAt(
+  userId: string,
+  grantTypes: string[],
+  opts: { includeSandbox?: boolean } = {},
+): Promise<string | null> {
+  if (!planDbConfigured() || grantTypes.length === 0) return null;
+  const env = opts.includeSandbox ? "" : `&or=(environment.is.null,environment.neq.SANDBOX)`;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/payments?user_id=eq.${userId}` +
+      `&event_type=in.(${grantTypes.join(",")})&event_at=not.is.null${env}` +
+      `&select=event_at&order=event_at.desc&limit=1`,
+    { headers: headers(), cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`latestGrantEventAt: payments read ${res.status}`);
+  const [row] = (await res.json()) as { event_at: string | null }[];
+  return row?.event_at ?? null;
 }

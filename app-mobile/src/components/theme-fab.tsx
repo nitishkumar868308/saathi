@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors, useThemeMode } from "@/theme/theme";
 import { useT } from "@/lib/i18n/LanguageProvider";
+import { useKeyboardHeight } from "@/lib/use-keyboard";
 
 /**
  * Har screen par mila hua theme switch.
@@ -29,6 +30,19 @@ export function ThemeFab() {
   const tc = useColors();
   const { scheme, setMode } = useThemeMode();
   const t = useT();
+  const kb = useKeyboardHeight();
+
+  /**
+   * ⚠️ Keyboard khula ho to button hota hi nahi.
+   *
+   * Shikayat: "keyboard chalate time problem ho rhi h, automatically click ho
+   * rha h". Keyboard khulte hi screen ka neeche wala hissa (chat ka input bar,
+   * send button, form ka Save) upar khisak ke theek isi daayin kinare wali
+   * oonchai par aa jaata hai — aur type karte angoothe ka tap is button par pad
+   * ke theme badal deta tha. Typing ke waqt theme badalne ki zaroorat kisi ko
+   * nahi hoti, isliye koi bhi "sahi jagah" dhoondhne se seedha hata dena behtar.
+   */
+  if (kb > 0) return null;
 
   // Ab kya banega — icon wahi dikhata hai, kyunki ye button ek KAAM hai, haal
   // nahi. Moon ka matlab "gehra kar do", sooraj ka "ujla kar do".

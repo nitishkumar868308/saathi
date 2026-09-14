@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { supabase } from "./supabase";
 import { addReminder, listReminders, ReminderLimitError, type Reminder } from "./reminders";
 import { linkNoteReminder } from "./notes";
 import { cancelReminder, scheduleReminderSeries } from "./notifications";
@@ -25,12 +26,88 @@ import { emitDataChanged } from "./data-events";
  *      chali jaati hai.
  *
  * Local id `local:` se shuru hoti hai. Server wali id UUID hoti hai, isliye
- * dono kabhi takra nahi sakti — aur `syncNotifications()` sirf unhi ids ke
- * alarm cancel karta hai jo server se aayi list me hain, isliye kataar me pada
- * reminder kisi sync me chup-chaap mit nahi jaata.
+ * dono kabhi takra nahi sakti — aur `syncNotifications()` `local:` wali ids ko
+ * kabhi nahi chhoota (na schedule, na "list me nahi hai" wali safai), isliye
+ * kataar me pada reminder kisi sync me chup-chaap mit nahi jaata.
  */
 
+/**
+ * Kataar ki chaabi — HAR USER KI ALAG (`saathi-reminder-outbox:<uid>`).
+ *
+ * ⚠️ Pehle ek hi global chaabi thi. User A offline reminder banata, logout
+ * karta, B login karta — aur agla flush A ka reminder B ke account me daal
+ * deta (insert B ke session se hota hai). B ke paas kisi aur ka reminder, A ka
+ * reminder kahin nahi.
+ *
+ * Purani global chaabi (`KEY` akela) ek baar padhi jaati hai — neeche
+ * `adoptLegacy()`.
+ */
 const KEY = "saathi-reminder-outbox";
+const keyFor = (uid: string) => `${KEY}:${uid}`;
+
+/** Abhi kaun logged-in hai — local session se (bina network ke). */
+async function currentUid(): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function parseList(raw: string | null): OutboxItem[] {
+  if (!raw) return [];
+  try {
+    const list = JSON.parse(raw) as OutboxItem[];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    // Kharab/adhoora data — usse chipke rehne se behtar hai saaf shuruaat.
+    return [];
+  }
+}
+
+/**
+ * Purani global kataar — update ke baad ek hi baar.
+ *
+ * ⚠️ Us kataar ke items me koi user id hoti hi nahi, isliye unka maalik
+ * pakka nahi bataya ja sakta. Jo user update ke baad pehli baar kataar padhta
+ * hai wo lagbhag hamesha wahi hota hai jisne wo reminder banaye the (update
+ * logout nahi karta). Isliye wo unhe apna leta hai aur global chaabi mita di
+ * jaati hai — aaj ka ek-user wala vyavhaar bilkul waisa hi rehta hai, aur
+ * aage koi doosra user unhe kabhi nahi uthata.
+ *
+ * Promise isliye (boolean nahi) ki do saath chalne wale `read()` dono adoption
+ * poora hone ka intezaar karein — warna doosra khaali list padh ke usi par
+ * likh deta.
+ */
+let legacyAdopt: Promise<void> | null = null;
+
+function adoptLegacy(uid: string): Promise<void> {
+  if (!legacyAdopt) {
+    legacyAdopt = (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(KEY);
+        if (raw === null) return;
+        const old = parseList(raw);
+        if (old.length > 0) {
+          const mine = parseList(await AsyncStorage.getItem(keyFor(uid)));
+          const known = new Set(mine.map((x) => x.id));
+          await AsyncStorage.setItem(
+            keyFor(uid),
+            JSON.stringify([...mine, ...old.filter((x) => !known.has(x.id))]),
+          );
+        }
+        await AsyncStorage.removeItem(KEY);
+      } catch (e) {
+        // Agli baar phir koshish — global chaabi mitayi hi nahi gayi.
+        legacyAdopt = null;
+        reportError(e, { screen: "reminder-outbox", action: "adopt_legacy" }, "warn");
+      }
+    })();
+  }
+  return legacyAdopt;
+}
 
 export type OutboxInput = {
   /**
@@ -63,21 +140,19 @@ export function isPendingId(id: string): boolean {
   return id.startsWith("local:");
 }
 
-async function read(): Promise<OutboxItem[]> {
+async function read(uid: string): Promise<OutboxItem[]> {
+  await adoptLegacy(uid);
   try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return [];
-    const list = JSON.parse(raw) as OutboxItem[];
-    return Array.isArray(list) ? list : [];
+    return parseList(await AsyncStorage.getItem(keyFor(uid)));
   } catch {
-    // Kharab/adhoora data — usse chipke rehne se behtar hai saaf shuruaat.
     return [];
   }
 }
 
-async function write(list: OutboxItem[]): Promise<void> {
+async function write(uid: string, list: OutboxItem[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(list));
+    if (list.length === 0) await AsyncStorage.removeItem(keyFor(uid));
+    else await AsyncStorage.setItem(keyFor(uid), JSON.stringify(list));
   } catch (e) {
     // Ye chup-chaap fail hua to user ka reminder gum ho jaayega — alarm to bajega
     // par server par kabhi nahi pahunchega, aur doosre phone par kabhi nahi
@@ -88,7 +163,9 @@ async function write(list: OutboxItem[]): Promise<void> {
 
 /** Kataar me pade reminders (list screens inhe apne data ke saath dikhati hain). */
 export async function pendingReminders(): Promise<Reminder[]> {
-  const list = await read();
+  const uid = await currentUid();
+  if (!uid) return [];
+  const list = await read(uid);
   return list.map((r) => ({
     id: r.id,
     title: r.title,
@@ -122,11 +199,11 @@ export async function listRemindersWithPending(): Promise<Reminder[]> {
 }
 
 /** Reminder kataar me daalo aur uski local id lauta do. */
-async function queue(input: OutboxInput): Promise<string> {
+async function queue(uid: string, input: OutboxInput): Promise<string> {
   const id = `local:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const list = await read();
+  const list = await read(uid);
   list.push({ ...input, id, queuedAt: Date.now() });
-  await write(list);
+  await write(uid, list);
   return id;
 }
 
@@ -140,10 +217,12 @@ async function queue(input: OutboxInput): Promise<string> {
  * sirf sync hone ke baad karne deta hai.
  */
 export async function removeFromOutbox(id: string): Promise<boolean> {
-  const list = await read();
+  const uid = await currentUid();
+  if (!uid) return false;
+  const list = await read(uid);
   const left = list.filter((r) => r.id !== id);
   if (left.length === list.length) return false;
-  await write(left);
+  await write(uid, left);
   await cancelReminder(id);
   return true;
 }
@@ -172,7 +251,10 @@ export async function saveReminder(input: OutboxInput): Promise<SaveResult> {
     return { id: r.id, pending: false };
   } catch (e) {
     if (e instanceof ReminderLimitError || !isNetworkError(e)) throw e;
-    return { id: await queue(input), pending: true };
+    // Kataar user ki hai — bina session ke kiske naam rakhein? Asli galti hi aage.
+    const uid = await currentUid();
+    if (!uid) throw e;
+    return { id: await queue(uid, input), pending: true };
   }
 }
 
@@ -214,10 +296,15 @@ export function flushOutbox(): Promise<{ sent: number; dropped: number }> {
 }
 
 async function runFlush(): Promise<{ sent: number; dropped: number }> {
-  const list = await read();
+  // Sirf ABHI wale user ki kataar — kisi aur ki kataar is session se kabhi
+  // insert nahi honi chahiye (wajah `keyFor` par).
+  const uid = await currentUid();
+  if (!uid) return { sent: 0, dropped: 0 };
+  const list = await read(uid);
   if (list.length === 0) return { sent: 0, dropped: 0 };
 
-  const left: OutboxItem[] = [];
+  /** Jo items nipat gaye (bhej diye ya chhod diye) — aakhir me sirf yahi hatenge. */
+  const done = new Set<string>();
   let sent = 0;
   let dropped = 0;
 
@@ -249,20 +336,49 @@ async function runFlush(): Promise<{ sent: number; dropped: number }> {
         );
       }
       sent++;
+      done.add(item.id);
     } catch (e) {
-      if (isNetworkError(e)) {
+      /**
+       * ⚠️ Limit ki jaanch NET wali jaanch se PEHLE.
+       *
+       * Server ka trigger (`plan_limit_reminders`) ab offline kataar ko bhi
+       * rokta hai. Wo galti kabhi "net aane par chal jaayegi" nahi hoti — use
+       * kataar me chhodna matlab har app-open par ek bekaar insert, hamesha ke
+       * liye, aur uska `local:` alarm bhi bajta rehta jiske peeche koi reminder
+       * nahi. Isliye chhod dete hain + alarm hatate hain (niche wala hi raasta).
+       * Report nahi karte: ye bug nahi, free plan ka niyam hai.
+       */
+      const isLimit = e instanceof ReminderLimitError;
+      if (!isLimit && isNetworkError(e)) {
         // Net abhi bhi nahi — kataar me hi rehne do.
-        left.push(item);
         continue;
       }
       // Limit / permission / koi aur pakki galti — ye baad me bhi nahi jaayega.
       await cancelReminder(item.id);
       dropped++;
-      reportError(e, { screen: "reminder-outbox", action: "flush", title: item.title }, "warn");
+      done.add(item.id);
+      if (!isLimit) {
+        reportError(e, { screen: "reminder-outbox", action: "flush", title: item.title }, "warn");
+      }
     }
   }
 
-  await write(left);
+  /**
+   * ⚠️ Storage DOBARA padho aur sirf nipte hue items hatao — shuru wali list
+   * (`left`) seedha mat likho.
+   *
+   * Flush network par hai aur seconds le sakta hai. Us beech user ne offline
+   * ek aur reminder banaya ho to wo storage me aa chuka hota hai, par shuru me
+   * padhi gayi list me nahi. Purani list likh dene se wo naya reminder
+   * chup-chaap mit jaata tha — alarm bajta, par server par kabhi nahi pahunchta.
+   */
+  if (done.size > 0) {
+    const now = await read(uid);
+    await write(
+      uid,
+      now.filter((x) => !done.has(x.id)),
+    );
+  }
   // Ek bhi reminder server par gaya to uski id badal chuki hai — khuli hui
   // list screens ko dobara padhna hoga, warna wahan purani `local:` wali row
   // padi rehti hai.

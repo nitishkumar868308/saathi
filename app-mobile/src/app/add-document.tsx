@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import {
   keepOnPhone,
   uploadDocumentFile,
 } from "@/lib/documents";
+import { queueUpload } from "@/lib/doc-upload-queue";
 import { ConfirmModal } from "@/components/confirm-modal";
 import { ensureNotifPermission, scheduleDocumentExpiry } from "@/lib/notifications";
 import { checkReferralQualification } from "@/lib/plan";
@@ -195,6 +196,18 @@ export default function AddDocument() {
    * chhota sa toast milta tha jo wo padhta bhi nahi.
    */
   const [permModal, setPermModal] = useState(false);
+  /**
+   * Screen abhi khuli hai? Save network par hai aur user beech me screen band
+   * kar sakta hai — uske baad state/navigation nahi chhoona, par document ka
+   * kaam (kataar, alarm) poora hona hi chahiye.
+   */
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   /**
    * Chuni hui file ko lena — camera aur "Chuno", dono yahin aate hain.
@@ -477,6 +490,21 @@ export default function AddDocument() {
        * aur pata theek us din chalta jab document sach me chahiye hota.
        */
       const uploadOk = await uploadDocumentFile(doc.id, pickedUri, pickedMime);
+      /**
+       * ⚠️ Fail hua to file TURANT kataar me — user ke jawab ka intezaar kiye bina.
+       *
+       * Neeche ka modal user se poochhta hai, par wo tabhi dikhta hai jab screen
+       * khuli ho. Net jaate hi log aksar screen band kar dete hain (ya app peeche
+       * chali jaati hai) — us soorat me document ki row ban chuki thi, file kahin
+       * darj nahi thi, aur `file_uri` bhi khaali tha, isliye `requeueMissingUploads`
+       * bhi use kabhi pakad nahi paata. Document hamesha ke liye bina file ka.
+       *
+       * Kataar sirf UPLOAD karti hai, phone par kuch nahi rakhti — "chupchaap
+       * device par" wali purani galti wapas nahi aati. Modal ke dono jawab isi
+       * entry ko badal dete hain (`keepOnPhone`) ya hata dete hain (kaamyab
+       * `uploadDocumentFile`).
+       */
+      if (!uploadOk) await queueUpload(doc.id, pickedUri, pickedMime).catch(() => {});
 
       /**
        * Expiry ke liye notification (7 din pehle, 1 din pehle, aur us din).
@@ -504,6 +532,8 @@ export default function AddDocument() {
       checkReferralQualification().catch(() => {});
       // Review popup ka padav — document + reminder dono ho jaayein to poochho.
       markFirstDocument().catch(() => {});
+      // Screen band ho chuki — document ka zaroori kaam upar ho gaya, UI ka nahi.
+      if (!mounted.current) return;
       /**
        * Toast wahi kahe jo sach me hua.
        *
@@ -563,14 +593,15 @@ export default function AddDocument() {
       router.back();
     } catch (e) {
       if (e instanceof DocLimitError) {
+        if (!mounted.current) return;
         toast.show(d.limitReached, "info");
         router.push("/upgrade" as never);
       } else {
         reportError(e, { screen: "add-document", action: "save" });
-        toast.show(d.saveFailed, "error");
+        if (mounted.current) toast.show(d.saveFailed, "error");
       }
     } finally {
-      setSaving(false);
+      if (mounted.current) setSaving(false);
     }
   }
 

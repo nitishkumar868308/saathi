@@ -1,6 +1,9 @@
 import {
   readToken,
   recordEvent,
+  isOwnSiteUrl,
+  urlInSend,
+  urlSignatureOk,
   APP_DEST_URL,
   WEB_DEST_URL,
   type ClickDest,
@@ -64,10 +67,35 @@ export async function GET(request: Request) {
   const dRaw = url.searchParams.get("d");
   const dest: ClickDest = dRaw === "app" || dRaw === "url" ? dRaw : "web";
 
-  const to =
-    dest === "app" ? appUrl(agent) : dest === "url" ? safeUrl(url.searchParams.get("u")) : WEB_DEST_URL;
-
   const sendId = readToken(url.searchParams.get("k"));
+
+  /**
+   * ⚠️ `d=url` pehle bina kisi token ke bhi chalta tha — sirf http/https ki
+   * jaanch. Yaani `apkasaathi.com/api/t/c?d=url&u=https://phishing.example`
+   * kisi ko bhi hamare naam se kahin bhi bhej deta tha. Ab teen me se ek shart:
+   *
+   *   1. `s` — url ka apna hmac (naye email me hamesha hota hai), ya
+   *   2. url hamari apni site ka hai, ya
+   *   3. url us send ke asli message me likha tha (purane, bina `s` wale email).
+   *
+   * Aur teeno se pehle `k` sahi hona chahiye. Kuch bhi na mile to apni site.
+   */
+  let to = WEB_DEST_URL;
+  if (dest === "app") {
+    to = appUrl(agent);
+  } else if (dest === "url" && sendId) {
+    const raw = url.searchParams.get("u");
+    const candidate = safeUrl(raw);
+    if (
+      raw &&
+      candidate !== WEB_DEST_URL &&
+      (urlSignatureOk(sendId, raw, url.searchParams.get("s")) ||
+        isOwnSiteUrl(candidate) ||
+        (await urlInSend(sendId, raw)))
+    ) {
+      to = candidate;
+    }
+  }
   if (sendId) {
     // Click likhna user ke redirect ko rok nahi sakta — isliye await hai par
     // fail chup-chaap nigal liya jaata hai (recordEvent khud hi aisa hai).

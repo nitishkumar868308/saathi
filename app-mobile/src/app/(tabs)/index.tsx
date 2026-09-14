@@ -18,11 +18,16 @@ import { timed } from "@/lib/network";
 import { UserAvatar } from "@/components/user-avatar";
 import { UpgradeBanner } from "@/components/upgrade-banner";
 import { deleteDocument, listDocuments, type Document } from "@/lib/documents";
-import { setReminderOn, type Reminder } from "@/lib/reminders";
+import { completeReminder, type Reminder } from "@/lib/reminders";
 import { isPendingId, listRemindersWithPending } from "@/lib/reminder-outbox";
 import { hasBeenReferred } from "@/lib/plan";
+import { reportIfNetwork } from "@/lib/net-alert";
 import { ReferralCodeModal } from "@/components/referral-code-modal";
-import { cancelDocumentExpiry, cancelReminder } from "@/lib/notifications";
+import {
+  cancelDocumentExpiry,
+  cancelReminder,
+  scheduleReminderSeries,
+} from "@/lib/notifications";
 import { expiryStatus } from "@/utils/expiry";
 import { DocCard } from "@/components/doc-card";
 import { ConfirmModal } from "@/components/confirm-modal";
@@ -34,10 +39,13 @@ import { tpl } from "@/lib/i18n/dictionaries";
 import { useOffers } from "@/lib/use-offers";
 import { emitDataChanged, useDataChanged } from "@/lib/data-events";
 import { usePlan } from "@/lib/use-plan";
-import { dailyBrief, dayPart } from "@/lib/ai";
+import { dailyBrief, dayPart, localIso } from "@/lib/ai";
 import { Reveal3D, Press3D } from "@/components/reveal-3d";
 import { deviceOwner, getDeviceId } from "@/lib/device";
 import { markFirstDocument, markFirstReminder } from "@/lib/reviews";
+
+/** Referral modal "dekh liya" — ab `<key>:<uid>`; akela key purana global nishaan hai. */
+const REF_SEEN_KEY = "referral_prompt_seen";
 
 function isToday(iso: string | null): boolean {
   if (!iso) return false;
@@ -72,17 +80,33 @@ export default function Home() {
   // Header ka avatar — shared cache se, taaki profile me photo badalte hi yahan
   // bhi turant badal jaye (pehle logout-login tak purani photo dikhti thi).
   const avatarUrl = useUserDetails().details?.avatar_url ?? null;
+  const uid = session?.user?.id;
 
   // Referral code ek baar poochho — jinhone signup pe code nahi daala + pehle
   // se referred nahi. Dismiss/apply ke baad dobara nahi.
+  //
+  // ⚠️ "Dekh liya" ka nishaan HAR USER KA ALAG (`referral_prompt_seen:<uid>`).
+  // Pehle ek hi global nishaan tha: is phone par pehle user ne modal band kiya,
+  // to naye account wale ko (jiske liye ye modal bana hi hai — abhi-abhi signup
+  // kiya hai) code daalne ka mauka kabhi mila hi nahi.
+  //
+  // Purana global nishaan ek baar abhi wale user ka maan liya jaata hai aur mit
+  // jaata hai — update ke baad pehli baar Home kholne wala lagbhag hamesha wahi
+  // hota hai jisne use band kiya tha, aur use modal dobara dikhana chidhchida hota.
   useEffect(() => {
-    if (!offers.referralsEnabled) return;
+    if (!offers.referralsEnabled || !uid) return;
     let alive = true;
     (async () => {
       try {
-        if (await AsyncStorage.getItem("referral_prompt_seen")) return;
+        const key = `${REF_SEEN_KEY}:${uid}`;
+        if (await AsyncStorage.getItem(key)) return;
+        if (await AsyncStorage.getItem(REF_SEEN_KEY)) {
+          await AsyncStorage.setItem(key, "1");
+          await AsyncStorage.removeItem(REF_SEEN_KEY);
+          return;
+        }
         if (await hasBeenReferred()) {
-          await AsyncStorage.setItem("referral_prompt_seen", "1");
+          await AsyncStorage.setItem(key, "1");
           return;
         }
         if (alive) setRefModal(true);
@@ -93,12 +117,12 @@ export default function Home() {
     return () => {
       alive = false;
     };
-  }, [offers.referralsEnabled]);
+  }, [offers.referralsEnabled, uid]);
 
   const closeRefModal = useCallback(() => {
     setRefModal(false);
-    AsyncStorage.setItem("referral_prompt_seen", "1").catch(() => {});
-  }, []);
+    if (uid) AsyncStorage.setItem(`${REF_SEEN_KEY}:${uid}`, "1").catch(() => {});
+  }, [uid]);
 
   /**
    * "Ye phone kisi aur ke naam par hai" — pehle din sirf ek toast.
@@ -112,7 +136,6 @@ export default function Home() {
    * Toast rok nahi hai aur kuch poochta bhi nahi — bas ek line jo us khamoshi ko
    * khatam kar deti hai. Ek hi baar, har (device, user) jodi par.
    */
-  const uid = session?.user?.id;
   useEffect(() => {
     if (!uid) return;
     let alive = true;
@@ -194,7 +217,15 @@ export default function Home() {
     async (documents: Document[], reminders: Reminder[]) => {
       const uid = session?.user?.id;
       if (!isPlus || !uid) return;
-      const day = new Date().toISOString().slice(0, 10);
+      /**
+       * ⚠️ Aaj ki taarikh PHONE KE apne din se — `toISOString()` se nahi.
+       *
+       * `toISOString()` UTC deta hai. India me raat 12 se subah 5:30 tak wo
+       * KAL ki taarikh bolta hai: cache ki chaabi pichhle din ki banti (raat
+       * wala purana brief subah tak chipka rehta) aur AI ko `today` bhi galat
+       * din jaata — "aaj ke reminder" wo kal wale gin leta.
+       */
+      const day = localIso(new Date()).slice(0, 10);
       /**
        * ⚠️ Key me `locale` hona ZAROORI hai.
        *
@@ -332,12 +363,35 @@ export default function Home() {
       return;
     }
     setToday((prev) => prev.filter((x) => x.id !== r.id));
+    /**
+     * ⚠️ Bilkul wahi raasta jo Reminders tab ka "Ho gaya" hai — `complete_reminder`.
+     *
+     * Pehle yahan `setReminderOn(false)` tha. Ek-baar wale reminder par wo theek
+     * tha, par ROZ wale par seedha nuksan: "aaj ki dawai ho gayi" dabate hi poora
+     * reminder HAMESHA ke liye band — kal subah koi alarm nahi. Aur saari khidki
+     * ke alarm bhi cancel. Server batata hai agli baari kab hai; wahi alarm lagao.
+     */
     try {
-      await setReminderOn(r.id, false);
-      await cancelReminder(r.id);
-      toast.show(h.doneToast, "success");
-    } catch {
-      /* best-effort; list already updated */
+      const next = await completeReminder(r.id);
+      if (next) {
+        await scheduleReminderSeries(
+          r.id,
+          r.title,
+          new Date(next),
+          r.repeat_every_days,
+          r.repeat_until,
+        );
+        toast.show(r0.doneToday, "success");
+      } else {
+        await cancelReminder(r.id);
+        toast.show(r0.doneAll, "success");
+      }
+    } catch (e) {
+      // List se hat chuka hai — neeche `emitDataChanged` Home dobara padhta hai,
+      // to nipta nahi to wapas aa jaata hai. Chup rehna yahan jhooth hota.
+      if (!reportIfNetwork(e, "save", () => markDone(r))) {
+        toast.show(r0.title + " ✕", "error");
+      }
     } finally {
       // Reminders tab bhi khula ho sakta hai — wahan bhi turant sudhar jaye.
       emitDataChanged();
@@ -385,7 +439,7 @@ export default function Home() {
         }
       >
         <View style={styles.headerRow}>
-          <View>
+          <View style={styles.greetingCol}>
             <Text style={styles.greeting}>
               {tpl(h.greeting, { name: firstName ? ` ${firstName}` : "" })}
             </Text>
@@ -449,7 +503,9 @@ export default function Home() {
                 <Text style={styles.briefUpsellText}>{h.briefPlusHook}</Text>
                 <View style={styles.briefUpsellCta}>
                   <Text style={styles.briefUpsellCtaText}>{h.briefPlusCta}</Text>
-                  <Ionicons name="arrow-forward" size={12} color={tc.ink} />
+                  {/* `onAccent` — `ink` dark theme me lagbhag safed hai aur amber
+                      chip par teer gayab ho jaata tha (text ke saath wahi galti). */}
+                  <Ionicons name="arrow-forward" size={12} color={tc.onAccent} />
                 </View>
               </Pressable>
             )}
@@ -683,6 +739,9 @@ const useStyles = makeStyles((c) => ({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  // ⚠️ `flex: 1` + margin — bina iske lamba naam (ya Hindi greeting) 320dp
+  // screen par avatar ko screen se bahar dhakel deta tha.
+  greetingCol: { flex: 1, marginRight: 12 },
   greeting: { fontSize: 28, fontWeight: "700", color: c.ink },
   sub: { marginTop: 3, fontSize: 15, color: c.inkSoft },
   avatarRing: {

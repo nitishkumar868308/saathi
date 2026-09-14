@@ -178,10 +178,28 @@ export async function saveUserDetails(d: UserDetails): Promise<void> {
    * Number badla to DB ka trigger use apne aap `null` kar deta hai — yaani
    * purana verification naye number par chipak nahi sakta.
    */
-  const { phone_verified_at: _ignored, ...writable } = d;
-
+  //
+  // ⚠️ Isliye (aur ek aur wajah se) payload me SIRF profile ke column, naam le
+  // ke — `...d` nahi. `getUserDetails()` `select("*")` karta hai, yaani cache
+  // wale object me `app_lock_hash`, `app_lock_at` jaise server ke column bhi
+  // hote hain. Unhe wapas bhejna DB ke trigger se bekaar to hota hai, par ek
+  // bhi naya server column aane par save tootne ka raasta bana rehta.
   const { error } = await sb.from("user_details").upsert(
-    { user_id: uid, ...writable, updated_at: new Date().toISOString() },
+    {
+      user_id: uid,
+      full_name: d.full_name,
+      email: d.email,
+      phone: d.phone,
+      phone_dial_code: d.phone_dial_code,
+      phone_country: d.phone_country,
+      address: d.address,
+      gender: d.gender,
+      country_id: d.country_id,
+      state_id: d.state_id,
+      city_id: d.city_id,
+      avatar_url: d.avatar_url,
+      updated_at: new Date().toISOString(),
+    },
     { onConflict: "user_id" },
   );
   if (error) throw error;

@@ -874,6 +874,14 @@ export type AdminDict = {
       purge: string;
       reject: string;
       hideConfirm: string;
+      /** Request bina login ke aayi — account sirf email se mila. */
+      unverified: string;
+      unverifiedHelp: string;
+      /** {email} = request ka email. Hide/purge se pehle ki alag pushti. */
+      unverifiedConfirm: string;
+      /** Purge adhoora raha — status nahi badla. */
+      purgePartial: string;
+      filesError: string;
       /** {email} = user ka email, jo admin ko likhna padta hai. */
       purgeConfirm: string;
       /** Dono raaston ka fark — sabse zaroori line. */
@@ -1575,6 +1583,14 @@ const en: AdminDict = {
       purge: "Delete everything",
       reject: "Reject",
       hideConfirm: "Hide this account? Their data stays in the database and you can restore it.",
+      unverified: "email not verified",
+      unverifiedHelp:
+        "This request was sent without signing in, so we can't be sure the account owner sent it. The account shown was matched by email only. Confirm with them from that email address before hiding or deleting anything.",
+      unverifiedConfirm:
+        "Email not verified — anyone could have typed {email} into the form. Have you confirmed with the account owner that they really want this?",
+      purgePartial:
+        "Delete did not finish — the request status was not changed. Fix the problem below and run delete again (it is safe to repeat):",
+      filesError: "Could not list files",
       purgeConfirm:
         "This cannot be undone. Type the email to confirm you want to permanently delete everything:\n\n{email}",
       hideVsDelete:
@@ -2256,6 +2272,14 @@ const hi: AdminDict = {
       reject: "मना करें",
       hideConfirm:
         "यह अकाउंट छुपा दें? इनका डेटा डेटाबेस में रहेगा और आप इसे वापस चालू कर सकते हैं।",
+      unverified: "ईमेल वेरिफ़ाई नहीं",
+      unverifiedHelp:
+        "यह रिक्वेस्ट बिना लॉगिन के भेजी गई है, इसलिए पक्का नहीं कि अकाउंट के मालिक ने ही भेजी है। दिखाया गया अकाउंट सिर्फ़ ईमेल से मिलाया गया है। छुपाने या डिलीट करने से पहले उसी ईमेल पर उनसे पुष्टि कर लें।",
+      unverifiedConfirm:
+        "ईमेल वेरिफ़ाई नहीं है — फ़ॉर्म में कोई भी {email} लिख सकता है। क्या आपने अकाउंट के मालिक से पुष्टि कर ली है?",
+      purgePartial:
+        "डिलीट पूरा नहीं हुआ — रिक्वेस्ट का स्टेटस नहीं बदला गया। नीचे की दिक्कत ठीक करके फिर से डिलीट चलाएँ (दोबारा चलाना सुरक्षित है):",
+      filesError: "फ़ाइलों की सूची नहीं मिली",
       purgeConfirm:
         "यह वापस नहीं होगा। हमेशा के लिए सब कुछ डिलीट करने की पुष्टि के लिए ईमेल लिखें:\n\n{email}",
       hideVsDelete:
@@ -2937,6 +2961,14 @@ const hinglish: AdminDict = {
       reject: "Mana karo",
       hideConfirm:
         "Ye account chhupa dein? Inka data database me rahega aur aap ise wapas chalu kar sakte ho.",
+      unverified: "email verified nahi hai",
+      unverifiedHelp:
+        "Ye request bina login ke bheji gayi hai, isliye pakka nahi ki account ke maalik ne hi bheji hai. Dikhaya gaya account sirf email se milaya gaya hai. Chhupane ya delete karne se pehle usi email par unse pushti kar lo.",
+      unverifiedConfirm:
+        "Email verified nahi hai — form me koi bhi {email} likh sakta hai. Kya aapne account ke maalik se pushti kar li hai?",
+      purgePartial:
+        "Delete poora nahi hua — request ka status nahi badla. Neeche wali dikkat theek karke dobara delete chalao (dobara chalana safe hai):",
+      filesError: "Files ki list nahi mili",
       purgeConfirm:
         "Ye wapas nahi hoga. Hamesha ke liye sab kuch delete karne ki pushti ke liye email likho:\n\n{email}",
       hideVsDelete:

@@ -209,7 +209,9 @@ export default function ForgotPassword() {
                   keyboardType="number-pad"
                   autoComplete="one-time-code"
                   textContentType="oneTimeCode"
-                  maxLength={CODE_MAX}
+                  // ⚠️ `maxLength` jaan-boojh ke NAHI: wo native hai, aur chipkaaya
+                  // hua "Your code is 123456" JS tak aane se pehle hi kat jaata
+                  // tha. Kaatna upar `slice` me hota hai.
                   returnKeyType="done"
                   onSubmitEditing={() => void submitCode()}
                   style={[styles.input, styles.codeInput]}

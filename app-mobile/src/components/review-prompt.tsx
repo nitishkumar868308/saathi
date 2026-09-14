@@ -6,7 +6,9 @@ import {
   Modal,
   TextInput,
   Linking,
+  ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { makeStyles, useColors } from "@/theme/theme";
@@ -56,6 +58,7 @@ export function ReviewPrompt() {
    * par hai (poori wajah `lib/use-keyboard.ts` par likhi hai).
    */
   const kbPad = useKeyboardPad(12);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -111,7 +114,22 @@ export function ReviewPrompt() {
 
   return (
     <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={onLater}>
-      <View style={[styles.backdrop, { paddingBottom: 26 + kbPad }]}>
+      {/**
+       * ⚠️ Backdrop ab ScrollView hai (`otp-modal` wala tareeka). Keyboard ki
+       * padding card ko upar dhakelti thi, par card lamba ho (360x640 phone, bada
+       * font) to uski heading status bar ke NEECHE chali jaati thi — koi scroll
+       * nahi tha. Ab card chhota ho to beech me, bada ho to scroll.
+       */}
+      <ScrollView
+        style={styles.backdrop}
+        contentContainerStyle={[
+          styles.backdropInner,
+          { paddingTop: insets.top + 26, paddingBottom: 26 + kbPad },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         <View style={styles.card}>
           {thanks ? (
             <>
@@ -175,7 +193,7 @@ export function ReviewPrompt() {
             </>
           )}
         </View>
-      </View>
+      </ScrollView>
 
       <LoaderOverlay visible={saving} />
     </Modal>
@@ -183,12 +201,13 @@ export function ReviewPrompt() {
 }
 
 const useStyles = makeStyles((c) => ({
-  backdrop: {
-    flex: 1,
-    backgroundColor: c.scrim,
+  backdrop: { flex: 1, backgroundColor: c.scrim },
+  // `flexGrow: 1` + center — sirf `flex: 1` par scroll kabhi chalta hi nahi.
+  backdropInner: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 26,
+    paddingHorizontal: 26,
   },
   card: {
     width: "100%",

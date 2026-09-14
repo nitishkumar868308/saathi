@@ -429,7 +429,10 @@ const useStyles = makeStyles((c) => ({
    */
   testBtn: {
     marginTop: 14,
-    height: 46,
+    // `minHeight` — bade font par label do line me jaaye to kate nahi.
+    minHeight: 46,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -439,7 +442,7 @@ const useStyles = makeStyles((c) => ({
     borderColor: c.terracotta,
     backgroundColor: "rgba(194,90,55,0.07)",
   },
-  testText: { fontSize: 14.5, fontWeight: "800", color: c.terracotta },
+  testText: { flexShrink: 1, textAlign: "center", fontSize: 14.5, fontWeight: "800", color: c.terracotta },
   cta: {
     marginTop: 12,
     height: 50,

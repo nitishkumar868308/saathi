@@ -99,7 +99,15 @@ export async function requestAccountDeletion(opts: {
   try {
     const res = await fetch(`${WEB_URL}/api/account/delete-request`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // ⚠️ Token zaroori hai: server ab `user_id` sirf tab jodta hai jab token
+      // wale user ka email form ke email se mile. Bina iske app se aayi har
+      // request admin ko "email verified nahi hai" dikhti.
+      headers: {
+        "content-type": "application/json",
+        ...(data.session?.access_token
+          ? { Authorization: `Bearer ${data.session.access_token}` }
+          : {}),
+      },
       body: JSON.stringify({
         name,
         email,

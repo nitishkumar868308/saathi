@@ -39,7 +39,7 @@ type Req = {
 
 type Profile = { deleted_at: string | null; email: string | null };
 type InvItem = { table: string; col: string; label: string; count: number | null };
-type Inventory = { items: InvItem[]; files: number };
+type Inventory = { items: InvItem[]; files: number; filesError?: string | null };
 
 export default function AdminDeleteRequests() {
   const t = useAdminT();
@@ -47,6 +47,14 @@ export default function AdminDeleteRequests() {
 
   const [rows, setRows] = useState<Req[] | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
+  /**
+   * Bina verified email wali request -> email se mila account (sirf sujhaav).
+   *
+   * ⚠️ Pehle server form ke email se hi `user_id` jod deta tha, yaani koi bhi
+   * kisi ka email daal ke uske account ki "asli" dikhne wali request bana sakta
+   * tha. Ab aisi request par kaam se pehle alag pushti maangi jaati hai.
+   */
+  const [suggested, setSuggested] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -62,11 +70,13 @@ export default function AdminDeleteRequests() {
       const body = (await res.json()) as {
         requests?: Req[];
         profiles?: Record<string, Profile>;
+        suggested?: Record<string, string>;
         error?: string;
       };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       setRows(body.requests ?? []);
       setProfiles(body.profiles ?? {});
+      setSuggested(body.suggested ?? {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "load failed");
       setRows([]);
@@ -77,6 +87,9 @@ export default function AdminDeleteRequests() {
     void load();
   }, [load]);
 
+  /** Kaam kis uid par hoga — verified `user_id`, ya email se mila sujhaav. */
+  const uidFor = (r: Req): string | null => r.user_id ?? suggested[r.id] ?? null;
+
   async function openInventory(r: Req) {
     if (openId === r.id) {
       setOpenId(null);
@@ -85,13 +98,14 @@ export default function AdminDeleteRequests() {
     }
     setOpenId(r.id);
     setInv(null);
-    if (!r.user_id) return; // bina login ke bhari gayi request
+    const uid = uidFor(r);
+    if (!uid) return; // is email ka koi account hi nahi
     setInvLoading(true);
     try {
       const res = await fetch("/api/admin/delete-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "inventory", user_id: r.user_id }),
+        body: JSON.stringify({ action: "inventory", user_id: uid }),
       });
       const body = (await res.json()) as Inventory & { error?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -104,6 +118,13 @@ export default function AdminDeleteRequests() {
   }
 
   async function act(r: Req, action: "hide" | "unhide" | "purge" | "reject") {
+    const uid = uidFor(r);
+    const unverified = !r.user_id && !!uid;
+    // ⚠️ Email verified nahi — form me koi bhi kisi ka email likh sakta hai.
+    // Is account par haath lagane se pehle ek alag, saaf pushti.
+    if (unverified && action !== "reject") {
+      if (!confirm(s.unverifiedConfirm.replace("{email}", r.email))) return;
+    }
     if (action === "purge") {
       // ⚠️ Do baar poochte hain, aur doosri baar email likhwate hain. Ye kaam
       // wapas nahi hota — ek galat click par kisi ka poora data chala jaata hai.
@@ -119,10 +140,17 @@ export default function AdminDeleteRequests() {
       const res = await fetch("/api/admin/delete-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, id: r.id, user_id: r.user_id }),
+        body: JSON.stringify({ action, id: r.id, user_id: uid, unverified_ok: unverified }),
       });
-      const body = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      const body = (await res.json()) as { error?: string; failures?: string[] };
+      if (!res.ok) {
+        // ⚠️ Adhoora purge — status nahi badla. Admin ko har fail dikhna chahiye,
+        // "action failed" jaisa khaali shabd nahi.
+        if (body.failures?.length) {
+          throw new Error(`${s.purgePartial}\n• ${body.failures.join("\n• ")}`);
+        }
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
       setInv(null);
       setOpenId(null);
       await load();
@@ -152,7 +180,7 @@ export default function AdminDeleteRequests() {
       {!!error && (
         <div className="flex items-start gap-2 rounded-xl border border-terracotta/30 bg-terracotta/5 p-3 text-sm text-terracotta">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{error}</span>
+          <span className="whitespace-pre-line">{error}</span>
         </div>
       )}
 
@@ -164,7 +192,9 @@ export default function AdminDeleteRequests() {
 
       <div className="space-y-3">
         {rows.map((r) => {
-          const prof = r.user_id ? profiles[r.user_id] : undefined;
+          const uid = uidFor(r);
+          const unverified = !r.user_id && !!uid;
+          const prof = uid ? profiles[uid] : undefined;
           const isHidden = Boolean(prof?.deleted_at);
           const open = openId === r.id;
           return (
@@ -184,9 +214,15 @@ export default function AdminDeleteRequests() {
                   {new Date(r.created_at).toLocaleDateString()}
                 </span>
                 {/* Bina user_id wali request — email se koi account nahi mila. */}
-                {!r.user_id && (
+                {!uid && (
                   <span className="rounded bg-cream-deep px-2 py-1 text-xs text-ink-soft">
                     {s.noAccount}
+                  </span>
+                )}
+                {/* Account email se mila, par request bina login ke aayi thi. */}
+                {unverified && (
+                  <span className="rounded bg-terracotta/15 px-2 py-1 text-xs font-bold text-terracotta">
+                    {s.unverified}
                   </span>
                 )}
               </button>
@@ -222,7 +258,7 @@ export default function AdminDeleteRequests() {
                   )}
 
                   {/* Kya-kya delete hoga */}
-                  {r.status !== "deleted" && r.user_id && (
+                  {r.status !== "deleted" && uid && (
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                         {s.willDelete}
@@ -245,7 +281,12 @@ export default function AdminDeleteRequests() {
                               {s.files}: <b>{inv.files}</b>
                             </span>
                           )}
-                          {inv.items.every((i) => !i.count) && inv.files === 0 && (
+                          {!!inv.filesError && (
+                            <span className="rounded-lg bg-terracotta/10 px-2 py-1 text-xs text-terracotta">
+                              {s.filesError}: {inv.filesError}
+                            </span>
+                          )}
+                          {inv.items.every((i) => !i.count) && inv.files === 0 && !inv.filesError && (
                             <span className="text-sm text-ink-soft">{s.nothingLeft}</span>
                           )}
                         </div>
@@ -253,10 +294,15 @@ export default function AdminDeleteRequests() {
                     </div>
                   )}
 
-                  {!r.user_id && <p className="text-sm text-ink-soft">{s.noAccountHelp}</p>}
+                  {!uid && <p className="text-sm text-ink-soft">{s.noAccountHelp}</p>}
+                  {unverified && (
+                    <p className="rounded-xl border border-terracotta/30 bg-terracotta/5 p-3 text-sm text-terracotta">
+                      {s.unverifiedHelp}
+                    </p>
+                  )}
 
                   {/* Actions */}
-                  {r.user_id && r.status !== "deleted" && (
+                  {uid && r.status !== "deleted" && (
                     <div className="flex flex-wrap items-center gap-2">
                       {isHidden ? (
                         <button

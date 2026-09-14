@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  GRANTS,
   playBillingEnabled,
   playBillingStatus,
   verifyWebhookAuth,
@@ -9,9 +10,12 @@ import {
 import {
   activatePlus,
   deactivatePlus,
+  forgetPlayEvent,
   getPlanUser,
+  latestGrantEventAt,
   planDbConfigured,
   recordPlayEvent,
+  type RevokeResult,
 } from "@/lib/plan-server";
 import { sendPlusPurchaseEmail } from "@/lib/email";
 import { logServerError } from "@/lib/errors-server";
@@ -94,6 +98,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, skipped: ev.type, recorded });
   }
 
+  /**
+   * Sandbox (test) kharidari — record ho chuka, par Plus nahi.
+   *
+   * ⚠️ Pehle SANDBOX event bhi asli Plus de dete the. License tester ya koi bhi
+   * jo test card se "kharid" le, use bina paise ke asli account par Plus mil
+   * jaata — aur uska revoke bhi asli plan ko chhoota. Testing ke liye chahiye
+   * to `ALLOW_SANDBOX_PLUS=1` set karo (sirf staging/preview par).
+   */
+  const sandbox = (ev.environment ?? "").toUpperCase() === "SANDBOX";
+  if (sandbox && process.env.ALLOW_SANDBOX_PLUS !== "1") {
+    return NextResponse.json({ ok: true, skipped: "sandbox", type: ev.type, recorded });
+  }
+
+  let revoke: RevokeResult | "stale" | undefined;
+
   try {
     if (ev.action === "grant") {
       /**
@@ -161,7 +180,22 @@ export async function POST(request: Request) {
         }
       }
     } else {
-      await deactivatePlus(ev.userId);
+      /**
+       * ⚠️ Purana revoke naye grant ke baad pahuncha? To use chhod do.
+       *
+       * Webhook tarteeb se nahi aate (retry, der). Ek purana EXPIRATION agar
+       * abhi-abhi aaye RENEWAL ke baad pahunche, to bina is jaanch ke wo taaza
+       * renew hua Plus mita deta. `event_at` na ho to jaanch nahi ho sakti —
+       * pehle jaisa revoke.
+       */
+      const latest = ev.eventAt
+        ? await latestGrantEventAt(ev.userId, Array.from(GRANTS), { includeSandbox: sandbox })
+        : null;
+      if (latest && ev.eventAt && new Date(latest).getTime() > new Date(ev.eventAt).getTime()) {
+        revoke = "stale";
+      } else {
+        revoke = await deactivatePlus(ev.userId, { refund: ev.type === "REFUND" });
+      }
     }
   } catch (e) {
     void logServerError(e, { where: "play/webhook", type: ev.type, user: ev.userId });
@@ -170,8 +204,13 @@ export async function POST(request: Request) {
     //
     // ⚠️ Retry par record duplicate nahi hoga: `recordPlayEvent` `event_id` par
     // `ignore-duplicates` karta hai (dekho supabase/play-payments.sql).
+    //
+    // ⚠️ Par ISI call ne row banayi thi to use hata do. Warna retry par
+    // `recorded = false` aata, plan to lag jaata par kharidari ka email kabhi
+    // na jaata (poori wajah `forgetPlayEvent` par).
+    if (recorded && ev.eventId) await forgetPlayEvent(ev.eventId);
     return NextResponse.json({ error: "update failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, action: ev.action, recorded });
+  return NextResponse.json({ ok: true, action: ev.action, recorded, revoke });
 }

@@ -366,7 +366,11 @@ export default function NoteEdit() {
         {/* Footer — mic aur reminder, dono keyboard ke UPAR rehte hain. */}
         <View style={{ paddingBottom: kb }}>
         <View style={styles.voiceRow}>
-          <VoiceButton onText={(t) => setBody((prev) => (prev.trim() ? `${prev.trim()} ${t}` : t))} />
+          <VoiceButton
+            // Mic row me sabse baayin — patti daayin taraf badhe (screen ke bahar nahi).
+            pillAlign="left"
+            onText={(t) => setBody((prev) => (prev.trim() ? `${prev.trim()} ${t}` : t))}
+          />
           <Text style={styles.voiceHint} numberOfLines={2}>
             {v.micHint}
           </Text>
@@ -483,7 +487,10 @@ const useStyles = makeStyles((c) => ({
     marginHorizontal: 20,
     marginBottom: 12,
     paddingHorizontal: 16,
-    height: 48,
+    // ⚠️ `height` nahi `minHeight` — bade font / Hindi me label do line ka ho
+    // jaata hai aur tay oonchai use kaat deti thi.
+    minHeight: 48,
+    paddingVertical: 10,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(194,90,55,0.32)",
@@ -497,7 +504,8 @@ const useStyles = makeStyles((c) => ({
     marginHorizontal: 20,
     marginBottom: 12,
     paddingHorizontal: 16,
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 10,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(124,138,107,0.35)",

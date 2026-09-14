@@ -5,6 +5,7 @@ import {
   ScrollView,
   Pressable,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -49,6 +50,14 @@ export default function Upgrade() {
    * par hota hai, kisi ek par nahi.
    */
   const insets = useSafeAreaInsets();
+  /**
+   * ⚠️ Desh wale modal ke card ki hadd. Pehle card par na scroll tha na
+   * `maxHeight` — chhote phone + bade font par heading status bar ke neeche
+   * aur dono button nav bar ke neeche chale jaate the. `device-owner-warning`
+   * wala hi tareeka.
+   */
+  const { height: winHeight } = useWindowDimensions();
+  const mmMaxHeight = Math.max(320, winHeight - insets.top - insets.bottom - 48);
   const { session, rewardsVersion } = useAuth();
   const toast = useToast();
   const offers = useOffers();
@@ -452,15 +461,27 @@ export default function Upgrade() {
 
       {/* IP-country vs profile-country mismatch — kaunse desh ka price? */}
       <Modal statusBarTranslucent transparent visible={showMismatch} animationType="fade" onRequestClose={() => setShowMismatch(false)}>
-        <View style={styles.mmBackdrop}>
-          <View style={styles.mmCard}>
+        <View
+          style={[
+            styles.mmBackdrop,
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+          ]}
+        >
+          <View style={[styles.mmCard, { maxHeight: mmMaxHeight }]}>
             <View style={styles.mmIcon}>
               <Ionicons name="globe-outline" size={26} color={tc.white} />
             </View>
-            <Text style={styles.mmTitle}>{u.mismatchTitle}</Text>
-            <Text style={styles.mmBody}>
-              {tpl(u.mismatchBody, { ip: ipCode ?? "", profile: profileCode ?? "" })}
-            </Text>
+            {/* flexShrink: sirf beech ka text scroll hota hai — button hamesha dikhte hain. */}
+            <ScrollView
+              style={styles.mmScroll}
+              contentContainerStyle={styles.mmScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.mmTitle}>{u.mismatchTitle}</Text>
+              <Text style={styles.mmBody}>
+                {tpl(u.mismatchBody, { ip: ipCode ?? "", profile: profileCode ?? "" })}
+              </Text>
+            </ScrollView>
             <Pressable
               onPress={() => chooseCountry(ipCode ?? "IN")}
               style={({ pressed }) => [styles.mmBtn, pressed && { opacity: 0.9 }]}
@@ -537,7 +558,8 @@ const useStyles = makeStyles((c) => ({
     padding: 22,
   },
   plusName: { fontSize: 18, fontWeight: "700", color: c.white },
-  priceRow: { flexDirection: "row", alignItems: "flex-end", marginTop: 8, gap: 4 },
+  // flexWrap: lamba daam (₹1,199) + "/साल" bade font par card se bahar nikal jaata tha.
+  priceRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", marginTop: 8, gap: 4 },
   price: { fontSize: 38, fontWeight: "800", color: c.white },
   period: { fontSize: 15, color: c.onInkSoft, paddingBottom: 6 },
   gst: { marginTop: 2, fontSize: 12.5, color: c.onInkSoft, fontWeight: "600" },
@@ -557,11 +579,15 @@ const useStyles = makeStyles((c) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    height: 54,
+    // ⚠️ `height` nahi `minHeight` — "₹1,199 me Plus lo" bade font par do line
+    // ka ho jaata hai; tay oonchai use beech se kaat deti thi.
+    minHeight: 54,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 18,
     backgroundColor: c.terracotta,
   },
-  payText: { color: c.white, fontWeight: "800", fontSize: 16 },
+  payText: { color: c.white, fontWeight: "800", fontSize: 16, flexShrink: 1, textAlign: "center" },
   payNote: {
     marginTop: 10,
     textAlign: "center",
@@ -635,8 +661,11 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
-    padding: 26,
+    // Upar/neeche ki padding component me insets se lagti hai.
+    paddingHorizontal: 26,
   },
+  mmScroll: { flexShrink: 1, alignSelf: "stretch" },
+  mmScrollContent: { alignItems: "center" },
   mmCard: {
     width: "100%",
     maxWidth: 360,
@@ -671,21 +700,25 @@ const useStyles = makeStyles((c) => ({
     marginTop: 18,
     alignSelf: "stretch",
     alignItems: "center",
-    height: 50,
+    minHeight: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: 15,
     backgroundColor: c.terracotta,
   },
-  mmBtnText: { color: c.white, fontWeight: "800", fontSize: 15 },
+  mmBtnText: { color: c.white, fontWeight: "800", fontSize: 15, textAlign: "center" },
   mmBtnAlt: {
     marginTop: 10,
     alignSelf: "stretch",
     alignItems: "center",
-    height: 50,
+    minHeight: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: 15,
     borderWidth: 1,
     borderColor: c.line,
   },
-  mmBtnAltText: { color: c.ink, fontWeight: "700", fontSize: 15 },
+  mmBtnAltText: { color: c.ink, fontWeight: "700", fontSize: 15, textAlign: "center" },
 }));

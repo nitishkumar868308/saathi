@@ -1,10 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
+import notifee from "@notifee/react-native";
 import { supabase } from "./supabase";
 import { forgetLocalLock } from "./app-lock";
 import { getDeviceId } from "./device";
 import { resetDeviceState } from "./device-approval";
+import { takeNotificationActions, takePendingAlert } from "./notification-background";
+import { logOutPurchases } from "./purchases";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -232,7 +235,42 @@ export async function signOut() {
     /* best-effort */
   }
 
-  await client().auth.signOut();
+  /**
+   * ⚠️ `signOut()` ka jawab DEKHNA zaroori hai — wo net na hone par throw nahi
+   * karta, sirf `{ error }` lautata hai, aur us soorat me LOCAL session bhi
+   * nahi hatata (supabase-js server se token maarne ki koshish pehle karta hai).
+   * Nateeja: user ne logout dabaya, screen login par gayi, par app khulte hi wo
+   * phir se andar. Isliye fail hone par `scope: "local"` — kam se kam is phone
+   * se to session sach me hat jaye. Server wala refresh token apni umar se mar
+   * jaata hai.
+   */
+  try {
+    const { error } = await client().auth.signOut();
+    if (error) throw error;
+  } catch {
+    await client()
+      .auth.signOut({ scope: "local" })
+      .catch(() => {});
+  }
+
+  /**
+   * ⚠️ Is phone par lage SAARE alarm aur parchi hatao — session ke BAAD.
+   *
+   * Alarm notifee se phone ke andar lagte hain, account se bandhe nahi hote.
+   * Bina iske logout ke baad bhi pichhle user ke reminder bajte rehte the —
+   * agla user (ya bech diya hua phone) unka poora text dekhta, aur unhe rokne
+   * ka koi raasta nahi tha (app me wo reminder hai hi nahi).
+   *
+   * Session ke BAAD isliye ki koi chalu sync `listReminders()` se ab khaali
+   * list hi paaye aur ye alarm dobara na laga de. Kataar wale "Ho gaya" /
+   * background alert bhi pichhle user ke hain — agla user unhe na dekhe.
+   */
+  await notifee.cancelAllNotifications().catch(() => {});
+  await takePendingAlert().catch(() => null);
+  await takeNotificationActions().catch(() => []);
+  // RevenueCat bhi — warna agla user ki kharidari pichhle ke naam jaati.
+  await logOutPurchases();
+
   // Agla user is phone par aaye to use purana haal na dikhe.
   resetDeviceState();
 }

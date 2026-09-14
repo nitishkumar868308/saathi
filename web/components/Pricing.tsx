@@ -217,7 +217,7 @@ export default function Pricing() {
           onClick={() => setShowDownload(false)}
         >
           <div
-            className="w-full max-w-sm rounded-4xl border border-line bg-surface p-7 text-center shadow-warm"
+            className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-4xl border border-line bg-surface p-7 text-center shadow-warm"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-terracotta/10 text-terracotta">

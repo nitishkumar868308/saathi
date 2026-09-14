@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 
 import { documentUrl } from "./storage";
+import { pendingUploadsFor } from "./doc-upload-queue";
 import { belongsToDoc, cacheFileName } from "../utils/doc-file-name";
 import type { Document } from "./documents";
 
@@ -359,6 +360,12 @@ export async function clearFileCache(): Promise<void> {
  *
  * List cache user-wise hai, isliye uska key hatate hain; files ek hi folder me
  * hain isliye poora folder. Dono cheezein server par surakshit hain.
+ *
+ * ⚠️ …SIVAAY un files ke jo abhi cloud tak pahunchi hi nahi. "Phone par rakho"
+ * wale document ki EK MAATR copy isi folder me hoti hai (`file_uri` usi par),
+ * aur uska upload is user ki kataar me pada hota hai. Poora folder udane par
+ * wo document hamesha ke liye gaya — agle login par kataar ki file "nahi mili"
+ * gin ke chhod di jaati. Aisi files rehne dete hain; baaki sab jaisa tha.
  */
 export async function clearDocCache(uid?: string | null): Promise<void> {
   if (uid) {
@@ -368,7 +375,20 @@ export async function clearDocCache(uid?: string | null): Promise<void> {
       /* ignore */
     }
   }
-  await clearFileCache();
+  const pending = uid ? await pendingUploadsFor(uid).catch(() => []) : [];
+  if (pending.length === 0) {
+    await clearFileCache();
+    return;
+  }
+  try {
+    const names = await FileSystem.readDirectoryAsync(DIR);
+    for (const n of names) {
+      const keep = pending.some((p) => belongsToDoc(n, p.docId) || p.uri === DIR + n);
+      if (!keep) await FileSystem.deleteAsync(DIR + n, { idempotent: true }).catch(() => {});
+    }
+  } catch {
+    /* folder hi nahi — hatane ko kuch nahi */
+  }
 }
 
 /** "42 MB" jaisa chhota label. */

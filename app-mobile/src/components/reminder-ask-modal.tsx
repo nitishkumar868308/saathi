@@ -237,7 +237,21 @@ export function ReminderAskModal({
 
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel} statusBarTranslucent>
-      <View style={[styles.backdrop, { paddingBottom: 20 + kbPad }]}>
+      {/**
+       * ⚠️ Backdrop ab ScrollView hai (`otp-modal` wala tareeka). Keyboard ki
+       * padding card ko upar dhakelti thi, par 360x640 phone par card ki heading
+       * status bar ke NEECHE chali jaati thi aur scroll ka koi raasta nahi tha.
+       */}
+      <ScrollView
+        style={styles.backdrop}
+        contentContainerStyle={[
+          styles.backdropInner,
+          { paddingTop: insets.top + 20, paddingBottom: 20 + kbPad },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
           <View style={[styles.card, { paddingBottom: 20 + Math.min(insets.bottom, 20) }]}>
             <View style={styles.head}>
@@ -267,6 +281,9 @@ export function ReminderAskModal({
 
             <ScrollView
               style={{ maxHeight: 260 }}
+              // Bahar wala backdrop bhi ab ScrollView hai — Android par andar
+              // wala iske bina scroll hi nahi karta.
+              nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
@@ -399,7 +416,7 @@ export function ReminderAskModal({
             </View>
           </View>
         </Animated.View>
-      </View>
+      </ScrollView>
     </Modal>
   );
 }
@@ -409,9 +426,13 @@ const useStyles = makeStyles((c) => ({
     flex: 1,
     // Theme-aware parda — light par 45% garam-kaala, dark par 72%.
     backgroundColor: c.scrim,
+  },
+  // `flexGrow: 1` + center — card chhota ho to beech me, bada ho to scroll.
+  backdropInner: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    paddingHorizontal: 20,
   },
   cardWrap: { width: "100%", maxWidth: 400 },
   card: {

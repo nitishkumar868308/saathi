@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable, Modal, Animated, Easing } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  Modal,
+  Animated,
+  Easing,
+  ScrollView,
+  useWindowDimensions,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -43,6 +53,15 @@ export function LockOffer() {
 
   const [show, setShow] = useState(false);
   const [scale] = useState(() => new Animated.Value(0.94));
+
+  /**
+   * ⚠️ Card ki hadd + safe-area. Pehle na scroll tha na `maxHeight`: chhote
+   * phone + bade font par heading status bar ke neeche aur button nav bar ke
+   * neeche chale jaate the. `device-owner-warning` wala hi tareeka.
+   */
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const maxCardHeight = Math.max(320, height - insets.top - insets.bottom - 48);
 
   const check = useCallback(async () => {
     if (!uid) return;
@@ -106,14 +125,22 @@ export function LockOffer() {
 
   return (
     <Modal statusBarTranslucent transparent animationType="fade" visible onRequestClose={() => void no()}>
-      <View style={styles.backdrop}>
+      <View
+        style={[
+          styles.backdrop,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+        ]}
+      >
         <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
-          <View style={styles.card}>
+          <View style={[styles.card, { maxHeight: maxCardHeight }]}>
             <View style={styles.iconWrap}>
               <Ionicons name="lock-closed" size={24} color={tc.terracotta} />
             </View>
-            <Text style={styles.title}>{l.offerTitle}</Text>
-            <Text style={styles.body}>{l.offerBody}</Text>
+            {/* flexShrink: sirf text scroll hota hai — dono button hamesha dikhte hain. */}
+            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.title}>{l.offerTitle}</Text>
+              <Text style={styles.body}>{l.offerBody}</Text>
+            </ScrollView>
 
             <Pressable
               onPress={() => void yes()}
@@ -140,9 +167,11 @@ const useStyles = makeStyles((c) => ({
     backgroundColor: c.scrim,
     alignItems: "center",
     justifyContent: "center",
-    padding: 18,
+    // Upar/neeche ki padding component me insets se lagti hai.
+    paddingHorizontal: 18,
   },
   cardWrap: { width: "100%", maxWidth: 420 },
+  scroll: { flexShrink: 1 },
   card: {
     backgroundColor: c.surface,
     borderRadius: 26,

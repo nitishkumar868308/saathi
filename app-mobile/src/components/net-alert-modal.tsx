@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, Modal, Animated, Easing } from "react-native";
+import { View, Text, Pressable, Modal, Animated, Easing, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -95,19 +95,31 @@ export function NetAlertModal() {
         {/* Peeche naram teal glow — khaali screen thandi/khaali na lage. */}
         <View style={styles.glow} pointerEvents="none" />
 
-        <Animated.View
-          style={[styles.body, { opacity: fade, transform: [{ translateY: rise }] }]}
+        {/**
+         * ⚠️ Beech ka hissa scroll me. Chhote phone + bade font par icon, heading
+         * aur do paragraph milke screen se lambe ho jaate the aur upar-neeche se
+         * kat jaate the. Button is scroll ke BAHAR hain — hamesha pahunch me.
+         */}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollInner}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          <View style={styles.iconOuter}>
-            <View style={styles.iconWrap}>
-              <Ionicons name="cloud-offline" size={44} color={tc.terracotta} />
+          <Animated.View
+            style={[styles.body, { opacity: fade, transform: [{ translateY: rise }] }]}
+          >
+            <View style={styles.iconOuter}>
+              <View style={styles.iconWrap}>
+                <Ionicons name="cloud-offline" size={44} color={tc.terracotta} />
+              </View>
             </View>
-          </View>
 
-          <Text style={styles.title}>{n.failTitle}</Text>
-          <Text style={styles.line}>{line}</Text>
-          <Text style={styles.hint}>{n.failHint}</Text>
-        </Animated.View>
+            <Text style={styles.title}>{n.failTitle}</Text>
+            <Text style={styles.line}>{line}</Text>
+            <Text style={styles.hint}>{n.failHint}</Text>
+          </Animated.View>
+        </ScrollView>
 
         {/* Buttons neeche — angootha yahin pahunchta hai. */}
         <Animated.View style={[styles.actions, { opacity: fade }]}>
@@ -148,7 +160,10 @@ const useStyles = makeStyles((c) => ({
     borderRadius: 150,
     backgroundColor: "rgba(18,81,86,0.06)",
   },
-  body: { flex: 1, alignItems: "center", justifyContent: "center" },
+  scroll: { flex: 1 },
+  // `flexGrow: 1` + center — content chhota ho to beech me (pehle jaisa), lamba ho to scroll.
+  scrollInner: { flexGrow: 1, justifyContent: "center", paddingVertical: 20 },
+  body: { alignItems: "center" },
   iconOuter: {
     height: 132,
     width: 132,

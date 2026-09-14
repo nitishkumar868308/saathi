@@ -43,16 +43,41 @@ function prune(map: Map<string, Bucket>, now: number, windowMs: number): void {
 }
 
 /**
+ * Client ka IP — sirf un headers se jinhe client khud nahi likh sakta.
+ *
+ * ⚠️ Pehle `x-forwarded-for` ka PEHLA hissa liya jaata tha. Wo hissa client ka
+ * apna likha hua ho sakta hai: `X-Forwarded-For: 1.2.3.<har baar naya>` bhejo
+ * aur har request ek nayi "jagah" ban jaati — yaani poori rok (admin login ki
+ * brute-force wali bhi) ek header se khatam.
+ *
+ * Tarteeb:
+ *   1. `x-vercel-forwarded-for` — Vercel ka apna, edge par bharta hai.
+ *   2. `x-real-ip` — Vercel isme bhi asli client IP rakhta hai.
+ *   3. `x-forwarded-for` ka AAKHRI hissa — sabse paas wale proxy ne jo dekha.
+ *
+ * ⚠️ Ye Vercel par hone ki shart par tika hai. Beech me koi aur proxy (jaise
+ * Cloudflare proxied DNS) ho to 1-2 us proxy ka IP de sakte hain.
+ */
+export function clientIpFrom(request: Request): string | null {
+  const vercel = request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  if (vercel) return vercel;
+  const real = request.headers.get("x-real-ip")?.trim();
+  if (real) return real;
+  const hops = (request.headers.get("x-forwarded-for") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return hops.length > 0 ? hops[hops.length - 1] : null;
+}
+
+/**
  * Request kis "jagah" se aayi.
  *
- * Vercel `x-forwarded-for` bharta hai; sabse pehla hissa asli client hota hai.
  * Kuch na mile to ek hi bucket ("unknown") — us soorat me rok sabke liye ek
  * saath lagti hai, jo bina pehchaan wale traffic ke liye theek hi hai.
  */
 export function requestKey(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for") ?? "";
-  const first = fwd.split(",")[0]?.trim();
-  return first || request.headers.get("x-real-ip") || "unknown";
+  return clientIpFrom(request) || "unknown";
 }
 
 export type RateVerdict = { allowed: true } | { allowed: false; retryAfter: number };
