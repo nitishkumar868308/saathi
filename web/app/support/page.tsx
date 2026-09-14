@@ -8,7 +8,8 @@ import SubHeader from "@/components/SubHeader";
 import Footer from "@/components/Footer";
 import BackHomeLink from "@/components/BackHomeLink";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+// Aakhri slash hatao — env me `https://apkasaathi.com/` hai (wajah seo-server.ts me).
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com").replace(/\/+$/, "");
 const SUPPORT_EMAIL = "info@apkasaathi.com";
 
 export function generateMetadata(): Promise<Metadata> {

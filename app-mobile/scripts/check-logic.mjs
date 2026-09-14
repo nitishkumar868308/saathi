@@ -34,43 +34,67 @@ function eq(what, got, want) {
   else fails.push(`${what}\n     mila : ${JSON.stringify(got)}\n     chahiye: ${JSON.stringify(want)}`);
 }
 
-/* ══════════════════ 1. Reminder ke chaar khaane ══════════════════ */
+/* ══════════════════ 1. Reminder ke teen khaane ══════════════════ */
 
-const { bucketOf } = await load("src/utils/reminder-bucket.ts");
+const { bucketOf, effectiveAt, msUntilNextChange } = await load("src/utils/reminder-bucket.ts");
 
-// "Aaj" 14 Aug 2026, dopahar — bilkul wahi din jis din user ne screenshot bheja.
+// "Abhi" 14 Aug 2026, dopahar 1:00 baje.
 const NOW = new Date(2026, 7, 14, 13, 0, 0);
-const at = (y, m, d, h = 9) => new Date(y, m - 1, d, h).toISOString();
-const R = (iso, is_on = true, is_paused = false) => ({ remind_at: iso, is_on, is_paused });
+const at = (y, m, d, h = 9, min = 0) => new Date(y, m - 1, d, h, min).toISOString();
+const R = (iso, is_on = true, is_paused = false, every = null, until = null) => ({
+  remind_at: iso,
+  is_on,
+  is_paused,
+  repeat_every_days: every,
+  repeat_until: until,
+});
 
-// ── User ki asli shikayat: 11/12 Aug ke NIPTE hue reminder "Aane wale" me the.
+// ── User ki asli shikayat: waqt nikal gaya to "Ho chuke" — "Chhoot gaye" hai hi nahi.
 eq("11 Aug ka band reminder -> past", bucketOf(R(at(2026, 8, 11, 19), false), NOW), "past");
-eq("12 Aug ka band reminder -> past", bucketOf(R(at(2026, 8, 12, 8), false), NOW), "past");
+eq("5 Aug ka CHALU ek-baar wala -> past", bucketOf(R(at(2026, 8, 5)), NOW), "past");
 
-// ── Chalu par beeta hua = chhoot gaya (ye pehle se theek tha, toota na ho).
-eq("5 Aug ka CHALU reminder -> missed", bucketOf(R(at(2026, 8, 5)), NOW), "missed");
-
-// ── Aaj ka reminder hamesha "aaj" — chahe band ho.
-eq("aaj ka chalu -> today", bucketOf(R(at(2026, 8, 14, 9)), NOW), "today");
-eq("aaj ka BAND bhi -> today", bucketOf(R(at(2026, 8, 14, 9), false), NOW), "today");
-eq("aaj ka subah 00:30 -> today", bucketOf(R(at(2026, 8, 14, 0)), NOW), "today");
-eq("aaj ka raat 23:30 -> today", bucketOf(R(at(2026, 8, 14, 23)), NOW), "today");
+// ── "Aaj" sirf tab tak jab tak waqt aana baaki hai (1:43 wali shikayat).
+eq("aaj subah 9 (nikal gaya) -> past", bucketOf(R(at(2026, 8, 14, 9)), NOW), "past");
+eq("aaj 12:59 (ek minute pehle) -> past", bucketOf(R(at(2026, 8, 14, 12, 59)), NOW), "past");
+eq("aaj 13:01 (ek minute baad) -> today", bucketOf(R(at(2026, 8, 14, 13, 1)), NOW), "today");
+eq("aaj raat 23:30 -> today", bucketOf(R(at(2026, 8, 14, 23, 30)), NOW), "today");
+eq("aaj baad me, par BAND -> today", bucketOf(R(at(2026, 8, 14, 18), false), NOW), "today");
+eq("theek abhi ka waqt -> past", bucketOf(R(NOW.toISOString()), NOW), "past");
 
 // ── Aage ka.
 eq("kal ka -> upcoming", bucketOf(R(at(2026, 8, 15)), NOW), "upcoming");
 eq("kal ka BAND -> upcoming", bucketOf(R(at(2026, 8, 15), false), NOW), "upcoming");
 
-// ── Paused (Plus khatam) — beeta hua ho to "past", aage ka ho to "upcoming".
+// ── Paused (Plus khatam).
 eq("paused + beeta -> past", bucketOf(R(at(2026, 8, 10), true, true), NOW), "past");
 eq("paused + aage -> upcoming", bucketOf(R(at(2026, 8, 20), true, true), NOW), "upcoming");
 
 // ── Bina waqt wala reminder kabhi "beeta hua" nahi hota.
 eq("remind_at null -> upcoming", bucketOf(R(null), NOW), "upcoming");
-eq("remind_at null + band -> upcoming", bucketOf(R(null, false), NOW), "upcoming");
 eq("kharaab date -> upcoming", bucketOf(R("kuch-bhi-nahi"), NOW), "upcoming");
 
+// ── Roz wala: server ne remind_at nahi sarkaya, phir bhi "Ho chuke" nahi.
+eq("roz, kal raat 8 wala -> aaj raat 8 (today)", bucketOf(R(at(2026, 8, 13, 20), true, false, 1), NOW), "today");
+eq("roz, aaj subah 9 wala -> kal (upcoming)", bucketOf(R(at(2026, 8, 14, 9), true, false, 1), NOW), "upcoming");
+eq(
+  "roz, agla waqt kal subah 9",
+  effectiveAt(R(at(2026, 8, 14, 9), true, false, 1), NOW)?.toISOString(),
+  at(2026, 8, 15, 9),
+);
+eq("har hafte, 1 Aug wala -> 15 Aug (upcoming)", bucketOf(R(at(2026, 8, 1), true, false, 7), NOW), "upcoming");
+eq("roz, 13 Aug tak — series khatam -> past", bucketOf(R(at(2026, 8, 10, 9), true, false, 1, "2026-08-13"), NOW), "past");
+eq("roz, aaj tak — aaj raat 8 baaki -> today", bucketOf(R(at(2026, 8, 10, 20), true, false, 1, "2026-08-14"), NOW), "today");
+eq("roz par BAND -> past", bucketOf(R(at(2026, 8, 13, 20), false, false, 1), NOW), "past");
+
+// ── Screen kab jaage: aaj 1:43 wala hai to theek 43 minute baad.
+eq(
+  "agla badlaav 1:43 par",
+  msUntilNextChange([R(at(2026, 8, 14, 13, 43)), R(at(2026, 8, 20))], NOW),
+  43 * 60 * 1000,
+);
+
 /**
- * ⚠️ Sabse zaroori jaanch: chaar khaane poori list ko BAANTTE hain.
+ * ⚠️ Sabse zaroori jaanch: teen khaane poori list ko BAANTTE hain.
  *
  * Har reminder theek EK khaane me jaana chahiye. Yahi wo cheez hai jo pehle do
  * baar tooti — aur uska nateeja hamesha ek hi tha: reminder kisi khaane me
@@ -79,15 +103,19 @@ eq("kharaab date -> upcoming", bucketOf(R("kuch-bhi-nahi"), NOW), "upcoming");
 {
   const all = [];
   for (const day of [1, 5, 10, 13, 14, 15, 20, 40]) {
-    for (const on of [true, false]) {
-      for (const paused of [true, false]) {
-        all.push(R(at(2026, 8, day), on, paused));
+    for (const hour of [9, 20]) {
+      for (const on of [true, false]) {
+        for (const paused of [true, false]) {
+          for (const every of [null, 1, 7]) {
+            all.push(R(at(2026, 8, day, hour), on, paused, every));
+          }
+        }
       }
     }
   }
   all.push(R(null), R(null, false), R("bakwaas"));
 
-  const buckets = ["missed", "today", "upcoming", "past"];
+  const buckets = ["today", "upcoming", "past"];
   const counted = buckets.map((b) => all.filter((r) => bucketOf(r, NOW) === b).length);
   eq("har reminder theek ek khaane me", counted.reduce((a, b) => a + b, 0), all.length);
   eq("koi khaana khaali nahi chhoota", counted.every((n) => n > 0), true);

@@ -115,9 +115,19 @@ const jsonLd = {
        * khaali jagah sabse zyada chubhti hai.
        */
       legalName: "RAHVIAN TECHNOLOGIES PRIVATE LIMITED",
+      /**
+       * ⚠️ Log naam kai tarah likhte hain — "Aapka Saathi", "ApkaSaathi". Google
+       * ko ye saaf batana ki ye sab EK hi brand hai, taaki "apka saathi" search
+       * par milte-julte naam (matrimony, APK sites) ki jagah ye site pehchaani jaye.
+       */
+      alternateName: ["Aapka Saathi", "ApkaSaathi", "Apka Saathi App"],
       url: SITE_URL,
-      downloadUrl:
-        "https://play.google.com/store/apps/details?id=com.apkasaathi.app",
+      /**
+       * Brand ki doosri asli jagah — Play Store listing. Google `sameAs` se
+       * website aur app ko ek hi company maanta hai. Instagram/LinkedIn/X profile
+       * bane to wo bhi yahin jodo (sirf asli, apne profiles).
+       */
+      sameAs: ["https://play.google.com/store/apps/details?id=com.apkasaathi.app"],
       logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png` },
       email: "info@apkasaathi.com",
       description:
@@ -129,6 +139,8 @@ const jsonLd = {
       "@id": `${SITE_URL}/#website`,
       url: SITE_URL,
       name: SITE_NAME,
+      // Google search result me site ka naam isi se aata hai (site name).
+      alternateName: ["Aapka Saathi", "ApkaSaathi"],
       publisher: { "@id": `${SITE_URL}/#organization` },
       inLanguage: ["en-IN", "hi-IN"],
     },
@@ -139,6 +151,8 @@ const jsonLd = {
       applicationCategory: "ProductivityApplication",
       operatingSystem: "Android",
       url: SITE_URL,
+      // `downloadUrl` app ka hai, company ka nahi — pehle Organization me laga tha.
+      downloadUrl: "https://play.google.com/store/apps/details?id=com.apkasaathi.app",
       publisher: { "@id": `${SITE_URL}/#organization` },
       description:
         "Reminder app that tracks document expiry dates — passport, Aadhaar, insurance, FASTag — and reminds you about medicines, bills and daily tasks.",

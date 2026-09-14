@@ -212,13 +212,23 @@ export default function AdminBlog() {
                   <p className="truncate font-semibold text-ink">{p.title}</p>
                   <p className="truncate font-mono text-xs text-ink-soft">/blog/{p.slug}</p>
                 </button>
-                <span className="shrink-0 text-xs text-ink-soft">{p.published_at}</span>
+                <span className="hidden shrink-0 text-xs text-ink-soft sm:inline">
+                  {p.published_at}
+                </span>
+                {/*
+                  ⚠️ Pehle yahan sirf ek chhota sa 🗑️ icon tha, bina kisi label ke —
+                  aur dabate hi post BINA POOCHHE hat jaati thi. Admin ko dikhta hi
+                  nahi tha ki delete ka raasta hai, aur galti se lag jaata to post
+                  (aur uska Google wala link) turant gaya. Ab saaf likha button, aur
+                  pehle ek pushti — baaki admin screens (team, renewals) jaisa.
+                */}
                 <button
-                  onClick={() => remove(p.slug)}
-                  aria-label={t.common.delete}
-                  className="shrink-0 text-ink-soft transition hover:text-terracotta-dark"
+                  onClick={() => {
+                    if (confirm(b.deleteConfirm.replace("{title}", p.title))) void remove(p.slug);
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-terracotta/30 px-3 py-1.5 text-xs font-semibold text-terracotta-dark transition hover:bg-terracotta/10"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={14} /> {t.common.delete}
                 </button>
               </li>
             ))}

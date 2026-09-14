@@ -20,8 +20,18 @@ import type { Metadata } from "next";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+/**
+ * ⚠️ Aakhri `/` hamesha hatao.
+ *
+ * Vercel par env `https://apkasaathi.com/` (slash ke saath) set hai, aur har jagah
+ * `${SITE_URL}/about` likha hai — nateeja `https://apkasaathi.com//about`. Live
+ * site par yahi tha: har page ka og:url, JSON-LD ka logo/@id, aur robots.txt ka
+ * sitemap link — sab double slash wale, jo 308 redirect dete hain. Google ko
+ * brand (Organization) aur sitemap dono ek toote pate par milte the.
+ */
+export const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com"
+).replace(/\/+$/, "");
 export const SITE_NAME = "Apka Saathi";
 
 /** DB row na mile to yahi chalta hai. */
@@ -107,7 +117,18 @@ export async function pageMetadata(
   };
 
   return {
-    title: titleTemplate ? { default: title, template: titleTemplate } : title,
+    /**
+     * ⚠️ Admin ke title me brand pehle se ho to template dobara na jode.
+     *
+     * Live par "About Apka Saathi – Smart Document Reminder App · Apka Saathi" ban
+     * raha tha — brand do baar. Google lambe/doharaye title ko khud kaat ke apna
+     * bana leta hai, aur wo aksar brand wala hissa hi girata hai.
+     */
+    title: titleTemplate
+      ? { default: title, template: titleTemplate }
+      : title.includes(SITE_NAME)
+        ? { absolute: title }
+        : title,
     description,
     ...(keywords ? { keywords } : {}),
     // Canonical har page ka apna — bina iske ?ref= aur trailing-slash wali

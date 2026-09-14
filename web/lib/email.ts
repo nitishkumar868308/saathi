@@ -37,7 +37,8 @@ export const FROM_EMAIL = SMTP_USER ?? GMAIL_USER ?? "info@apkasaathi.com";
 const CONTACT_TO = process.env.CONTACT_TO ?? FROM_EMAIL;
 /** App/web ke errors yahan aate hain. */
 export const ERROR_ALERT_TO = process.env.ERROR_ALERT_TO ?? "saathi8683@gmail.com";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+// Aakhri slash hatao — env me `https://apkasaathi.com/` hai (wajah seo-server.ts me).
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com").replace(/\/+$/, "");
 
 /**
  * Logo ko email ke saath hi bhejo (CID inline attachment) — remote URL slow

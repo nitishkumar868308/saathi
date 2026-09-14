@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://apkasaathi.com";
+import { SITE_URL } from "@/lib/seo-server";
 
 /**
  * robots.txt — `/robots.txt` par Next isse khud serve karta hai.
@@ -29,7 +29,9 @@ export default function robots(): MetadataRoute.Robots {
       // AI crawlers ko bhi allow — brand ka zikr in jawaabon me aana faayda hi hai.
       { userAgent: ["GPTBot", "PerplexityBot"], allow: "/" },
     ],
+    // ⚠️ Pehle yahan `https://apkasaathi.com//sitemap.xml` ban raha tha (env me
+    // aakhri slash). `SITE_URL` ab seo-server se aata hai jo slash hata deta hai.
+    // `host` hataya — Google use padhta hi nahi, aur wahan bhi slash galat tha.
     sitemap: `${SITE_URL}/sitemap.xml`,
-    host: SITE_URL,
   };
 }

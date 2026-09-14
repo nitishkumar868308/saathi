@@ -33,7 +33,8 @@ import {
 } from "@/lib/reminder-outbox";
 import { scheduleReminderSeries, cancelReminder } from "@/lib/notifications";
 import { repeatLine } from "@/lib/repeat-label";
-import { bucketOf } from "@/utils/reminder-bucket";
+import { bucketOf, effectiveAt } from "@/utils/reminder-bucket";
+import { useReminderClock } from "@/lib/use-reminder-clock";
 import { formatWhen } from "@/utils/parse-time";
 import { Pagination, usePaged, PAGE_SIZE } from "@/components/pagination";
 import { UpgradeBanner } from "@/components/upgrade-banner";
@@ -210,36 +211,50 @@ export default function Reminders() {
   // Home tab pehle se hi `remind_at` se hisaab lagata hai (`isToday`). Ab dono
   // screen ek hi sach dikhate hain.
   /**
-   * CHAAR khaane — aur chaaron alag-alag zaroori hain.
+   * TEEN khaane — hisaab `utils/reminder-bucket.ts` me.
    *
-   *   • **Chhoot gaye** — waqt nikal gaya, reminder abhi bhi chalu. Inpar kuch
-   *     karna baaki hai, isliye sabse upar.
-   *   • **Aaj** — aaj hi bajega.
-   *   • **Aane wale** — aage ka. ⚠️ Ab ismein SIRF aage ka hi hai: `isDonePast`
-   *     wali shart lagne se pehle nipta hua/band reminder bhi yahin gir jaata
-   *     tha (poori wajah `isDonePast` ke upar likhi hai).
-   *   • **Ho chuke** — waqt bhi gaya aur switch bhi band. Ye chhupte nahi (user
-   *     dobara chalu kar sakta hai) par "aane wale" ka jhooth bhi nahi bolte.
+   *   • **Aaj** — aaj ka, aur waqt ABHI aana baaki hai.
+   *   • **Aane wale** — aaj ke baad ka.
+   *   • **Ho chuke** — waqt nikal chuka (chahe switch chalu ho ya band). Ye
+   *     chhupte nahi — user dobara chalu kar sakta hai.
    *
-   * ⚠️ Chaaron shart mil ke poori list ko baant deti hain — koi reminder do
-   * khaane me nahi ja sakta, aur koi bahar bhi nahi reh sakta. Ye ganit hi is
-   * screen ka bharosa hai: ek reminder ka "kahin dikhna hi band ho jaana" is
-   * app ka sabse mehnga bug hai.
+   * ⚠️ "Chhoot gaye" ab nahi hai (user ki shikayat, wajah bucket file me). Roz
+   * wala reminder "Ho chuke" me tabhi jaata hai jab series khatam ho.
+   *
+   * ⚠️ Teeno shart mil ke poori list ko baant deti hain — koi reminder do
+   * khaane me nahi ja sakta, aur koi bahar bhi nahi reh sakta. Ek reminder ka
+   * "kahin dikhna hi band ho jaana" is app ka sabse mehnga bug hai.
    */
-  const missed = items.filter((r) => bucketOf(r) === "missed");
-  const today = items.filter((r) => bucketOf(r) === "today");
-  const upcoming = items.filter((r) => bucketOf(r) === "upcoming");
-  const donePast = items.filter((r) => bucketOf(r) === "past");
+  // Screen khuli rahe tab bhi waqt nikalte hi reminder apne khaane me chala jaaye
+  // (poori wajah `use-reminder-clock.ts` par).
+  const now = useReminderClock(items);
+  const atMs = (r: Reminder) => effectiveAt(r, now)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  const today = items
+    .filter((r) => bucketOf(r, now) === "today")
+    .sort((a, b) => atMs(a) - atMs(b));
+  const upcoming = items
+    .filter((r) => bucketOf(r, now) === "upcoming")
+    .sort((a, b) => atMs(a) - atMs(b));
+  // Ho chuke — sabse naya sabse upar (abhi-abhi nikla wahi dhoondha jaata hai).
+  const donePast = items
+    .filter((r) => bucketOf(r, now) === "past")
+    .sort((a, b) => atMs(b) - atMs(a));
 
   // 7 se zyada hote hi pagination — har list me (item 21).
-  const mp = usePaged(missed, PAGE_SIZE);
   const tp = usePaged(today, PAGE_SIZE);
   const up = usePaged(upcoming, PAGE_SIZE);
   const dp = usePaged(donePast, PAGE_SIZE);
 
-  // Card pe time hamesha current bhasha me — stored label ki jagah remind_at se.
-  const timeOf = (r: Reminder): string | null =>
-    r.remind_at ? formatWhen(new Date(r.remind_at), words, locale) : r.time_label ?? null;
+  /**
+   * Card pe time hamesha current bhasha me — stored label ki jagah waqt se.
+   *
+   * ⚠️ `effectiveAt`, `remind_at` nahi: roz wale reminder ka `remind_at` purana
+   * reh sakta hai, aur card par "kal 8 pm" dikhta jabki wo aaj raat bajega.
+   */
+  const timeOf = (r: Reminder): string | null => {
+    const when = effectiveAt(r, now);
+    return when ? formatWhen(when, words, locale) : r.time_label ?? null;
+  };
 
   // "Roz · 90 din tak" — card aur detail sheet dono ek hi line dikhate hain.
   const repeatOf = (r: Reminder): string | null =>
@@ -278,15 +293,9 @@ export default function Reminders() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Chhoot gaye — sabse upar, kyunki yahi wo hain jinpe kuch karna
-              baaki hai. Khaali ho to `Section` khud kuch nahi dikhata. */}
-          {missed.length > 0 && (
-            <>
-              <Section title={r0.missed} items={mp.pageItems} {...rowProps} />
-              <Text style={styles.missedHint}>{r0.missedHint}</Text>
-              <Pagination page={mp.page} pageCount={mp.pageCount} onPage={mp.setPage} />
-            </>
-          )}
+          {/* ⚠️ "Chhoot gaye" khaana jaan-boojh ke HATA diya — jiska waqt nikal
+              gaya wo seedha neeche "Ho chuke" me jaata hai (wajah
+              `utils/reminder-bucket.ts` ke sar par). */}
           <Section title={r0.today} items={tp.pageItems} {...rowProps} />
           <Pagination page={tp.page} pageCount={tp.pageCount} onPage={tp.setPage} />
           <Section title={r0.upcoming} items={up.pageItems} {...rowProps} />

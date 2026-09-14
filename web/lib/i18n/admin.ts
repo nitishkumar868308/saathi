@@ -908,6 +908,8 @@ export type AdminDict = {
       sectionBody: string;
       addSection: string;
       publish: string;
+      /** {title} — delete se pehle pushti. */
+      deleteConfirm: string;
     };
     analytics: {
       events: string;
@@ -1617,6 +1619,8 @@ const en: AdminDict = {
       sectionBody: "Paragraphs — leave a blank line to start a new one",
       addSection: "Add section",
       publish: "Publish on the website",
+      deleteConfirm:
+        "Delete \"{title}\"? It will be removed from the website and sitemap right away. This cannot be undone.",
     },
     analytics: {
       events: "Events", sessions: "Sessions", peakUsers: "Peak daily users",
@@ -2306,6 +2310,8 @@ const hi: AdminDict = {
       sectionBody: "पैराग्राफ़ — खाली लाइन से नया पैराग्राफ़ बनता है",
       addSection: "सेक्शन जोड़ें",
       publish: "वेबसाइट पर पब्लिश करें",
+      deleteConfirm:
+        "\"{title}\" डिलीट करें? यह वेबसाइट और sitemap से तुरंत हट जाएगी। इसे वापस नहीं लाया जा सकता।",
     },
     analytics: {
       events: "इवेंट", sessions: "सेशन",
@@ -2995,6 +3001,8 @@ const hinglish: AdminDict = {
       sectionBody: "Paragraphs — khaali line se naya paragraph banta hai",
       addSection: "Section jodo",
       publish: "Website par publish karo",
+      deleteConfirm:
+        "\"{title}\" delete karein? Ye website aur sitemap se turant hat jayegi. Wapas nahi aayegi.",
     },
     analytics: {
       events: "Events", sessions: "Sessions", peakUsers: "Sabse zyada rozana users",

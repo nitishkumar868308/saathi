@@ -40,23 +40,15 @@ import { useOffers } from "@/lib/use-offers";
 import { emitDataChanged, useDataChanged } from "@/lib/data-events";
 import { usePlan } from "@/lib/use-plan";
 import { dailyBrief, dayPart, localIso } from "@/lib/ai";
+import { bucketOf, effectiveAt } from "@/utils/reminder-bucket";
+import { useReminderClock } from "@/lib/use-reminder-clock";
+import { formatWhen } from "@/utils/parse-time";
 import { Reveal3D, Press3D } from "@/components/reveal-3d";
 import { deviceOwner, getDeviceId } from "@/lib/device";
 import { markFirstDocument, markFirstReminder } from "@/lib/reviews";
 
 /** Referral modal "dekh liya" — ab `<key>:<uid>`; akela key purana global nishaan hai. */
 const REF_SEEN_KEY = "referral_prompt_seen";
-
-function isToday(iso: string | null): boolean {
-  if (!iso) return false;
-  const d = new Date(iso);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
 
 export default function Home() {
   const tc = useColors();
@@ -71,7 +63,25 @@ export default function Home() {
   const { locale } = useLocale();
   const offers = useOffers();
   const [docs, setDocs] = useState<Document[]>([]);
+  /** Saare CHALU reminders — "aaj" wala chhaantna neeche `todayNow` karta hai. */
   const [today, setToday] = useState<Reminder[]>([]);
+  /**
+   * "Aaj ke reminders" card — sirf wo jinka waqt ABHI aana baaki hai.
+   *
+   * ⚠️ Pehle yahan aaj ki TAARIKH wale saare reminder dikhte the — dopahar 1:43
+   * wala reminder raat tak card me pada rehta tha. Ab Reminders tab jaisa hi
+   * hisaab (`bucketOf`), aur `useReminderClock` card ko khule-khule hi taaza
+   * rakhta hai: waqt nikalte hi reminder card se hat jaata hai.
+   */
+  const now = useReminderClock(today);
+  const todayNow = today
+    .filter((r) => bucketOf(r, now) === "today")
+    .sort((a, b) => (effectiveAt(a, now)?.getTime() ?? 0) - (effectiveAt(b, now)?.getTime() ?? 0));
+  // Roz wale reminder ka `time_label` purana ho sakta hai — waqt asli occurrence se.
+  const todayWhen = (r: Reminder): string | null => {
+    const when = effectiveAt(r, now);
+    return when ? formatWhen(when, { today: cm.today, tomorrow: cm.tomorrow }, locale) : r.time_label;
+  };
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refModal, setRefModal] = useState(false);
@@ -291,7 +301,9 @@ export default function Home() {
           Promise.all([listDocuments(), listRemindersWithPending()]),
         );
         setDocs(d);
-        setToday(r.filter((x) => x.is_on && !x.is_paused && isToday(x.remind_at)));
+        // Taarikh se yahan mat chhaanto — roz wale reminder ka `remind_at` kal ka
+        // ho sakta hai jabki wo aaj bajega. Chhaantna render par (`todayNow`).
+        setToday(r.filter((x) => x.is_on && !x.is_paused));
         /**
          * Padav ko ASLI data se mila lo.
          *
@@ -513,19 +525,19 @@ export default function Home() {
         </Reveal3D>
 
         {/* Aaj ke reminders — kaam + kitne time ke liye set + "kiya?" */}
-        {!loading && today.length > 0 && (
+        {!loading && todayNow.length > 0 && (
           <Reveal3D index={1} style={styles.todayCard}>
             <View style={styles.todayHead}>
               <Ionicons name="alarm" size={16} color={tc.terracotta} />
               <Text style={styles.todayTitle}>{h.todayTitle}</Text>
             </View>
-            {today.map((r) => (
+            {todayNow.map((r) => (
               <View key={r.id} style={styles.todayRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.todayTask} numberOfLines={1}>
                     {r.title}
                   </Text>
-                  {!!r.time_label && <Text style={styles.todayTime}>🕒 {r.time_label}</Text>}
+                  {!!todayWhen(r) && <Text style={styles.todayTime}>🕒 {todayWhen(r)}</Text>}
                 </View>
                 <Pressable
                   onPress={() => markDone(r)}

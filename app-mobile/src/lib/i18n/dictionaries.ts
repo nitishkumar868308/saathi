@@ -1143,13 +1143,11 @@ export type Dict = {
     exportData: string;
     deleteAll: string;
     /**
-     * Template — `{v}` me app ka ASLI version bharta hai (expo-application se).
+     * You tab ke sabse neeche wali line — "Apka Saathi · Made in India".
      *
-     * ⚠️ Pehle yahan "v0.1.0" seedha likha hua tha, jabki app kab ki 1.0.0 ho
-     * chuki thi. Settings me har user ko galat version dikhta tha — aur support
-     * me "aapke paas kaunsa version hai?" poochhne ka koi matlab hi nahi bachta
-     * tha. Hardcode karne par har release me ye dobara purana ho jaata; ab wo
-     * `app.json` se khud aata hai.
+     * ⚠️ Isme version number jaan-boojh ke NAHI hai (user ne kaha "v1.0.0 nahi
+     * hona chahiye"). Support ko version chahiye to wo error logs me pehle se
+     * jaata hai (`report-error.ts`), user ko dikhana zaroori nahi.
      */
     help: string;
     about: string;
